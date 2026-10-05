@@ -1088,6 +1088,14 @@
   font-size: 12px;
   flex: 0 0 auto;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.act-svg {
+  display: inline-block;
+  vertical-align: -1px;
+  flex: 0 0 auto;
 }
 
 .act-title {

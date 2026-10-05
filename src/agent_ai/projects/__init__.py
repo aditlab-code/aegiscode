@@ -2,8 +2,8 @@
 
 Metadata project (`project.json`) disimpan di bawah workspace Agent-Ai
 (mis. J:\\Agent_Ai\\projects\\<id>\\). Knowledge project (AI Project Bible)
-disimpan project-local di `<root project target>/.aether/bible/`, dan log task
-di `<root project target>/.aether/log/<task_id>.log`.
+disimpan project-local di `<root project target>/.aegis/bible/`, dan log task
+di `<root project target>/.aegis/log/<task_id>.log`.
 
     from agent_ai.projects import ProjectRegistry
 
@@ -14,8 +14,6 @@ legacy). Belum ada database, RAG/vector DB, embeddings, atau autonomous learning
 from agent_ai.projects.aegis_store import (
     AEGIS_DIR_NAME,
     AegisProjectStore,
-    AetherProjectStore,
-    AetherTaskLog,
     BIBLE_SKILLS_DIR_NAME,
     BibleStore,
     SKILL_FILE_NAME,
@@ -224,8 +222,6 @@ __all__ = [
     "CATEGORY_ALIASES",
     "AEGIS_DIR_NAME",
     "AegisProjectStore",
-    "AetherProjectStore",
-    "AetherTaskLog",
     "BibleStore",
     "TaskLog",
     "new_task_id",

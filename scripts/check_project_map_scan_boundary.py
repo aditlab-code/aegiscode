@@ -1,7 +1,7 @@
 """Verifikasi scan boundary Project Map (Atlas + RIG).
 
 Membuat fixture project di `dummy_test/project_map_scan_fixture` (workspace
-testing terisolasi, BUKAN source AETHER) dengan struktur yang memuat source
+testing terisolasi, BUKAN source Aegis) dengan struktur yang memuat source
 project ASLI dan directory environment/dependency/build/metadata, lalu
 memverifikasi bahwa:
 
@@ -10,11 +10,11 @@ memverifikasi bahwa:
     3. Source project valid TETAP terpetakan (src/, tests/, vendor/, lib/).
     4. Directory ambigu (app, core, common, modules, pkg, packages, external,
        third_party) TIDAK dibuang membabi buta.
-    5. `.aether/map/` tidak ikut dipindai.
+    5. `.aegis/map/` tidak ikut dipindai.
     6. symlink/junction tidak ditelusuri (workspace boundary) [best-effort].
     7. Atlas & RIG tetap menghasilkan JSON valid.
     8. Query tools (atlas_query / rig_query / project_map_status) tetap bekerja.
-    9. Engine tetap benar saat dijalankan LANGSUNG (tanpa env AETHER).
+    9. Engine tetap benar saat dijalankan LANGSUNG (tanpa env Aegis).
 
 Fixture memakai engine Atlas/RIG vendored yang NYATA (bukan fake engine) supaya
 yang diuji benar-benar policy traversal engine.
@@ -97,7 +97,7 @@ EXCLUDED_COMPONENTS = (
     "coverage",
     "htmlcov",
     "site-packages",
-    ".aether",
+    ".aegis",
     ".pytest_cache",
     ".mypy_cache",
     ".ruff_cache",
@@ -173,9 +173,9 @@ def setup_fixture() -> None:
     _write(FIXTURE / "dist" / "bundle.py", _EXCLUDED_PY)
     _write(FIXTURE / "dist" / "bundle.js", "console.log(1);\n")
     _write(FIXTURE / "target" / "artifact.py", _EXCLUDED_PY)
-    _write(FIXTURE / ".aether" / "map" / "atlas.json", "{}\n")
-    _write(FIXTURE / ".aether" / "map" / "rig.json", "{}\n")
-    _write(FIXTURE / ".aether" / "bible" / "facts.md", "# facts\n")
+    _write(FIXTURE / ".aegis" / "map" / "atlas.json", "{}\n")
+    _write(FIXTURE / ".aegis" / "map" / "rig.json", "{}\n")
+    _write(FIXTURE / ".aegis" / "bible" / "facts.md", "# facts\n")
 
     # --- boundary test (best-effort): link ke tree eksternal --------------
     _write(EXTERNAL / "outside_source.py", _EXCLUDED_PY)
@@ -288,8 +288,8 @@ def _missing_expected(paths: Iterable[str]) -> List[str]:
 # Checks
 # --------------------------------------------------------------------------- #
 def check_engine_policy_alone() -> None:
-    """Engine standalone (TANPA env AETHER) harus tetap memakai policy bersama."""
-    print("-- engine standalone (tanpa env AETHER) --")
+    """Engine standalone (TANPA env Aegis) harus tetap memakai policy bersama."""
+    print("-- engine standalone (tanpa env Aegis) --")
     out_dir = CACHE_DIR
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -302,8 +302,8 @@ def check_engine_policy_alone() -> None:
         if map_type == MAP_TYPE_RIG:
             cmd.append("--overwrite")
         env = os.environ.copy()
-        env.pop(scan_policy.AETHER_SCAN_POLICY_ENV, None)
-        env.pop(scan_policy.AETHER_SCAN_POLICY_PATH_ENV, None)
+        env.pop(scan_policy.AEGIS_SCAN_POLICY_ENV, None)
+        env.pop(scan_policy.AEGIS_SCAN_POLICY_PATH_ENV, None)
         result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         _expect(result.returncode == 0, "engine {} standalone gagal: {}".format(
             map_type, (result.stderr or "")[-400:]
@@ -360,13 +360,13 @@ def check_service_boundary() -> None:
             )
     print("[OK] site-packages/conda/venv/node_modules tidak muncul sebagai node")
 
-    # (3) `.aether/map` tidak dipindai.
+    # (3) `.aegis/map` tidak dipindai.
     for path in atlas_paths + rig_paths:
         _expect(
-            not path.startswith(".aether/"),
-            "map/dependency tidak boleh memuat .aether: {}".format(path),
+            not path.startswith(".aegis/"),
+            "map/dependency tidak boleh memuat .aegis: {}".format(path),
         )
-    print("[OK] .aether (termasuk .aether/map) tidak dipindai")
+    print("[OK] .aegis (termasuk .aegis/map) tidak dipindai")
 
     # (4) source ambigu (vendor/lib/app/pkg/...) TIDAK dibuang membabi buta.
     for map_type, paths in ((MAP_TYPE_ATLAS, atlas_paths), (MAP_TYPE_RIG, rig_paths)):

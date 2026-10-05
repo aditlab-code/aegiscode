@@ -32,7 +32,7 @@ def _load_local(rel_path: str, dotted_suffix: str) -> Any:
     """Import a sibling module of this extension.
 
     Works both when the extension is imported as a package and when the
-    AETHER loader executes ``extension.py`` as a standalone module (where
+    Aegis loader executes ``extension.py`` as a standalone module (where
     relative imports are unavailable). Falls back to file-path loading.
     """
     package = __package__ or ""

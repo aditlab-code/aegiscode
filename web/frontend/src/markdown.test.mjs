@@ -15,8 +15,8 @@ assert.equal(escapeHtml("Foo & Bar"), "Foo &amp; Bar");
 
 // Safe links
 {
-  const link = inlineMarkdown("[Docs](https://aether.dev/guide)");
-  assert.ok(link.includes('<a class="md-link" href="https://aether.dev/guide" target="_blank" rel="noopener noreferrer">Docs</a>'));
+  const link = inlineMarkdown("[Docs](https://aegis.dev/guide)");
+  assert.ok(link.includes('<a class="md-link" href="https://aegis.dev/guide" target="_blank" rel="noopener noreferrer">Docs</a>'));
 
   const anchor = inlineMarkdown("[Section](#setup)");
   assert.ok(anchor.includes('<a class="md-link" href="#setup">Section</a>'));

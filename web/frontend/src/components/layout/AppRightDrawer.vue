@@ -253,8 +253,9 @@ function handleSubmit() {
 }
 
 async function viewReport(taskId) {
-  if (!taskId) return;
-  emit("open-report", taskId);
+  if (!taskId || loadingReport.value) return;
+  // Laporan dibuka in-drawer saja; TIDAK memancarkan open-report global agar
+  // modal overlay ReportViewer tidak ikut muncul (race condition).
   activeReportTaskId.value = taskId;
   loadingReport.value = true;
   try {
@@ -287,13 +288,14 @@ const taskMetaTooltip = computed(() => {
   return parts.length ? parts.join(" · ") : (props.task?.id ? "Hover for task info" : "No task info");
 });
 
-const statusIcon = computed(() => {
+// Path SVG terpadu untuk badge status (pengganti glyph/emotikon).
+const statusIconPath = computed(() => {
   const s = props.task?.status || "idle";
-  if (s === "running") return "⏳";
-  if (s === "done" || s === "completed") return "✓";
-  if (s === "failed") return "✕";
-  if (s === "cancelled") return "⊘";
-  return "○";
+  if (s === "running") return '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>';
+  if (s === "done" || s === "completed") return '<path d="M20 6L9 17l-5-5"/>';
+  if (s === "failed") return '<path d="M18 6L6 18M6 6l12 12"/>';
+  if (s === "cancelled") return '<circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/>';
+  return '<circle cx="12" cy="12" r="9"/>';
 });
 </script>
 
@@ -308,7 +310,8 @@ const statusIcon = computed(() => {
           :class="{ active: isAgentsTab }"
           role="tab"
           :aria-selected="isAgentsTab"
-          title="Agent Activity"
+          aria-label="Agent Activity"
+          title="Agent: autonomous task execution"
           @click="setTab(activeTab === 'activity' ? 'activity' : 'agents')"
         >
           <svg
@@ -325,7 +328,7 @@ const statusIcon = computed(() => {
           >
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
-          <span class="rd-tab-title">Agent Activity</span>
+          <span class="rd-tab-title">Agent</span>
         </button>
         <button
           type="button"
@@ -333,7 +336,8 @@ const statusIcon = computed(() => {
           :class="{ active: isAskTab }"
           role="tab"
           :aria-selected="isAskTab"
-          title="Consultant Chat"
+          aria-label="Consultant Chat"
+          title="Ask: Quick or Deep project consultation"
           @click="setTab(activeTab === 'consultant' ? 'consultant' : 'ask')"
         >
           <svg
@@ -350,7 +354,7 @@ const statusIcon = computed(() => {
           >
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
-          <span class="rd-tab-title">Consultant Chat</span>
+          <span class="rd-tab-title">Ask</span>
         </button>
       </div>
 
@@ -406,7 +410,7 @@ const statusIcon = computed(() => {
           <div class="task-hstrip" :title="taskMetaTooltip">
             <span class="sr-only">Latest Task</span>
             <span class="ths-badge" :class="`ths-${task.status || 'idle'}`" aria-label="`Status: ${task.status || 'idle'}`">
-              {{ statusIcon }}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="statusIconPath"></svg>
             </span>
             <span v-if="task.id" class="ths-id mono">{{ task.id }}</span>
             <span class="ths-prompt" :title="task.text || 'No task yet'">

@@ -139,7 +139,7 @@ class HttpFetchTool(BaseBrowserTool):
         self,
         timeout: float = _DEFAULT_TIMEOUT,
         max_bytes: int = _DEFAULT_MAX_BYTES,
-        user_agent: str = "AETHER-Browser/1.0",
+        user_agent: str = "Aegis-Browser/1.0",
         allow_private: bool = False,
     ) -> None:
         self.timeout = timeout

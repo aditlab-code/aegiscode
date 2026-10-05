@@ -29,7 +29,7 @@ import MonacoDiffEditor from "../components/MonacoDiffEditor.vue";
 import SettingsOverlay from "./SettingsOverlay.vue";
 import WelcomeView from "../components/WelcomeView.vue";
 import AppModal from "../components/ui/AppModal.vue";
-import { streamTerminalCommand, discardProjectGitChanges } from "../api.js";
+import { streamTerminalCommand, discardProjectGitChanges, readFileContent } from "../api.js";
 import {
   createEditorTabsState,
   openTab,
@@ -38,8 +38,15 @@ import {
   selectTab,
   setTabDirty,
   setTabSaved,
+  setTabConflict,
   getActiveTab,
 } from "../services/editorTabsService.js";
+import {
+  isDirty,
+  getModel,
+  markSaved,
+  applyExternalContent,
+} from "../services/monacoModelRegistry.js";
 import { mapMonacoMarkersToDiagnostics, classifyDiagnostic } from "../services/diagnosticService.js";
 
 const props = defineProps({
@@ -443,6 +450,7 @@ const effectiveTaskModel = computed(() => {
 
 const effectiveConsultantProps = computed(() => {
   const base = props.consultantProps || {};
+  const currentTab = activeTab.value;
   return {
     ...base,
     activeSessionId: activeConsultantSessionId.value || base.activeSessionId || "",
@@ -454,6 +462,13 @@ const effectiveConsultantProps = computed(() => {
     runningTaskId: base.runningTaskId || props.task?.id || "",
     providerLabel: effectiveTaskProvider.value,
     modelLabel: effectiveTaskModel.value,
+    activeTabPath: currentTab ? currentTab.path : "",
+    activeFile: currentTab
+      ? {
+          path: currentTab.path,
+          content: currentTab.content || null,
+        }
+      : null,
   };
 });
 
@@ -596,6 +611,24 @@ watch(
             text: `Tool '${p.tool || "tool"}' error: ${p.error || "Execution failed"}`,
             ts,
           });
+        } else {
+          const isFileWriteTool = [
+            "write_file",
+            "write_to_file",
+            "replace_file_content",
+            "replace_content",
+            "patch_file",
+            "apply_patch",
+          ].includes(p.tool);
+          const writtenPath = p.path || p.target || p.file_path || p.file;
+          if (isFileWriteTool && writtenPath) {
+            checkAndHandleAgentFileConflict(writtenPath);
+          }
+        }
+      } else if (type === "file_written" || type === "file_modified") {
+        const writtenPath = p.path || p.target || p.file_path || p.file;
+        if (writtenPath) {
+          checkAndHandleAgentFileConflict(writtenPath);
         }
       } else if (type === "validation_completed") {
         if (p.success === false || p.passed === false || p.error) {
@@ -653,7 +686,150 @@ const splitCodeEditorRef = ref(null);
 const splitActive = ref(Boolean(props.initialSplitActive));
 const splitDirection = ref(props.initialSplitDirection || "vertical");
 const splitRatio = ref(50);
-const activePane = ref("pane1"); // "pane1" (Tab 1 / Left) or "pane2" (Tab 2 / Right)
+const activePane = ref("pane1"); // "pane1" (Window 1 / Left) or "pane2" (Window 2 / Right)
+
+// --- Smart Agent Dirty Conflict Resolution ---
+const conflictFile = ref(null);
+const conflictAgentText = ref("");
+const conflictUserText = ref("");
+
+const conflictAddedLines = computed(() => {
+  if (!conflictAgentText.value || !conflictUserText.value) return 0;
+  const agentLines = new Set(conflictAgentText.value.split("\n"));
+  const userLines = new Set(conflictUserText.value.split("\n"));
+  return [...agentLines].filter((l) => !userLines.has(l)).length;
+});
+
+const conflictRemovedLines = computed(() => {
+  if (!conflictAgentText.value || !conflictUserText.value) return 0;
+  const agentLines = new Set(conflictAgentText.value.split("\n"));
+  const userLines = new Set(conflictUserText.value.split("\n"));
+  return [...userLines].filter((l) => !agentLines.has(l)).length;
+});
+
+async function triggerConflictResolution(filePath) {
+  try {
+    const data = await readFileContent(filePath);
+    conflictAgentText.value = typeof data?.content === "string" ? data.content : "";
+    conflictUserText.value = getModel(filePath)?.getValue?.() ?? "";
+    setTabConflict(pane1TabsState, filePath, true);
+    setTabConflict(pane2TabsState, filePath, true);
+    conflictFile.value = filePath;
+  } catch (err) {
+    console.error("Conflict detection failed to load disk content:", err);
+  }
+}
+
+async function checkAndHandleAgentFileConflict(filePath) {
+  if (!filePath) return;
+  const isDirtyFile =
+    isDirty(filePath) ||
+    pane1TabsState.tabs.value.some((t) => t.path === filePath && t.dirty) ||
+    pane2TabsState.tabs.value.some((t) => t.path === filePath && t.dirty);
+
+  if (isDirtyFile) {
+    await triggerConflictResolution(filePath);
+  } else {
+    try {
+      const data = await readFileContent(filePath);
+      if (typeof data?.content === "string") {
+        applyExternalContent(filePath, data.content);
+        const m = getModel(filePath);
+        if (m?.getAlternativeVersionId) {
+          markSaved(filePath, m.getAlternativeVersionId());
+        }
+        setTabDirty(pane1TabsState, filePath, false);
+        setTabDirty(pane2TabsState, filePath, false);
+      }
+    } catch {
+      // Abaikan reload error latar belakang jika file belum ada
+    }
+  }
+}
+
+function resolveKeepMine() {
+  if (conflictFile.value) {
+    setTabConflict(pane1TabsState, conflictFile.value, false);
+    setTabConflict(pane2TabsState, conflictFile.value, false);
+    conflictFile.value = null;
+  }
+}
+
+function resolveAcceptAgent() {
+  if (conflictFile.value) {
+    const target = conflictFile.value;
+    applyExternalContent(target, conflictAgentText.value);
+    const m = getModel(target);
+    if (m?.getAlternativeVersionId) {
+      markSaved(target, m.getAlternativeVersionId());
+    }
+    setTabDirty(pane1TabsState, target, false);
+    setTabDirty(pane2TabsState, target, false);
+    setTabConflict(pane1TabsState, target, false);
+    setTabConflict(pane2TabsState, target, false);
+    conflictFile.value = null;
+  }
+}
+
+async function resolveReviewDiff() {
+  if (conflictFile.value) {
+    const target = conflictFile.value;
+    setTabConflict(pane1TabsState, target, false);
+    setTabConflict(pane2TabsState, target, false);
+    openDiffTab(pane2TabsState, target);
+    if (!splitActive.value) {
+      toggleSplitEditor();
+    }
+    conflictFile.value = null;
+  }
+}
+
+// Effective split direction responsive to tier/mobile/compact
+const effectiveSplitDirection = computed(() => {
+  if (props.tier === "mobile" || props.tier === "compact") {
+    return "horizontal"; // stacked on smaller screens
+  }
+  return splitDirection.value;
+});
+
+const pane1Style = computed(() => {
+  if (effectiveSplitDirection.value === "vertical") {
+    return {
+      width: `calc(${splitRatio.value}% - 2px)`,
+      height: "100%",
+      flex: `0 0 calc(${splitRatio.value}% - 2px)`,
+      minWidth: "0",
+    };
+  }
+  return {
+    height: `calc(${splitRatio.value}% - 2px)`,
+    width: "100%",
+    flex: `0 0 calc(${splitRatio.value}% - 2px)`,
+    minHeight: "0",
+  };
+});
+
+const pane2Style = computed(() => {
+  if (effectiveSplitDirection.value === "vertical") {
+    return {
+      width: `calc(${100 - splitRatio.value}% - 2px)`,
+      height: "100%",
+      flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
+      minWidth: "0",
+    };
+  }
+  return {
+    height: `calc(${100 - splitRatio.value}% - 2px)`,
+    width: "100%",
+    flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
+    minHeight: "0",
+  };
+});
+
+function triggerEditorLayout() {
+  activeCodeEditorRef.value?.layout?.();
+  splitCodeEditorRef.value?.layout?.();
+}
 
 // Initialize initial tabs if provided for Pane 1
 if (props.initialTabs && props.initialTabs.length > 0) {
@@ -793,7 +969,7 @@ function onSplitDividerMouseDown(e) {
   const container = e.currentTarget.parentElement;
   if (!container) return;
   const rect = container.getBoundingClientRect();
-  const isVert = splitDirection.value === "vertical";
+  const isVert = effectiveSplitDirection.value === "vertical";
 
   function onMouseMove(moveEvt) {
     if (!isDraggingSplit) return;
@@ -1008,13 +1184,18 @@ function onEditorSaved(evt, pane = "pane1") {
   const path = evt?.path || (pane === "pane2" ? pane2ActiveTabPath.value : pane1ActiveTabPath.value);
   setTabSaved(pane1TabsState, path);
   setTabSaved(pane2TabsState, path);
+  setTabConflict(pane1TabsState, path, false);
+  setTabConflict(pane2TabsState, path, false);
+  if (conflictFile.value === path) {
+    conflictFile.value = null;
+  }
 }
 
 function onEditorDirtyChange(evt, pane = "pane1") {
   const path = evt?.path || (pane === "pane2" ? pane2ActiveTabPath.value : pane1ActiveTabPath.value);
-  const isDirty = evt?.dirty !== undefined ? evt.dirty : true;
-  const state = pane === "pane2" ? pane2TabsState : pane1TabsState;
-  setTabDirty(state, path, isDirty);
+  const isDirtyVal = evt?.dirty !== undefined ? evt.dirty : true;
+  setTabDirty(pane1TabsState, path, isDirtyVal);
+  setTabDirty(pane2TabsState, path, isDirtyVal);
 }
 
 function onCursorChange(pos) {
@@ -1052,6 +1233,7 @@ async function handleDirectDiscard(filePath = null) {
       const regularTab1 = pane1TabsState.tabs.value.find((t) => t.path === filePath);
       if (regularTab1) {
         setTabDirty(pane1TabsState, filePath, false);
+        setTabConflict(pane1TabsState, filePath, false);
         if (pane1ActiveTabPath.value === filePath && activeCodeEditorRef.value?.reload) {
           activeCodeEditorRef.value.reload();
         }
@@ -1059,9 +1241,13 @@ async function handleDirectDiscard(filePath = null) {
       const regularTab2 = pane2TabsState.tabs.value.find((t) => t.path === filePath);
       if (regularTab2) {
         setTabDirty(pane2TabsState, filePath, false);
+        setTabConflict(pane2TabsState, filePath, false);
         if (pane2ActiveTabPath.value === filePath && splitCodeEditorRef.value?.reload) {
           splitCodeEditorRef.value.reload();
         }
+      }
+      if (conflictFile.value === filePath) {
+        conflictFile.value = null;
       }
 
       showBgToast({
@@ -1076,11 +1262,18 @@ async function handleDirectDiscard(filePath = null) {
 
       // Clean dirty state and reload active editors if regular
       pane1TabsState.tabs.value.forEach((t) => {
-        if (!t.isDiff) setTabDirty(pane1TabsState, t.path, false);
+        if (!t.isDiff) {
+          setTabDirty(pane1TabsState, t.path, false);
+          setTabConflict(pane1TabsState, t.path, false);
+        }
       });
       pane2TabsState.tabs.value.forEach((t) => {
-        if (!t.isDiff) setTabDirty(pane2TabsState, t.path, false);
+        if (!t.isDiff) {
+          setTabDirty(pane2TabsState, t.path, false);
+          setTabConflict(pane2TabsState, t.path, false);
+        }
       });
+      conflictFile.value = null;
       if (activeCodeEditorRef.value?.reload) {
         activeCodeEditorRef.value.reload();
       }
@@ -1152,15 +1345,16 @@ watch(
 
 function openSettings(tabName = "providers") {
   settingsSubTab.value = tabName;
-  openTab(editorTabsState, {
-    path: "aether://settings",
+  activePane.value = "pane1";
+  openTab(pane1TabsState, {
+    path: "aegis://settings",
     name: "Settings",
   });
 }
 
 function openWelcomeTab() {
   openTab(editorTabsState, {
-    path: "aether://welcome",
+    path: "aegis://welcome",
     name: "Welcome",
   });
 }
@@ -1368,15 +1562,24 @@ function onKeyDown(e) {
   }
 }
 
+watch(
+  [() => props.tier, effectiveSplitDirection],
+  () => {
+    nextTick(() => triggerEditorLayout());
+  }
+);
+
 onMounted(() => {
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", triggerEditorLayout);
   }
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("resize", triggerEditorLayout);
   }
 });
 
@@ -1499,7 +1702,7 @@ defineExpose({
             >
               <span class="tab-icon" aria-hidden="true">
                 <svg
-                  v-if="tab.path === 'aether://settings'"
+                  v-if="tab.path === 'aegis://settings'"
                   width="13"
                   height="13"
                   viewBox="0 0 24 24"
@@ -1513,7 +1716,7 @@ defineExpose({
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
                 <svg
-                  v-else-if="tab.path === 'aether://welcome'"
+                  v-else-if="tab.path === 'aegis://welcome'"
                   width="13"
                   height="13"
                   viewBox="0 0 24 24"
@@ -1557,6 +1760,7 @@ defineExpose({
                 </svg>
               </span>
               <span class="tab-title" :title="tab.path">{{ tab.name }}</span>
+              <span v-if="tab.conflict" class="tab-conflict-dot" title="Agent modified this file while you have unsaved edits">!</span>
               <span v-if="tab.dirty" class="tab-dot" title="Unsaved changes">●</span>
               <button
                 type="button"
@@ -1567,6 +1771,31 @@ defineExpose({
               >
                 ×
               </button>
+
+              <!-- Inline Popover for Agent Dirty Conflict -->
+              <div
+                v-if="conflictFile && tab.path === conflictFile"
+                class="wb-conflict-popover"
+                @click.stop
+              >
+                <div class="conflict-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <span>Agent modified this file</span>
+                </div>
+                <div class="conflict-diff-preview">
+                  <span class="diff-stat-add">+{{ conflictAddedLines }} lines</span>
+                  <span class="diff-stat-del">-{{ conflictRemovedLines }} lines</span>
+                </div>
+                <div class="conflict-actions">
+                  <button type="button" class="conf-btn conf-keep" @click="resolveKeepMine">Keep Mine</button>
+                  <button type="button" class="conf-btn conf-accept" @click="resolveAcceptAgent">Accept Agent</button>
+                  <button type="button" class="conf-btn conf-diff" @click="resolveReviewDiff">Review Diff</button>
+                </div>
+              </div>
 
               <!-- Inline Popover for Unsaved Changes -->
               <div
@@ -1585,7 +1814,7 @@ defineExpose({
           </div>
 
           <!-- Actions toolbar: Compact Save and Split Buttons -->
-          <div v-if="pane1ActiveTabPath && !['aether://settings', 'aether://welcome'].includes(pane1ActiveTabPath)" class="wb-tab-actions">
+          <div v-if="pane1ActiveTabPath && !['aegis://settings', 'aegis://welcome'].includes(pane1ActiveTabPath)" class="wb-tab-actions">
             <button
               type="button"
               class="wb-tab-save-btn"
@@ -1622,12 +1851,12 @@ defineExpose({
 
         <!-- Breadcrumbs Navigation Bar (Single-window mode only) -->
         <div v-if="!splitActive && pane1ActiveTabPath" class="wb-breadcrumbs-bar">
-          <div v-if="pane1ActiveTabPath === 'aether://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+          <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
             <span class="crumb-item crumb-root">Preferences</span>
             <span class="crumb-separator" aria-hidden="true">›</span>
             <span class="crumb-item crumb-file current">Settings</span>
           </div>
-          <div v-else-if="pane1ActiveTabPath === 'aether://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+          <div v-else-if="pane1ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
             <span class="crumb-item crumb-root">AEGIS</span>
             <span class="crumb-separator" aria-hidden="true">›</span>
             <span class="crumb-item crumb-file current">Welcome</span>
@@ -1649,7 +1878,7 @@ defineExpose({
         <!-- Central Editor Surface / Settings Tab / Welcome / Empty State Canvas -->
         <div class="wb-editor-canvas">
           <!-- 1. Settings tab -->
-          <div v-if="!splitActive && pane1ActiveTabPath === 'aether://settings'" class="wb-settings-tab">
+          <div v-if="!splitActive && pane1ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
             <SettingsOverlay
               embedded
               :open="true"
@@ -1661,7 +1890,7 @@ defineExpose({
               :model-id="modelId"
               :mode="config?.mode"
               v-model:active-tab="settingsSubTab"
-              @close="handleCloseTab('aether://settings', 'pane1')"
+              @close="handleCloseTab('aegis://settings', 'pane1')"
               @refresh-config="emit('refresh-config')"
               @update:provider-instance-id="emit('update:provider-instance-id', $event)"
               @update:model-id="emit('update:model-id', $event)"
@@ -1681,23 +1910,21 @@ defineExpose({
             v-else-if="splitActive"
             class="wb-split-editor-container"
             :class="[
-              `split-${splitDirection}`,
+              `split-${effectiveSplitDirection}`,
               `split-tier-${tier}`,
               { 'pane-primary-active': activePane === 'pane1', 'pane-split-active': activePane === 'pane2' }
             ]"
           >
-            <!-- Primary Editor Pane (Tab 1 / Left) -->
+            <!-- Primary Editor Pane (Window 1 / Left) -->
             <div
               class="wb-split-pane wb-split-pane-primary"
               :class="{ 'is-focused-pane': activePane === 'pane1' }"
-              :style="splitDirection === 'vertical'
-                ? { width: `calc(${splitRatio}% - 2px)`, height: '100%', flex: `0 0 calc(${splitRatio}% - 2px)` }
-                : { height: `calc(${splitRatio}% - 2px)`, width: '100%', flex: `0 0 calc(${splitRatio}% - 2px)` }"
+              :style="pane1Style"
               @click="activePane = 'pane1'"
             >
               <!-- Primary Pane Tab Strip -->
               <div class="wb-editor-tabs-bar wb-pane-tabs-bar">
-                <div class="wb-editor-tabs" role="tablist" aria-label="Editor Tabs 1">
+                <div class="wb-editor-tabs" role="tablist" aria-label="Editor Window 1">
                   <div
                     v-for="tab in pane1TabsState.tabs.value"
                     :key="'p1-' + tab.path"
@@ -1738,6 +1965,7 @@ defineExpose({
                       </svg>
                     </span>
                     <span class="tab-title" :title="tab.path">{{ tab.name }}</span>
+                    <span v-if="tab.conflict" class="tab-conflict-dot" title="Agent modified this file while you have unsaved edits">!</span>
                     <span v-if="tab.dirty" class="tab-dot" title="Unsaved changes">●</span>
                     <button
                       type="button"
@@ -1748,6 +1976,31 @@ defineExpose({
                     >
                       ×
                     </button>
+
+                    <!-- Inline Popover for Agent Dirty Conflict -->
+                    <div
+                      v-if="conflictFile && tab.path === conflictFile"
+                      class="wb-conflict-popover"
+                      @click.stop
+                    >
+                      <div class="conflict-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                          <line x1="12" y1="9" x2="12" y2="13"/>
+                          <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Agent modified this file</span>
+                      </div>
+                      <div class="conflict-diff-preview">
+                        <span class="diff-stat-add">+{{ conflictAddedLines }} lines</span>
+                        <span class="diff-stat-del">-{{ conflictRemovedLines }} lines</span>
+                      </div>
+                      <div class="conflict-actions">
+                        <button type="button" class="conf-btn conf-keep" @click="resolveKeepMine">Keep Mine</button>
+                        <button type="button" class="conf-btn conf-accept" @click="resolveAcceptAgent">Accept Agent</button>
+                        <button type="button" class="conf-btn conf-diff" @click="resolveReviewDiff">Review Diff</button>
+                      </div>
+                    </div>
 
                     <!-- Inline Popover for Unsaved Changes -->
                     <div
@@ -1768,7 +2021,7 @@ defineExpose({
                 <!-- Primary Pane Actions Toolbar -->
                 <div class="wb-tab-actions">
                   <button
-                    v-if="pane1ActiveTabPath && !['aether://settings', 'aether://welcome'].includes(pane1ActiveTabPath)"
+                    v-if="pane1ActiveTabPath && !['aegis://settings', 'aegis://welcome'].includes(pane1ActiveTabPath)"
                     type="button"
                     class="wb-tab-save-btn"
                     :class="{ dirty: isPane1TabDirty }"
@@ -1807,7 +2060,18 @@ defineExpose({
 
               <!-- Primary Breadcrumbs Bar -->
               <div v-if="pane1ActiveTabPath" class="wb-breadcrumbs-bar">
+                <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+                  <span class="crumb-item crumb-root">Preferences</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Settings</span>
+                </div>
+                <div v-else-if="pane1ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+                  <span class="crumb-item crumb-root">AEGIS</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Welcome</span>
+                </div>
                 <AppBreadcrumbs
+                  v-else
                   :path="pane1ActiveTabPath"
                   :root="projectRootName"
                   @navigate="handleBreadcrumbNavigate"
@@ -1817,6 +2081,31 @@ defineExpose({
 
               <!-- Primary Editor Canvas -->
               <div class="wb-pane-editor-canvas">
+                <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
+                  <SettingsOverlay
+                    embedded
+                    :open="true"
+                    :config="config"
+                    :projects="projects"
+                    :task-history="taskHistory"
+                    :active-project="activeProject"
+                    :provider-instance-id="providerInstanceId"
+                    :model-id="modelId"
+                    :mode="config?.mode"
+                    v-model:active-tab="settingsSubTab"
+                    @close="handleCloseTab('aegis://settings', 'pane1')"
+                    @refresh-config="emit('refresh-config')"
+                    @update:provider-instance-id="emit('update:provider-instance-id', $event)"
+                    @update:model-id="emit('update:model-id', $event)"
+                    @update:mode="emit('update:mode', $event)"
+                    @open-report="emit('open-report', $event)"
+                    @open-history-task="emit('open-history-task', $event)"
+                    @delete-history="emit('delete-history', $event)"
+                    @clear-history="emit('clear-history')"
+                    @open-project-policy="emit('open-project-policy', $event)"
+                    @delete-project="emit('delete-project', $event)"
+                  />
+                </div>
                 <MonacoDiffEditor
                   v-if="pane1ActiveTab?.isDiff || pane1ActiveTabPath.startsWith('diff://')"
                   :key="'p1-diff-' + pane1ActiveTabPath"
@@ -1833,7 +2122,6 @@ defineExpose({
                 <CodeEditor
                   v-else-if="pane1ActiveTabPath"
                   ref="activeCodeEditorRef"
-                  :key="'p1-code-' + pane1ActiveTabPath"
                   :path="pane1ActiveTabPath"
                   instance-id="primary"
                   embedded
@@ -1846,7 +2134,7 @@ defineExpose({
                   @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
                 />
                 <div v-else class="empty-split-pane">
-                  <p>No open tabs in Tab 1</p>
+                  <p>No open tabs in Window 1</p>
                   <span>Select a file from Explorer to open</span>
                 </div>
               </div>
@@ -1855,9 +2143,9 @@ defineExpose({
             <!-- Draggable / Responsive Split Divider -->
             <div
               class="wb-split-divider"
-              :class="[`divider-${splitDirection}`]"
+              :class="[`divider-${effectiveSplitDirection}`]"
               role="separator"
-              :aria-orientation="splitDirection"
+              :aria-orientation="effectiveSplitDirection"
               title="Drag to resize split, double click to center"
               @mousedown="onSplitDividerMouseDown"
               @dblclick="onSplitDividerDblClick"
@@ -1865,18 +2153,16 @@ defineExpose({
               <div class="divider-handle"></div>
             </div>
 
-            <!-- Secondary Editor Pane (Tab 2 / Right) -->
+            <!-- Secondary Editor Pane (Window 2 / Right) -->
             <div
               class="wb-split-pane wb-split-pane-secondary"
               :class="{ 'is-focused-pane': activePane === 'pane2' }"
-              :style="splitDirection === 'vertical'
-                ? { width: `calc(${100 - splitRatio}% - 2px)`, height: '100%', flex: `0 0 calc(${100 - splitRatio}% - 2px)` }
-                : { height: `calc(${100 - splitRatio}% - 2px)`, width: '100%', flex: `0 0 calc(${100 - splitRatio}% - 2px)` }"
+              :style="pane2Style"
               @click="activePane = 'pane2'"
             >
               <!-- Secondary Pane Tab Strip -->
               <div class="wb-editor-tabs-bar wb-pane-tabs-bar">
-                <div class="wb-editor-tabs" role="tablist" aria-label="Editor Tabs 2">
+                <div class="wb-editor-tabs" role="tablist" aria-label="Editor Window 2">
                   <div
                     v-for="tab in pane2TabsState.tabs.value"
                     :key="'p2-' + tab.path"
@@ -1917,6 +2203,7 @@ defineExpose({
                       </svg>
                     </span>
                     <span class="tab-title" :title="tab.path">{{ tab.name }}</span>
+                    <span v-if="tab.conflict" class="tab-conflict-dot" title="Agent modified this file while you have unsaved edits">!</span>
                     <span v-if="tab.dirty" class="tab-dot" title="Unsaved changes">●</span>
                     <button
                       type="button"
@@ -1927,6 +2214,31 @@ defineExpose({
                     >
                       ×
                     </button>
+
+                    <!-- Inline Popover for Agent Dirty Conflict -->
+                    <div
+                      v-if="conflictFile && tab.path === conflictFile"
+                      class="wb-conflict-popover"
+                      @click.stop
+                    >
+                      <div class="conflict-header">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                          <line x1="12" y1="9" x2="12" y2="13"/>
+                          <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Agent modified this file</span>
+                      </div>
+                      <div class="conflict-diff-preview">
+                        <span class="diff-stat-add">+{{ conflictAddedLines }} lines</span>
+                        <span class="diff-stat-del">-{{ conflictRemovedLines }} lines</span>
+                      </div>
+                      <div class="conflict-actions">
+                        <button type="button" class="conf-btn conf-keep" @click="resolveKeepMine">Keep Mine</button>
+                        <button type="button" class="conf-btn conf-accept" @click="resolveAcceptAgent">Accept Agent</button>
+                        <button type="button" class="conf-btn conf-diff" @click="resolveReviewDiff">Review Diff</button>
+                      </div>
+                    </div>
 
                     <!-- Inline Popover for Unsaved Changes -->
                     <div
@@ -1979,7 +2291,18 @@ defineExpose({
 
               <!-- Secondary Breadcrumbs Bar -->
               <div v-if="pane2ActiveTabPath" class="wb-breadcrumbs-bar split-breadcrumbs">
+                <div v-if="pane2ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+                  <span class="crumb-item crumb-root">Preferences</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Settings</span>
+                </div>
+                <div v-else-if="pane2ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+                  <span class="crumb-item crumb-root">AEGIS</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Welcome</span>
+                </div>
                 <AppBreadcrumbs
+                  v-else
                   :path="pane2ActiveTabPath"
                   :root="projectRootName"
                   @navigate="handleBreadcrumbNavigate"
@@ -1989,6 +2312,31 @@ defineExpose({
 
               <!-- Secondary Editor Canvas -->
               <div class="wb-pane-editor-canvas">
+                <div v-if="pane2ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
+                  <SettingsOverlay
+                    embedded
+                    :open="true"
+                    :config="config"
+                    :projects="projects"
+                    :task-history="taskHistory"
+                    :active-project="activeProject"
+                    :provider-instance-id="providerInstanceId"
+                    :model-id="modelId"
+                    :mode="config?.mode"
+                    v-model:active-tab="settingsSubTab"
+                    @close="handleCloseTab('aegis://settings', 'pane2')"
+                    @refresh-config="emit('refresh-config')"
+                    @update:provider-instance-id="emit('update:provider-instance-id', $event)"
+                    @update:model-id="emit('update:model-id', $event)"
+                    @update:mode="emit('update:mode', $event)"
+                    @open-report="emit('open-report', $event)"
+                    @open-history-task="emit('open-history-task', $event)"
+                    @delete-history="emit('delete-history', $event)"
+                    @clear-history="emit('clear-history')"
+                    @open-project-policy="emit('open-project-policy', $event)"
+                    @delete-project="emit('delete-project', $event)"
+                  />
+                </div>
                 <MonacoDiffEditor
                   v-if="pane2ActiveTab?.isDiff || pane2ActiveTabPath.startsWith('diff://')"
                   :key="'p2-diff-' + pane2ActiveTabPath"
@@ -2005,7 +2353,6 @@ defineExpose({
                 <CodeEditor
                   v-else-if="pane2ActiveTabPath"
                   ref="splitCodeEditorRef"
-                  :key="'p2-code-' + pane2ActiveTabPath"
                   :path="pane2ActiveTabPath"
                   instance-id="split"
                   embedded
@@ -2018,7 +2365,7 @@ defineExpose({
                   @close="handleCloseTab(pane2ActiveTabPath, 'pane2')"
                 />
                 <div v-else class="empty-split-pane">
-                  <p>No open tabs in Tab 2</p>
+                  <p>No open tabs in Window 2</p>
                   <span>Select a file from Explorer to open</span>
                 </div>
               </div>
@@ -2044,7 +2391,6 @@ defineExpose({
           <CodeEditor
             v-else-if="pane1ActiveTabPath"
             ref="activeCodeEditorRef"
-            :key="'single-code-' + pane1ActiveTabPath"
             :path="pane1ActiveTabPath"
             instance-id="primary"
             embedded
@@ -2459,5 +2805,101 @@ defineExpose({
 .toast-slide-leave-to {
   opacity: 0;
   transform: translateY(8px) scale(0.98);
+}
+
+/* Conflict dot on tab strip */
+.tab-conflict-dot {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--danger, #ef4444);
+  margin-left: 2px;
+  line-height: 1;
+}
+
+/* Smart Conflict Popover */
+.wb-conflict-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 250;
+  background: var(--bg-card, #1a1b26);
+  border: 1px solid var(--danger, #ef4444);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 230px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  cursor: default;
+  text-align: left;
+}
+
+.conflict-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--danger, #ef4444);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.conflict-diff-preview {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  font-family: var(--mono, monospace);
+  margin-bottom: 8px;
+}
+
+.diff-stat-add {
+  color: var(--success, #4ec9b0);
+}
+
+.diff-stat-del {
+  color: var(--danger, #ef4444);
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.conf-btn {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.conf-keep {
+  background: var(--bg-panel, #24283b);
+  color: var(--text, #c0caf5);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.12));
+}
+
+.conf-keep:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+}
+
+.conf-accept {
+  background: var(--accent, #7aa2f7);
+  color: #0b0f19;
+  border: none;
+}
+
+.conf-accept:hover {
+  opacity: 0.9;
+}
+
+.conf-diff {
+  background: transparent;
+  color: var(--accent, #7aa2f7);
+  border: 1px solid var(--accent, #7aa2f7);
+}
+
+.conf-diff:hover {
+  background: rgba(122, 162, 247, 0.1);
 }
 </style>

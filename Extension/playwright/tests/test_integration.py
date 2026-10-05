@@ -980,7 +980,7 @@ class TestExtensionLifecycleIntegration(_LocalWebProjectCase):
             extension_root=EXT_DIR,
             manifest=manifest,
             capability_registry=registry,
-            aether_root=self.root / "aether",
+            aegis_root=self.root / "aegis",
             extensions_dir=self.root / "extensions",
             config_store=ConfigValueStore(db_path=str(self.root / "config.db")),
         )
@@ -1130,7 +1130,7 @@ class TestExtensionInstallLifecycle(unittest.TestCase):
             registry=registry,
             capability_registry=CapabilityRegistry(),
             lifecycle_store=get_lifecycle_store(db_path=str(self.root / "lifecycle.db")),
-            aether_root=self.root / "aether",
+            aegis_root=self.root / "aegis",
             extensions_dir=extensions_dir,
             config_store=ConfigValueStore(db_path=str(self.root / "config.db")),
         )

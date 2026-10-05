@@ -53,7 +53,7 @@ class StdioMCPClient(MCPClient):
         self,
         config: MCPServerConfig,
         timeout: float = 30.0,
-        client_name: str = "aether",
+        client_name: str = "aegis",
         client_version: str = "0.1",
     ) -> None:
         super().__init__(server_name=config.name)

@@ -1,5 +1,5 @@
 <script setup>
-// AETHER Monaco Diff Editor — Side-by-Side & Inline Git Diff (#Fase 1.2).
+// Aegis Monaco Diff Editor — Side-by-Side & Inline Git Diff (#Fase 1.2).
 //
 // Menampilkan perbandingan working tree vs HEAD secara interaktif:
 //   - original model (kiri): konten dari Git HEAD (read-only),
@@ -142,7 +142,7 @@ async function mountDiffEditor(originalText, modifiedText) {
   diffEditor = monaco.editor.createDiffEditor(container.value, {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
-    theme: isLight ? (mod.AEGIS_LIGHT_THEME || mod.AETHER_LIGHT_THEME) : (mod.AEGIS_THEME || mod.AETHER_THEME),
+    theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
     originalEditable: false,
     readOnly: true,
     renderSideBySide: sideBySide.value,
@@ -168,9 +168,7 @@ async function mountDiffEditor(originalText, modifiedText) {
     themeObserver = new MutationObserver(() => {
       const lightNow = document.documentElement.dataset.theme === "light";
       monaco.editor.setTheme(
-        lightNow
-          ? (mod.AEGIS_LIGHT_THEME || mod.AETHER_LIGHT_THEME)
-          : (mod.AEGIS_THEME || mod.AETHER_THEME)
+        lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME
       );
     });
     themeObserver.observe(document.documentElement, {

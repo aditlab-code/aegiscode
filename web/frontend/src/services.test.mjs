@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 import {
   THEME_KEY,
@@ -587,4 +590,25 @@ test("6. responsiveService: getBreakpointTier, responsive state mutations, overl
   // SSR safe resize binding
   state.bindResizeListener();
   state.unbindResizeListener();
+});
+
+// -----------------------------------------------------------------------------
+// Test 7: Dual-theme CSS tokens — --bg-drawer & --bg-sidebar (AGENTS.md §9.1)
+// Verifikasi token warna kontainer wajib terdefinisi di kedua tema (dark + light).
+// -----------------------------------------------------------------------------
+test("7. dual-theme CSS tokens: --bg-drawer dan --bg-sidebar terdefinisi di kedua tema", () => {
+  const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
+  const darkVars = readFileSync(
+    resolve(frontendRoot, "src/styles/base/variables.css"),
+    "utf-8"
+  );
+  const lightVars = readFileSync(
+    resolve(frontendRoot, "src/styles/themes/theme-light.css"),
+    "utf-8"
+  );
+
+  assert.ok(darkVars.includes("--bg-drawer"), "dark theme mendefinisikan --bg-drawer");
+  assert.ok(darkVars.includes("--bg-sidebar"), "dark theme mendefinisikan --bg-sidebar");
+  assert.ok(lightVars.includes("--bg-drawer"), "light theme mendefinisikan --bg-drawer");
+  assert.ok(lightVars.includes("--bg-sidebar"), "light theme mendefinisikan --bg-sidebar");
 });

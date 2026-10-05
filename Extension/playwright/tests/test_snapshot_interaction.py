@@ -428,9 +428,9 @@ class FakePage:
 
     def evaluate(self, expression, arg=None):
         text = expression if isinstance(expression, str) else ""
-        if "AETHER_SNAPSHOT_SCAN" in text:
+        if "AEGIS_SNAPSHOT_SCAN" in text:
             return self._scan()
-        if "AETHER_SCROLL_TO" in text:
+        if "AEGIS_SCROLL_TO" in text:
             self.scrolled_to = True
             return True
         return None
@@ -459,7 +459,7 @@ class FakePage:
             if el.checked:
                 node["checked"] = True
             nodes.append(node)
-        return {"marker": "AETHER_SNAPSHOT_SCAN", "nodes": nodes, "count": len(nodes)}
+        return {"marker": "AEGIS_SNAPSHOT_SCAN", "nodes": nodes, "count": len(nodes)}
 
     # -- locators -------------------------------------------------------
     def locator(self, selector):
@@ -467,7 +467,7 @@ class FakePage:
 
     def _match(self, selector):
         selector = selector.strip()
-        if selector.startswith("[data-aether-ref="):
+        if selector.startswith("[data-aegis-ref="):
             ref = selector.split('"', 2)[1]
             return [el for el in self.elements if el.ref == ref]
         if selector in ("body", "*"):

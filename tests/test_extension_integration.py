@@ -2,7 +2,7 @@
 
 End-to-end validation of the whole Extension System built in Tasks 01-07:
 
-    AETHER startup -> discover/load/register -> capability registry ->
+    Aegis startup -> discover/load/register -> capability registry ->
     Agent/Consultant/UI -> config/storage -> structured result -> artifact
 
 and the lifecycle: git install -> validate -> load -> register -> enable ->
@@ -74,14 +74,14 @@ from agent_ai.tools.registry import ToolRegistry
 def _isolate_extension_storage(tmp_path, monkeypatch):
     """Redirect ExtensionStorage runtime data root into ``tmp_path``.
 
-    ``ExtensionStorage`` normally resolves its data root from the AETHER
+    ``ExtensionStorage`` normally resolves its data root from the AegisCode
     project root; for integration we redirect it so startup/disable/uninstall
     tests never write into the repository ``data/extensions`` directory.
     """
     import agent_ai.extensions.storage as storage_mod
 
-    root = tmp_path / "aether_runtime_data" / "extensions"
-    monkeypatch.setattr(storage_mod, "_get_data_root", lambda aether_root=None: root)
+    root = tmp_path / "aegis_runtime_data" / "extensions"
+    monkeypatch.setattr(storage_mod, "_get_data_root", lambda aegis_root=None: root)
     return root
 
 
@@ -978,7 +978,7 @@ def test_git_install_through_ui_service(tmp_path, monkeypatch):
 
     ext_dir = tmp_path / "Extension"
     ext_dir.mkdir()
-    monkeypatch.setenv("AETHER_EXTENSIONS_DIR", str(ext_dir))
+    monkeypatch.setenv("AEGIS_EXTENSIONS_DIR", str(ext_dir))
 
     repo = tmp_path / "repo-integration-uipath"
     _git_repo(repo, _manifest_dict("integration.uipath", "1.0.0"), _TOOL_ONLY.replace("integration.tool-only", "integration.uipath"))
@@ -1046,7 +1046,7 @@ def test_windows_cleanup_regression_readonly_git_objects(tmp_path, monkeypatch):
     mgr, reg, cap, tool, lc = _make_manager(tmp_path, ext_dir)
 
     staging_parent = Path(mgr_mod.tempfile.gettempdir())
-    before = {p.name for p in staging_parent.glob("aether_ext_staging_*")}
+    before = {p.name for p in staging_parent.glob("aegis_ext_staging_*")}
 
     result = mgr.install(str(repo))
     assert result["id"] == "integration.win"
@@ -1054,7 +1054,7 @@ def test_windows_cleanup_regression_readonly_git_objects(tmp_path, monkeypatch):
     assert installed.is_dir()
     assert not (installed / ".git").exists()
 
-    after = {p.name for p in staging_parent.glob("aether_ext_staging_*")}
+    after = {p.name for p in staging_parent.glob("aegis_ext_staging_*")}
     assert after <= before, f"staging leaked: {after - before}"
 
 

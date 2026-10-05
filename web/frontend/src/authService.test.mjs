@@ -113,17 +113,17 @@ test("authService: exchangeOAuthCallback saves token and user on success", async
     return {
       ok: true,
       json: async () => ({
-        token: "minted.aether.jwt",
-        user: { sub: "sub_1", email: "operator@aether.ai", name: "Operator" },
+        token: "minted.aegis.jwt",
+        user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
       }),
     };
   };
 
   const result = await exchangeOAuthCallback("google_auth_code_123", "signed_state_token");
-  assert.equal(result.token, "minted.aether.jwt");
-  assert.equal(getAuthToken(), "minted.aether.jwt");
+  assert.equal(result.token, "minted.aegis.jwt");
+  assert.equal(getAuthToken(), "minted.aegis.jwt");
   assert.equal(isAuthenticated(), true);
-  assert.equal(getStoredUser().email, "operator@aether.ai");
+  assert.equal(getStoredUser().email, "operator@aegis.local");
 });
 
 test("authService: verifyCurrentSession validates existing token", async () => {
@@ -137,13 +137,13 @@ test("authService: verifyCurrentSession validates existing token", async () => {
       ok: true,
       json: async () => ({
         authenticated: true,
-        user: { sub: "sub_1", email: "operator@aether.ai", name: "Operator" },
+        user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
       }),
     };
   };
 
   const user = await verifyCurrentSession();
-  assert.equal(user.email, "operator@aether.ai");
+  assert.equal(user.email, "operator@aegis.local");
 });
 
 test("authService: logoutUser clears local storage and notifies server", async () => {

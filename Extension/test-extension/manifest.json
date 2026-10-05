@@ -1,7 +1,7 @@
 {
-  "id": "aether.test-extension",
+  "id": "aegis.test-extension",
   "name": "Test Extension",
   "version": "0.1.0",
-  "description": "Minimal test extension for AETHER",
+  "description": "Minimal test extension for AegisCode",
   "api_version": "1"
 }

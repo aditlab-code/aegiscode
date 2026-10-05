@@ -388,12 +388,15 @@ function handleClose() {
               :class="{ active: activeFilter === 'error' }"
               @click="activeFilter = activeFilter === 'error' ? 'all' : 'error'"
             >
-              <span class="pill-dot dot-error">✖</span>
+              <span class="pill-dot dot-error">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </span>
               Error ({{ diagnosticsSummary.error }})
             </button>
           </div>
           <div v-if="diagnosticsSummary.total === 0" class="dock-tb-clean">
-            ✓ 0 issues detected
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>0 issues detected</span>
           </div>
         </div>
 

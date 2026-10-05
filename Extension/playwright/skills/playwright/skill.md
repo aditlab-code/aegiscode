@@ -1,6 +1,6 @@
 # Playwright Extension Skill
 
-The **Playwright Extension** is AETHER's **browser automation + web debugging**
+The **Playwright Extension** is Aegis's **browser automation + web debugging**
 capability. It owns the whole browser hierarchy (browser → session/context →
 page) and exposes it to the LLM as namespaced, JSON-returning tools.
 
@@ -9,10 +9,10 @@ Division of labour — this is the important part:
 | Concern | Handled by |
 |---|---|
 | Open/reproduce a web UI, read console/network/DOM, click/fill/select, screenshot, trace, persist a browser session | **this Playwright Extension** |
-| Change the source code of the web project, run its tests/linters, reload | the normal AETHER tools (`read_file`, `search_code`, `edit_file`/`write_file`, `run_command`, …) |
+| Change the source code of the web project, run its tests/linters, reload | the normal Aegis tools (`read_file`, `search_code`, `edit_file`/`write_file`, `run_command`, …) |
 
 Playwright **observes, drives and debugs** the browser. It never edits source
-code — after collecting evidence you fix the project with the ordinary AETHER
+code — after collecting evidence you fix the project with the ordinary Aegis
 tooling and then come back to Playwright to verify.
 
 ## Capability map
@@ -32,7 +32,7 @@ tooling and then come back to Playwright to verify.
   - `headless` (boolean)
   - `timeout` (integer, seconds)
 - **Service** – `PlaywrightService` is registered under the namespaced id
-  `aether.playwright.playwright_service` and owns the whole hierarchy:
+  `aegis.playwright.playwright_service` and owns the whole hierarchy:
 
   ```
   PlaywrightService
@@ -136,7 +136,7 @@ browser_dom_inspect(page_id, locator={"css": "#login-error"})
 browser_screenshot(page_id, full_page=True)     -> path
 browser_trace_start(session_id) ; browser_click(page_id, ref="e7") ; browser_trace_stop(session_id)
 
-# fix the source (ordinary AETHER tools, not Playwright)
+# fix the source (ordinary Aegis tools, not Playwright)
 search_code("api/login") ; read_file(...) ; edit_file(...)
 run_command("python manage.py test accounts")     # or npm test
 
@@ -157,7 +157,7 @@ browser_extract(page_id, what="text", locator={"css": "#dashboard"})  # -> "Welc
 Always follow this loop — never guess element handles and never read raw HTML:
 
 ```
-1. snapshot      aether.playwright.browser_snapshot(page_id)
+1. snapshot      aegis.playwright.browser_snapshot(page_id)
                  -> refs: e1, e2, e3 ...   (each has role + name)
 2. pick a ref    choose the ref whose role/name matches what you want
 3. interact      browser_click / browser_fill / browser_select / browser_press
@@ -181,80 +181,80 @@ Refs are **temporary**:
 
 | Tool id | Purpose |
 |---|---|
-| `aether.playwright.browser_launch` | launch a browser, returns `browser_id` |
-| `aether.playwright.browser_close` | close a browser (all when no id) |
-| `aether.playwright.session_create` | create a session, returns `session_id` |
-| `aether.playwright.session_list` | list sessions with their pages |
-| `aether.playwright.session_close` | close a session and its pages |
-| `aether.playwright.page_new` | open a page/tab, returns `page_id` |
-| `aether.playwright.page_list` | list pages with url/title |
-| `aether.playwright.page_navigate` | go to a URL |
-| `aether.playwright.page_reload` | reload the page |
-| `aether.playwright.page_back` | history back |
-| `aether.playwright.page_forward` | history forward |
-| `aether.playwright.page_close` | close a page |
+| `aegis.playwright.browser_launch` | launch a browser, returns `browser_id` |
+| `aegis.playwright.browser_close` | close a browser (all when no id) |
+| `aegis.playwright.session_create` | create a session, returns `session_id` |
+| `aegis.playwright.session_list` | list sessions with their pages |
+| `aegis.playwright.session_close` | close a session and its pages |
+| `aegis.playwright.page_new` | open a page/tab, returns `page_id` |
+| `aegis.playwright.page_list` | list pages with url/title |
+| `aegis.playwright.page_navigate` | go to a URL |
+| `aegis.playwright.page_reload` | reload the page |
+| `aegis.playwright.page_back` | history back |
+| `aegis.playwright.page_forward` | history forward |
+| `aegis.playwright.page_close` | close a page |
 
 ### Snapshot & interaction (Task 03)
 
 | Tool id | Purpose |
 |---|---|
-| `aether.playwright.browser_snapshot` | snapshot + element refs (`e1`, `e2`, ...) |
-| `aether.playwright.browser_refs` | refs of the last snapshot (no re-scan) |
-| `aether.playwright.browser_click` | click a ref/locator |
-| `aether.playwright.browser_fill` | fill an input/textarea |
-| `aether.playwright.browser_select` | select option(s) by value/label/index |
-| `aether.playwright.browser_press` | press a key (on an element or the page) |
-| `aether.playwright.browser_scroll` | element into view, by delta, or to top/bottom |
-| `aether.playwright.browser_extract` | text/value/attribute/count/visible/enabled/selected |
-| `aether.playwright.browser_wait` | condition-based wait |
-| `aether.playwright.browser_upload` | set files on a file input |
-| `aether.playwright.browser_download` | capture a download as an artifact |
-| `aether.playwright.browser_dialog` | handle alert/confirm/prompt |
+| `aegis.playwright.browser_snapshot` | snapshot + element refs (`e1`, `e2`, ...) |
+| `aegis.playwright.browser_refs` | refs of the last snapshot (no re-scan) |
+| `aegis.playwright.browser_click` | click a ref/locator |
+| `aegis.playwright.browser_fill` | fill an input/textarea |
+| `aegis.playwright.browser_select` | select option(s) by value/label/index |
+| `aegis.playwright.browser_press` | press a key (on an element or the page) |
+| `aegis.playwright.browser_scroll` | element into view, by delta, or to top/bottom |
+| `aegis.playwright.browser_extract` | text/value/attribute/count/visible/enabled/selected |
+| `aegis.playwright.browser_wait` | condition-based wait |
+| `aegis.playwright.browser_upload` | set files on a file input |
+| `aegis.playwright.browser_download` | capture a download as an artifact |
+| `aegis.playwright.browser_dialog` | handle alert/confirm/prompt |
 
 ### Debugging (Task 04)
 
 | Tool id | Purpose |
 |---|---|
-| `aether.playwright.browser_console` | structured console/page-error events + filters |
-| `aether.playwright.browser_network` | captured request/response records + filters |
-| `aether.playwright.browser_dom_inspect` | inspect one element (tag/text/attrs/box/html) |
-| `aether.playwright.browser_screenshot` | full-page / viewport / element screenshot |
-| `aether.playwright.browser_trace_start` | start Playwright tracing on a session |
-| `aether.playwright.browser_trace_stop` | stop tracing, save a re-openable `.zip` |
-| `aether.playwright.browser_trace_open` | open descriptor for a trace `.zip` (reveal with the OS if requested) |
+| `aegis.playwright.browser_console` | structured console/page-error events + filters |
+| `aegis.playwright.browser_network` | captured request/response records + filters |
+| `aegis.playwright.browser_dom_inspect` | inspect one element (tag/text/attrs/box/html) |
+| `aegis.playwright.browser_screenshot` | full-page / viewport / element screenshot |
+| `aegis.playwright.browser_trace_start` | start Playwright tracing on a session |
+| `aegis.playwright.browser_trace_stop` | stop tracing, save a re-openable `.zip` |
+| `aegis.playwright.browser_trace_open` | open descriptor for a trace `.zip` (reveal with the OS if requested) |
 
 ### Debug UI & persistence (Task 05)
 
 | Tool id | Purpose |
 |---|---|
-| `aether.playwright.browser_debug_panel` | debug-panel view model: sessions + pages + console + network (`renderer/type/data`) |
-| `aether.playwright.session_save_state` | save a session's storage state (cookies + localStorage) |
-| `aether.playwright.session_restore_state` | restore a saved storage state (new or existing session) |
-| `aether.playwright.session_state_list` | list saved storage-state names |
-| `aether.playwright.session_state_delete` | delete a saved storage state |
+| `aegis.playwright.browser_debug_panel` | debug-panel view model: sessions + pages + console + network (`renderer/type/data`) |
+| `aegis.playwright.session_save_state` | save a session's storage state (cookies + localStorage) |
+| `aegis.playwright.session_restore_state` | restore a saved storage state (new or existing session) |
+| `aegis.playwright.session_state_list` | list saved storage-state names |
+| `aegis.playwright.session_state_delete` | delete a saved storage state |
 
 ## Debug UI (Task 05)
 
 The extension ships a **generic** debug UI. It does not add a new UI framework:
 it registers normal Extension UI capabilities through `context.ui.register`, so
-the standard AETHER UI runtime renders them (rendering is chosen from
-`type` / `props.viewer_type`, never from `aether.playwright`).
+the standard Aegis UI runtime renders them (rendering is chosen from
+`type` / `props.viewer_type`, never from `aegis.playwright`).
 
 Contributions:
 
 ```
-aether.playwright.debug_panel        panel  — sessions, pages, console, network
-aether.playwright.console_viewer     viewer — structured console events
-aether.playwright.network_viewer     table  — method / url / status / type / failed
-aether.playwright.dom_viewer         viewer — DOM inspection of one element
-aether.playwright.screenshot_viewer  viewer — image preview of browser_screenshot
-aether.playwright.trace_viewer       viewer — .zip reference of browser_trace_stop (+ Open Trace)
+aegis.playwright.debug_panel        panel  — sessions, pages, console, network
+aegis.playwright.console_viewer     viewer — structured console events
+aegis.playwright.network_viewer     table  — method / url / status / type / failed
+aegis.playwright.dom_viewer         viewer — DOM inspection of one element
+aegis.playwright.screenshot_viewer  viewer — image preview of browser_screenshot
+aegis.playwright.trace_viewer       viewer — .zip reference of browser_trace_stop (+ Open Trace)
 ```
 
 The panel view model is produced by `PlaywrightService.debug_panel(...)`; each
 sub-view is also available on its own (`sessions_view`, `pages_view`,
 `console_view`, `network_view`, `dom_view`, `screenshot_view`, `trace_view`,
-`trace_status`). Every view returns the AETHER UI Result contract
+`trace_status`). Every view returns the Aegis UI Result contract
 (`{renderer, type, data, [artifact]}`).
 
 ```python
@@ -279,19 +279,19 @@ Panel actions map to existing capabilities: **Refresh**
 
 ## Session persistence (Task 05)
 
-Browser state survives an AETHER restart via Playwright's **official**
+Browser state survives an Aegis restart via Playwright's **official**
 storage-state mechanism and the Extension storage API — useful for "debug a
 logged-in flow" without re-authenticating every run:
 
 ```
-session -> browser state -> save_state -> restart AETHER -> restore_state
+session -> browser state -> save_state -> restart Aegis -> restore_state
 ```
 
 ```python
 # save the current session (cookies + localStorage)
 session_save_state(session_id=session_id, name="login", project=None)
 
-# on a fresh AETHER process: restore straight into a new session
+# on a fresh Aegis process: restore straight into a new session
 session_restore_state(name="login")                # -> creates a new session
 
 # or re-apply the state to an existing session
@@ -306,7 +306,7 @@ Rules:
 
 - State is stored through `context.storage`, **isolated per extension** and,
   when `project` is given, **per project**
-  (`<project>/.aether/extensions/aether.playwright/…`). Extension-scope and
+  (`<project>/.aegis/extensions/aegis.playwright/…`). Extension-scope and
   project-scope states never mix.
 - `restore_state` with no `session_id` uses
   `new_context(storage_state=…)` (the path that survives a restart); with a
@@ -378,24 +378,24 @@ fires its own XHR/fetch calls, so you read network evidence after they settle.
 
 ```python
 # 1. snapshot
-snap = tools.execute("aether.playwright.browser_snapshot", {"page_id": page_id})
+snap = tools.execute("aegis.playwright.browser_snapshot", {"page_id": page_id})
 # snap["refs"] == {"e1": {"role": "textbox", "name": "Email"}, "e2": {"role": "button", "name": "Save"}, ...}
 
 # 2/3. interact using a ref
-tools.execute("aether.playwright.browser_fill",
+tools.execute("aegis.playwright.browser_fill",
               {"page_id": page_id, "ref": "e1", "value": "dev@example.com"})
-tools.execute("aether.playwright.browser_click", {"page_id": page_id, "ref": "e2"})
+tools.execute("aegis.playwright.browser_click", {"page_id": page_id, "ref": "e2"})
 
 # 4. wait for the page to react
-tools.execute("aether.playwright.browser_wait",
+tools.execute("aegis.playwright.browser_wait",
               {"page_id": page_id, "condition": "text",
                "locator": {"css": "#out"}, "text": "saved:"})
 
 # 5. snapshot again (refs from step 1 are stale once the DOM changed)
-snap2 = tools.execute("aether.playwright.browser_snapshot", {"page_id": page_id})
+snap2 = tools.execute("aegis.playwright.browser_snapshot", {"page_id": page_id})
 
 # extracting data
-tools.execute("aether.playwright.browser_extract",
+tools.execute("aegis.playwright.browser_extract",
               {"page_id": page_id, "what": "text", "locator": {"css": "#out"}})
 ```
 
@@ -435,7 +435,7 @@ browser_trace_stop(session_id, filename=..., save_dir=...)
 
 ## Lifecycle notes
 
-- The extension is a normal AETHER Extension: `register` declares the config
+- The extension is a normal Aegis Extension: `register` declares the config
   keys, the service capability and the debug-UI contributions; `enable` lazily
   builds the service and registers every tool; `disable` shuts the service down
   and releases every browser/session/page. `disable` **never** deletes persisted

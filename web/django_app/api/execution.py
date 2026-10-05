@@ -1,16 +1,16 @@
-"""Execution bridge: Django Gateway -> AETHER Runtime (#55 wiring).
+"""Execution bridge: Django Gateway -> Aegis Runtime (#55 wiring).
 
 Django HANYA menjadi gateway/orchestration boundary. Modul ini TIDAK
 mendefinisikan Runtime/Orchestrator/Loop/Planning/Tool baru: ia hanya
-MERAKIT komponen AETHER yang sudah ada dan menjalankannya.
+MERAKIT komponen Aegis yang sudah ada dan menjalankannya.
 
 Alur:
     PreparedTask
-        -> AgentRuntime (AETHER, existing)
+        -> AgentRuntime (Aegis, existing)
              -> AgentOrchestrator -> ToolExecutor(permission_manager=...)
                   -> PermissionManager (#54) -> ToolRegistry -> Tools
-        -> TaskLifecycle (AETHER, existing) -> status lifecycle
-        -> SessionStore (AETHER, existing) -> events -> SSE (#51)
+        -> TaskLifecycle (Aegis, existing) -> status lifecycle
+        -> SessionStore (Aegis, existing) -> events -> SSE (#51)
 
 Eksekusi dijalankan di background thread daemon (minimal, tanpa dependency
 baru). Ini BUKAN Task Queue subsystem / worker framework: hanya satu thread
@@ -22,7 +22,7 @@ Sumber konfigurasi provider (provider-agnostic):
        `agent_ai.providers.factory`; `model_name` diabaikan karena model
        berasal dari konfigurasi tersimpan. Ini sumber tunggal provider aktif.
     2. KATALOG REGISTRY (fallback eksplisit): `provider_name` + `model_name`
-       dari ProviderRegistry AETHER. Dipakai hanya bila `provider_name`
+       dari ProviderRegistry Aegis. Dipakai hanya bila `provider_name`
        diberikan eksplisit (mis. verifier); TIDAK ada default dari .env.
 
 Bila provider tidak tersedia (mis. tidak ada API key / server lokal mati),
@@ -62,12 +62,12 @@ def _normalize_change_path(path: Any) -> str:
 
 
 class TaskExecutor:
-    """Merakit & menjalankan AETHER Runtime untuk sebuah PreparedTask.
+    """Merakit & menjalankan Aegis Runtime untuk sebuah PreparedTask.
 
     Args:
-        session_store: SessionStore AETHER (event system existing).
+        session_store: SessionStore Aegis (event system existing).
         provider_factory: callable `() -> BaseProvider` opsional. Bila None,
-            provider diambil dari ProviderRegistry AETHER berdasarkan nama
+            provider diambil dari ProviderRegistry Aegis berdasarkan nama
             eksplisit. Disediakan agar verifier dapat menyuntikkan provider fake.
         permission_manager: PermissionManager opsional (#54). Bila None,
             dibuat default (dari settings) sehingga policy tetap terpasang.
@@ -141,7 +141,7 @@ class TaskExecutor:
         *,
         resolved_config: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Bangun provider AETHER (provider-agnostic).
+        """Bangun provider Aegis (provider-agnostic).
 
         Args:
             provider_name: nama provider eksplisit (mis. "deepseek", "ollama").
@@ -188,7 +188,7 @@ class TaskExecutor:
 
         workspace_root: bila diisi (active project root), tool filesystem/
         workspace diarahkan ke root tersebut sehingga write/edit relatif
-        terhadap project aktif (bukan root AETHER). Bila None, memakai
+        terhadap project aktif (bukan root Aegis). Bila None, memakai
         registry global (backward compatible).
 
         model_name: nama model eksplisit dari pilihan UI. Bila diisi, dipakai
@@ -203,7 +203,7 @@ class TaskExecutor:
 
         permission_manager: PermissionManager efektif opsional. Bila None,
         memakai `self.permission_manager` (perilaku existing). Dipakai untuk
-        memasang policy project-local (`<root>/.aether/permissions.json`) pada
+        memasang policy project-local (`<root>/.aegis/permissions.json`) pada
         perintah task project tertentu TANPA mengubah jalur lain.
 
         project_matrix: Project Permission Matrix project-local opsional.
@@ -284,8 +284,8 @@ class TaskExecutor:
             session_id=session_id,
             options=options,
             # Project-local storage (Task 5): root project target -> Task Log
-            # (`.aether/log/<task_id>.log`) + AI Project Bible
-            # (`.aether/bible`). Bila None, storage project-local dilewati.
+            # (`.aegis/log/<task_id>.log`) + AI Project Bible
+            # (`.aegis/bible`). Bila None, storage project-local dilewati.
             project_root=workspace_root,
             # Cooperative cancellation: token dibagikan gateway -> runtime ->
             # orchestrator agar loop berhenti di safe boundary saat user Stop.
@@ -297,7 +297,7 @@ class TaskExecutor:
         )
 
     # ------------------------------------------------------------------ #
-    # Event helpers (memakai SessionStore AETHER; tanpa event bus baru)
+    # Event helpers (memakai SessionStore Aegis; tanpa event bus baru)
     # ------------------------------------------------------------------ #
     def _emit(
         self,
@@ -340,11 +340,11 @@ class TaskExecutor:
         approval_gate: Optional[Callable[[Dict[str, Any]], bool]] = None,
         requested_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Jalankan PreparedTask lewat AETHER Runtime (synchronous).
+        """Jalankan PreparedTask lewat Aegis Runtime (synchronous).
 
         Args:
             prepared: PreparedTask (task + context + plan).
-            session_id: session AETHER untuk event.
+            session_id: session Aegis untuk event.
             task_id: id task (untuk lifecycle + event).
             on_status: callback opsional `(status, result, error)` dipanggil
                 saat status berubah (dipakai gateway untuk update TaskRecord).
@@ -352,7 +352,7 @@ class TaskExecutor:
                 filesystem/workspace diarahkan ke root tersebut sehingga
                 write/edit relatif terhadap project aktif.
             provider_name: nama provider eksplisit dari pilihan UI (mis.
-                "deepseek", "ollama"). Bila None, memakai default AETHER.
+                "deepseek", "ollama"). Bila None, memakai default Aegis.
             model_name: nama model eksplisit dari pilihan UI. Bila None,
                 provider memakai model default-nya.
             provider_instance_id: id provider instance dari konfigurasi LLM
@@ -364,16 +364,16 @@ class TaskExecutor:
                 runtime/orchestrator berhenti di safe boundary saat token
                 diminta dan task dilaporkan CANCELLED (bukan FAILED).
             user_parts: content blocks opsional untuk pesan user awal (mis.
-                image, format internal AETHER provider-agnostic). Diteruskan ke
+                image, format internal Aegis provider-agnostic). Diteruskan ke
                 AgentRuntime -> AgentOrchestrator (user_parts). Kosong (default)
                 = text-only tidak berubah.
             project_permission_config: PermissionConfig project-local opsional
-                (dari `<root>/.aether/permissions.json`). Bila diisi, policy
+                (dari `<root>/.aegis/permissions.json`). Bila diisi, policy
                 di-enforce oleh PermissionManager EXISTING untuk task project
                 ini saja (project lain tidak terpengaruh). Bila None, perilaku
                 default tidak berubah.
             project_permission_matrix: Project Permission Matrix project-local
-                opsional (dari `<root>/.aether/permissions.json`). Bila diisi,
+                opsional (dari `<root>/.aegis/permissions.json`). Bila diisi,
                 matrix (aksi x inside/outside) di-enforce pada execution path:
                 DENY menahan eksekusi, ASK menahan + butuh approval. Matrix
                 berlaku untuk project task ini saja. Bila None, perilaku
@@ -398,7 +398,7 @@ class TaskExecutor:
         if on_status is not None:
             on_status(TaskStatus.RUNNING.value, None, None)
 
-        # Change Tracker AETHER (existing): snapshot SEBELUM eksekusi, lalu
+        # Change Tracker Aegis (existing): snapshot SEBELUM eksekusi, lalu
         # deteksi perubahan SETELAH eksekusi. Read-only terhadap project.
         # Ini menjadi CONSISTENCY CHECK akhir (mis. perubahan lewat
         # run_command), BUKAN lagi satu-satunya sumber update UI: event live
@@ -499,7 +499,7 @@ class TaskExecutor:
                 on_status(TaskStatus.FAILED.value, None, error)
             return {"status": TaskStatus.FAILED.value, "result": None, "error": error, "iterations": 0}
 
-        # Consistency check AKHIR via Change Tracker AETHER (existing) dan emit
+        # Consistency check AKHIR via Change Tracker Aegis (existing) dan emit
         # event change_detected (event system existing) untuk perubahan yang
         # TIDAK tercakup event live (mis. file dibuat lewat run_command).
         # File yang sudah diemit live di-skip (hindari duplicate event).
@@ -569,6 +569,6 @@ def run_in_background(target: Callable[[], Any]) -> threading.Thread:
     daemon per task agar request HTTP tidak blocking. Technical debt: tidak ada
     retry/persistence/backpressure (lihat laporan).
     """
-    thread = threading.Thread(target=target, daemon=True, name="aether-task-exec")
+    thread = threading.Thread(target=target, daemon=True, name="aegis-task-exec")
     thread.start()
     return thread

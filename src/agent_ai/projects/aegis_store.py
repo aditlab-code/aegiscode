@@ -1,9 +1,9 @@
-"""Project-local `.aether` store: AI Project Bible + Task Log.
+"""Project-local `.aegis` store: AI Project Bible + Task Log.
 
 Struktur yang dikelola (di ROOT project target):
 
     <root project target>/
-        .aether/
+        .aegis/
             bible/
                 index.md          # manifest/navigation (dibaca LLM)
                 architecture.md
@@ -23,7 +23,7 @@ Struktur yang dikelola (di ROOT project target):
 
 Prinsip:
     - Project-local: semua ditulis di dalam root project target, tidak di
-      workspace AETHER.
+      workspace AegisCode.
     - AI-oriented: Bible ditulis sebagai markdown terstruktur (marker +
       key-value) yang padat & tidak ambigu untuk dibaca LLM.
     - Best-effort untuk Task Log: kegagalan menulis log TIDAK boleh
@@ -31,7 +31,7 @@ Prinsip:
     - Tidak ada dependency baru; tanpa DB/vektor/embeddings.
     - Idempotent: `ensure()` aman dipanggil berulang.
 
-Modul ini adalah SATU-SATUNYA tempat penulisan `<root>/.aether/`. ProjectBrain/
+Modul ini adalah SATU-SATUNYA tempat penulisan `<root>/.aegis/`. ProjectBrain/
 ProjectIntelligence membaca & menulis Bible hanya lewat sini.
 """
 
@@ -52,10 +52,8 @@ from agent_ai.projects.models import (
     _now_iso,
 )
 
-#: Nama folder root metadata project AegisCode (default baru).
+#: Nama folder root metadata project AegisCode.
 AEGIS_DIR_NAME = ".aegis"
-#: Nama folder root metadata project lama (backward-compatible fallback).
-AETHER_DIR_NAME = ".aether"
 #: Subfolder log task.
 LOG_DIR_NAME = "log"
 #: Subfolder (di dalam `log/`) untuk log response mentah API LLM per task.
@@ -154,14 +152,8 @@ class AegisProjectStore:
 
     def __init__(self, root: Union[str, Path]) -> None:
         self.root = Path(root).resolve()
-        aegis_path = self.root / AEGIS_DIR_NAME
-        aether_path = self.root / AETHER_DIR_NAME
-        if not aegis_path.exists() and aether_path.exists():
-            target_dir = aether_path
-        else:
-            target_dir = aegis_path
+        target_dir = self.root / AEGIS_DIR_NAME
         self.aegis_dir = target_dir
-        self.aether_dir = target_dir
         self.log_dir = target_dir / LOG_DIR_NAME
         self.response_log_dir = self.log_dir / RESPONSE_LOG_DIR_NAME
         self.bible_dir = target_dir / BIBLE_DIR_NAME
@@ -187,7 +179,7 @@ class AegisProjectStore:
     def response_log_path(self, task_id: Any) -> Path:
         """Path log response API LLM untuk `task_id` (task_id dibuat bila kosong).
 
-        Satu file per task: `<root>/.aether/log/response/<task_id>.json`.
+        Satu file per task: `<root>/.aegis/log/response/<task_id>.json`.
         """
         name = safe_task_id(task_id) or new_task_id()
         return self.response_log_dir / f"{name}{RESPONSE_LOG_SUFFIX}"
@@ -201,15 +193,15 @@ class AegisProjectStore:
         return self.bible_dir / BIBLE_INDEX_NAME
 
     def environment_path(self) -> Path:
-        """Path file Environment Context (`<root>/.aether/ENVIRONMENT.md`)."""
-        return self.aether_dir / ENVIRONMENT_FILE_NAME
+        """Path file Environment Context (`<root>/.aegis/ENVIRONMENT.md`)."""
+        return self.aegis_dir / ENVIRONMENT_FILE_NAME
 
     def skills_dir(self) -> Path:
-        """Directory `<root>/.aether/bible/skills` (project-local Skill store)."""
+        """Directory `<root>/.aegis/bible/skills` (project-local Skill store)."""
         return self.bible_dir / BIBLE_SKILLS_DIR_NAME
 
     def skill_dir(self, skill_id: str) -> Path:
-        """Directory skill `<root>/.aether/bible/skills/<skill_id>`."""
+        """Directory skill `<root>/.aegis/bible/skills/<skill_id>`."""
         from agent_ai.projects.skills import validate_skill_id
         return self.skills_dir() / validate_skill_id(skill_id)
 
@@ -218,13 +210,13 @@ class AegisProjectStore:
         return self.skill_dir(skill_id) / SKILL_FILE_NAME
 
     def __repr__(self) -> str:  # pragma: no cover - bantuan debug
-        return f"<AetherProjectStore root={self.root}>"
+        return f"<AegisProjectStore root={self.root}>"
 
     # ------------------------------------------------------------------ #
     # Task Log Discovery
     # ------------------------------------------------------------------ #
     def list_task_logs(self) -> List[Path]:
-        """Daftar semua file log task di `.aether/log/`.
+        """Daftar semua file log task di `.aegis/log/`.
 
         Returns:
             Daftar Path file .log, terurut terbaru ke terlama
@@ -242,13 +234,13 @@ class AegisProjectStore:
 class TaskLog:
     """Writer log task project-local (append-only JSON Lines, best-effort).
 
-    Satu file per task: `<root>/.aether/log/<task_id>.log`. Semua kegagalan
+    Satu file per task: `<root>/.aegis/log/<task_id>.log`. Semua kegagalan
     (folder tidak bisa dibuat, disk penuh, dsb.) ditelan dan hanya menghasilkan
     `False` agar TIDAK pernah menggagalkan eksekusi task.
     """
 
-    def __init__(self, root: Union[str, Path, AetherProjectStore], task_id: Any = None) -> None:
-        self.store = root if isinstance(root, AetherProjectStore) else AetherProjectStore(root)
+    def __init__(self, root: Union[str, Path, AegisProjectStore], task_id: Any = None) -> None:
+        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
         self.task_id = safe_task_id(task_id) or new_task_id()
         self.store.ensure()
         self.path = self.store.log_path(self.task_id)
@@ -292,12 +284,12 @@ class TaskLog:
 class ResponseLog:
     """Writer log response mentah API LLM per task (best-effort).
 
-    Satu file per task: `<root>/.aether/log/response/<task_id>.json`. File
+    Satu file per task: `<root>/.aegis/log/response/<task_id>.json`. File
     berisi SATU objek JSON dengan kunci `responses` = daftar record untuk
     SETIAP round/request LLM dalam task tersebut (append-only secara semantik;
     record lama dipertahankan).
 
-    Tujuan: mencatat APA yang benar-benar diterima AETHER dari API LLM —
+    Tujuan: mencatat APA yang benar-benar diterima AegisCode dari API LLM —
     termasuk response yang diterima sebelum error (partial response bila
     tersedia) — sehingga kasus API terputus dapat dianalisis dari file log.
 
@@ -312,12 +304,12 @@ class ResponseLog:
 
     Semua kegagalan (folder tidak bisa dibuat, disk penuh, JSON tidak valid,
     dsb.) ditelan dan hanya menghasilkan `False` agar logging TIDAK pernah
-    menggagalkan eksekusi task. Directory `.aether/log/response/` dibuat
+    menggagalkan eksekusi task. Directory `.aegis/log/response/` dibuat
     otomatis saat diperlukan.
     """
 
-    def __init__(self, root: Union[str, Path, AetherProjectStore], task_id: Any = None) -> None:
-        self.store = root if isinstance(root, AetherProjectStore) else AetherProjectStore(root)
+    def __init__(self, root: Union[str, Path, AegisProjectStore], task_id: Any = None) -> None:
+        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
         self.task_id = safe_task_id(task_id) or new_task_id()
         self.store.ensure()
         self.path = self.store.response_log_path(self.task_id)
@@ -382,15 +374,15 @@ class ResponseLog:
 class BibleStore:
     """Storage AI Project Bible berbasis markdown project-local.
 
-    Kategori dipetakan ke file `<kategori>.md` di `<root>/.aether/bible/`.
+    Kategori dipetakan ke file `<kategori>.md` di `<root>/.aegis/bible/`.
     Format berorientasi LLM: header marker + blok entri key-value (lihat
     `BIBLE_FORMAT`). Append-only secara semantik (knowledge lama dipertahankan).
     """
 
     categories = BIBLE_CATEGORIES
 
-    def __init__(self, root: Union[str, Path, AetherProjectStore]) -> None:
-        self.store = root if isinstance(root, AetherProjectStore) else AetherProjectStore(root)
+    def __init__(self, root: Union[str, Path, AegisProjectStore]) -> None:
+        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
 
     # ------------------------------------------------------------------ #
     # Layout
@@ -473,9 +465,9 @@ class BibleStore:
     def _header(self, category: str) -> str:
         return (
             f"# bible:{category}\n"
-            f"<!-- AETHER BIBLE (machine-readable). format={BIBLE_FORMAT}. -->\n"
+            f"<!-- AEGIS BIBLE (machine-readable). format={BIBLE_FORMAT}. -->\n"
             f"<!-- Setiap entri dimulai dengan marker '{ENTRY_MARKER}'. -->\n"
-            "<!-- Tambahkan knowledge lewat ProjectBrain/AETHER; jangan edit manual. -->\n"
+            "<!-- Tambahkan knowledge lewat ProjectBrain/AegisCode; jangan edit manual. -->\n"
             "\n"
         )
 
@@ -557,9 +549,9 @@ class BibleStore:
         lines = [
             "# Project Bible",
             "",
-            "<!-- AETHER BIBLE index (machine-readable). Manifest/navigation. -->",
+            "<!-- AEGIS BIBLE index (machine-readable). Manifest/navigation. -->",
             "<!-- Knowledge project untuk agen AI. Baca kategori relevan sebelum",
-            "     bekerja; tulis lewat ProjectBrain/AETHER, jangan edit manual. -->",
+            "     bekerja; tulis lewat ProjectBrain/AegisCode, jangan edit manual. -->",
             "",
             "## categories",
         ]
@@ -588,14 +580,10 @@ def _parse_confidence(value: Optional[str]) -> float:
     return confidence
 
 
-#: Alias lama agar pemanggil dapat memakai nama yang lebih deskriptif.
-AetherTaskLog = TaskLog
-
-
 class TaskLogReader:
     """Reader log task project-local (read-only, JSON Lines).
 
-    Membaca file `.aether/log/<task_id>.log` yang sudah ada.
+    Membaca file `.aegis/log/<task_id>.log` yang sudah ada.
     Tidak menulis atau memodifikasi log apa pun.
 
     Args:
@@ -603,8 +591,8 @@ class TaskLogReader:
         task_id: identifier task.
     """
 
-    def __init__(self, root: Union[str, Path, AetherProjectStore], task_id: Any = None) -> None:
-        self.store = root if isinstance(root, AetherProjectStore) else AetherProjectStore(root)
+    def __init__(self, root: Union[str, Path, AegisProjectStore], task_id: Any = None) -> None:
+        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
         self.task_id = safe_task_id(task_id) or new_task_id()
         self.path = self.store.log_path(self.task_id)
 
@@ -722,8 +710,4 @@ class TaskLogReader:
             if evt == "task_finished" and "result" in data:
                 return data["result"]
         return None
-
-
-#: Alias kompatibilitas
-AetherProjectStore = AegisProjectStore
 

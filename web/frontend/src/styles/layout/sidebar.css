@@ -5,7 +5,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: var(--bg-sidebar, #13141f);
   border-right: none;
   box-sizing: border-box;
   overflow: hidden;
@@ -217,7 +217,7 @@
   max-height: 30px;
   border-top: none;
   border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-surface);
+  background: var(--bg-sidebar, #13141f);
   margin: 0;
   width: 100%;
   box-sizing: border-box;

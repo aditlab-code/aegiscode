@@ -91,7 +91,7 @@ def write_log_response_api() -> bool:
     """Baca `write_log_response_api` dari `data/settings.json`.
 
     Global switch ON/OFF untuk logging response mentah API LLM per task ke
-    `<root project target>/.aether/log/response/<task_id>.json`. Default False
+    `<root project target>/.aegis/log/response/<task_id>.json`. Default False
     (backward compatible): bila file/field tidak ada, atau terjadi error baca,
     return False sehingga AETHER berjalan PERSIS seperti sekarang (tanpa
     menulis response API). Hanya nilai eksplisit `true` yang mengaktifkan.
@@ -490,7 +490,7 @@ def normalize_global_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
         raise SettingsWriteError("Body update harus berupa object JSON.")
 
     # Pemisahan konfigurasi: policy/permission adalah milik Project Settings
-    # (`<root>/.aether/permissions.json`), BUKAN Global Settings AETHER. Tolak
+    # (`<root>/.aegis/permissions.json`), BUKAN Global Settings AETHER. Tolak
     # dengan pesan yang mengarahkan user ke tempat yang benar (bukan menerima
     # diam-diam lalu menyimpan konfigurasi project ke file global).
     migrated = set(updates) & _PROJECT_POLICY_KEYS
@@ -1199,6 +1199,24 @@ class Settings:
     # Permission / Safety Policy Layer (#54)
     permission: PermissionConfig = field(default_factory=PermissionConfig)
 
+    # Local Semantic Embeddings (Phase 2.1)
+    embed_model: str = field(default_factory=lambda: _get("AEGIS_EMBED_MODEL", "BAAI/bge-small-en-v1.5"))
+    embed_cache: str = field(default_factory=lambda: _get("AEGIS_EMBED_CACHE", ""))
+
+    @property
+    def EMBED_MODEL(self) -> str:
+        return self.embed_model
+
+    @property
+    def EMBED_CACHE(self) -> str:
+        return self.embed_cache
+
 
 # Instance global yang bisa di-import: `from config.settings import settings`
 settings = Settings()
+
+#: Model embedding lokal Phase 2.1 (fastembed).
+EMBED_MODEL: str = os.getenv("AEGIS_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+#: Direktori cache model; kosong = <AEGIS_ROOT>/data/models.
+EMBED_CACHE: str = os.getenv("AEGIS_EMBED_CACHE", "")
+

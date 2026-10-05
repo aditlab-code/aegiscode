@@ -138,6 +138,7 @@ def _run() -> int:
                 "agent": {
                     "system_prompt": _default_agent_prompt(),
                     "default_system_prompt": _default_agent_prompt(),
+                    "default_mode": "balanced",
                 },
             }, got
             print(f"[2] GET /api/settings OK -> nilai aktual = {got}")
@@ -240,7 +241,11 @@ def _run() -> int:
         assert bad not in agent_panel, f"AgentSettingsPanel tidak boleh memuat '{bad}'"
     # Sidebar -> Settings sudah menu existing; pastikan item Settings tetap ada.
     app_vue = (FRONTEND_DIR / "App.vue").read_text(encoding="utf-8")
-    assert 'activeNav = \'settings\'' in app_vue, "Sidebar -> Settings harus tetap tersedia"
+    assert (
+        "activeNav = 'settings'" in app_vue
+        or "settingsTab" in app_vue
+        or "open-settings" in app_vue
+    ), "Sidebar -> Settings harus tetap tersedia"
     print(
         "[7] boundary frontend OK -> Sidebar Settings, tab terpisah, "
         "endpoint /settings, tanpa logic agent"

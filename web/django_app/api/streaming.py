@@ -1,10 +1,10 @@
-"""SSE streaming untuk AETHER Gateway (#51).
+"""SSE streaming untuk Aegis Gateway (#51).
 
 Django HANYA menjadi transport:
-    AETHER Event -> Django Gateway -> SSE -> Client
+    Aegis Event -> Django Gateway -> SSE -> Client
 
 TIDAK membuat event model kedua, event bus baru, broker, Redis, Celery,
-Channels, database, atau persistent event store. Memakai SessionStore AETHER
+Channels, database, atau persistent event store. Memakai SessionStore Aegis
 yang sudah ada (subscription minimal ditambahkan di layer session).
 
 Format SSE standar:
@@ -59,14 +59,14 @@ def format_comment(text: str) -> str:
 
 
 class EventSubscription:
-    """Subscription tipis ke SessionStore AETHER (bounded, tanpa thread permanen).
+    """Subscription tipis ke SessionStore Aegis (bounded, tanpa thread permanen).
 
     Membungkus callback subscription store + queue bounded. Callback store
     dipanggil saat event di-append; event yang lolos filter dimasukkan ke queue
     (drop bila penuh, agar tidak memory leak).
 
     Args:
-        store: SessionStore AETHER.
+        store: SessionStore Aegis.
         session_id: filter session (opsional).
         task_id: filter task (opsional).
         maxsize: batas queue (bounded).

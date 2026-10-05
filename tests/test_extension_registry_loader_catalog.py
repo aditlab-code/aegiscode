@@ -242,6 +242,6 @@ def test_existing_extension_folder_loads():
     loader = ExtensionLoader(registry=reg, enable_entry_points=False)
     res = loader.load_all()
     # At least test-extension should be present
-    assert reg.exists("aether.test-extension")
+    assert reg.exists("aegis.test-extension")
     cat = ExtensionCatalog(reg).get_catalog()
-    assert any(e["id"] == "aether.test-extension" for e in cat["extensions"])
+    assert any(e["id"] == "aegis.test-extension" for e in cat["extensions"])

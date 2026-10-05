@@ -7,8 +7,8 @@
 
 import { ref, computed } from "vue";
 
-const TOKEN_STORAGE_KEY = "aether_auth_token";
-const USER_STORAGE_KEY = "aether_auth_user";
+const TOKEN_STORAGE_KEY = "aegis_auth_token";
+const USER_STORAGE_KEY = "aegis_auth_user";
 
 export function getAuthToken() {
   try {
@@ -77,7 +77,7 @@ export function getRedirectUri() {
 function dispatchAuthChange() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent("aether:auth-changed", {
+      new CustomEvent("aegis:auth-changed", {
         detail: {
           authenticated: isAuthenticated(),
           user: getStoredUser(),
@@ -100,7 +100,7 @@ export async function fetchGoogleLoginUrl(redirectUri = null) {
 }
 
 /**
- * Exchange authorization code and anti-CSRF state token for AETHER session.
+ * Exchange authorization code and anti-CSRF state token for Aegis session.
  */
 export async function exchangeOAuthCallback(code, state, redirectUri = null) {
   const payload = {
@@ -212,11 +212,11 @@ export function useAuth() {
   async function initAuth() {
     if (typeof window === "undefined") return;
 
-    window.addEventListener("aether:auth-unauthorized", () => {
+    window.addEventListener("aegis:auth-unauthorized", () => {
       currentUser.value = null;
       clearAuthSession();
     });
-    window.addEventListener("aether:auth-changed", (e) => {
+    window.addEventListener("aegis:auth-changed", (e) => {
       currentUser.value = e.detail?.user || null;
     });
 

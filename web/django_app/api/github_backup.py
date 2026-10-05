@@ -1,4 +1,4 @@
-"""GitHub Backup (checkpoint/recovery) — layer gateway AETHER.
+"""GitHub Backup (checkpoint/recovery) — layer gateway AegisCode.
 
 Fitur OPTIONAL per project. Menggabungkan tiga kemampuan yang SUDAH ada /
 diperluas secara ADDITIVE:
@@ -8,8 +8,8 @@ diperluas secara ADDITIVE:
        `GitRepositoryFacade` + `SubprocessGitClient` yang sudah ada. Paket
        `agent_ai.git` tetap READ-ONLY; operasi tulis Git ditambahkan di layer
        gateway (modul ini), bukan dengan menambah mutasi ke paket read-only.
-    2. Project-local `.aether` store (src/agent_ai/projects/github_backup.py)
-       -> lokasi metadata private per project (`.aether/github/`).
+    2. Project-local `.aegis` store (src/agent_ai/projects/github_backup.py)
+       -> lokasi metadata private per project (`.aegis/github/`).
     3. Credential protection Windows (DPAPI) via `WindowsCredentialProtector`.
 
 Boundary:
@@ -38,14 +38,11 @@ from agent_ai.git.models import GitCommit
 from agent_ai.git.repository import GitRepositoryFacade
 from agent_ai.projects.github_backup import (
     AEGIS_DIR_NAME,
-    AETHER_DIR_NAME,
     GithubBackupConfig,
     GithubBackupStore,
     _normalize_exclude,
     aegis_is_ignored,
-    aether_is_ignored,
     ensure_aegis_ignored,
-    ensure_aether_ignored,
 )
 
 
@@ -79,7 +76,7 @@ class WindowsCredentialProtector:
 
     CRYPTPROTECT_UI_FORBIDDEN = 0x01
     #: Entropy opsional (konstanta aplikasi) — bukan secret.
-    _ENTROPY = b"AETHER_GITHUB_BACKUP_V1"
+    _ENTROPY = b"AEGIS_GITHUB_BACKUP_V1"
 
     def __init__(self) -> None:
         if not sys.platform.startswith("win"):
@@ -142,11 +139,6 @@ class WindowsCredentialProtector:
                 return base64.b64decode(blob_bytes[len(b"AEGIS_PLAIN_V1:"):]).decode("utf-8")
             except Exception as exc:
                 raise CredentialProtectionError("Credential tersimpan rusak.") from exc
-        if blob_bytes.startswith(b"AETHER_PLAIN_V1:"):
-            try:
-                return base64.b64decode(blob_bytes[len(b"AETHER_PLAIN_V1:"):]).decode("utf-8")
-            except Exception as exc:
-                raise CredentialProtectionError("Credential tersimpan rusak.") from exc
         if self._crypt32 is None:
             raise CredentialProtectionError(
                 "Dekripsi credential hanya didukung pada Windows (DPAPI)."
@@ -186,8 +178,8 @@ class WindowsCredentialProtector:
 #: Git credential helper: membaca token dari ENV (bukan dari argv/URL), agar
 #: token tidak muncul di daftar argumen proses maupun di URL remote.
 _CREDENTIAL_HELPER = (
-    "!f() { echo \"username=${AEGIS_GIT_USERNAME:-$AETHER_GIT_USERNAME}\"; "
-    "echo \"password=${AEGIS_GIT_PASSWORD:-$AETHER_GIT_PASSWORD}\"; }; f"
+    "!f() { echo \"username=${AEGIS_GIT_USERNAME}\"; "
+    "echo \"password=${AEGIS_GIT_PASSWORD}\"; }; f"
 )
 
 
@@ -232,12 +224,10 @@ class GitBackupClient:
         if token:
             env["AEGIS_GIT_USERNAME"] = "x-access-token"
             env["AEGIS_GIT_PASSWORD"] = token
-            env["AETHER_GIT_USERNAME"] = "x-access-token"
-            env["AETHER_GIT_PASSWORD"] = token
         return env
 
     def _credential_args(self, token: Optional[str]) -> List[str]:
-        # Bila token diberikan, pakai credential helper internal AETHER.
+        # Bila token diberikan, pakai credential helper internal AegisCode.
         # Bila tidak ada token, biarkan Git memakai credential bawaan sistem
         # (SSH keys, macOS Keychain, Git Credential Manager).
         if token:
@@ -294,9 +284,9 @@ class GitBackupClient:
     def _identity_args(self, cwd: Path) -> List[str]:
         args: List[str] = []
         if not self._config_value(cwd, "user.name"):
-            args += ["-c", "user.name=AETHER Backup"]
+            args += ["-c", "user.name=Aegis Backup"]
         if not self._config_value(cwd, "user.email"):
-            args += ["-c", "user.email=aether@localhost"]
+            args += ["-c", "user.email=aegis@localhost"]
         return args
 
     # -- operations ------------------------------------------------------- #
@@ -383,15 +373,13 @@ def _matches_exclude(path: str, patterns: List[str]) -> bool:
     return False
 
 
-def _is_aether_metadata(path: str) -> bool:
-    """True bila path berada di dalam `.aegis/` atau `.aether/` (metadata private)."""
+def _is_aegis_metadata(path: str) -> bool:
+    """True bila path berada di dalam `.aegis/`, `.aether/`, atau metadata internal."""
+    from agent_ai.git.client import _is_internal_ignored_path
     p = _normalize_rel(path)
-    return (
-        p == AEGIS_DIR_NAME
-        or p.startswith(AEGIS_DIR_NAME + "/")
-        or p == AETHER_DIR_NAME
-        or p.startswith(AETHER_DIR_NAME + "/")
-    )
+    if _is_internal_ignored_path(p):
+        return True
+    return p == AEGIS_DIR_NAME or p.startswith(AEGIS_DIR_NAME + "/")
 
 
 def _github_owner_repo(url: str) -> Optional[Tuple[str, str]]:
@@ -468,7 +456,7 @@ class GithubBackupService:
             "detected_remote": detected_remote,
             "repository": status.get("repository") or detected_remote,
             "branch": status.get("branch") or current_branch or "main",
-            "gitignore_ok": aether_is_ignored(root),
+            "gitignore_ok": aegis_is_ignored(root),
             "changes": {"modified": 0, "added": 0, "deleted": 0, "total": 0},
         }
         if is_repo:
@@ -486,7 +474,7 @@ class GithubBackupService:
         except Exception:  # noqa: BLE001 - status gagal bukan crash service
             return summary
         for f in status.files:
-            if _is_aether_metadata(f.path):
+            if _is_aegis_metadata(f.path):
                 continue
             if _matches_exclude(f.path, exclude):
                 continue
@@ -555,7 +543,7 @@ class GithubBackupService:
             store.save_credential(self.protector.protect(token))
 
         store.save_config(config)
-        ensure_aether_ignored(root)
+        ensure_aegis_ignored(root)
         return self.get_config(root)
     # -- test connection -------------------------------------------------- #
     def test_connection(
@@ -655,7 +643,7 @@ class GithubBackupService:
             headers={
                 "Authorization": f"token {token}",
                 "Accept": "application/vnd.github+json",
-                "User-Agent": "AETHER",
+                "User-Agent": "Aegis",
             },
         )
         try:
@@ -720,10 +708,10 @@ class GithubBackupService:
         if not message:
             raise GithubBackupError("Field 'description' (commit message) wajib diisi.")
 
-        # 1) Pastikan `.aether/` di-ignore (mandatory).
-        ensure_aether_ignored(root)
+        # 1) Pastikan `.aegis/` di-ignore (mandatory).
+        ensure_aegis_ignored(root)
 
-        # 2) Tentukan path yang akan di-commit (selalu kecualikan `.aether/`).
+        # 2) Tentukan path yang akan di-commit (selalu kecualikan `.aegis/`).
         exclude_patterns = list(config.exclude if config and exclude is None else (exclude or []))
         try:
             status = facade.status()
@@ -732,7 +720,7 @@ class GithubBackupService:
 
         staged: List[str] = []
         for f in status.files:
-            if _is_aether_metadata(f.path):
+            if _is_aegis_metadata(f.path):
                 continue
             if _matches_exclude(f.path, exclude_patterns):
                 continue

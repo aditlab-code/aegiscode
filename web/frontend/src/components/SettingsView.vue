@@ -23,6 +23,8 @@ import {
 } from "../api";
 import GlobalSettingsPanel from "./GlobalSettingsPanel.vue";
 import AgentSettingsPanel from "./AgentSettingsPanel.vue";
+import AppButton from "./ui/AppButton.vue";
+import AppCard from "./ui/AppCard.vue";
 
 const props = defineProps({
   // Konfigurasi runtime aktif dari AETHER (provider/model/mode + instance).
@@ -32,6 +34,7 @@ const props = defineProps({
   providerInstanceId: { type: String, default: "" },
   modelId: { type: String, default: "" },
   mode: { type: String, default: "" },
+  initialProviders: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits([
@@ -63,7 +66,15 @@ const notice = ref("");
 
 const credentials = ref([]);
 const providerTypes = ref([]);
-const providers = ref([]);
+const providers = ref(props.initialProviders?.length ? [...props.initialProviders] : []);
+watch(
+  () => props.initialProviders,
+  (val) => {
+    if (Array.isArray(val) && val.length) {
+      providers.value = [...val];
+    }
+  }
+);
 
 // Form: provider instance (mode CREATE bila id kosong, mode EDIT bila terisi).
 const providerForm = reactive({
@@ -415,12 +426,12 @@ async function testProvider(p) {
   try {
     const result = await testLLMProvider(id);
     if (result.status === "ok") {
-      testResults[id] = "✅ Connection OK";
+      testResults[id] = "Connection OK";
     } else {
-      testResults[id] = `❌ ${result.detail || "Failed"}`;
+      testResults[id] = `${result.detail || "Failed"}`;
     }
   } catch (e) {
-    testResults[id] = `❌ ${e.message || e}`;
+    testResults[id] = `${e.message || e}`;
   }
   // Auto-clear setelah 8 detik
   setTimeout(() => { testResults[id] = ""; }, 8000);
@@ -508,19 +519,19 @@ watch(activeTab, (tab) => {
         <div class="desc">Provider, model, dan credential yang dipakai AegisCode.</div>
       </div>
       <div class="sv-config-head-actions">
-        <button
-          type="button"
-          class="btn-aether btn-ghost-a"
+        <AppButton
+          variant="ghost"
           :disabled="loading || busy || !activeInstance"
+          :busy="testResults[activeInstance?.id] === 'testing…'"
           title="Test connectivity to active provider"
           @click="testProvider(activeInstance)"
         >
           <span v-if="testResults[activeInstance?.id] === 'testing…'">Testing…</span>
           <span v-else>Test Connection</span>
-        </button>
-        <button class="btn-aether btn-ghost-a" :disabled="loading || busy" @click="load">
+        </AppButton>
+        <AppButton variant="ghost" :disabled="loading || busy" @click="load">
           Refresh
-        </button>
+        </AppButton>
       </div>
     </div>
     <div class="panel-body">
@@ -641,10 +652,7 @@ watch(activeTab, (tab) => {
           </div>
         </div>
 
-        <div v-if="activeInstance?.provider_type === 'antigravity'" class="sv-tip-box" title="Jalankan agy di terminal -> pilih akun Google -> copy token OAuth -> paste ke terminal">
-          <span class="sv-tip-icon">💡</span>
-          <span><strong>Antigravity Login:</strong> Buka terminal luar dan jalankan <code>agy</code> &rarr; pilih akun Google di browser &rarr; salin token &rarr; tempel ke CLI. Atau set <code>ANTIGRAVITY_API_KEY</code> di .env.</span>
-        </div>
+
       </div>
     </div>
   </section>
@@ -679,26 +687,31 @@ watch(activeTab, (tab) => {
             </div>
           </div>
           <div class="sv-actions">
-            <button
-              class="btn-aether btn-ghost-a"
+            <AppButton
+              variant="ghost"
               :disabled="busy"
               @click="toggleProvider(p)"
             >
               {{ p.enabled ? "Disable" : "Enable" }}
-            </button>
-            <button class="btn-aether btn-ghost-a" :disabled="busy" @click="testProvider(p)">
+            </AppButton>
+            <AppButton variant="ghost" :disabled="busy" @click="testProvider(p)">
               Test
-            </button>
-            <button class="btn-aether btn-ghost-a" :disabled="busy" @click="startEditProvider(p)">
+            </AppButton>
+            <AppButton variant="ghost" :disabled="busy" @click="startEditProvider(p)">
               Edit
-            </button>
-            <button class="btn-aether btn-danger-a" :disabled="busy" @click="removeProvider(p)">
+            </AppButton>
+            <AppButton variant="danger" :disabled="busy" @click="removeProvider(p)">
               Delete
-            </button>
+            </AppButton>
           </div>
         </div>
         <div v-if="p.provider_type === 'antigravity'" class="sv-tip-box" title="Jalankan agy di terminal luar -> pilih akun Google -> copy token OAuth -> paste ke terminal">
-          <span class="sv-tip-icon">💡</span>
+          <span class="sv-tip-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+              <line x1="9" y1="21" x2="15" y2="21"/>
+            </svg>
+          </span>
           <span><strong>Cara Login:</strong> Jalankan <code>agy</code> di terminal luar &rarr; verifikasi akun Google &rarr; salin token &rarr; tempel ke CLI. Kredensial tersimpan di <code>~/.gemini/oauth_creds.json</code>.</span>
         </div>
         <div class="sv-test-result" v-if="testResults[p.id]">{{ testResults[p.id] }}</div>
@@ -777,17 +790,17 @@ watch(activeTab, (tab) => {
           />
         </div>
         <div class="sv-form-actions">
-          <button
+          <AppButton
             v-if="editingProviderId"
-            class="btn-aether btn-ghost-a"
+            variant="ghost"
             :disabled="busy"
             @click="cancelEditProvider"
           >
             Cancel
-          </button>
-          <button class="btn-aether btn-primary-a" :disabled="busy" @click="submitProvider">
+          </AppButton>
+          <AppButton variant="primary" :disabled="busy" @click="submitProvider">
             {{ editingProviderId ? "Save changes" : "Create provider" }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>
@@ -818,9 +831,9 @@ watch(activeTab, (tab) => {
             <span v-if="(c.used_by || []).length" class="mono">· used by: {{ c.used_by.join(", ") }}</span>
           </div>
         </div>
-        <button class="btn-aether btn-danger-a" :disabled="busy" @click="removeCredential(c)">
+        <AppButton variant="danger" :disabled="busy" @click="removeCredential(c)">
           Delete
-        </button>
+        </AppButton>
       </div>
 
       <!-- Form: set/simpan API key (.env). -->
@@ -841,9 +854,9 @@ watch(activeTab, (tab) => {
           />
         </div>
         <div class="sv-form-actions">
-          <button class="btn-aether btn-primary-a" :disabled="busy" @click="submitCredential">
+          <AppButton variant="primary" :disabled="busy" @click="submitCredential">
             Save credential
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>
@@ -851,13 +864,13 @@ watch(activeTab, (tab) => {
   </template>
 
   <!-- Quick Set Key Modal -->
-  <div v-if="quickKeyModalOpen" class="sv-quick-key-overlay" @click.self="closeQuickKeyModal">
-    <div class="sv-quick-key-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-key-title">
-      <div class="sv-quick-key-head">
-        <div id="quick-key-title" class="sv-quick-key-title">Set API Key for {{ quickKeyEnvName }}</div>
-        <button type="button" class="btn-aether btn-ghost-a" @click="closeQuickKeyModal">&times;</button>
+  <div v-if="quickKeyModalOpen" class="unified-popup-backdrop sv-quick-key-overlay" @click.self="closeQuickKeyModal">
+    <div class="unified-popup-card sv-quick-key-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-key-title">
+      <div class="unified-popup-head sv-quick-key-head">
+        <div id="quick-key-title" class="unified-popup-title sv-quick-key-title">Set API Key for {{ quickKeyEnvName }}</div>
+        <AppButton variant="ghost" size="sm" class="unified-popup-close-btn" @click="closeQuickKeyModal">&times;</AppButton>
       </div>
-      <div class="sv-quick-key-body">
+      <div class="unified-popup-body sv-quick-key-body">
         <p class="sv-quick-key-desc">
           Save secret securely to <code>.env</code>. Keys are never displayed in plain text after saving.
         </p>
@@ -869,16 +882,16 @@ watch(activeTab, (tab) => {
           @keyup.enter="submitQuickKey"
         />
       </div>
-      <div class="sv-quick-key-actions">
-        <button type="button" class="btn-aether btn-ghost-a" @click="closeQuickKeyModal">Cancel</button>
-        <button
-          type="button"
-          class="btn-aether btn-primary-a"
+      <div class="unified-popup-foot sv-quick-key-actions">
+        <AppButton variant="ghost" @click="closeQuickKeyModal">Cancel</AppButton>
+        <AppButton
+          variant="primary"
           :disabled="busy || !quickKeyValue.trim()"
+          :busy="busy"
           @click="submitQuickKey"
         >
           {{ busy ? "Saving…" : "Save Key" }}
-        </button>
+        </AppButton>
       </div>
     </div>
   </div>
@@ -972,10 +985,10 @@ watch(activeTab, (tab) => {
   color: var(--text-faint);
 }
 .sv-prov-meta .mono.ok {
-  color: #86efac;
+  color: var(--ok);
 }
 .sv-prov-meta .mono.warn {
-  color: #fcd34d;
+  color: var(--warn);
 }
 .sv-actions {
   display: flex;
@@ -1041,7 +1054,7 @@ watch(activeTab, (tab) => {
 }
 .sv-mini.danger:hover {
   background: var(--err);
-  color: #ffffff;
+  color: var(--text);
   border-color: var(--err);
 }
 
@@ -1296,19 +1309,19 @@ watch(activeTab, (tab) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.22);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-dim);
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 11.5px;
-  color: var(--text-dim, #94a3b8);
+  color: var(--text-dim);
   line-height: 1.4;
   margin-top: 8px;
 }
 
 .sv-tip-box code {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent);
+  background: var(--accent-soft);
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 11px;

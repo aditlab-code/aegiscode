@@ -558,8 +558,9 @@ class BibleRetriever:
         ordered, level = self._select(scored, list(data.keys()), keywords)
         selected, truncated, text = self._fit_to_budget(ordered, total_entries, budget)
 
-        if not selected:
+        if not selected or total_entries == 0:
             level = "empty"
+            text = ""
 
         categories = [category for category, _ in self._group(selected)]
         return RetrievalResult(

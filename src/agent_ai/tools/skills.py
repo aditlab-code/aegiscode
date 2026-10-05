@@ -389,7 +389,7 @@ def build_skill_tools(
     """Bangun daftar capability Skill (satu sumber konstruksi).
 
     Args:
-        root: root project target (lokasi .aether/bible/skills).
+        root: root project target (lokasi .aegis/bible/skills).
         include_catalog: bila True sertakan skill_catalog (default True).
         include_lifecycle: bila True sertakan create_skill, update_skill,
             delete_skill (Agent only). Default False sehingga Consultant

@@ -186,7 +186,7 @@ class AgentOrchestrator:
             lama hanya dipakai bila pemanggil memberi eksplisit `False`
             (kompatibilitas/uji).
         environment_context: Environment Context project-local (markdown dari
-            `.aether/ENVIRONMENT.md`). Bila diisi, disisipkan sebagai system
+            `.aegis/ENVIRONMENT.md`). Bila diisi, disisipkan sebagai system
             message pada awal session continuous loop. Disiapkan pemanggil.
         context_budget_tokens: anggaran token untuk konteks percakapan
             (system + task + history) pada continuous loop. Bila None, anggaran
@@ -224,7 +224,7 @@ class AgentOrchestrator:
         self.system_prompt = system_prompt
         self.brain = brain
         # Environment Context (project-local, opsional). Bila diisi (teks
-        # markdown dari `.aether/ENVIRONMENT.md`), disisipkan sebagai system
+        # markdown dari `.aegis/ENVIRONMENT.md`), disisipkan sebagai system
         # message pada awal session continuous loop. Disiapkan oleh pemanggil
         # (mis. AgentRuntime) agar tidak menulis file di sini.
         self.environment_context = environment_context
@@ -264,7 +264,7 @@ class AgentOrchestrator:
         # `write_log_response_api`). Bila diisi (objek duck-typed dengan
         # `append(record)`), SETIAP response mentah yang benar-benar diterima
         # AETHER dari provider dicatat per round ke
-        # `.aether/log/response/<task_id>.json`. Bila None (default), TIDAK ada
+        # `.aegis/log/response/<task_id>.json`. Bila None (default), TIDAK ada
         # penulisan apa pun (AETHER berjalan seperti sekarang). Ini murni
         # observability: TIDAK mengubah loop/lifecycle/provider.
         self.response_log = response_log
@@ -645,7 +645,7 @@ class AgentOrchestrator:
     def _environment_context_message(self) -> Optional[Message]:
         """Environment Context (project-local) sebagai system message (opsional).
 
-        Teks berasal dari `<root>/.aether/ENVIRONMENT.md` yang sudah disiapkan
+        Teks berasal dari `<root>/.aegis/ENVIRONMENT.md` yang sudah disiapkan
         pemanggil (AgentRuntime). Bila kosong/tidak diisi, kembalikan None tanpa
         efek samping. Tidak menulis file di sini.
         """

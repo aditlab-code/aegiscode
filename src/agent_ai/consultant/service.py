@@ -191,6 +191,103 @@ class ConsultantSession:
         )
 
 
+def _detect_fence_lang(path: str) -> str:
+    ext = Path(path).suffix.lower().lstrip(".")
+    mapping = {
+        "py": "python",
+        "js": "javascript",
+        "ts": "typescript",
+        "vue": "vue",
+        "json": "json",
+        "md": "markdown",
+        "html": "html",
+        "css": "css",
+        "yaml": "yaml",
+        "yml": "yaml",
+        "sh": "bash",
+        "toml": "toml",
+    }
+    return mapping.get(ext, "")
+
+
+def _build_active_file_context(
+    active_file: Optional[Dict[str, Any]], root: Optional[str | Path]
+) -> str:
+    if not active_file or not isinstance(active_file, dict):
+        return ""
+    path = str(active_file.get("path") or "").strip()
+    if not path:
+        return ""
+    content = active_file.get("content")
+    if not content and root:
+        try:
+            resolved_root = Path(root).resolve()
+            target = (resolved_root / path).resolve()
+            if target.is_file() and target.is_relative_to(resolved_root):
+                content = target.read_text(encoding="utf-8", errors="replace")[:32768]
+        except Exception:
+            content = ""
+
+    lines = [
+        "",
+        "---",
+        f"# Berkas Aktif dari Text Editor: {path}",
+    ]
+    cursor = active_file.get("cursor_line")
+    if cursor:
+        lines.append(f"Posisi Kursor: Baris {cursor}")
+    selection = active_file.get("selection")
+    if selection and str(selection).strip():
+        lines.append("Teks Terpilih (Selection):")
+        lines.append("```")
+        lines.append(str(selection).strip()[:8192])
+        lines.append("```")
+    if content and str(content).strip():
+        lang = _detect_fence_lang(path)
+        lines.append("Isi Berkas:")
+        lines.append(f"```{lang}")
+        lines.append(str(content)[:32768])
+        lines.append("```")
+    lines.append("---")
+    return "\n".join(lines)
+
+
+def _build_auto_semantic_context(
+    message: str, root: Optional[str | Path], k: int = 3
+) -> str:
+    if not root:
+        return ""
+    try:
+        from agent_ai.repointel.semantic.availability import is_available
+
+        if not is_available()[0]:
+            return ""
+        from agent_ai.repointel.semantic.service import SemanticIndexService
+
+        svc = SemanticIndexService.get_instance(root)
+        results = svc.search(message, k=k)
+        if not results:
+            return ""
+        lines = [
+            "",
+            "---",
+            "# Konteks Semantik Relevan dari Basis Kode (Local Vector DB):",
+        ]
+        for res in results:
+            sym_or_kind = res.get("symbol") or res.get("kind") or "code"
+            lines.append(
+                f"## {res.get('path')} ({sym_or_kind}, baris {res.get('start_line', 1)}-{res.get('end_line', 1)}):"
+            )
+            lang = _detect_fence_lang(res.get("path") or "")
+            lines.append(f"```{lang}")
+            lines.append(res.get("snippet", ""))
+            lines.append("```")
+        lines.append("---")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 class ConsultantService:
     """Menjalankan satu giliran konsultasi memakai komponen AETHER existing.
 
@@ -411,6 +508,7 @@ class ConsultantService:
         max_steps: Optional[int] = None,
         mode: Optional[str] = None,
         images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
     ) -> ConsultantResult:
         """Jalankan satu giliran konsultasi dan kembalikan hasilnya.
 
@@ -419,7 +517,7 @@ class ConsultantService:
             provider: instance BaseProvider (dibangun pemanggil dari konfigurasi
                 LLM tersimpan; Consultant tidak memilih provider sendiri).
             root: root project target. Bila diisi, tool dibatasi ke root itu dan
-                Project Bible dibaca/ditulis di `<root>/.aether/bible/`.
+                Project Bible dibaca/ditulis di `<root>/.aegis/bible/`.
             session_id: id sesi konsultasi (untuk konteks lintas giliran).
             project_id: id project terkait. Dipakai untuk MENGISOLASI sesi per
                 project: sesi dengan id sama pada project berbeda tidak berbagi
@@ -513,6 +611,15 @@ class ConsultantService:
         )
 
         enriched_message, _ = resolve_file_mentions(str(message).strip(), root)
+
+        active_block = _build_active_file_context(active_file, root)
+        if active_block:
+            enriched_message = enriched_message + "\n" + active_block
+
+        semantic_block = _build_auto_semantic_context(str(message).strip(), root, k=3)
+        if semantic_block:
+            enriched_message = enriched_message + "\n" + semantic_block
+
         task_text = session.build_task(enriched_message)
         user_parts = _build_image_parts(images)
         result = orchestrator.run_continuous_loop(

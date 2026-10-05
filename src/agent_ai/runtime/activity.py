@@ -47,12 +47,16 @@ _TOOL_ACTIVITY = {
     "search_code": ActivityPhase.INSPECTING,
     "list_files": ActivityPhase.INSPECTING,
     # Project Map (Agent): termasuk refresh_project_map. refresh_project_map
-    # menulis artefak map (.aether/map) tetapi konsepnya "project map /
+    # menulis artefak map (.aegis/map) tetapi konsepnya "project map /
     # inspection" (memahami project), sehingga dikelompokkan sebagai inspecting.
     "atlas_query": ActivityPhase.INSPECTING,
     "rig_query": ActivityPhase.INSPECTING,
     "project_map_status": ActivityPhase.INSPECTING,
     "refresh_project_map": ActivityPhase.INSPECTING,
+    # Semantic Search & Vector DB (Phase 2.1)
+    "semantic_search": ActivityPhase.INSPECTING,
+    "refresh_semantic_index": ActivityPhase.INSPECTING,
+
     # --- Editing (mutasi workspace) ---
     "write_file": ActivityPhase.EDITING,
     "edit_file": ActivityPhase.EDITING,

@@ -1,13 +1,13 @@
-"""Environment Context project-local (`<root>/.aether/ENVIRONMENT.md`).
+"""Environment Context project-local (`<root>/.aegis/ENVIRONMENT.md`).
 
 Mendeteksi environment eksekusi (OS, shell, runtime bahasa, package manager,
 virtualenv, dan tipe project) lalu menuliskannya sebagai markdown ke
-`<root project target>/.aether/ENVIRONMENT.md`. File ini dibaca sebagai system
+`<root project target>/.aegis/ENVIRONMENT.md`. File ini dibaca sebagai system
 message pada awal session agar agent memahami lingkungan kerja project.
 
 Prinsip:
-    - Project-local: penulisan dilakukan lewat `AetherProjectStore` (satu-
-      satunya penulis `<root>/.aether/`), memakai atomic write yang sama.
+    - Project-local: penulisan dilakukan lewat `AegisProjectStore` (satu-
+      satunya penulis `<root>/.aegis/`), memakai atomic write yang sama.
     - Konfigurasi-adaptif (bukan hardcode): TIDAK ada informasi spesifik
       mesin/user yang ditanam di kode. Semua nilai berasal dari deteksi runtime
       saat file dibuat (platform, shutil.which, sys, env).
@@ -34,7 +34,6 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from agent_ai.projects.aegis_store import (
     AegisProjectStore,
-    AetherProjectStore,
     _atomic_write,
 )
 
@@ -128,7 +127,7 @@ def _detect_shell() -> Dict[str, Any]:
 
 
 def _detect_python() -> Dict[str, Any]:
-    """Info interpreter Python yang sedang menjalankan AETHER."""
+    """Info interpreter Python yang sedang menjalankan AegisCode."""
     return {
         "version": platform.python_version(),
         "executable": sys.executable or "",
@@ -231,7 +230,7 @@ def render_environment(data: Mapping[str, Any]) -> str:
     lines: List[str] = [
         "# Environment Context",
         "",
-        "<!-- AETHER context (machine-readable). Dibuat dari deteksi lingkungan",
+        "<!-- AegisCode context (machine-readable). Dibuat dari deteksi lingkungan",
         "     saat file ini dibuat; jangan ditanam sebagai nilai tetap. -->",
         "<!-- Dibaca sebagai system message pada awal session agent. -->",
         "",
@@ -313,8 +312,8 @@ def render_environment(data: Mapping[str, Any]) -> str:
 # Public API
 # --------------------------------------------------------------------------- #
 def environment_path(root: Union[str, Path]) -> Path:
-    """Path file Environment Context (`<root>/.aether/ENVIRONMENT.md`)."""
-    return AetherProjectStore(root).environment_path()
+    """Path file Environment Context (`<root>/.aegis/ENVIRONMENT.md`)."""
+    return AegisProjectStore(root).environment_path()
 
 
 def build_or_load_environment(root: Union[str, Path]) -> str:
@@ -327,7 +326,7 @@ def build_or_load_environment(root: Union[str, Path]) -> str:
         Isi file ENVIRONMENT.md (markdown). Bila penulisan gagal (mis. izin),
         tetap mengembalikan teks hasil deteksi (best-effort, tidak melempar).
     """
-    store = AetherProjectStore(root)
+    store = AegisProjectStore(root)
     store.ensure()
     path = store.environment_path()
     try:

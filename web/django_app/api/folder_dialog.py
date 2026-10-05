@@ -14,7 +14,7 @@ Kontrak Result (TIDAK pernah melempar ke luar modul ini):
 Catatan keamanan:
     - Semua eksekusi memakai argv list + shell=False (tanpa interpolasi input).
     - Skrip osascript/PowerShell adalah literal statis; TIDAK ada string user.
-    - Gateway AETHER terikat ke 127.0.0.1 (single-user local app).
+    - Gateway Aegis terikat ke 127.0.0.1 (single-user local app).
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _cancelled(stderr: str) -> bool:
 def _pick_darwin(timeout: int) -> Dict[str, Any]:
     """macOS: choose folder via osascript (Finder)."""
     script = (
-        'POSIX path of (choose folder with prompt "Pilih workspace project AETHER")'
+        'POSIX path of (choose folder with prompt "Pilih workspace project Aegis")'
     )
     try:
         proc = subprocess.run(
@@ -70,7 +70,7 @@ def _pick_windows(timeout: int) -> Dict[str, Any]:
     script = (
         "Add-Type -AssemblyName System.Windows.Forms; "
         "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
-        "$d.Description = 'Pilih workspace project AETHER'; "
+        "$d.Description = 'Pilih workspace project Aegis'; "
         "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }"
     )
     try:
@@ -104,10 +104,10 @@ def _pick_linux(timeout: int) -> Dict[str, Any]:
 
     if shutil.which("zenity"):
         argv = ["zenity", "--file-selection", "--directory",
-                "--title=Pilih workspace project AETHER"]
+                "--title=Pilih workspace project Aegis"]
     elif shutil.which("kdialog"):
         argv = ["kdialog", "--getexistingdirectory", "/",
-                "--title", "Pilih workspace project AETHER"]
+                "--title", "Pilih workspace project Aegis"]
     else:
         return {
             "ok": False,

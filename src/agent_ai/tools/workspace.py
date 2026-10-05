@@ -124,7 +124,7 @@ def _atomic_write_text(target: Path, content: str) -> None:
     """
     parent = target.parent
     fd, tmp_name = tempfile.mkstemp(
-        dir=str(parent), prefix=".aether_tmp_", suffix=".swp"
+        dir=str(parent), prefix=".aegis_tmp_", suffix=".swp"
     )
     os.close(fd)
     try:

@@ -129,7 +129,7 @@ async function handleDevClick() {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
-          <span>⚡ Dev Quick Sign-In (aditwicaksono34@gmail.com)</span>
+          <span>Dev Quick Sign-In (aditwicaksono34@gmail.com)</span>
         </button>
       </div>
 

@@ -1,18 +1,13 @@
 <script setup>
-// AETHER Code Editor (Monaco) — modal editor di dalam Workbench.
+// Aegis Code Editor (Monaco) — modal dan embedded editor di dalam Workbench.
 //
-// Dibuka dari File Explorer (klik file / klik kanan -> "Open with Editor") dan
-// dari tombol Edit di panel CHANGES. Bukan route/halaman baru dan bukan
-// subsystem file manager baru:
-//   - daftar file & boundary workspace memakai Explorer/API yang sudah ada,
-//   - isi file dibaca/ditulis lewat API file backend existing
-//     (ReadFileTool/WriteFileTool AETHER; browser TIDAK menulis file),
-//   - modal memakai pola .modal-backdrop/.modal AETHER existing.
-//
-// Lifecycle Monaco: dibuat saat modal dibuka, di-dispose saat modal ditutup
-// (termasuk model + listener + ResizeObserver) supaya tidak ada instance atau
-// listener yang menumpuk saat editor dibuka berulang kali untuk file berbeda.
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+// Lifecycle Monaco:
+//   - ICodeEditor view dibuat sekali saat onMounted dan di-dispose saat unmount.
+//   - ITextModel dikelola secara terpusat oleh monacoModelRegistry.js (satu model
+//     per path, di-share antar-window/pane untuk real-time sync tanpa race condition).
+//   - Pergantian tab di pane yang sama menggunakan editor.setModel(model) sehingga
+//     DOM Monaco tidak dihancurkan ulang dan riwayat undo/redo tetap persisten.
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { readFileContent, writeFileContent } from "../api.js";
 import { languageForFile, languageLabel } from "../editorLanguages.js";
 import {
@@ -21,31 +16,45 @@ import {
   EDITOR_SETTINGS_EVENT,
 } from "../services/editorSettingsService.js";
 import { validateCodeSyntax } from "../services/diagnosticService.js";
+import {
+  getOrCreateModel,
+  releaseModel,
+  markSaved,
+  isShared,
+} from "../services/monacoModelRegistry.js";
 
 const props = defineProps({
-  // Path relatif terhadap root project (dari Explorer, bukan path baru).
+  // Path relatif terhadap root project.
   path: { type: String, required: true },
   // Nama file (untuk judul header + deteksi language).
   name: { type: String, default: "" },
   // Mode embedded (terintegrasi di central workspace, bukan modal backdrop).
   embedded: { type: Boolean, default: true },
-  // Instance identifier to support split tabs without model URI collision
+  // Instance identifier
   instanceId: { type: String, default: "primary" },
 });
 
-const emit = defineEmits(["close", "error", "saved", "dirty-change", "cursor-change", "markers-change", "syntax-change"]);
+const emit = defineEmits([
+  "close",
+  "error",
+  "saved",
+  "dirty-change",
+  "cursor-change",
+  "markers-change",
+  "syntax-change",
+]);
 
 const container = ref(null);
 const loading = ref(true);
 const loadError = ref("");
 const saveError = ref("");
 const saving = ref(false);
-// Dirty = isi Monaco berbeda dari versi terakhir yang berhasil dibaca/disimpan.
 const dirty = ref(false);
 const confirmOpen = ref(false);
 const cursor = ref({ line: 1, column: 1 });
+const currentPath = ref("");
 
-const instanceUid = `${props.instanceId}-${Math.random().toString(36).slice(2, 8)}`;
+const isSharedModel = computed(() => Boolean(props.path && isShared(props.path)));
 
 const fileName = computed(
   () => props.name || String(props.path || "").split("/").pop() || props.path
@@ -53,24 +62,19 @@ const fileName = computed(
 const language = computed(() => languageForFile(props.name || props.path));
 const languageName = computed(() => languageLabel(language.value));
 
-// Instance Monaco + model + listener (di-dispose saat unmount).
 let monaco = null;
 let editor = null;
 let model = null;
 let contentSub = null;
 let cursorSub = null;
 let markerSub = null;
+let syntaxTimer = null;
 let resizeObserver = null;
 let themeObserver = null;
 let settingsListener = null;
-// "Versi tersimpan" model: dipakai untuk menentukan dirty tanpa string-diff
-// (undo kembali ke kondisi tersimpan -> dirty false).
 let savedVersionId = null;
-// Ditandai saat unmount: mencegah mount Monaco setelah await import() selesai.
 let disposed = false;
 
-// Monaco dimuat LAZY (dynamic import): bundle utama Workbench tidak ikut
-// membawa Monaco, dan render tanpa browser (SSR/verifier) tidak menyentuhnya.
 let monacoModulePromise = null;
 function loadMonacoModule() {
   if (!monacoModulePromise) {
@@ -79,29 +83,106 @@ function loadMonacoModule() {
   return monacoModulePromise;
 }
 
-function modelUri(path, instanceId = "") {
-  const clean = String(path || "untitled")
-    .split("/")
-    .map((part) => encodeURIComponent(part))
-    .join("/");
-  const prefix = instanceId ? `${encodeURIComponent(instanceId)}/` : "";
-  return monaco.Uri.parse(`inmemory://aether/${prefix}${clean}`);
-}
-
 function layout() {
   if (editor) editor.layout();
 }
 
-// --- Load / mount ------------------------------------------------------------
-async function load() {
+function detachModelSubscriptions() {
+  if (syntaxTimer) {
+    clearTimeout(syntaxTimer);
+    syntaxTimer = null;
+  }
+  if (contentSub) {
+    contentSub.dispose();
+    contentSub = null;
+  }
+  if (markerSub) {
+    markerSub.dispose();
+    markerSub = null;
+  }
+}
+
+async function switchToFile(targetPath, previousPath = "") {
+  if (!targetPath) return;
   loading.value = true;
   loadError.value = "";
   saveError.value = "";
+
   try {
-    const data = await readFileContent(props.path);
+    const mod = await loadMonacoModule();
+    if (disposed || !container.value) return;
+    monaco = mod.getMonaco();
+
+    detachModelSubscriptions();
+    const oldP = previousPath || currentPath.value;
+    if (oldP && oldP !== targetPath) {
+      releaseModel(oldP);
+    }
+
+    const data = await readFileContent(targetPath);
     const text = typeof data?.content === "string" ? data.content : "";
-    await nextTick();
-    await mountEditor(text);
+    const lang = languageForFile(props.name || targetPath);
+
+    const entry = getOrCreateModel(monaco, targetPath, text, lang);
+    model = entry.model;
+    savedVersionId = entry.savedVersionId;
+    currentPath.value = targetPath;
+
+    if (editor) {
+      editor.setModel(model);
+    }
+
+    dirty.value = model.getAlternativeVersionId() !== savedVersionId;
+    emit("dirty-change", { path: targetPath, dirty: dirty.value });
+
+    function runSyntaxCheck() {
+      if (syntaxTimer) clearTimeout(syntaxTimer);
+      syntaxTimer = setTimeout(() => {
+        if (!model || disposed) return;
+        const textVal = model.getValue();
+        const syntaxErrors = validateCodeSyntax(textVal, lang, targetPath);
+        emit("syntax-change", { path: targetPath, errors: syntaxErrors });
+        if (monaco?.editor?.setModelMarkers) {
+          const monacoMarkers = syntaxErrors.map((err) => ({
+            severity: err.severity === "warning" ? 4 : 8,
+            message: err.text,
+            startLineNumber: err.line || 1,
+            startColumn: err.col || 1,
+            endLineNumber: err.line || 1,
+            endColumn: (err.col || 1) + 15,
+          }));
+          monaco.editor.setModelMarkers(model, "aegis-syntax", monacoMarkers);
+        }
+      }, 200);
+    }
+
+    contentSub = model.onDidChangeContent(() => {
+      dirty.value = model.getAlternativeVersionId() !== savedVersionId;
+      emit("dirty-change", { path: targetPath, dirty: dirty.value });
+      runSyntaxCheck();
+    });
+
+    if (monaco?.editor?.onDidChangeMarkers) {
+      markerSub = monaco.editor.onDidChangeMarkers((uris) => {
+        if (!model || disposed) return;
+        const uriStr = model.uri ? model.uri.toString() : "";
+        if (uris && uris.some((u) => u.toString() === uriStr)) {
+          const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+          emit("markers-change", { path: targetPath, markers });
+        }
+      });
+      if (model.uri) {
+        const initMarkers = monaco.editor.getModelMarkers({ resource: model.uri });
+        if (initMarkers && initMarkers.length) {
+          emit("markers-change", { path: targetPath, markers: initMarkers });
+        }
+      }
+    }
+
+    runSyntaxCheck();
+    if (editor) {
+      editor.focus();
+    }
   } catch (e) {
     loadError.value = e.message || "Gagal memuat file.";
     emit("error", loadError.value);
@@ -113,25 +194,28 @@ async function load() {
   }
 }
 
-async function mountEditor(text) {
+async function initEditor() {
   if (!container.value) return;
   const mod = await loadMonacoModule();
-  if (disposed || !container.value) return; // modal sudah ditutup saat menunggu
+  if (disposed || !container.value) return;
   monaco = mod.getMonaco();
-  const uri = modelUri(props.path, instanceUid);
-  const existingModel = monaco.editor.getModel(uri);
-  if (existingModel) {
-    existingModel.dispose();
-  }
-  model = monaco.editor.createModel(text, language.value, uri);
-  const isLight = typeof document !== "undefined" && document.documentElement.dataset.theme === "light";
+
+  const isLight =
+    typeof document !== "undefined" &&
+    document.documentElement.dataset.theme === "light";
   const userEditorOpts = toMonacoOptions(getStoredEditorSettings());
+
   editor = monaco.editor.create(container.value, {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
     automaticLayout: true,
-    theme: isLight ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME,
-    model,
+    theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
+    model: null,
+  });
+
+  cursorSub = editor.onDidChangeCursorPosition((e) => {
+    cursor.value = { line: e.position.lineNumber, column: e.position.column };
+    emit("cursor-change", { line: e.position.lineNumber, column: e.position.column });
   });
 
   settingsListener = (e) => {
@@ -146,136 +230,51 @@ async function mountEditor(text) {
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     themeObserver = new MutationObserver(() => {
       const lightNow = document.documentElement.dataset.theme === "light";
-      monaco.editor.setTheme(lightNow ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME);
+      monaco.editor.setTheme(lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME);
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme"],
     });
   }
-  savedVersionId = model.getAlternativeVersionId();
-
-  let syntaxTimer = null;
-  function runSyntaxCheck() {
-    if (syntaxTimer) clearTimeout(syntaxTimer);
-    syntaxTimer = setTimeout(() => {
-      if (!model || disposed) return;
-      const text = model.getValue();
-      const syntaxErrors = validateCodeSyntax(text, language.value, props.path);
-      emit("syntax-change", { path: props.path, errors: syntaxErrors });
-      if (monaco?.editor?.setModelMarkers) {
-        const monacoMarkers = syntaxErrors.map((err) => ({
-          severity: err.severity === "warning" ? 4 : 8,
-          message: err.text,
-          startLineNumber: err.line || 1,
-          startColumn: err.col || 1,
-          endLineNumber: err.line || 1,
-          endColumn: (err.col || 1) + 15,
-        }));
-        monaco.editor.setModelMarkers(model, "aether-syntax", monacoMarkers);
-      }
-    }, 200);
-  }
-
-  contentSub = model.onDidChangeContent(() => {
-    dirty.value = model.getAlternativeVersionId() !== savedVersionId;
-    emit("dirty-change", { path: props.path, dirty: dirty.value });
-    runSyntaxCheck();
-  });
-  cursorSub = editor.onDidChangeCursorPosition((e) => {
-    cursor.value = { line: e.position.lineNumber, column: e.position.column };
-    emit("cursor-change", { line: e.position.lineNumber, column: e.position.column });
-  });
-
-  if (monaco?.editor?.onDidChangeMarkers) {
-    markerSub = monaco.editor.onDidChangeMarkers((uris) => {
-      if (!model || disposed) return;
-      const uriStr = model.uri.toString();
-      if (uris && uris.some((u) => u.toString() === uriStr)) {
-        const markers = monaco.editor.getModelMarkers({ resource: model.uri });
-        emit("markers-change", { path: props.path, markers });
-      }
-    });
-    const initMarkers = monaco.editor.getModelMarkers({ resource: uri });
-    if (initMarkers && initMarkers.length) {
-      emit("markers-change", { path: props.path, markers: initMarkers });
-    }
-  }
-
-  // Initial syntax scan
-  runSyntaxCheck();
 
   if (typeof ResizeObserver !== "undefined") {
     resizeObserver = new ResizeObserver(() => layout());
     resizeObserver.observe(container.value);
   }
   window.addEventListener("resize", layout);
-  // Siap dipakai langsung (keyboard/shortcut) tanpa klik tambahan.
-  editor.focus();
-  nextTick(() => layout());
-  setTimeout(() => layout(), 60);
-  setTimeout(() => layout(), 250);
+
+  if (props.path) {
+    await switchToFile(props.path);
+  }
 }
 
-function disposeEditor() {
-  if (syntaxTimer) {
-    clearTimeout(syntaxTimer);
-    syntaxTimer = null;
+watch(
+  () => props.path,
+  async (newPath, oldPath) => {
+    if (newPath && editor && newPath !== currentPath.value) {
+      await switchToFile(newPath, oldPath);
+    }
   }
-  if (contentSub) {
-    contentSub.dispose();
-    contentSub = null;
-  }
-  if (cursorSub) {
-    cursorSub.dispose();
-    cursorSub = null;
-  }
-  if (markerSub) {
-    markerSub.dispose();
-    markerSub = null;
-  }
-  if (resizeObserver) {
-    resizeObserver.disconnect();
-    resizeObserver = null;
-  }
-  if (themeObserver) {
-    themeObserver.disconnect();
-    themeObserver = null;
-  }
-  if (settingsListener) {
-    window.removeEventListener(EDITOR_SETTINGS_EVENT, settingsListener);
-    settingsListener = null;
-  }
-  window.removeEventListener("resize", layout);
-  window.removeEventListener("keydown", onDocumentKeydown);
-  if (editor) {
-    editor.dispose();
-    editor = null;
-  }
-  if (model) {
-    model.dispose();
-    model = null;
-  }
-}
+);
 
 // --- Save --------------------------------------------------------------------
 async function save() {
-  if (!editor || saving.value) return false;
+  if (!editor || saving.value || !props.path) return false;
   const value = editor.getValue();
   saving.value = true;
   saveError.value = "";
   try {
     await writeFileContent(props.path, value);
-    // Hanya anggap "bersih" bila isi editor tidak berubah selama proses simpan.
-    if (editor.getValue() === value) {
+    if (editor.getValue() === value && model) {
       savedVersionId = model.getAlternativeVersionId();
+      markSaved(props.path, savedVersionId);
       dirty.value = false;
       emit("dirty-change", { path: props.path, dirty: false });
     }
     emit("saved", { path: props.path });
     return true;
   } catch (e) {
-    // Simpan gagal: file TIDAK dianggap tersimpan, isi editor dipertahankan.
     saveError.value = e.message || "Gagal menyimpan file.";
     emit("error", saveError.value);
     return false;
@@ -304,7 +303,6 @@ function requestClose() {
 async function confirmSave() {
   const ok = await save();
   if (!ok) {
-    // Save gagal -> editor tetap terbuka (feedback error di footer editor).
     confirmOpen.value = false;
     return;
   }
@@ -321,8 +319,6 @@ function confirmCancel() {
   confirmOpen.value = false;
 }
 
-// Escape & Ctrl/Cmd+S mengikuti aturan unsaved changes yang sama (tidak ada
-// jalur yang menutup editor tanpa konfirmasi saat dirty).
 function onDocumentKeydown(e) {
   if (confirmOpen.value) {
     if (e.key === "Escape") {
@@ -344,12 +340,39 @@ function onDocumentKeydown(e) {
 
 onMounted(() => {
   window.addEventListener("keydown", onDocumentKeydown);
-  load();
+  initEditor();
 });
 
 onBeforeUnmount(() => {
   disposed = true;
-  disposeEditor();
+  detachModelSubscriptions();
+  if (currentPath.value) {
+    releaseModel(currentPath.value);
+    currentPath.value = "";
+  }
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
+  if (settingsListener) {
+    window.removeEventListener(EDITOR_SETTINGS_EVENT, settingsListener);
+    settingsListener = null;
+  }
+  window.removeEventListener("resize", layout);
+  window.removeEventListener("keydown", onDocumentKeydown);
+  if (cursorSub) {
+    cursorSub.dispose();
+    cursorSub = null;
+  }
+  if (editor) {
+    editor.dispose();
+    editor = null;
+  }
+  model = null;
 });
 
 function revealPosition(line, column = 1) {
@@ -369,7 +392,8 @@ defineExpose({
   applyContent,
   layout,
   revealPosition,
-  reload: load,
+  reload: () => switchToFile(props.path),
+  switchToFile,
 });
 </script>
 
@@ -385,6 +409,7 @@ defineExpose({
 
     <div class="ed-status">
       <span class="ed-lang">{{ languageName }}</span>
+      <span v-if="isSharedModel" class="ed-shared-badge" title="File ini terbuka dan tersinkronisasi di kedua window">W1·W2</span>
       <span class="ed-sep">|</span>
       <span class="ed-enc">UTF-8</span>
       <span class="ed-right">
@@ -445,6 +470,7 @@ defineExpose({
 
       <div class="ed-status">
         <span class="ed-lang">{{ languageName }}</span>
+        <span v-if="isSharedModel" class="ed-shared-badge" title="File ini terbuka dan tersinkronisasi di kedua window">W1·W2</span>
         <span class="ed-sep">|</span>
         <span class="ed-enc">UTF-8</span>
         <span class="ed-right">

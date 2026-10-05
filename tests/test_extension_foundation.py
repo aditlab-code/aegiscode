@@ -10,7 +10,7 @@ from agent_ai.extensions.manifest import (
     detect_duplicate_ids,
 )
 from agent_ai.extensions.context import ExtensionContext, _Placeholder
-from agent_ai.extensions.paths import get_aether_root, get_extensions_dir
+from agent_ai.extensions.paths import get_aegis_root, get_extensions_dir
 from agent_ai.extensions.base import Extension
 from agent_ai.extensions.discovery import load_extension_from_dir, discover_extensions_from_dir
 from agent_ai.extensions.api_version import CURRENT_API_VERSION
@@ -88,13 +88,13 @@ extension = MyExt()
     assert ext_dir.name == "my-ext-folder" 
 
 def test_paths_no_hardcode():
-    root = get_aether_root()
+    root = get_aegis_root()
     ext_dir = get_extensions_dir(root)
     assert ext_dir == root / "Extension"
     
     # Test override
-    custom_root = Path("/tmp/aether")
-    assert get_aether_root(custom_root) == custom_root
+    custom_root = Path("/tmp/aegis")
+    assert get_aegis_root(custom_root) == custom_root
     assert get_extensions_dir(custom_root) == custom_root / "Extension"
 
 def test_api_version():

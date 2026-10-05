@@ -1,7 +1,7 @@
-"""Persistensi konfigurasi LLM pada database GLOBAL AETHER (`data/aether.db`).
+"""Persistensi konfigurasi LLM pada database GLOBAL AegisCode (`data/aegis.db`).
 
 Modul ini TIDAK membuat database baru: ia memakai database SQLite global yang
-sudah ada (`data/aether.db`, sama dengan launcher gateway). Ia hanya menambah
+sudah ada (`data/aegis.db`, sama dengan launcher gateway). Ia hanya menambah
 tabel khusus konfigurasi LLM:
 
     - llm_provider_instances  -> instance provider (OpenRouter/DeepSeek/...)
@@ -34,12 +34,7 @@ def default_db_path() -> Path:
     # Import lokal: hindari siklus import saat settings dimuat.
     from agent_ai.config.settings import PROJECT_ROOT
 
-    base = Path(PROJECT_ROOT) / "data"
-    aegis_db = base / "aegis.db"
-    aether_db = base / "aether.db"
-    if not aegis_db.exists() and aether_db.exists():
-        return aether_db
-    return aegis_db
+    return Path(PROJECT_ROOT) / "data" / "aegis.db"
 
 
 _SCHEMA_STATEMENTS = (
@@ -76,8 +71,8 @@ class LLMConfigStore:
     """Repositori SQLite untuk konfigurasi LLM (provider instance + model).
 
     Args:
-        db_path: path database SQLite. Default: database global AETHER
-            (`data/aether.db`). Dapat diarahkan ke path sementara saat test.
+        db_path: path database SQLite. Default: database global AegisCode
+            (`data/aegis.db`). Dapat diarahkan ke path sementara saat test.
     """
 
     def __init__(self, db_path: Optional[PathLike] = None) -> None:

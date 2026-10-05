@@ -82,7 +82,7 @@ export function openTab(state, fileOrPath) {
 
   let existing = tabs.find((t) => t.path === path);
   if (!existing) {
-    const newTab = { path, filePath, name, dirty: false, isDiff };
+    const newTab = { path, filePath, name, dirty: false, isDiff, conflict: false };
     tabs.push(newTab);
     existing = tabs[tabs.length - 1];
   }
@@ -180,6 +180,23 @@ export function setTabDirty(state, path, dirty = true) {
  */
 export function setTabSaved(state, path) {
   return setTabDirty(state, path, false);
+}
+
+/**
+ * Mark tab conflict status (misal saat agen AI mengubah file dirty).
+ * @param {object} state
+ * @param {string} path
+ * @param {boolean} [value=true]
+ * @returns {boolean}
+ */
+export function setTabConflict(state, path, value = true) {
+  const tabs = getTabsList(state);
+  const tab = tabs.find((t) => t.path === path);
+  if (tab) {
+    tab.conflict = Boolean(value);
+    return true;
+  }
+  return false;
 }
 
 /**

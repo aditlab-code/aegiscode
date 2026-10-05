@@ -1,10 +1,10 @@
 """Bridge: tool Extension ENABLED -> toolset Agent (integration seam).
 
-Latar belakang (akar masalah): AETHER Extension System sudah punya mekanisme
+Latar belakang (akar masalah): Aegis Extension System sudah punya mekanisme
 registration tool yang lengkap (``ExtensionContext.tools`` -> ``ToolsFacade`` ->
 ``ToolRegistry``). Namun registry yang dipakai Agent dibangun TERPISAH oleh
 ``agent_ai.tools.registry.build_registry`` (registry baru per task), sehingga
-tool Extension — mis. ``aether.playwright.browser_*`` — tidak pernah muncul
+tool Extension — mis. ``aegis.playwright.browser_*`` — tidak pernah muncul
 pada toolset Agent walau Extension-nya ter-load & ENABLED.
 
 Modul ini menutup celah itu TANPA subsystem baru dan TANPA mengubah Extension:
@@ -36,7 +36,7 @@ _lock = threading.Lock()
 def get_agent_extension_manager():
     """ExtensionManager proses-wide yang terikat registry tool bersama Agent.
 
-    Memuat seluruh Extension yang ter-discover (filesystem ``<AETHER_ROOT>/Extension``)
+    Memuat seluruh Extension yang ter-discover (filesystem ``<AEGIS_ROOT>/Extension``)
     lewat ``ExtensionLoader`` yang sudah ada, dengan ``tool_registry`` diarahkan ke
     registry bersama. Extension yang ENABLED akan mendaftarkan tool-nya ke registry
     bersama itu pada fase aktivasi (``on_enable``).

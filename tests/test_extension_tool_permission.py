@@ -1,7 +1,7 @@
 """Regresi: tool Extension yang ENABLED otomatis ALLOW (tanpa approval popup).
 
 Root masalah: `PermissionPolicy` mengklasifikasi nama tool. Tool Extension
-(mis. `aether.playwright.browser_launch`) tidak dikenal classifier -> jatuh ke
+(mis. `aegis.playwright.browser_launch`) tidak dikenal classifier -> jatuh ke
 `ActionClass.UNKNOWN` -> `REQUIRE_APPROVAL` -> PermissionManager MENOLAK-nya
 sebelum sempat dieksekusi.
 
@@ -9,16 +9,16 @@ Perbaikan: `PermissionPolicy` mengizinkan (ALLOW) tool yang berasal dari
 Extension yang ENABLED. Identifikasi memakai MEKANISME REGISTRASI Extension yang
 SUDAH ADA (keanggotaan registry tool Extension bersama yang diisi saat extension
 ENABLED dan dicabut saat DISABLE) — BUKAN daftar nama Extension (mis.
-"playwright"). Tool bawaan AETHER tidak ada di registry itu, sehingga tetap
+"playwright"). Tool bawaan AegisCode tidak ada di registry itu, sehingga tetap
 mengikuti permission policy normal.
 
 Test ini mengunci tiga jaminan:
   1. Tool Extension enabled -> ALLOW dan dapat dieksekusi.
   2. Tool Extension disabled / tidak terdaftar -> TIDAK di-auto-allow (perilaku
      tidak berubah: tetap mengikuti policy normal; UNKNOWN -> require_approval).
-  3. Tool bawaan AETHER tetap mengikuti permission policy yang berlaku.
+  3. Tool bawaan AegisCode tetap mengikuti permission policy yang berlaku.
 
-`aether.playwright.browser_launch` dipakai sebagai contoh KONKRET untuk
+`aegis.playwright.browser_launch` dipakai sebagai contoh KONKRET untuk
 skenario 1, tetapi implementasinya generik (lihat juga uji tool demo generik).
 
 State proses-wide Extension di-isolasi per-test oleh `tests/conftest.py`.
@@ -50,15 +50,15 @@ from agent_ai.tools.registry import (  # noqa: E402
     is_extension_tool,
 )
 
-EXT_ID = "aether.playwright"
+EXT_ID = "aegis.playwright"
 PREFIX = EXT_ID + "."
 
 #: Contoh KONKRET dari task: tool Extension nyata (nama bertitik).
-PW_LAUNCH = "aether.playwright.browser_launch"
+PW_LAUNCH = "aegis.playwright.browser_launch"
 #: Tool Playwright yang AMAN dieksekusi tanpa menjalankan browser (hanya membaca
 #: daftar storage-state) — dipakai untuk membuktikan tool Extension benar-benar
 #: dapat dieksekusi lewat runtime tanpa approval.
-PW_SAFE = "aether.playwright.session_state_list"
+PW_SAFE = "aegis.playwright.session_state_list"
 
 #: Nama tool Extension generik (bukan Playwright) untuk membuktikan mekanisme
 #: berlaku untuk SELURUH Extension, bukan logic khusus satu Extension.
@@ -137,7 +137,7 @@ def test_enabled_extension_tool_is_executable_through_executor():
 
 
 def test_playwright_browser_launch_example_is_allowed():
-    """Contoh KONKRET `aether.playwright.browser_launch` -> ALLOW (tanpa popup)."""
+    """Contoh KONKRET `aegis.playwright.browser_launch` -> ALLOW (tanpa popup)."""
     _loaded_manager()
     assert is_extension_tool(PW_LAUNCH) is True
 
@@ -223,7 +223,7 @@ def test_disabled_extension_tool_not_executed_as_extension():
 
 
 # --------------------------------------------------------------------------- #
-# 3) Tool bawaan AETHER tetap mengikuti permission policy normal
+# 3) Tool bawaan AegisCode tetap mengikuti permission policy normal
 # --------------------------------------------------------------------------- #
 def test_builtin_tool_is_never_treated_as_extension():
     """Tool bawaan tidak pernah dianggap tool Extension (tidak ada auto ALLOW)."""

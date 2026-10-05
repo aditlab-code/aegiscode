@@ -95,7 +95,7 @@ async function mountPreviewEditor() {
     const mod = await import("../monacoSetup.js");
     if (disposed || !previewContainer.value) return;
     monaco = mod.getMonaco();
-    const uri = monaco.Uri.parse("inmemory://aether/preview/sampleTask.ts");
+    const uri = monaco.Uri.parse("inmemory://aegis/preview/sampleTask.ts");
     const existing = monaco.editor.getModel(uri);
     if (existing) existing.dispose();
     previewModel = monaco.editor.createModel(sampleCode, "typescript", uri);
@@ -105,7 +105,7 @@ async function mountPreviewEditor() {
     previewEditor = monaco.editor.create(previewContainer.value, {
       ...mod.EDITOR_OPTIONS,
       ...userOpts,
-      theme: isLight ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME,
+      theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
       model: previewModel,
       readOnly: true,
       domReadOnly: true,
@@ -122,7 +122,7 @@ async function mountPreviewEditor() {
     if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
       themeObserver = new MutationObserver(() => {
         const lightNow = document.documentElement.dataset.theme === "light";
-        monaco.editor.setTheme(lightNow ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME);
+        monaco.editor.setTheme(lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME);
       });
       themeObserver.observe(document.documentElement, {
         attributes: true,

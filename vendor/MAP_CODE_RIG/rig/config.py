@@ -6,8 +6,8 @@ Per blueprint section 5, 29 (CLI), and 33 (Security/Workspace Boundary).
 Scan boundary policy
 --------------------
 Daftar directory/file yang di-ignore diambil dari SATU sumber bersama:
-``src/agent_ai/projects/scan_policy.py`` milik AETHER (lihat
-``AETHER_SCAN_POLICY_PATH_ENV`` / ``AETHER_SCAN_POLICY_ENV``). Bila file policy
+``src/agent_ai/projects/scan_policy.py`` milik Aegis (lihat
+``AEGIS_SCAN_POLICY_PATH_ENV`` / ``AEGIS_SCAN_POLICY_ENV``). Bila file policy
 bersama itu tidak ditemukan, engine memakai daftar bawaan di bawah ini agar
 tetap berjalan mandiri.
 """
@@ -21,10 +21,10 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Set
 
 
-# Environment variable berisi payload JSON policy (di-set oleh AETHER).
-_SHARED_POLICY_ENV = "AETHER_SCAN_POLICY"
-# Environment variable berisi path file policy bersama (di-set oleh AETHER).
-_SHARED_POLICY_PATH_ENV = "AETHER_SCAN_POLICY_PATH"
+# Environment variable berisi payload JSON policy (di-set oleh Aegis).
+_SHARED_POLICY_ENV = "AEGIS_SCAN_POLICY"
+# Environment variable berisi path file policy bersama (di-set oleh Aegis).
+_SHARED_POLICY_PATH_ENV = "AEGIS_SCAN_POLICY_PATH"
 
 # Suffix directory metadata paket yang di-generate (mis. ``foo.egg-info``).
 _GENERATED_DIR_SUFFIXES = (".egg-info", ".dist-info")
@@ -54,7 +54,7 @@ _BASE_IGNORE_DIRS: Set[str] = {
     "node_modules",
     ".npm",
     ".cache",
-    ".aether",
+    ".aegis",
     "build",
     "dist",
     "target",
@@ -76,7 +76,7 @@ def _load_module_from_path(path):
             return None
         import importlib.util
 
-        spec = importlib.util.spec_from_file_location("aether_scan_policy", str(path))
+        spec = importlib.util.spec_from_file_location("aegis_scan_policy", str(path))
         if spec is None or spec.loader is None:
             return None
         module = importlib.util.module_from_spec(spec)

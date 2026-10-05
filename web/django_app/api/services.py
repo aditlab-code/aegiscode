@@ -1,21 +1,21 @@
-"""Service/facade tipis untuk AETHER Gateway (#50).
+"""Service/facade tipis untuk Aegis Gateway (#50).
 
-Gateway HANYA memanggil komponen AETHER yang sudah ada. TIDAK menduplikasi
+Gateway HANYA memanggil komponen Aegis yang sudah ada. TIDAK menduplikasi
 logic Agent/Runtime/Orchestrator/Planning/Tool/Validation/Recovery/Routing/
 Fallback/Project Intelligence/Session.
 
-Yang dipakai dari AETHER:
+Yang dipakai dari Aegis:
     - ProjectRegistry  (src/agent_ai/projects)  -> daftar project
     - TaskPreparation  (src/agent_ai/task)      -> siapkan task (read-only)
     - TaskExecutor     (api/execution.py)       -> bridge ke AgentRuntime (#55)
 
 Task execution (#55): setelah task disiapkan, eksekusi nyata dijalankan lewat
-AETHER Runtime di background thread daemon (non-blocking HTTP). TIDAK ada
+Aegis Runtime di background thread daemon (non-blocking HTTP). TIDAK ada
 background queue / worker framework / database. State task disimpan di memori
-proses. Event eksekusi memakai SessionStore AETHER (event system existing).
+proses. Event eksekusi memakai SessionStore Aegis (event system existing).
 
 Konfigurasi provider (provider-agnostic): provider instance + model dibaca dari
-LLMConfigService (SQLite GLOBAL `data/aether.db`, tabel yang sama dengan
+LLMConfigService (SQLite GLOBAL `data/aegis.db`, tabel yang sama dengan
 ProjectStore) via metadata task (`provider_instance_id`, `model_id`). Sumber
 tunggal pemilihan provider aktif = Provider Instance -> Model (SQLite), BUKAN
 .env. `get_config()` juga mengekspos daftar provider instance + model ke UI
@@ -123,7 +123,7 @@ class TaskRecord:
         status: status task (lifecycle: prepared/running/completed/failed).
         prepared: ringkasan PreparedTask (task + plan metadata).
         metadata: info tambahan bebas.
-        session_id: session AETHER untuk event streaming (#51).
+        session_id: session Aegis untuk event streaming (#51).
         result: hasil akhir runtime (bila completed).
         error: pesan error runtime (bila failed).
         runtime: ringkasan hasil runtime (iterations, dll).
@@ -142,7 +142,7 @@ class TaskRecord:
     # Status antrian (TAMPILAN/kontrol UI), TERPISAH dari `status` lifecycle.
     # Nilai: "pending" | "running" | "disabled" | "done".
     # SENGAJA bukan bagian dari enum TaskStatus core / TERMINAL_STATUSES, agar
-    # TaskState/TaskLifecycle/.aether/log/SSE/task history tidak terpengaruh.
+    # TaskState/TaskLifecycle/.aegis/log/SSE/task history tidak terpengaruh.
     # Pada tahap ini belum ada scheduler serial: nilai queue_state hanya
     # merepresentasikan niat user (mis. disable = jangan dieksekusi).
     queue_state: str = "pending"
@@ -155,7 +155,7 @@ class TaskRecord:
     # TERPISAH dari `status`/`execution_mode` di atas. requested_mode = mode
     # yang diminta user; effective_mode = mode yang benar-benar dipakai Agent
     # (dapat naik setelah assessment). SENGAJA field gateway (bukan enum
-    # TaskStatus core) agar TaskState/TaskLifecycle/.aether log/SSE tidak
+    # TaskStatus core) agar TaskState/TaskLifecycle/.aegis log/SSE tidak
     # terpengaruh. None = policy tidak aktif (perilaku lama).
     requested_mode: Optional[str] = None
     effective_mode: Optional[str] = None
@@ -240,10 +240,10 @@ def _validate_matrix_payload(payload: Any) -> None:
 
 
 class GatewayService:
-    """Facade tipis menuju komponen AETHER yang sudah ada.
+    """Facade tipis menuju komponen Aegis yang sudah ada.
 
     Args:
-        project_registry: ProjectRegistry opsional (default: registry AETHER).
+        project_registry: ProjectRegistry opsional (default: registry Aegis).
         task_preparation: TaskPreparation opsional (default: TaskPreparation()).
     """
 
@@ -261,20 +261,20 @@ class GatewayService:
         self.projects = project_registry or ProjectRegistry()
         self.preparation = task_preparation or TaskPreparation()
         # Persistence launcher + active project (SQLite, layer gateway).
-        # Bukan Project Registry kedua: registry AETHER tetap sumber kebenaran
+        # Bukan Project Registry kedua: registry Aegis tetap sumber kebenaran
         # struktur project; store ini hanya metadata launcher + active state.
         self.project_store = project_store or ProjectStore()
-        # SessionStore AETHER (event system existing). Dipakai untuk event
+        # SessionStore Aegis (event system existing). Dipakai untuk event
         # streaming (#51). Tidak ada event model kedua.
         self.sessions = session_store or InMemorySessionStore()
-        # Execution bridge ke AETHER Runtime (#55). Dibuat lazy agar import
+        # Execution bridge ke Aegis Runtime (#55). Dibuat lazy agar import
         # runtime tidak membebani jalur read-only (health/projects).
         self._task_executor = task_executor
         self.auto_execute = auto_execute
         # Konfigurasi LLM tersimpan (SQLite) — provider instance + model.
-        # Lazy agar jalur read-only tetap ringan. Database GLOBAL AETHER.
+        # Lazy agar jalur read-only tetap ringan. Database GLOBAL Aegis.
         self._llm_config_service = llm_config_service
-        # Consultant (AETHER reasoning layer, read-only terhadap CODE PROJECT).
+        # Consultant (Aegis reasoning layer, read-only terhadap CODE PROJECT).
         # Lazy agar jalur read-only tetap ringan; verifier dapat menyuntikkan.
         self._consultant_service = consultant_service
         # GitHub Backup (fitur OPTIONAL per project). Lazy: hanya dibangun saat
@@ -323,7 +323,7 @@ class GatewayService:
 
     @property
     def llm_config_service(self) -> Any:
-        """LLMConfigService efektif (lazy; database GLOBAL `data/aether.db`).
+        """LLMConfigService efektif (lazy; database GLOBAL `data/aegis.db`).
 
         Dibuat lazy agar gateway tetap ringan pada jalur read-only, dan agar
         verifier dapat menyuntikkan service dengan DB fixture sementara.
@@ -336,10 +336,10 @@ class GatewayService:
 
     @property
     def consultant_service(self) -> Any:
-        """ConsultantService AETHER (lazy).
+        """ConsultantService Aegis (lazy).
 
         Consultant adalah reasoning layer (bukan Agent eksekutor): memakai loop
-        & tool AETHER yang sudah ada dengan boundary read-only terhadap CODE
+        & tool Aegis yang sudah ada dengan boundary read-only terhadap CODE
         PROJECT dan read+update terhadap Project Bible. Dibuat lazy agar jalur
         read-only gateway tetap ringan.
         """
@@ -390,7 +390,7 @@ class GatewayService:
     def github_backup_service(self) -> Any:
         """GithubBackupService (lazy) — fitur OPTIONAL per project.
 
-        Memakai ulang Git Awareness Foundation AETHER (read) + `.aether/github`
+        Memakai ulang Git Awareness Foundation Aegis (read) + `.aegis/github`
         project-local store + proteksi credential Windows (DPAPI). Dibuat lazy
         agar jalur read-only gateway tetap ringan. Bukan subsystem kedua:
         checkpoint/commit history tetap milik Git, bukan DB checkpoint baru.
@@ -406,16 +406,16 @@ class GatewayService:
     # ------------------------------------------------------------------ #
     def health(self) -> Dict[str, Any]:
         """Status gateway sederhana (tanpa memanggil model/API)."""
-        return {"status": "ok", "service": "aether-gateway"}
+        return {"status": "ok", "service": "aegis-gateway"}
 
     # ------------------------------------------------------------------ #
-    # Config (dibaca dari AETHER settings; TIDAK hardcode di frontend)
+    # Config (dibaca dari Aegis settings; TIDAK hardcode di frontend)
     # ------------------------------------------------------------------ #
     def get_config(self) -> Dict[str, Any]:
-        """Konfigurasi provider/model/mode dari AETHER.
+        """Konfigurasi provider/model/mode dari Aegis.
 
         Frontend TIDAK meng-hardcode nama model/provider: semua dibaca dari
-        konfigurasi AETHER yang sudah ada (provider-agnostic).
+        konfigurasi Aegis yang sudah ada (provider-agnostic).
 
         Sumber tunggal pemilihan provider aktif = Provider Instance + Model
         (SQLite). `providers` = daftar nama provider terdaftar (ProviderRegistry,
@@ -493,7 +493,7 @@ class GatewayService:
     # ------------------------------------------------------------------ #
     # Global Settings (`data/settings.json` — SATU sumber konfigurasi global)
     #
-    # Gateway HANYA meneruskan baca/tulis ke loader konfigurasi AETHER yang
+    # Gateway HANYA meneruskan baca/tulis ke loader konfigurasi Aegis yang
     # sudah ada (`agent_ai.config.settings`). TIDAK ada skema/file konfigurasi
     # kedua: `data/settings.json` tetap sumber tunggal, dan penulisan bersifat
     # MERGE (key lain tidak hilang).
@@ -519,15 +519,15 @@ class GatewayService:
         return {"settings": updated}
 
     # ------------------------------------------------------------------ #
-    # LLM Config (halaman Settings; LLMConfigService AETHER existing)
+    # LLM Config (halaman Settings; LLMConfigService Aegis existing)
     #
-    # Gateway HANYA memanggil facade CRUD konfigurasi LLM AETHER
+    # Gateway HANYA memanggil facade CRUD konfigurasi LLM Aegis
     # (`agent_ai.llm_config`). TIDAK ada model konfigurasi kedua. Nilai
     # secret (.env) TIDAK pernah dikembalikan: hanya versi masked.
     # ------------------------------------------------------------------ #
     @staticmethod
     def _llm_error_to_gateway(exc: Exception) -> GatewayError:
-        """Petakan error konfigurasi LLM AETHER -> error gateway (HTTP)."""
+        """Petakan error konfigurasi LLM Aegis -> error gateway (HTTP)."""
         from agent_ai.llm_config import (
             LLMConfigConflictError,
             LLMConfigNotFoundError,
@@ -570,7 +570,7 @@ class GatewayService:
         """Daftar provider instance + nested model (TANPA secret).
 
         Dipakai alur New Task: dropdown Provider Instance + Model diambil dari
-        konfigurasi LLM tersimpan (SQLite) via LLMConfigService AETHER existing,
+        konfigurasi LLM tersimpan (SQLite) via LLMConfigService Aegis existing,
         BUKAN dari settings/.env. Nilai secret tidak pernah dikembalikan.
         """
         try:
@@ -733,10 +733,10 @@ class GatewayService:
             return {"status": "error", "detail": f"{type(exc).__name__}: {exc}"}
 
     # ------------------------------------------------------------------ #
-    # Projects (memakai ProjectRegistry AETHER)
+    # Projects (memakai ProjectRegistry Aegis)
     # ------------------------------------------------------------------ #
     def list_projects(self) -> List[Dict[str, Any]]:
-        """Daftar project terdaftar (dari ProjectRegistry AETHER)."""
+        """Daftar project terdaftar (dari ProjectRegistry Aegis)."""
         return [p.to_dict() for p in self.projects.list()]
 
     def get_project(self, id_or_name: str) -> Dict[str, Any]:
@@ -768,21 +768,21 @@ class GatewayService:
         projects = self.project_store.list_projects()
         for p in projects:
             # Alias `path` (store) tetap `path`; sediakan `root` agar konsisten
-            # dengan kontrak project AETHER (registry memakai `root`).
+            # dengan kontrak project Aegis (registry memakai `root`).
             p["root"] = p.get("path")
         return projects
 
     def create_project(self, name: str, path: str) -> Dict[str, Any]:
-        """Buat project baru: validasi path, daftarkan ke AETHER, jadikan aktif.
+        """Buat project baru: validasi path, daftarkan ke Aegis, jadikan aktif.
 
-        Mengintegrasikan ProjectRegistry AETHER (Core) untuk struktur project,
+        Mengintegrasikan ProjectRegistry Aegis (Core) untuk struktur project,
         lalu menyimpan metadata launcher (last_opened_at) di SQLite. Project
         baru langsung dijadikan active project.
 
         Bila path belum ada, directory dibuat secara recursive (termasuk
         parent yang belum ada). Project yang dibuat adalah PURE EMPTY project:
         TIDAK ada template aplikasi/source yang dibuat di sini (hanya metadata
-        & infrastructure AETHER yang diwajibkan oleh mekanisme registration).
+        & infrastructure Aegis yang diwajibkan oleh mekanisme registration).
         Bila path menunjuk ke FILE, operasi DITOLAK tanpa menghapus/memindahkan/
         mengubah file tersebut.
 
@@ -814,13 +814,13 @@ class GatewayService:
                     f"Gagal membuat directory project '{root}': {exc}"
                 ) from exc
 
-        # Daftarkan ke ProjectRegistry AETHER (Core) -> struktur project.
+        # Daftarkan ke ProjectRegistry Aegis (Core) -> struktur project.
         try:
             config = self.projects.register(name=name.strip(), root=str(root))
         except ProjectRootNotFoundError as exc:
             raise ValidationError(str(exc)) from exc
 
-        # Simpan metadata launcher di SQLite (id sama dengan registry AETHER).
+        # Simpan metadata launcher di SQLite (id sama dengan registry Aegis).
         self.project_store.add_project_with_id(config.id, config.name, config.root)
         # Jadikan active project.
         self.project_store.set_active_project(config.id)
@@ -855,11 +855,11 @@ class GatewayService:
         raise ValidationError(f"Folder picker gagal ({result.get('reason')}): {message}")
 
     def delete_project(self, project_id: str) -> Dict[str, Any]:
-        """Hapus RECORD project dari database SQLite AETHER.
+        """Hapus RECORD project dari database SQLite Aegis.
 
         HANYA menghapus record di SQLite (launcher state). TIDAK menghapus,
         memindahkan, atau mengubah folder/filesystem project (baik folder
-        project target maupun metadata registry AETHER). Bila project yang
+        project target maupun metadata registry Aegis). Bila project yang
         dihapus sedang aktif, active project ikut dibersihkan (dilakukan di
         ProjectStore.delete_project).
 
@@ -875,8 +875,8 @@ class GatewayService:
     # Project Policy / Permission (PROJECT-LOCAL)
     #
     # Gateway HANYA mengorkestrasi: policy disimpan di
-    # `<root project target>/.aether/permissions.json` (project-local) memakai
-    # `ProjectPermissionStore` AETHER. TIDAK ada sistem permission kedua:
+    # `<root project target>/.aegis/permissions.json` (project-local) memakai
+    # `ProjectPermissionStore` Aegis. TIDAK ada sistem permission kedua:
     # mode/scope dipetakan ke `PermissionConfig`/`PolicyMode` existing dan
     # di-enforce oleh PermissionManager yang sudah ada.
     # ------------------------------------------------------------------ #
@@ -887,7 +887,7 @@ class GatewayService:
         return ProjectPermissionStore(root=self._project_root_by_id(project_id))
 
     def get_project_policy(self, project_id: str) -> Dict[str, Any]:
-        """GET Project Permission Matrix aktual dari `<root>/.aether/permissions.json`.
+        """GET Project Permission Matrix aktual dari `<root>/.aegis/permissions.json`.
 
         Mengembalikan nilai policy AKTUAL project tersebut (bukan default
         global). Bila file belum ada, default policy (matrix default) dipakai
@@ -913,7 +913,7 @@ class GatewayService:
     def save_project_policy(
         self, project_id: str, body: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """POST Project Permission Matrix -> simpan ke `<root>/.aether/permissions.json`.
+        """POST Project Permission Matrix -> simpan ke `<root>/.aegis/permissions.json`.
 
         Body menerima matrix kanonik (langsung atau dibungkus `{"matrix": {...}}`):
 
@@ -929,7 +929,7 @@ class GatewayService:
         from agent_ai.projects.permissions import ProjectPolicy
 
         body = body or {}
-        # Pemisahan konfigurasi: Global Settings AETHER (`data/settings.json`)
+        # Pemisahan konfigurasi: Global Settings Aegis (`data/settings.json`)
         # TIDAK boleh masuk lewat endpoint Project Policy. Hanya field project
         # policy (matrix) yang diterima; key global ditolak eksplisit.
         from agent_ai.config.settings import _EDITABLE_SETTINGS_KEYS
@@ -937,7 +937,7 @@ class GatewayService:
         leaked = set(body) & _EDITABLE_SETTINGS_KEYS
         if leaked:
             raise ValidationError(
-                "Field berikut milik Global Settings AETHER (bukan Project "
+                "Field berikut milik Global Settings Aegis (bukan Project "
                 f"Policy): {', '.join(sorted(leaked))}. "
                 "Kelola dari Sidebar -> Settings."
             )
@@ -1182,9 +1182,9 @@ class GatewayService:
         return {"deleted": True, "path": str(target)}
 
     def list_project_files(self, path: str = ".", recursive: bool = False) -> Dict[str, Any]:
-        """Daftar file project aktif (read-only) via ListFilesTool AETHER.
+        """Daftar file project aktif (read-only) via ListFilesTool Aegis.
 
-        Memakai tool filesystem AETHER yang sudah ada (bukan abstraksi baru).
+        Memakai tool filesystem Aegis yang sudah ada (bukan abstraksi baru).
         Root dibatasi ke path project aktif.
 
         Raises:
@@ -1217,7 +1217,7 @@ class GatewayService:
         """Root active project untuk operasi file workspace (Code Editor).
 
         Satu sumber path (active project). Boundary workspace TIDAK dibuat
-        ulang: ReadFileTool/WriteFileTool AETHER yang memvalidasi path tetap di
+        ulang: ReadFileTool/WriteFileTool Aegis yang memvalidasi path tetap di
         dalam root ini (tidak ada mekanisme security kedua).
 
         Raises:
@@ -1238,10 +1238,10 @@ class GatewayService:
         return target
 
     def read_project_file(self, path: str) -> Dict[str, Any]:
-        """Baca isi file project aktif via ReadFileTool AETHER.
+        """Baca isi file project aktif via ReadFileTool Aegis.
 
         Dipakai Code Editor (Workbench) untuk memuat isi file. Read-only dan
-        tidak ada abstraksi filesystem baru: tool AETHER existing dipakai apa
+        tidak ada abstraksi filesystem baru: tool Aegis existing dipakai apa
         adanya (termasuk batas ukuran file + validasi workspace boundary).
 
         Raises:
@@ -1261,10 +1261,10 @@ class GatewayService:
             raise ValidationError(str(exc)) from exc
 
     def write_project_file(self, path: str, content: str) -> Dict[str, Any]:
-        """Simpan isi file project aktif via WriteFileTool AETHER.
+        """Simpan isi file project aktif via WriteFileTool Aegis.
 
         Dipakai Code Editor (Workbench) untuk menyimpan hasil edit. Penulisan
-        dilakukan backend (bukan browser) memakai tool AETHER existing, jadi
+        dilakukan backend (bukan browser) memakai tool Aegis existing, jadi
         validasi workspace boundary + penulisan atomic tetap sama.
 
         Raises:
@@ -1289,7 +1289,7 @@ class GatewayService:
     # GitHub Backup (OPTIONAL per project; checkpoint/recovery via Git)
     #
     # Gateway HANYA mengorkestrasi: konfigurasi per project disimpan di
-    # `<root>/.aether/github/` (credential terenkripsi Windows DPAPI), sedangkan
+    # `<root>/.aegis/github/` (credential terenkripsi Windows DPAPI), sedangkan
     # checkpoint/history/recovery memakai Git yang sudah ada (bukan DB kedua).
     # Token TIDAK pernah dikembalikan ke frontend / dicatat di log.
     # ------------------------------------------------------------------ #
@@ -1392,7 +1392,7 @@ class GatewayService:
     def create_github_checkpoint(
         self, project_id: str, description: str
     ) -> Dict[str, Any]:
-        """Buat checkpoint (add -> commit -> push) memakai Git AETHER existing."""
+        """Buat checkpoint (add -> commit -> push) memakai Git Aegis existing."""
         root = self._project_root_by_id(project_id)
         try:
             return self.github_backup_service.create_checkpoint(root, description)
@@ -1569,12 +1569,13 @@ class GatewayService:
         metadata: Optional[Dict[str, Any]] = None,
         execution_mode: Optional[str] = None,
         images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Buat task: validasi + siapkan via TaskPreparation, lalu eksekusi.
 
-        Menyiapkan (context + plan) memakai komponen AETHER yang sudah ada,
+        Menyiapkan (context + plan) memakai komponen Aegis yang sudah ada,
         menyimpan state task di memori, lalu (bila auto_execute) menjalankan
-        eksekusi nyata lewat AETHER Runtime di background thread.
+        eksekusi nyata lewat Aegis Runtime di background thread.
 
         Args:
             task: deskripsi task (wajib, non-kosong).
@@ -1619,19 +1620,23 @@ class GatewayService:
 
         # Attachment gambar (vision, ADDITIVE): normalisasi + proses
         # (preprocess) di sini agar gambar invalid ditolak LEBIH AWAL (400),
-        # sama seperti jalur Consultant. Hasil = image content parts AETHER
+        # sama seperti jalur Consultant. Hasil = image content parts Aegis
         # (provider-agnostic). Disimpan per-task, BUKAN di TaskRecord.to_dict().
         image_parts = self._prepare_task_image_parts(images)
 
         task_root = self._resolve_workspace_root(project_id)
         from agent_ai.contextbuilder.mention import resolve_file_mentions
+        from agent_ai.consultant.service import _build_active_file_context
 
         enriched_task, _ = resolve_file_mentions(task.strip(), task_root)
+        active_block = _build_active_file_context(active_file, task_root)
+        if active_block:
+            enriched_task = enriched_task + "\n" + active_block
 
         task_id = new_task_id()
         prepared = self.preparation.prepare(enriched_task, task_id=task_id)
 
-        # Session AETHER untuk event streaming (#51). Satu session per task.
+        # Session Aegis untuk event streaming (#51). Satu session per task.
         session = self.sessions.create_session(
             project_id=project_id,
             metadata={"task_id": task_id},
@@ -1662,7 +1667,7 @@ class GatewayService:
             if image_parts:
                 self._task_attachments[task_id] = image_parts
 
-        # Event TASK_CREATED (memakai event AETHER existing).
+        # Event TASK_CREATED (memakai event Aegis existing).
         self._emit(
             session.session_id,
             "task_created",
@@ -1813,7 +1818,7 @@ class GatewayService:
         run_in_background(lambda: self._execute_task(task_id, token))
 
     def _execute_task(self, task_id: str, token: CancellationToken) -> None:
-        """Jalankan task lewat AETHER Runtime (dipanggil di background thread).
+        """Jalankan task lewat Aegis Runtime (dipanggil di background thread).
 
         Error apa pun ditangkap dan dicatat sebagai status FAILED agar thread
         tidak crash dan task tidak menggantung di status 'running'.
@@ -1865,7 +1870,7 @@ class GatewayService:
 
         # Workspace root = active project root (bila ada). Ini mengarahkan
         # tool filesystem/workspace ke folder project aktif sehingga write/edit
-        # relatif terhadap project, bukan root AETHER.
+        # relatif terhadap project, bukan root Aegis.
         workspace_root = self._resolve_workspace_root(record.project_id)
 
         # Pilihan provider/model eksplisit dari UI (metadata task). Diteruskan
@@ -1897,14 +1902,14 @@ class GatewayService:
         # belum mengenal parameter ini (perilaku text-only tidak berubah).
         if user_parts:
             run_kwargs["user_parts"] = user_parts
-        # Policy project-local (`<root>/.aether/permissions.json`) HANYA untuk
+        # Policy project-local (`<root>/.aegis/permissions.json`) HANYA untuk
         # project task ini. Hanya dikirim bila policy ADA, agar verifier/
         # executor lama yang belum mengenal parameter ini tetap bekerja.
         project_config = self.project_permission_config(record.project_id)
         if project_config is not None:
             run_kwargs["project_permission_config"] = project_config
         # Project Permission Matrix project-local (aksi x inside/outside). Bila
-        # project punya `.aether/permissions.json`, matrix-nya di-enforce pada
+        # project punya `.aegis/permissions.json`, matrix-nya di-enforce pada
         # execution path (DENY menahan, ASK menahan + butuh approval). Bila
         # tidak ada, perilaku existing tidak berubah.
         project_matrix = self.project_permission_matrix(record.project_id)
@@ -2047,7 +2052,7 @@ class GatewayService:
     def _resolve_workspace_root(self, project_id: Optional[str]) -> Optional[str]:
         """Tentukan workspace root untuk eksekusi task.
 
-        Prioritas: project task -> active project -> None (root AETHER default).
+        Prioritas: project task -> active project -> None (root Aegis default).
         Mengembalikan path root project (string) atau None bila tidak ada.
         Path diambil dari record SQLite (konsisten dengan launcher).
         """
@@ -2094,7 +2099,7 @@ class GatewayService:
         task_id: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Emit event ke SessionStore AETHER (tanpa event bus baru)."""
+        """Emit event ke SessionStore Aegis (tanpa event bus baru)."""
         try:
             self.emit_event(session_id, event_type, task_id=task_id, payload=payload)
         except Exception:  # noqa: BLE001 - event emission tidak boleh crash
@@ -2202,7 +2207,7 @@ class GatewayService:
     # CATATAN: pada tahap ini BELUM ada scheduler serial. queue_state adalah
     # proyeksi UI dari TaskRecord (pending/running/disabled/done) + niat user
     # (disable = jangan dieksekusi). TIDAK ada TaskManager/queue subsystem
-    # kedua: sumber data tetap self._tasks (satu queue GLOBAL AETHER).
+    # kedua: sumber data tetap self._tasks (satu queue GLOBAL Aegis).
     _QUEUE_ACTIVE = ("pending", "running", "disabled")
 
     def list_queue(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -2371,10 +2376,10 @@ class GatewayService:
         return {"cleared": True, "deleted_count": len(keys_to_remove)}
 
     # ------------------------------------------------------------------ #
-    # Task History (from .aether/log/ persistent store)
+    # Task History (from .aegis/log/ persistent store)
     # ------------------------------------------------------------------ #
     def list_task_history(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Daftar semua task dari .aether/log/ (persistent source of truth).
+        """Daftar semua task dari .aegis/log/ (persistent source of truth).
 
         Membaca file log task dan mengembalikan ringkasan terurut
         terbaru -> terlama berdasarkan `last_timestamp` dari isi log
@@ -2383,7 +2388,7 @@ class GatewayService:
         Isolasi: bila `project_id` diberikan, HANYA log di root project itu yang
         dibaca (task project lain tidak pernah bocor). Bila `project_id` tidak
         diberikan, pencarian mencakup seluruh candidate root (project_id/active
-        project, AETHER workspace, project terdaftar) lalu di-dedupe per task_id.
+        project, Aegis workspace, project terdaftar) lalu di-dedupe per task_id.
 
         Args:
             project_id: project terkait (opsional).
@@ -2394,7 +2399,7 @@ class GatewayService:
         from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
 
         # Isolasi per project: bila project_id diberikan, HANYA baca root project
-        # ini. JANGAN menambahkan repo root AETHER / project terdaftar lain
+        # ini. JANGAN menambahkan repo root Aegis / project terdaftar lain
         # (perilaku `_candidate_log_roots`), karena itu membuat task milik
         # project lain ikut muncul di Sidebar -> Tasks (task "stale" dari
         # project sebelumnya). Tanpa project_id (perilaku lama / daftar semua)
@@ -2435,7 +2440,7 @@ class GatewayService:
         return tasks
 
     def get_task_history(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
-        """Ambil ringkasan task spesifik dari .aether/log/.
+        """Ambil ringkasan task spesifik dari .aegis/log/.
 
         Args:
             task_id: identifier task.
@@ -2601,9 +2606,9 @@ class GatewayService:
         project_id: Optional[str] = None,
         event_types: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Ambil seluruh chronological activity satu Task dari .aether/log/.
+        """Ambil seluruh chronological activity satu Task dari .aegis/log/.
 
-        Source: .aether/log/<task_id>.log
+        Source: .aegis/log/<task_id>.log
 
         Args:
             task_id: identifier task.
@@ -2628,7 +2633,7 @@ class GatewayService:
     # Report API
     # ------------------------------------------------------------------ #
     def get_task_report(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
-        """Ambil final Agent Report dari .aether/log/.
+        """Ambil final Agent Report dari .aegis/log/.
 
         Source utama: task_completed.data.result.
         Fallback: task_finished.data.result.
@@ -2656,7 +2661,7 @@ class GatewayService:
         }
 
     def _resolve_project_root(self, project_id: Optional[str]) -> Optional[str]:
-        """Tentukan project root untuk membaca .aether/log/.
+        """Tentukan project root untuk membaca .aegis/log/.
 
         Prioritas: project_id dari parameter -> active project dari store.
         """
@@ -2679,14 +2684,14 @@ class GatewayService:
         return None
 
     def _candidate_log_roots(self, project_id: Optional[str] = None) -> List[str]:
-        """Kandidat root tempat `.aether/log/` dicari (terurut & unik).
+        """Kandidat root tempat `.aegis/log/` dicari (terurut & unik).
 
         Log task bersifat project-local, tetapi satu task_id bisa berada di
-        root yang berbeda dari active project (mis. AETHER workspace tempat
+        root yang berbeda dari active project (mis. Aegis workspace tempat
         proses ini berjalan). Karena itu reader mencari beberapa kandidat:
             1. project_id eksplisit (bila diberikan),
             2. active project (bila ada),
-            3. AETHER workspace/repo root tempat backend berjalan,
+            3. Aegis workspace/repo root tempat backend berjalan,
             4. seluruh project yang terdaftar di launcher.
         """
         from pathlib import Path as _Path
@@ -2719,7 +2724,7 @@ class GatewayService:
         root: Optional[str] = None,
         project_id: Optional[str] = None,
     ) -> Optional[Path]:
-        """Cari file log task di `.aether/log/` berdasarkan task_id.
+        """Cari file log task di `.aegis/log/` berdasarkan task_id.
 
         Bila `root` diberikan, hanya root tersebut yang dicari (kompatibel
         dengan pemanggilan lama). Bila `root` None, pencarian dilakukan di
@@ -2744,8 +2749,6 @@ class GatewayService:
             if not candidate:
                 continue
             log_dir = _Path(candidate) / ".aegis" / "log"
-            if not log_dir.exists():
-                log_dir = _Path(candidate) / ".aether" / "log"
             if not log_dir.exists():
                 continue
             exact = log_dir / f"{safe_id}.log"
@@ -2784,7 +2787,7 @@ class GatewayService:
             2. tandai status record gateway CANCELLED (agar UI langsung tahu),
             3. Agent loop (runtime/orchestrator) melihat signal pada safe
                boundary, berhenti, dan mencatat event `task_cancelled` +
-               `task_finished(status=cancelled)` ke `.aether/log` (sumber
+               `task_finished(status=cancelled)` ke `.aegis/log` (sumber
                tunggal observability). TIDAK ada thread.kill / force terminate.
 
         Task yang sudah terminal (completed/failed/cancelled) TIDAK diubah.
@@ -2796,12 +2799,7 @@ class GatewayService:
             record = self._tasks.get(task_id)
             token = self._cancel_tokens.get(task_id)
         if record is None:
-            return {
-                "id": task_id,
-                "task_id": task_id,
-                "status": "cancelled",
-                "message": f"Task '{task_id}' sudah tidak aktif atau selesai.",
-            }
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
 
         # Hanya task yang belum terminal yang bisa dibatalkan. Task yang sudah
         # COMPLETED/FAILED tetap pada statusnya (tidak diubah menjadi CANCELLED).
@@ -2847,7 +2845,7 @@ class GatewayService:
         return count
 
     # ------------------------------------------------------------------ #
-    # Consultant (AETHER reasoning layer — read-only terhadap CODE PROJECT)
+    # Consultant (Aegis reasoning layer — read-only terhadap CODE PROJECT)
     # ------------------------------------------------------------------ #
     def consult(
         self,
@@ -2861,10 +2859,11 @@ class GatewayService:
         images: Optional[List[Dict[str, Any]]] = None,
         provider: Optional[Any] = None,
         root: Optional[str] = None,
+        active_file: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Jalankan satu giliran konsultasi Consultant.
 
-        Consultant memakai loop & tool AETHER yang sudah ada (read-only terhadap
+        Consultant memakai loop & tool Aegis yang sudah ada (read-only terhadap
         CODE PROJECT, read+update terhadap Project Bible). Hasilnya dapat memuat
         Task Proposal yang siap dikirim ke Agent lewat alur task existing.
 
@@ -2908,8 +2907,8 @@ class GatewayService:
         if root is None:
             root = self._resolve_workspace_root(project_id)
         if not root:
-            # Fallback ke root workspace AETHER (repo tempat backend berjalan)
-            # agar Consultant tetap dapat menganalisis project AETHER sendiri
+            # Fallback ke root workspace Aegis (repo tempat backend berjalan)
+            # agar Consultant tetap dapat menganalisis project Aegis sendiri
             # walau belum ada project aktif.
             from pathlib import Path as _Path
 
@@ -2927,6 +2926,7 @@ class GatewayService:
                 project_id=project_id,
                 mode=mode,
                 images=normalized_images,
+                active_file=active_file,
             )
         except ValidationError:
             raise
@@ -3042,7 +3042,7 @@ class GatewayService:
             raise ValidationError(str(exc)) from exc
 
     # ------------------------------------------------------------------ #
-    # Events (memakai SessionStore AETHER; tanpa event model kedua)
+    # Events (memakai SessionStore Aegis; tanpa event model kedua)
     # ------------------------------------------------------------------ #
     # ------------------------------------------------------------------ #
     # Extension Management (Task 07) — thin facade over ExtensionManager
@@ -3387,7 +3387,7 @@ class GatewayService:
         task_id: Optional[str] = None,
         payload: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Append event ke SessionStore AETHER (append-only).
+        """Append event ke SessionStore Aegis (append-only).
 
         Hanya meneruskan ke store existing; tidak membuat model event baru.
         """

@@ -1,8 +1,8 @@
-// Audio Registry — centralized sound configuration for AETHER.
+// Audio Registry — centralized sound configuration for Aegis.
 //
 // Single source of truth that maps terminal task outcomes to sound assets.
 // Assets are imported (bundled by Vite) instead of referenced by a raw URL,
-// so the SAME registry works in both modes AETHER actually uses:
+// so the SAME registry works in both modes Aegis actually uses:
 //   - dev server  : `npm run dev` (Vite)
 //   - production  : Django serves web/frontend/dist, and only static-serves
 //                   `/assets/**` from that build. Vite emits imported assets
@@ -31,7 +31,7 @@ export const SOUNDS = Object.freeze({
   stop: stopSound,
 });
 
-// Actual AETHER task status -> logical sound name.
+// Actual Aegis task status -> logical sound name.
 // Statuses verified against the running code (see new_analisa.txt):
 //   task_started    -> gateway/runtime          -> task.status "running"
 //   task_completed  -> runtime._lifecycle_finalize -> task.status "completed"
@@ -60,7 +60,7 @@ const STATUS_TO_SOUND = Object.freeze({
 let lastPlayedStatus = null;
 
 /**
- * Play the sound registered for a real AETHER task status transition
+ * Play the sound registered for a real Aegis task status transition
  * (non-terminal `running` -> start; terminal completed/failed/cancelled).
  *
  * No-op for unknown / non-terminal statuses, and for a terminal status that

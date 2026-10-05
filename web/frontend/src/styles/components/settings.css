@@ -56,7 +56,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: var(--text, #ffffff);
+  color: var(--text);
   line-height: 1.2;
 }
 
@@ -75,14 +75,14 @@
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--bg);
-  color: var(--text, #ffffff);
+  color: var(--text);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .settings-close-btn:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
-  border-color: var(--border-hover, #444444);
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
 .shortcut-badge {
@@ -189,13 +189,13 @@
 }
 
 .settings-nav-item:hover {
-  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
-  color: var(--text, #ffffff);
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .settings-nav-item.active {
-  background: rgba(45, 125, 78, 0.12);
-  color: var(--text, #ffffff);
+  background: var(--accent-soft);
+  color: var(--text);
   font-weight: 500;
 }
 
@@ -207,7 +207,7 @@
   bottom: 4px;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--accent, #2d7d4e);
+  background: var(--accent);
 }
 
 .settings-nav-icon {
@@ -232,11 +232,16 @@
 .settings-nav-desc {
   font-size: 10px;
   color: var(--text-faint);
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
-  margin-top: 1px;
+  line-height: 1.25;
+  min-height: 2.5em;
+  max-height: 2.5em;
+  margin-top: 2px;
 }
 
 .settings-nav-badge {
@@ -581,4 +586,167 @@ html:not([data-wallpaper="disabled"]) .settings-overlay-header.header-embedded {
 html:not([data-wallpaper="disabled"]) .settings-overlay.settings-embedded,
 html:not([data-wallpaper="disabled"]) .settings-overlay-dialog.dialog-embedded {
   background: transparent !important;
+}
+
+/* Standardized Unified Popup System (In-Situ) */
+.unified-popup-backdrop,
+.hist-report-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 12, 20, 0.72);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(3px);
+  animation: unified-popup-fade 0.15s ease-out;
+}
+
+.unified-popup-card,
+.hist-report-popup-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 680px;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-pop, 0 16px 40px rgba(0, 0, 0, 0.6));
+  animation: unified-popup-scale 0.15s ease-out;
+}
+
+@keyframes unified-popup-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes unified-popup-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.unified-popup-head,
+.hist-report-popup-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-header);
+  flex-shrink: 0;
+}
+
+.unified-popup-meta,
+.hist-report-popup-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.unified-popup-title,
+.hist-report-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.unified-popup-id,
+.hist-report-id {
+  font-size: 11px;
+  color: var(--text-dim);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unified-popup-close-btn,
+.hist-report-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.unified-popup-close-btn:hover,
+.hist-report-close-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.unified-popup-body,
+.hist-report-popup-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 16px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.unified-popup-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-header);
+  flex-shrink: 0;
+}
+
+.hist-report-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  padding: 24px 8px;
+  font-size: 12px;
+}
+
+.hist-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: hist-spin 0.8s linear infinite;
+}
+
+@keyframes hist-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hist-report-md {
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .unified-popup-card,
+  .hist-report-popup-card {
+    max-height: 88vh;
+  }
+  .unified-popup-id,
+  .hist-report-id {
+    max-width: 120px;
+  }
 }

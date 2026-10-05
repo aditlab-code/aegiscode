@@ -62,7 +62,7 @@ from agent_ai.extensions.errors import (
 )
 from agent_ai.extensions.lifecycle import ExtensionLifecycleStore, get_lifecycle_store
 from agent_ai.extensions.manifest import DuplicateExtensionError, Manifest, load_manifest
-from agent_ai.extensions.paths import get_aether_root, get_extensions_dir
+from agent_ai.extensions.paths import get_aegis_root, get_extensions_dir
 from agent_ai.extensions.registry import ExtensionRegistry
 
 
@@ -82,7 +82,7 @@ def _validate_api_compatibility(manifest: Manifest) -> None:
     if manifest.api_version not in SUPPORTED_API_VERSIONS:
         raise ExtensionCompatibilityError(
             f"Incompatible Extension API version: Extension '{manifest.id}' requires API version {manifest.api_version}, "
-            f"AETHER supports API version {CURRENT_API_VERSION} (supported: {', '.join(SUPPORTED_API_VERSIONS)})"
+            f"AegisCode supports API version {CURRENT_API_VERSION} (supported: {', '.join(SUPPORTED_API_VERSIONS)})"
         )
 
 
@@ -135,7 +135,7 @@ def _install_dependencies_if_needed(staged: Path) -> None:
 
 
 def _clone_to_staging(repository_url: str, ref: Optional[str], staging_parent: Path) -> Path:
-    tmp = Path(tempfile.mkdtemp(prefix="aether_ext_staging_", dir=str(staging_parent)))
+    tmp = Path(tempfile.mkdtemp(prefix="aegis_ext_staging_", dir=str(staging_parent)))
     clone_target = tmp / "repo"
     try:
         result = subprocess.run(
@@ -180,7 +180,7 @@ class ExtensionManager:
         registry: Optional[ExtensionRegistry] = None,
         capability_registry: Optional[CapabilityRegistry] = None,
         lifecycle_store: Optional[ExtensionLifecycleStore] = None,
-        aether_root: Optional[Path] = None,
+        aegis_root: Optional[Path] = None,
         extensions_dir: Optional[Path] = None,
         tool_registry: Optional[Any] = None,
         config_store: Optional[Any] = None,
@@ -190,8 +190,8 @@ class ExtensionManager:
         self.registry = registry if registry is not None else ExtensionRegistry()
         self.capability_registry = capability_registry if capability_registry is not None else CapabilityRegistry()
         self.lifecycle_store = lifecycle_store if lifecycle_store is not None else get_lifecycle_store()
-        self.aether_root = get_aether_root(aether_root) if aether_root is not None else get_aether_root()
-        self._extensions_dir = Path(extensions_dir) if extensions_dir is not None else get_extensions_dir(self.aether_root)
+        self.aegis_root = get_aegis_root(aegis_root) if aegis_root is not None else get_aegis_root()
+        self._extensions_dir = Path(extensions_dir) if extensions_dir is not None else get_extensions_dir(self.aegis_root)
         self.tool_registry = tool_registry
         self.config_store = config_store
         self.project_root = Path(project_root) if project_root is not None and str(project_root).strip() else None
@@ -223,7 +223,7 @@ class ExtensionManager:
         return ExtensionContext(
             extension_root=extension_root,
             manifest=manifest,
-            aether_root=self.aether_root,
+            aegis_root=self.aegis_root,
             extensions_dir=self._resolve_extensions_dir(),
             capability_registry=self.capability_registry,
             tool_registry=self.tool_registry,
@@ -594,7 +594,7 @@ class ExtensionManager:
             except Exception as exc:
                 raise ExtensionValidationError(f"Extension '{extension_id}' update validation/import failed: {exc}") from exc
             backup_parent = Path(tempfile.gettempdir())
-            backup_dir = Path(tempfile.mkdtemp(prefix=f"aether_ext_backup_{extension_id.replace('.', '_')}_", dir=str(backup_parent)))
+            backup_dir = Path(tempfile.mkdtemp(prefix=f"aegis_ext_backup_{extension_id.replace('.', '_')}_", dir=str(backup_parent)))
             backup_target = backup_dir / "backup"
             # Preserve the currently-installed package BEFORE replacing it so the
             # rollback path (below) can actually restore it if committing the new

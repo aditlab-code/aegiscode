@@ -1,4 +1,4 @@
-// AETHER Code Editor: pemetaan extension file -> language id Monaco.
+// Aegis Code Editor: pemetaan extension file -> language id Monaco.
 //
 // Mapping statis sederhana (bukan parser baru). Untuk menambah bahasa baru,
 // cukup tambahkan satu baris di EXT_LANGUAGE. Extension yang tidak dikenal

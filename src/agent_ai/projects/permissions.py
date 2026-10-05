@@ -1,4 +1,4 @@
-"""Project-local permission policy: `<root>/.aether/permissions.json`.
+"""Project-local permission policy: `<root>/.aegis/permissions.json`.
 
 Ini BUKAN sistem permission kedua. Modul ini hanya *persistence project-local*
 untuk konsep policy yang SUDAH ADA di `agent_ai.permission`:
@@ -11,7 +11,7 @@ Konfigurasi disimpan independen untuk setiap project di dalam root project
 target:
 
     <root project target>/
-        .aether/
+        .aegis/
             permissions.json
 
 Bentuk KANONIK (Project Permission Matrix: aksi x inside/outside workspace):
@@ -61,7 +61,6 @@ from agent_ai.permission.models import (
 
 #: Nama folder root metadata project.
 AEGIS_DIR_NAME = ".aegis"
-AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Nama file policy permission project-local.
 PERMISSIONS_FILE_NAME = "permissions.json"
 
@@ -218,7 +217,7 @@ class ProjectPolicy:
     def default(cls) -> "ProjectPolicy":
         """Default Project Policy (baseline) untuk project BARU.
 
-        Satu sumber kebenaran untuk inisialisasi `<root>/.aether/permissions.json`
+        Satu sumber kebenaran untuk inisialisasi `<root>/.aegis/permissions.json`
         saat project dibuat. Setelah file ada, policy menjadi milik project
         tersebut dan default ini tidak berubah.
         """
@@ -360,7 +359,7 @@ class ProjectPermissionStore:
         return ProjectPolicy.from_dict(raw)
 
     def save(self, policy: ProjectPolicy) -> ProjectPolicy:
-        """Simpan policy (atomic write) -> `<root>/.aether/permissions.json`."""
+        """Simpan policy (atomic write) -> `<root>/.aegis/permissions.json`."""
         data = json.dumps(policy.to_dict(), indent=2, ensure_ascii=False) + "\n"
         _atomic_write_bytes(self.path, data.encode("utf-8"))
         return policy

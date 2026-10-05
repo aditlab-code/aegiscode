@@ -84,17 +84,22 @@ export function parseAutocompleteTrigger(text, cursorPos) {
   if (lastAt !== -1) {
     const charBeforeAt = lastAt > 0 ? beforeCursor[lastAt - 1] : " ";
     const isValidBoundary = /[\s\(\[\{,\n\r]/.test(charBeforeAt);
-    const mentionSlice = beforeCursor.slice(lastAt + 1);
+    let mentionSlice = beforeCursor.slice(lastAt + 1);
+    const hasBracket = mentionSlice.startsWith("[");
+    if (hasBracket) {
+      mentionSlice = mentionSlice.slice(1);
+    }
 
     // No whitespace allowed inside the active mention query
     if (isValidBoundary && !/\s/.test(mentionSlice)) {
       return {
         active: true,
         type: "mention",
-        triggerChar: "@",
+        triggerChar: hasBracket ? "@[" : "@",
         query: mentionSlice,
         start: lastAt,
         end: safeCursor,
+        hasBracket,
       };
     }
   }
@@ -125,7 +130,7 @@ export function parseAutocompleteTrigger(text, cursorPos) {
 /**
  * Apply suggestion insertion into text.
  * @param {string} text
- * @param {{ start: number, end: number, type: string }} trigger
+ * @param {{ start: number, end: number, type: string, hasBracket?: boolean }} trigger
  * @param {string|object} suggestion
  * @returns {{ newText: string, newCursorPos: number }}
  */
@@ -137,7 +142,11 @@ export function applySuggestion(text, trigger, suggestion) {
   let insertContent = "";
   if (trigger.type === "mention") {
     const filePath = typeof suggestion === "string" ? suggestion : (suggestion?.path || suggestion?.name || "");
-    insertContent = `@${filePath} `;
+    if (trigger.hasBracket) {
+      insertContent = `@[${filePath}] `;
+    } else {
+      insertContent = `@${filePath} `;
+    }
   } else if (trigger.type === "template") {
     insertContent = typeof suggestion === "string"
       ? suggestion
@@ -146,6 +155,9 @@ export function applySuggestion(text, trigger, suggestion) {
 
   const prefix = text.slice(0, trigger.start);
   let suffix = text.slice(trigger.end);
+  if (trigger.hasBracket && suffix.startsWith("]")) {
+    suffix = suffix.slice(1);
+  }
   if (insertContent.endsWith(" ") && suffix.startsWith(" ")) {
     suffix = suffix.slice(1);
   }

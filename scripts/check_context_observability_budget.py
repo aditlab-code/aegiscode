@@ -230,7 +230,7 @@ def check_observation_truncation() -> None:
     )
 
     # Task Log nyata (jalur B1) harus menyimpan payload secara utuh.
-    from agent_ai.projects.aether_store import TaskLog
+    from agent_ai.projects.aegis_store import TaskLog
 
     with tempfile.TemporaryDirectory() as tmp:
         log = TaskLog(tmp, task_id="verifier-log-1")

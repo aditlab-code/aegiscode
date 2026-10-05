@@ -51,7 +51,6 @@ _IGNORED_SCAN_DIRS = frozenset({
     "__pycache__",
     "node_modules",
     ".git",
-    ".aether",
     ".aegis",
     "site-packages",
     "src",

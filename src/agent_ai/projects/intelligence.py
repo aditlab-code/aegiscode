@@ -3,7 +3,7 @@
 Mengelola knowledge untuk sebuah project dengan DUA mode storage:
 
 1. Bible project-local (mode utama, dipakai produksi):
-   `<root project target>/.aether/bible/<kategori>.md`
+   `<root project target>/.aegis/bible/<kategori>.md`
    Ditulis oleh `BibleStore` (markdown berorientasi LLM). Aktif bila `root`
    project target diberikan.
 
@@ -52,7 +52,7 @@ class ProjectIntelligence:
             (mis. J:\\Agent_Ai\\projects\\<id>). Dipakai untuk storage JSON
             legacy bila `root` tidak diberikan.
         root: root project target. Bila diberikan, knowledge disimpan sebagai
-            AI Project Bible project-local di `<root>/.aether/bible/`.
+            AI Project Bible project-local di `<root>/.aegis/bible/`.
     """
 
     def __init__(self, project_dir: Path, root: Optional[Union[str, Path]] = None) -> None:

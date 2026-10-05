@@ -2,21 +2,23 @@
 // Project Permission Matrix MODAL (PROJECT-LOCAL, Sidebar -> Projects ->
 // gear "Permission Policy" -> modal).
 //
-// SATU sumber policy per project: `<root>/.aether/permissions.json` — disimpan
+// SATU sumber policy per project: `<root>/.aegis/permissions.json` — disimpan
 // sebagai Permission Matrix (aksi x inside/outside), dibuat dari Default
 // Project Permission Matrix saat project dibuat. Komponen ini HANYA memanggil
 // HTTP gateway; TIDAK ada policy engine/konfigurasi permission kedua di
-// frontend. Matrix di-enforce oleh PermissionManager AETHER existing saat
+// frontend. Matrix di-enforce oleh PermissionManager Aegis existing saat
 // Agent melakukan action.
 //
 // Perubahan policy di sini HANYA berlaku untuk project ini (isolasi project):
 // project lain tidak terpengaruh, dan Default Project Policy tidak berubah.
 import { ref, watch } from "vue";
 import { getProjectPolicy, saveProjectPolicy } from "../api";
+import AppButton from "./ui/AppButton.vue";
 
 const props = defineProps({
   // Project (dari daftar launcher / active project): { id, name, root|path }.
   project: { type: Object, default: null },
+  embedded: { type: Boolean, default: false },
 });
 // Modal ditutup oleh pemanggil (App.vue) saat Close/Cancel/backdrop diklik.
 const emit = defineEmits(["close"]);
@@ -26,7 +28,7 @@ const busy = ref(false);
 const error = ref("");
 const notice = ref("");
 
-// Nilai AKTUAL project (dibaca dari `<root>/.aether/permissions.json`).
+// Nilai AKTUAL project (dibaca dari `<root>/.aegis/permissions.json`).
 const policy = ref({ matrix: {}, path: "", exists: false, project_id: "" });
 // Opsi dari backend (TIDAK di-hardcode di frontend).
 const actions = ref([]); // [{value, label, scopes:[{value,label}]}] dari backend
@@ -118,21 +120,28 @@ watch(() => projectId(), load, { immediate: true });
 </script>
 
 <template>
-  <!-- Modal AETHER (pola .modal-backdrop/.modal existing). Policy TIDAK lagi
-       ditampilkan sebagai panel inline di bawah tombol gear. -->
-  <div v-if="projectId()" class="modal-backdrop" @click.self="close">
-    <div class="modal pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-title">
-      <div class="pp-modal-head">
+  <div
+    v-if="projectId()"
+    :class="embedded ? 'unified-popup-backdrop' : 'modal-backdrop'"
+    @click.self="close"
+  >
+    <div
+      :class="embedded ? 'unified-popup-card pp-modal' : 'modal pp-modal'"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pp-title"
+    >
+      <div class="pp-modal-head" :class="{ 'unified-popup-head': embedded }">
         <div>
-          <div id="pp-title" class="modal-title">Permission Policy</div>
+          <div id="pp-title" class="modal-title" :class="{ 'unified-popup-title': embedded }">Permission Policy</div>
           <div class="pp-modal-sub">
             Permission matrix for
             <span class="mono">{{ project ? project.name : "project" }}</span>
             — saved per project.
           </div>
         </div>
-        <button
-          type="button"
+        <AppButton
+          variant="icon"
           class="pp-x"
           aria-label="Close"
           title="Close"
@@ -140,10 +149,10 @@ watch(() => projectId(), load, { immediate: true });
           @click="close"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+        </AppButton>
       </div>
 
-      <div class="pp-modal-body">
+      <div class="pp-modal-body" :class="{ 'unified-popup-body': embedded }">
         <div v-if="loading" class="pp-empty">Memuat Project Permission Matrix…</div>
 
         <template v-else>
@@ -205,16 +214,16 @@ watch(() => projectId(), load, { immediate: true });
         </template>
       </div>
 
-      <div class="modal-actions pp-modal-foot">
-        <button type="button" class="btn-ghost" :disabled="busy" @click="load">
+      <div class="modal-actions pp-modal-foot" :class="{ 'unified-popup-foot': embedded }">
+        <AppButton variant="ghost" :disabled="busy" @click="load">
           Reload
-        </button>
-        <button type="button" class="btn-ghost" :disabled="busy" @click="close">
+        </AppButton>
+        <AppButton variant="ghost" :disabled="busy" @click="close">
           Cancel
-        </button>
-        <button type="button" class="pp-btn primary" :disabled="busy || loading" @click="save">
+        </AppButton>
+        <AppButton variant="primary" :disabled="busy || loading" :busy="busy" @click="save">
           {{ busy ? "Menyimpan…" : "Save Policy" }}
-        </button>
+        </AppButton>
       </div>
     </div>
   </div>

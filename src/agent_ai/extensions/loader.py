@@ -9,8 +9,8 @@ Flow:
         -> store in ExtensionRegistry
         -> read enabled state (lifecycle) -> activate enabled extensions (on_enable)
 
-All Extensions in <AETHER_ROOT>/Extension/ are processed at startup.
-AETHER must not crash if one Extension fails; failures are recorded
+All Extensions in <AEGIS_ROOT>/Extension/ are processed at startup.
+AegisCode must not crash if one Extension fails; failures are recorded
 and other Extensions remain available.
 Disabled extensions remain discoverable/loaded/registered but capabilities not active.
 
@@ -39,7 +39,7 @@ from agent_ai.extensions.manifest import (
     ManifestError,
     ManifestValidationError,
 )
-from agent_ai.extensions.paths import get_aether_root, get_extensions_dir
+from agent_ai.extensions.paths import get_aegis_root, get_extensions_dir
 from agent_ai.extensions.registry import ExtensionRecord, ExtensionRegistry
 
 
@@ -83,7 +83,7 @@ class ExtensionLoader:
 
     Args:
         registry: target registry (created if None)
-        aether_root: override AETHER root (uses resolver otherwise)
+        aegis_root: override AEGIS root (uses resolver otherwise)
         extensions_dir: override extensions dir (uses resolver otherwise)
         entry_point_group: entry-point group for installed packages
         enable_entry_points: whether to load via entry-points (default True)
@@ -94,9 +94,9 @@ class ExtensionLoader:
     def __init__(
         self,
         registry: Optional[ExtensionRegistry] = None,
-        aether_root: Optional[Path] = None,
+        aegis_root: Optional[Path] = None,
         extensions_dir: Optional[Path] = None,
-        entry_point_group: str = "aether.extensions",
+        entry_point_group: str = "aegis.extensions",
         enable_entry_points: bool = True,
         capability_registry: Optional[Any] = None,
         tool_registry: Optional[Any] = None,
@@ -105,7 +105,7 @@ class ExtensionLoader:
         lifecycle_store: Optional[Any] = None,
     ) -> None:
         self.registry = registry if registry is not None else ExtensionRegistry()
-        self._aether_root = aether_root
+        self._aegis_root = aegis_root
         self._extensions_dir = extensions_dir
         self.entry_point_group = entry_point_group
         self.enable_entry_points = enable_entry_points
@@ -124,14 +124,14 @@ class ExtensionLoader:
     def _resolve_extensions_dir(self) -> Path:
         if self._extensions_dir is not None:
             return Path(self._extensions_dir)
-        root = self._aether_root if self._aether_root is not None else get_aether_root()
+        root = self._aegis_root if self._aegis_root is not None else get_aegis_root()
         return get_extensions_dir(root)
 
     def _make_context(self, manifest: Any, extension_root: Optional[Path], extensions_dir: Path) -> ExtensionContext:
         return ExtensionContext(
             extension_root=extension_root,
             manifest=manifest,
-            aether_root=get_aether_root(self._aether_root) if self._aether_root is not None else get_aether_root(),
+            aegis_root=get_aegis_root(self._aegis_root) if self._aegis_root is not None else get_aegis_root(),
             extensions_dir=extensions_dir,
             capability_registry=self.capability_registry,
             tool_registry=self.tool_registry,
@@ -301,7 +301,7 @@ class ExtensionLoader:
                 if entry.manifest.api_version not in SUPPORTED_API_VERSIONS:
                     raise ManifestValidationError(
                         f'Extension "{entry.manifest.id}" requires API version '
-                        f'{entry.manifest.api_version}, AETHER supports '
+                        f'{entry.manifest.api_version}, AegisCode supports '
                         f'{", ".join(SUPPORTED_API_VERSIONS)}'
                     )
             except ManifestValidationError as exc:
@@ -411,9 +411,9 @@ class ExtensionLoader:
 
 def load_all_extensions(
     registry: Optional[ExtensionRegistry] = None,
-    aether_root: Optional[Path] = None,
+    aegis_root: Optional[Path] = None,
     extensions_dir: Optional[Path] = None,
-    entry_point_group: str = "aether.extensions",
+    entry_point_group: str = "aegis.extensions",
     enable_entry_points: bool = True,
     capability_registry: Optional[Any] = None,
     tool_registry: Optional[Any] = None,
@@ -424,7 +424,7 @@ def load_all_extensions(
     reg = registry or ExtensionRegistry()
     loader = ExtensionLoader(
         registry=reg,
-        aether_root=aether_root,
+        aegis_root=aegis_root,
         extensions_dir=extensions_dir,
         entry_point_group=entry_point_group,
         enable_entry_points=enable_entry_points,

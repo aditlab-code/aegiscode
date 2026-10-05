@@ -75,7 +75,7 @@ class ProjectBrain:
     ) -> "ProjectBrain":
         """Bangun Brain yang membaca/menulis Bible project-local di `root`.
 
-        Knowledge disimpan di `<root>/.aether/bible/` (AI Project Bible).
+        Knowledge disimpan di `<root>/.aegis/bible/` (AI Project Bible).
         """
         return cls(ProjectIntelligence.for_project(root), provider=provider, options=options)
     # ------------------------------------------------------------------ #

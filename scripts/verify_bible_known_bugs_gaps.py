@@ -35,7 +35,7 @@ from agent_ai.projects import (  # noqa: E402
     ProjectBrain,
     ProjectIntelligence,
 )
-from agent_ai.projects.aether_store import ENTRY_MARKER  # noqa: E402
+from agent_ai.projects.aegis_store import ENTRY_MARKER  # noqa: E402
 
 DUMMY_ROOT = PROJECT_ROOT / "dummy_test"
 FIXTURE = DUMMY_ROOT / "bible_known_fixture"
@@ -46,7 +46,7 @@ def main() -> int:
     shutil.rmtree(FIXTURE, ignore_errors=True)
     FIXTURE.mkdir(parents=True, exist_ok=True)
     try:
-        bible_dir = FIXTURE / ".aether" / "bible"
+        bible_dir = FIXTURE / ".aegis" / "bible"
 
         # 1) + 2) ensure() membuat kedua file baru.
         store = BibleStore(FIXTURE)
@@ -158,8 +158,8 @@ def main() -> int:
         empty_root.mkdir()
         empty_intel = ProjectIntelligence.for_project(empty_root)
         empty_intel.create()  # struktur Bible dibuat, kategori kosong
-        assert (empty_root / ".aether" / "bible" / "known_bugs.md").exists()
-        assert (empty_root / ".aether" / "bible" / "known_gaps.md").exists()
+        assert (empty_root / ".aegis" / "bible" / "known_bugs.md").exists()
+        assert (empty_root / ".aegis" / "bible" / "known_gaps.md").exists()
         empty_brain = ProjectBrain.for_project(empty_root)
         empty_ctx = empty_brain.get_context()
         assert "known_bugs" not in empty_ctx.text and "known_gaps" not in empty_ctx.text
@@ -167,10 +167,10 @@ def main() -> int:
         assert empty_ctx.categories.get("known_gaps", 0) == 0
         print("[9] project tanpa bug/gap tetap normal (kategori kosong aman) OK")
 
-        # 12) Isolasi: tidak menulis ke source AETHER.
+        # 12) Isolasi: tidak menulis ke source AegisCode.
         assert str(bugs_path).startswith(str(DUMMY_ROOT)), "fixture harus di dummy_test"
-        assert not (SRC_DIR / "agent_ai" / ".aether").exists(), "tidak boleh menulis .aether ke src"
-        print(f"[12] terisolasi di {DUMMY_ROOT} (source AETHER tidak tersentuh) OK")
+        assert not (SRC_DIR / "agent_ai" / ".aegis").exists(), "tidak boleh menulis .aegis ke src"
+        print(f"[12] terisolasi di {DUMMY_ROOT} (source AegisCode tidak tersentuh) OK")
 
         print("\n[OK] known_bugs.md & known_gaps.md terintegrasi ke Project Bible (read+write existing).")
         return 0

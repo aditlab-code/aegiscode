@@ -33,6 +33,7 @@ class PythonParser(LanguageParser):
                         file=path,
                         line=node.lineno,
                         signature=self._class_signature(node),
+                        end_line=getattr(node, "end_lineno", None),
                     )
                 )
                 for child in node.body:
@@ -45,6 +46,7 @@ class PythonParser(LanguageParser):
                                 line=child.lineno,
                                 parent=node.name,
                                 signature=self._func_signature(child),
+                                end_line=getattr(child, "end_lineno", None),
                             )
                         )
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -55,8 +57,10 @@ class PythonParser(LanguageParser):
                         file=path,
                         line=node.lineno,
                         signature=self._func_signature(node),
+                        end_line=getattr(node, "end_lineno", None),
                     )
                 )
+
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     imports.append(

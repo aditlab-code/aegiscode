@@ -2,9 +2,9 @@
 
 Runtime data, not source package. Each extension gets isolated namespace.
 
-Reuse existing AETHER patterns:
-- Global runtime data lives under <AETHER_ROOT>/data/extensions/<extension_id>/
-- Project-scoped data lives under <PROJECT>/.aether/extensions/<extension_id>/
+Reuse existing AegisCode patterns:
+- Global runtime data lives under <AEGIS_ROOT>/data/extensions/<extension_id>/
+- Project-scoped data lives under <PROJECT>/.aegis/extensions/<extension_id>/
   (explicit project-scoped data, not random workspace folders)
 
 This module is a facade/adapter over filesystem — no new permission framework.
@@ -68,23 +68,23 @@ def _safe_key(key: str) -> str:
         raise ValueError(f"Invalid storage key: {key!r}")
     return text[:128]
 
-def _get_aether_root(explicit: Optional[Union[str, Path]] = None) -> Path:
-    from agent_ai.extensions.paths import get_aether_root
-    return get_aether_root(explicit)
+def _get_aegis_root(explicit: Optional[Union[str, Path]] = None) -> Path:
+    from agent_ai.extensions.paths import get_aegis_root
+    return get_aegis_root(explicit)
 
-def _get_data_root(aether_root: Optional[Union[str, Path]] = None) -> Path:
-    """Runtime data root for extensions: <AETHER_ROOT>/data/extensions"""
-    # Reuse existing AETHER data location (data/ folder)
+def _get_data_root(aegis_root: Optional[Union[str, Path]] = None) -> Path:
+    """Runtime data root for extensions: <AEGIS_ROOT>/data/extensions"""
+    # Reuse existing AegisCode data location (data/ folder)
     try:
         from agent_ai.config.settings import PROJECT_ROOT
         return Path(PROJECT_ROOT) / "data" / "extensions"
     except Exception:
-        root = _get_aether_root(aether_root)
+        root = _get_aegis_root(aegis_root)
         return root / "data" / "extensions"
 
-def _extension_root_data(extension_id: str, aether_root: Optional[Union[str, Path]] = None) -> Path:
+def _extension_root_data(extension_id: str, aegis_root: Optional[Union[str, Path]] = None) -> Path:
     safe = _safe_extension_id(extension_id)
-    return _get_data_root(aether_root) / safe
+    return _get_data_root(aegis_root) / safe
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -113,23 +113,23 @@ class ExtensionStorage:
 
     Args:
         extension_id: stable identity (publisher.extension)
-        aether_root: optional override for AETHER root (for tests)
+        aegis_root: optional override for AEGIS root (for tests)
         project_root: optional default project root for project-scoped ops
     """
 
     def __init__(
         self,
         extension_id: str,
-        aether_root: Optional[Union[str, Path]] = None,
+        aegis_root: Optional[Union[str, Path]] = None,
         project_root: Optional[Union[str, Path]] = None,
     ) -> None:
         if not extension_id or not extension_id.strip():
             raise ValueError("ExtensionStorage requires extension_id")
         self.extension_id = extension_id.strip()
         self._safe_id = _safe_extension_id(self.extension_id)
-        self._aether_root = _get_aether_root(aether_root)
+        self._aegis_root = _get_aegis_root(aegis_root)
         self._project_root = Path(project_root).resolve() if project_root is not None and str(project_root).strip() else None
-        self._base = _extension_root_data(self.extension_id, self._aether_root)
+        self._base = _extension_root_data(self.extension_id, self._aegis_root)
         # Sub-roots (global)
         self._state_dir = self._base / "state"
         self._cache_dir = self._base / "cache"
@@ -159,7 +159,7 @@ class ExtensionStorage:
 
     def _project_base(self, project_id_or_path: Union[str, Path]) -> Path:
         # project_id_or_path can be filesystem path or project id
-        # If it looks like existing directory, use it; else try to resolve via AetherProjectStore?
+        # If it looks like existing directory, use it; else try to resolve via AegisProjectStore?
         # For simplicity: if it's a path that exists and is dir, use it.
         # Otherwise treat as project id under default projects workspace? But easiest: require path.
         p = Path(str(project_id_or_path))
@@ -346,7 +346,7 @@ class ExtensionStorage:
 
     def project(self, project_id_or_path: Union[str, Path]) -> "ProjectScopedStorage":
         """Return a project-scoped storage view for given project."""
-        return ProjectScopedStorage(self.extension_id, project_id_or_path, self._aether_root)
+        return ProjectScopedStorage(self.extension_id, project_id_or_path, self._aegis_root)
 
     # Convenience project-scoped direct methods (if default project_root is set)
     def project_get(self, key: str, project_id_or_path: Optional[Union[str, Path]] = None, default: Any = None) -> Any:
@@ -392,13 +392,13 @@ class ExtensionStorage:
         return f"<ExtensionStorage id={self.extension_id!r} base={self._base!r}>"
 
 class ProjectScopedStorage:
-    """Project-scoped view for an extension (isolated under <project>/.aether/extensions/<id>)."""
+    """Project-scoped view for an extension (isolated under <project>/.aegis/extensions/<id>)."""
 
-    def __init__(self, extension_id: str, project_id_or_path: Union[str, Path], aether_root: Optional[Union[str, Path]] = None):
+    def __init__(self, extension_id: str, project_id_or_path: Union[str, Path], aegis_root: Optional[Union[str, Path]] = None):
         self.extension_id = extension_id
         self._safe_id = _safe_extension_id(extension_id)
         self._project_id_or_path = project_id_or_path
-        self._aether_root = aether_root
+        self._aegis_root = aegis_root
         # Will resolve lazily but also ensure base exists when needed
         self._base: Optional[Path] = None
 
@@ -406,7 +406,7 @@ class ProjectScopedStorage:
         if self._base is not None:
             return self._base
         # Use same logic as ExtensionStorage._project_base but without needing full object
-        tmp = ExtensionStorage(self.extension_id, self._aether_root)
+        tmp = ExtensionStorage(self.extension_id, self._aegis_root)
         base = tmp._project_base(self._project_id_or_path)
         self._base = base
         return base
@@ -474,9 +474,9 @@ class ProjectScopedStorage:
     def __repr__(self) -> str:  # pragma: no cover
         return f"<ProjectScopedStorage ext={self.extension_id!r} project={self._project_id_or_path!r}>"
 
-def get_extension_storage(extension_id: str, aether_root: Optional[Union[str, Path]] = None, project_root: Optional[Union[str, Path]] = None) -> ExtensionStorage:
+def get_extension_storage(extension_id: str, aegis_root: Optional[Union[str, Path]] = None, project_root: Optional[Union[str, Path]] = None) -> ExtensionStorage:
     """Factory helper."""
-    return ExtensionStorage(extension_id, aether_root=aether_root, project_root=project_root)
+    return ExtensionStorage(extension_id, aegis_root=aegis_root, project_root=project_root)
 
 __all__ = [
     "ExtensionStorage",

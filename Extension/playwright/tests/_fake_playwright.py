@@ -71,7 +71,7 @@ class FakeLocator:
 
     def evaluate(self, script, arg=None):
         text = script if isinstance(script, str) else ""
-        if "AETHER_DOM_INSPECT" in text:
+        if "AEGIS_DOM_INSPECT" in text:
             element = self._one()
             attrs = " ".join(f'{k}="{v}"' for k, v in element.attrs.items())
             out = {
@@ -205,7 +205,7 @@ class FakePage:
         return FakeResponse(status=200, ok=True)
 
     def evaluate(self, script, arg=None):
-        if "AETHER_SCROLL_TO" in (script if isinstance(script, str) else ""):
+        if "AEGIS_SCROLL_TO" in (script if isinstance(script, str) else ""):
             return True
         return None
 

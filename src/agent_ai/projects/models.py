@@ -1,7 +1,7 @@
 """Model untuk Project Intelligence / AI Project Bible.
 
 Project Intelligence disimpan sebagai AI Project Bible project-local di
-`<root project target>/.aether/bible/` (lihat `agent_ai.projects.aether_store`).
+`<root project target>/.aegis/bible/` (lihat `agent_ai.projects.aegis_store`).
 Legacy: beberapa jalur (mis. verifier lama) masih memakai storage JSON di bawah
 workspace Agent-Ai (J:\\Agent_Ai\\projects\\<id>\\intelligence\\) saat root
 project tidak diketahui.
@@ -38,7 +38,7 @@ INTELLIGENCE_CATEGORIES = (
 )
 
 # Kategori AI Project Bible project-local (file `<kategori>.md` di
-# `<root project target>/.aether/bible/`). "conventions" menggantikan "rules"
+# `<root project target>/.aegis/bible/`). "conventions" menggantikan "rules"
 # agar knowledge tetap terwakili (lihat CATEGORY_ALIASES).
 # "known_bugs"/"known_gaps" = persistent knowledge untuk masalah terverifikasi
 # (known_bugs.md) dan kekurangan/belum-tersedia yang bukan bug (known_gaps.md).
@@ -151,7 +151,7 @@ class IntelligenceEntry:
 
 @dataclass
 class Skill:
-    """Model generik untuk sebuah Skill AETHER.
+    """Model generik untuk sebuah Skill AegisCode.
 
     Skill bersifat dynamic — Core hanya memahami konsep generic
     skill_id / name / description / scope / location. Nama directory

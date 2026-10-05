@@ -1,7 +1,7 @@
 <script setup>
-// Changes / Diff + Result. Data dari event SSE AETHER.
+// Changes / Diff + Result. Data dari event SSE Aegis.
 // TIDAK ada diff engine di frontend: hanya menampilkan perubahan yang
-// dilaporkan AETHER. Diff detail ditampilkan bila payload menyediakannya.
+// dilaporkan Aegis. Diff detail ditampilkan bila payload menyediakannya.
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { getProjectGitStatus } from "../api.js";
 
@@ -93,6 +93,30 @@ onBeforeUnmount(() => {
   }
 });
 
+function isInternalOrIgnored(path) {
+  const p = String(path || "").trim().replace(/\\/g, "/").replace(/^\.\//, "");
+  if (!p || p === ".." || p.startsWith("../") || p.includes("/../")) return true;
+  const parts = p.split("/").filter(Boolean);
+  if (!parts.length) return true;
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  if (
+    first === ".aegis" ||
+    first === ".aether" ||
+    first === ".git" ||
+    first === ".gemini" ||
+    first === ".continue" ||
+    first === ".ipynb_checkpoints" ||
+    first === "__pycache__"
+  ) {
+    return true;
+  }
+  if (first.startsWith(".aegis") || first.startsWith(".aether")) return true;
+  if (last.startsWith(".aegis_tmp_") || last.startsWith(".aether_tmp_") || last.endsWith(".swp")) return true;
+  if (p === "data/aegis.db" || p === "data/aether.db" || p.startsWith("data/aegis.db-") || p.startsWith("data/aether.db-")) return true;
+  return false;
+}
+
 async function loadGitChanges() {
   const pId = props.project?.id || props.project?.project_id;
   if (!pId) {
@@ -103,19 +127,7 @@ async function loadGitChanges() {
     const res = await getProjectGitStatus(pId);
     if (res?.is_repository && Array.isArray(res.files)) {
       localGitChanges.value = res.files
-        .filter((f) => {
-          const p = String(f?.path || "").trim().replace(/\\/g, "/").replace(/^\.\//, "");
-          return (
-            p &&
-            !p.startsWith("../") &&
-            !p.includes("/../") &&
-            p !== ".." &&
-            p !== ".aether" &&
-            !p.startsWith(".aether/") &&
-            p !== ".git" &&
-            !p.startsWith(".git/")
-          );
-        })
+        .filter((f) => !isInternalOrIgnored(f?.path))
         .map((f) => ({
           path: f.path,
           kind: f.status.includes("?")
@@ -148,26 +160,14 @@ const displayChanges = computed(() => {
     props.changes && props.changes.length > 0
       ? props.changes
       : localGitChanges.value;
-  return (raw || []).filter((c) => {
-    const p = String(c?.path || c?.detail || "").trim().replace(/\\/g, "/").replace(/^\.\//, "");
-    return (
-      p &&
-      !p.startsWith("../") &&
-      !p.includes("/../") &&
-      p !== ".." &&
-      p !== ".aether" &&
-      !p.startsWith(".aether/") &&
-      p !== ".git" &&
-      !p.startsWith(".git/")
-    );
-  });
+  return (raw || []).filter((c) => !isInternalOrIgnored(c?.path || c?.detail));
 });
 
 function onRowClick(c) {
   emit("open-diff", c);
 }
 
-// Collapsible section (AETHER Workbench right column).
+// Collapsible section (Aegis Workbench right column).
 // Default: CHANGES tertutup. State hanya di frontend selama sesi aktif.
 const collapsed = ref(false);
 function toggleCollapse() {

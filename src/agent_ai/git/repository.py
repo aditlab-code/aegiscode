@@ -53,6 +53,11 @@ class GitRepositoryFacade:
             ValueError: bila path keluar dari workspace boundary.
         """
         rel = path if path else "."
+        # Tangani path dengan leading slash jika bukan absolute path valid di dalam root
+        if isinstance(rel, str) and rel.startswith("/"):
+            candidate = Path(rel)
+            if not (candidate.is_absolute() and (candidate == self.root or self.root in candidate.parents)):
+                rel = rel.lstrip("/")
         return _resolve_within_root(rel, self.root)
 
     # ------------------------------------------------------------------ #
@@ -118,14 +123,37 @@ class GitRepositoryFacade:
             return ""
         rel_path = None
         if file_path:
+            from agent_ai.git.client import _is_internal_ignored_path
+            if _is_internal_ignored_path(file_path):
+                return ""
             target = self._resolve(file_path)
             rel_path = target.relative_to(self.root).as_posix()
+            if _is_internal_ignored_path(rel_path):
+                return ""
         return self.client.diff_unified(self.root, rel_path)
 
     def diff_detail(self, file_path: str) -> Dict[str, Any]:
         """Detail diff side-by-side untuk Monaco Diff Editor."""
+        from agent_ai.git.client import _is_internal_ignored_path
+        if _is_internal_ignored_path(file_path):
+            return {
+                "path": file_path,
+                "status": "clean",
+                "original": "",
+                "modified": "",
+                "diff": "",
+            }
+
         target = self._resolve(file_path)
         rel_path = target.relative_to(self.root).as_posix()
+        if _is_internal_ignored_path(rel_path):
+            return {
+                "path": rel_path,
+                "status": "clean",
+                "original": "",
+                "modified": "",
+                "diff": "",
+            }
 
         # Baca konten working tree (modified)
         modified_content = ""

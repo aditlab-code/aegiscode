@@ -362,6 +362,9 @@ class ToolResultCompactor:
             "atlas_query": self._map_query,
             "rig_query": self._map_query,
             "project_map_status": self._project_map_status,
+            "semantic_search": self._semantic_search,
+            "refresh_semantic_index": self._refresh_semantic_index,
+
         }.get(tool)
         if handler is None:
             return self._generic_dict(tool, data, raw)
@@ -777,8 +780,85 @@ class ToolResultCompactor:
         )
 
     # ------------------------------------------------------------------ #
+    # semantic_search
+    # ------------------------------------------------------------------ #
+    def _semantic_search(
+        self, tool: str, data: Dict[str, Any], raw: str, hc: int, tc: int
+    ) -> CompactedToolResult:
+        query = data.get("query")
+        total = _safe_int(data.get("total_results"))
+        backend = data.get("backend")
+        results = data.get("results") if isinstance(data.get("results"), list) else []
+
+        lines: List[str] = [_header(tool)]
+        for label, value in (("query", query), ("backend", backend)):
+            line = _kv(label, value)
+            if line:
+                lines.append(line)
+        if total is not None:
+            lines.append(f"total_results: {total}")
+
+        shown = results[: self.max_items]
+        lines.append(f"results (showing {len(shown)} of {len(results)}):")
+        item_locators: List[Dict[str, Any]] = []
+        for item in shown:
+            if not isinstance(item, dict):
+                continue
+            path = item.get("path")
+            symbol = item.get("symbol")
+            score = item.get("score")
+            start = item.get("start_line")
+            end = item.get("end_line")
+            loc_str = f"{path}:{start}-{end}" if (path and start and end) else (path or "")
+            sym_str = f" [{symbol}]" if symbol else ""
+            score_str = f" (score: {score})" if score is not None else ""
+            lines.append(f"- {loc_str}{sym_str}{score_str}")
+            if path:
+                item_locators.append({"path": path, "line": start or 1})
+
+        if len(results) > len(shown):
+            lines.append(f"- … (+{len(results) - len(shown)} hasil lain)")
+
+        locators: Dict[str, Any] = {"tool": tool}
+        if query:
+            locators["query"] = query
+        if item_locators:
+            locators["results"] = item_locators
+
+        return CompactedToolResult(
+            tool=tool,
+            kind="semantic_search",
+            text="\n".join(lines),
+            locators=locators,
+        )
+
+    # ------------------------------------------------------------------ #
+    # refresh_semantic_index
+    # ------------------------------------------------------------------ #
+    def _refresh_semantic_index(
+        self, tool: str, data: Dict[str, Any], raw: str, hc: int, tc: int
+    ) -> CompactedToolResult:
+        status = data.get("status")
+        full = data.get("full")
+        stats = data.get("stats") if isinstance(data.get("stats"), dict) else {}
+        lines: List[str] = [
+            _header(tool),
+            f"status: {status}",
+            f"full_rebuild: {full}",
+        ]
+        for k, v in stats.items():
+            lines.append(f"{k}: {v}")
+        return CompactedToolResult(
+            tool=tool,
+            kind="refresh_semantic_index",
+            text="\n".join(lines),
+            locators={"tool": tool},
+        )
+
+    # ------------------------------------------------------------------ #
     # project_map_status
     # ------------------------------------------------------------------ #
+
     def _project_map_status(
         self, tool: str, data: Dict[str, Any], raw: str, hc: int, tc: int
     ) -> CompactedToolResult:

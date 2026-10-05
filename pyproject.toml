@@ -28,6 +28,16 @@ dependencies = [
 dev = [
     "pytest>=7.0",
 ]
+# Phase 2.1: pencarian semantik lokal (opsional, berat: onnxruntime).
+semantic = [
+    "langchain-core>=0.3",
+    "langchain-community>=0.3",
+    "langchain-text-splitters>=0.3",
+    "fastembed>=0.4",
+    "sqlite-vec>=0.1.6",
+    "sqlean.py>=3.45",
+]
+
 
 [project.urls]
 Homepage = "https://github.com/aditlab-code/aegiscode"

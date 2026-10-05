@@ -279,3 +279,50 @@ def test_git_status_scoped_to_subfolder(temp_git_repo):
     diff_paths = [d.path for d in diff_summaries]
     assert "feature.py" in diff_paths
     assert "root_change.py" not in diff_paths
+
+
+def test_git_status_and_diff_filters_internal_mechanisms(temp_git_repo):
+    """Memastikan metadata internal Aegis (.aegis, .aether, .aegis_tmp_*, swp, db) tidak bocor."""
+    # 1. Buat direktori dan berkas internal
+    aegis_dir = temp_git_repo / ".aegis"
+    aegis_dir.mkdir(exist_ok=True)
+    (aegis_dir / "ENVIRONMENT.md").write_text("# Aegis Environment", encoding="utf-8")
+
+    aether_dir = temp_git_repo / ".aether"
+    aether_dir.mkdir(exist_ok=True)
+    (aether_dir / "task.log").write_text("log data", encoding="utf-8")
+
+    tmp_swp = temp_git_repo / ".aegis_tmp_xyz123.swp"
+    tmp_swp.write_text("swap content", encoding="utf-8")
+
+    data_dir = temp_git_repo / "data"
+    data_dir.mkdir(exist_ok=True)
+    (data_dir / "aegis.db").write_text("sqlite db dummy", encoding="utf-8")
+
+    # 2. Buat berkas user biasa yang valid
+    user_file = temp_git_repo / "user_code.py"
+    user_file.write_text("print('user')", encoding="utf-8")
+
+    facade = GitRepositoryFacade(root=temp_git_repo)
+    st = facade.status()
+    file_paths = [f.path for f in st.files]
+
+    # Berkas user harus terdeteksi
+    assert "user_code.py" in file_paths
+
+    # Seluruh mekanisme internal harus disaring (tidak boleh terdeteksi)
+    assert not any(p.startswith(".aegis") for p in file_paths)
+    assert not any(p.startswith(".aether") for p in file_paths)
+    assert not any(p.endswith(".swp") for p in file_paths)
+    assert not any("data/aegis.db" in p for p in file_paths)
+
+    # diff_detail pada berkas internal harus mengembalikan status clean
+    detail_aegis = facade.diff_detail(".aegis/ENVIRONMENT.md")
+    assert detail_aegis["status"] == "clean"
+    assert detail_aegis["diff"] == ""
+
+    # diff summary tidak boleh memuat mekanisme internal
+    summaries = facade.diff()
+    summary_paths = [s.path for s in summaries]
+    assert not any(".aegis" in p for p in summary_paths)
+    assert not any(".aether" in p for p in summary_paths)

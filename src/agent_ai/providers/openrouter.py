@@ -22,5 +22,5 @@ class OpenRouterProvider(OpenAICompatibleProvider):
         self.config = config or settings.openrouter
 
     def _extra_headers(self) -> Dict[str, str]:
-        """Tambahkan header atribusi OpenRouter agar request AETHER dikenali."""
-        return {"X-Title": "AETHER"}
+        """Tambahkan header atribusi OpenRouter agar request Aegis dikenali."""
+        return {"X-Title": "Aegis"}

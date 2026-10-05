@@ -1,6 +1,6 @@
-"""Path resolver for Extension System (no hardcode J:\\Agent_Ai).
+"""Path resolver for Extension System (no hardcode).
 
-Resolves AETHER root and Extension runtime directory in a portable way.
+Resolves AegisCode root and Extension runtime directory in a portable way.
 """
 
 from __future__ import annotations
@@ -13,11 +13,9 @@ ProjectPath = Union[str, "os.PathLike[str]"]
 
 # src/agent_ai/extensions/paths.py -> parents[3] = repo root (AEGIS_ROOT)
 _AEGIS_ROOT: Path = Path(__file__).resolve().parents[3]
-_AETHER_ROOT: Path = _AEGIS_ROOT
 
 #: Environment variable to override extensions dir or aegis root.
 ENV_AEGIS_ROOT = "AEGIS_ROOT"
-ENV_AETHER_ROOT = "AETHER_ROOT"
 ENV_AEGIS_EXTENSIONS_DIR = "AEGIS_EXTENSIONS_DIR"
 ENV_EXTENSIONS_DIR = "AEGIS_EXTENSIONS_DIR"
 
@@ -27,12 +25,12 @@ def get_aegis_root(explicit: ProjectPath | None = None) -> Path:
 
     Priority:
         1. explicit argument
-        2. env AEGIS_ROOT / AETHER_ROOT
+        2. env AEGIS_ROOT
         3. repo root computed from this file location
     """
     if explicit is not None and str(explicit).strip():
         return Path(str(explicit).strip())
-    env = os.environ.get(ENV_AEGIS_ROOT, "") or os.environ.get(ENV_AETHER_ROOT, "")
+    env = os.environ.get(ENV_AEGIS_ROOT, "")
     if isinstance(env, str) and env.strip():
         return Path(env.strip())
     return _AEGIS_ROOT
@@ -45,12 +43,12 @@ def get_extensions_dir(
 
     Priority:
         1. explicit
-        2. env AEGIS_EXTENSIONS_DIR / AETHER_EXTENSIONS_DIR
+        2. env AEGIS_EXTENSIONS_DIR
         3. <AEGIS_ROOT>/Extension
     """
     if explicit is not None and str(explicit).strip():
         return Path(str(explicit).strip())
-    env = os.environ.get(ENV_AEGIS_EXTENSIONS_DIR, "") or os.environ.get("AETHER_EXTENSIONS_DIR", "")
+    env = os.environ.get(ENV_AEGIS_EXTENSIONS_DIR, "")
     if isinstance(env, str) and env.strip():
         return Path(env.strip())
     root = get_aegis_root(aegis_root)
@@ -67,22 +65,13 @@ def get_extensions_data_dir(aegis_root: ProjectPath | None = None) -> Path:
     return get_aegis_data_dir(aegis_root) / "extensions"
 
 
-#: Alias kompatibilitas
-get_aether_root = get_aegis_root
-get_aether_data_dir = get_aegis_data_dir
-
-
 __all__ = [
     "get_aegis_root",
-    "get_aether_root",
     "get_extensions_dir",
     "get_aegis_data_dir",
-    "get_aether_data_dir",
     "get_extensions_data_dir",
     "ENV_AEGIS_ROOT",
-    "ENV_AETHER_ROOT",
     "ENV_AEGIS_EXTENSIONS_DIR",
     "ENV_EXTENSIONS_DIR",
     "_AEGIS_ROOT",
-    "_AETHER_ROOT",
 ]

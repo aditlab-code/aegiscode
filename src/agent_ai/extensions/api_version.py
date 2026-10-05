@@ -1,4 +1,4 @@
-"""Extension API version contract for AETHER.
+"""Extension API version contract for AegisCode.
 
 Single source of truth for current Extension API version.
 Task 01 defines only version "1" without complex compatibility matrix.
@@ -6,7 +6,7 @@ Task 01 defines only version "1" without complex compatibility matrix.
 
 from __future__ import annotations
 
-#: Current Extension API version that AETHER Core implements.
+#: Current Extension API version that AegisCode Core implements.
 CURRENT_API_VERSION: str = "1"
 
 #: Supported versions (Task 01: only "1").

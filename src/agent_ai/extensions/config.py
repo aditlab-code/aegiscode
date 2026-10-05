@@ -1,9 +1,9 @@
-"""Extension Config System — generic facade over existing AETHER persistence.
+"""Extension Config System — generic facade over existing Aegis persistence.
 
 Task 04: Extension declares configuration via context.config.register(...)
 and reads/writes via context.config.get/set/has etc. This module provides
 validation, type handling, scope awareness, secrets handling, and persistence
-via the existing SQLite DB (data/aether.db) — no new JSON per extension.
+via the existing SQLite DB (data/aegis.db) — no new JSON per extension.
 
 This is the runtime value layer; definitions live in CapabilityRegistry
 (capabilities.ConfigFacade). This module provides the Value Store and validation
@@ -125,7 +125,7 @@ def _validate_default(cfg_type: str, default: Any, choices: Optional[List[Any]] 
 
 
 # ---------------------------------------------------------------------------
-# SQLite Value Store (reuses data/aether.db)
+# SQLite Value Store (reuses data/aegis.db)
 # ---------------------------------------------------------------------------
 
 def _default_db_path() -> Path:
