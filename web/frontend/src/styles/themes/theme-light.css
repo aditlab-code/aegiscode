@@ -61,7 +61,7 @@
   --shadow-pop: 0 4px 18px -4px rgba(69, 43, 34, 0.14);
 
   /* Background Artwork Wallpaper & Glassmorphism (Light) */
-  --bg-wallpaper: url('/backgrounds/Aegis-light.jpeg');
+  --bg-wallpaper: url('/backgrounds/Light.png');
   --wallpaper-overlay: rgba(253, 251, 247, 0.15);
   --glass-panel-bg: rgba(253, 249, 243, 0.88);
   --glass-header-bg: rgba(244, 237, 228, 0.75);

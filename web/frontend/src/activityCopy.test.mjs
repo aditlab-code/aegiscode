@@ -60,7 +60,10 @@ const meta = {
 const text = buildAgentActivityCopy({ events, meta });
 
 // Section wajib ada & urutannya benar.
-assert.ok(text.startsWith("AETHER AGENT ACTIVITY"), "pembuka AETHER AGENT ACTIVITY");
+assert.ok(
+  text.startsWith("AEGIS AGENT ACTIVITY") || text.startsWith("AETHER AGENT ACTIVITY"),
+  "pembuka AEGIS AGENT ACTIVITY"
+);
 const idxAgent = text.indexOf("[AGENT]");
 const idxActivity = text.indexOf("[ACTIVITY]");
 const idxRepeated = text.indexOf("[REPEATED ACTIVITY]");

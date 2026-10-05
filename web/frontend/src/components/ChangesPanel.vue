@@ -342,7 +342,7 @@ defineExpose({ loadGitChanges });
             <!-- Diff muncul saat caret diklik (accordion) -->
             <div v-if="expandedIndex === i" class="file-diff">
               <div v-if="c.diff" class="file-diff-body"><pre>{{ c.diff }}</pre></div>
-              <div v-else class="file-diff-note">Diff detail is not available from AETHER. Click row to open Monaco Diff.</div>
+              <div v-else class="file-diff-note">Diff detail is not available from AEGIS. Click row to open Monaco Diff.</div>
             </div>
           </template>
         </div>

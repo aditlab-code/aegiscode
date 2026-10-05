@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
     :class="{ 'settings-embedded': embedded }"
     role="dialog"
     :aria-modal="!embedded"
-    aria-label="AETHER Settings &amp; Administration"
+    aria-label="AEGIS Settings &amp; Administration"
   >
     <div v-if="!embedded" class="settings-overlay-backdrop" @click="emit('close')" />
 
@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
         <div class="settings-header-info">
           <div class="settings-badge aether-badge">Admin</div>
           <div>
-            <h2 class="settings-title">AETHER Settings &amp; Administration</h2>
+            <h2 class="settings-title">AEGIS Settings &amp; Administration</h2>
             <p v-if="!embedded" class="settings-subtitle">Configure providers, workspaces, task history, and extensions</p>
           </div>
         </div>
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
               <div class="panel-head">
                 <div>
                   <div class="title">Project Registry</div>
-                  <div class="desc">{{ projects.length }} workspace(s) registered in AETHER.</div>
+                  <div class="desc">{{ projects.length }} workspace(s) registered in AEGIS.</div>
                 </div>
               </div>
               <div v-if="!projects.length" class="panel-body">
@@ -379,8 +379,8 @@ onBeforeUnmount(() => {
                         <button
                           type="button"
                           class="icon-btn danger"
-                          title="Hapus dari daftar AETHER (file/folder di disk tidak dihapus)"
-                          aria-label="Hapus project dari daftar AETHER"
+                          title="Hapus dari daftar AEGIS (file/folder di disk tidak dihapus)"
+                          aria-label="Hapus project dari daftar AEGIS"
                           @click.stop="emit('delete-project', p)"
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">

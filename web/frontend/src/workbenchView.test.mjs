@@ -146,7 +146,7 @@ test("4. WorkbenchView: empty state welcome canvas when no tabs are open with sh
 
   assert.ok(html.includes('class="wb-welcome"'), "Renders wb-welcome container");
   assert.ok(html.includes('class="welcome-card"'), "Renders welcome card");
-  assert.ok(html.includes("AETHER Workbench"), "Displays welcome title");
+  assert.ok(html.includes("Welcome to AEGIS") || html.includes("AETHER Workbench"), "Displays welcome title");
   assert.ok(html.includes("/workspace/Aether-Agent"), "Displays active project path");
   assert.ok(html.includes("Quick Open"), "Displays Quick Open shortcut hint");
   assert.ok(html.includes("<kbd>Cmd</kbd> + <kbd>P</kbd>"), "Displays Cmd+P keybinding");

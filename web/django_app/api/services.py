@@ -2829,6 +2829,23 @@ class GatewayService:
             self._scheduler_pump()
         return self.get_task(task_id)
 
+    def cancel_all_tasks(self) -> int:
+        """Batalkan seluruh task yang sedang aktif/berjalan (untuk shutdown aman)."""
+        with self._lock:
+            active_ids = [
+                task_id
+                for task_id, record in self._tasks.items()
+                if record.status not in ("completed", "failed", "cancelled")
+            ]
+        count = 0
+        for task_id in active_ids:
+            try:
+                self.cancel_task(task_id)
+                count += 1
+            except Exception:
+                pass
+        return count
+
     # ------------------------------------------------------------------ #
     # Consultant (AETHER reasoning layer — read-only terhadap CODE PROJECT)
     # ------------------------------------------------------------------ #

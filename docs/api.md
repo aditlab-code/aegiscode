@@ -141,3 +141,33 @@ API ini mengabstraksikan operasi version control Git lokal tanpa mengeksekusi sh
 ### 7.2. WebSocket ANSI PTY Bridge
 - **Endpoint**: `ws://localhost:8000/ws/terminal/`
   - Terkoneksi ke sesi interactive pseudo-terminal dengan dukungan input karakter raw, penanganan signal `Ctrl+C`, dan pembersihan proses saat terminal ditutup.
+
+---
+
+## 8. API Siklus Hidup Server & Terminasi (Zero-Zombie Lifecycle)
+
+Endpoint ini mengelola penghentian server AegisCode secara deterministik sesuai spesifikasi [docs/PRD.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/PRD.md) dan [docs/ruleset.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ruleset.md):
+
+### 8.1. Terminasi Server
+- **Endpoint**: `POST /api/server/terminate`
+- **Payload (Opsional)**:
+  ```json
+  {
+    "force": false,
+    "delay": 0.3
+  }
+  ```
+- **Deskripsi**:
+  1. Menerima permintaan dan merespons segera dengan HTTP 200 agar klien antarmuka pengguna tidak terputus secara mendadak.
+  2. Membatalkan seluruh task agen yang sedang berjalan secara kooperatif (`CancellationToken`).
+  3. Menutup dan membersihkan seluruh sesi terminal PTY aktif (`pty.terminate()`) serta melepaskan file descriptor master/slave.
+  4. Menjadwalkan penghentian proses server dalam thread asinkron (mengirim sinyal `SIGTERM` ke pohon proses server, disusul eskalasi `SIGKILL` jika belum berhenti dalam batas waktu 3 detik) untuk memastikan port dilepas dan tingkat proses orphan/zombie adalah 0%.
+- **Response**:
+  ```json
+  {
+    "status": "terminating",
+    "message": "Penghentian server AegisCode telah diinisiasi.",
+    "pid": 12345,
+    "force": false
+  }
+  ```

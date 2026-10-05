@@ -114,7 +114,7 @@ onMounted(load);
       <div>
         <div class="title">Agent</div>
         <div class="desc">
-          System Prompt / Agent Instructions yang dipakai AETHER Agent saat
+          System Prompt / Agent Instructions yang dipakai AEGIS Agent saat
           membuat system message.
         </div>
       </div>
@@ -127,7 +127,7 @@ onMounted(load);
       <div v-if="notice" class="as-alert ok">{{ notice }}</div>
 
       <div class="as-scope">
-        <span class="as-scope-badge">Global AETHER Settings</span>
+        <span class="as-scope-badge">Global AEGIS Settings</span>
         <span class="as-scope-note">
           Disimpan di <span class="mono">data/settings.json</span> ->
           <span class="mono">agent.system_prompt</span> /
@@ -143,7 +143,7 @@ onMounted(load);
             <div class="as-help">
               Instruction DASAR Agent. Context dinamis (Project Environment,
               Project Bible, Skill, dan definisi tool) tetap disisipkan otomatis
-              oleh AETHER; TIDAK perlu ditulis ulang di sini.
+              oleh AEGIS; TIDAK perlu ditulis ulang di sini.
             </div>
           </div>
           <div class="as-control">
@@ -185,7 +185,7 @@ onMounted(load);
         </div>
         <div class="as-mode-help">
           <div><strong>Fast</strong> — Strategi cepat untuk perubahan kecil</div>
-          <div><strong>Balanced</strong> — Strategi default AETHER untuk pekerjaan umum</div>
+          <div><strong>Balanced</strong> — Strategi default AEGIS untuk pekerjaan umum</div>
           <div><strong>Deep</strong> — Strategi analisis mendalam untuk perubahan kompleks</div>
         </div>
 
@@ -201,7 +201,7 @@ onMounted(load);
           </button>
         </div>
         <div v-if="isDefaultValue" class="as-hint">
-          Editor sedang memuat System Prompt bawaan AETHER.
+          Editor sedang memuat System Prompt bawaan AEGIS.
         </div>
       </template>
     </div>
@@ -213,7 +213,7 @@ onMounted(load);
       <div>
         <div class="title">Actual value</div>
         <div class="desc">
-          Nilai yang benar-benar dipakai AETHER Agent dari
+          Nilai yang benar-benar dipakai AEGIS Agent dari
           <span class="mono">data/settings.json</span>.
         </div>
       </div>

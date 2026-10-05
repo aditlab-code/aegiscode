@@ -89,6 +89,8 @@ ALLOWED_HOSTS = _env_list(
     "DJANGO_ALLOWED_HOSTS",
     default=["127.0.0.1", "localhost"] if not IS_PRODUCTION else [],
 )
+if not IS_PRODUCTION and "testserver" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append("testserver")
 
 # ---------------------------------------------------------------------------
 # Production safety guard (#57)

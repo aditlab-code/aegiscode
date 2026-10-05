@@ -1628,7 +1628,7 @@ defineExpose({
             <span class="crumb-item crumb-file current">Settings</span>
           </div>
           <div v-else-if="pane1ActiveTabPath === 'aether://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
-            <span class="crumb-item crumb-root">AETHER</span>
+            <span class="crumb-item crumb-root">AEGIS</span>
             <span class="crumb-separator" aria-hidden="true">›</span>
             <span class="crumb-item crumb-file current">Welcome</span>
           </div>
@@ -2068,7 +2068,7 @@ defineExpose({
                   <circle cx="12" cy="12" r="1.5" fill="currentColor" />
                 </svg>
               </div>
-              <h2 class="welcome-title">AETHER Workbench</h2>
+              <h2 class="welcome-title">Welcome to AEGIS</h2>
               <div class="welcome-project">{{ activeProject?.path || activeProject?.root || '' }}</div>
               <div class="welcome-shortcuts">
                 <div class="shortcut-row">

@@ -40,7 +40,12 @@ test("1. SettingsOverlay: shell compilation, title, close button, and 6 navigati
   assert.ok(defaultHtml.includes("settings-overlay-backdrop"), "Renders backdrop");
   assert.ok(defaultHtml.includes("settings-overlay-dialog"), "Renders dialog shell");
   assert.ok(defaultHtml.includes("settings-overlay-header"), "Renders header bar");
-  assert.ok(defaultHtml.includes("AETHER Settings &amp; Administration") || defaultHtml.includes("AETHER Settings & Administration"));
+  assert.ok(
+    defaultHtml.includes("AEGIS Settings &amp; Administration") ||
+    defaultHtml.includes("AEGIS Settings & Administration") ||
+    defaultHtml.includes("AETHER Settings &amp; Administration") ||
+    defaultHtml.includes("AETHER Settings & Administration")
+  );
   assert.ok(defaultHtml.includes("Configure providers, workspaces, task history, and extensions"));
   assert.ok(defaultHtml.includes("settings-close-btn"), "Renders close button");
   assert.ok(defaultHtml.includes("shortcut-badge") && defaultHtml.includes("Esc"), "Renders Esc badge");

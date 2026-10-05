@@ -52,11 +52,14 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 from pathlib import Path
 
@@ -369,6 +372,169 @@ def _open_browser_later(url: str, delay: float = 3.0) -> None:
     threading.Thread(target=_open, daemon=True).start()
 
 
+def terminate_process_tree(proc: subprocess.Popen, timeout: float = 3.0) -> None:
+    """Hentikan pohon proses secara deterministik (Zero-Zombie process tree kill).
+
+    Sesuai docs/ruleset.md Bagian 4:
+    1. Mengirim sinyal SIGTERM ke seluruh sub-proses anak.
+    2. Memberi batas waktu aman (grace period) 3 detik untuk terminasi bersih.
+    3. Mengeksekusi SIGKILL (atau taskkill /F /T di Windows) bila proses belum berhenti.
+    """
+    if proc.poll() is not None:
+        return
+
+    pid = proc.pid
+    # 1. Tahap SIGTERM lembut
+    if os.name == "nt":
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    else:
+        try:
+            pgid = os.getpgid(pid)
+            if pgid != os.getpgid(0):
+                os.killpg(pgid, signal.SIGTERM)
+            else:
+                proc.terminate()
+        except (ProcessLookupError, OSError):
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+
+    # Tunggu bounded hingga batas waktu aman (grace period 3.0 detik)
+    deadline = time.time() + max(0.1, float(timeout))
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            return
+        time.sleep(0.1)
+
+    # 2. Eskalasi ke SIGKILL bila belum berhenti dalam batas waktu
+    if proc.poll() is None:
+        if os.name == "nt":
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=3.0,
+                    shell=False,
+                )
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        else:
+            try:
+                pgid = os.getpgid(pid)
+                if pgid != os.getpgid(0):
+                    os.killpg(pgid, signal.SIGKILL)
+                else:
+                    proc.kill()
+            except (ProcessLookupError, OSError):
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            try:
+                proc.wait(timeout=1.0)
+            except Exception:
+                pass
+
+
+def _kill_process_by_port(port: int) -> bool:
+    """Cari PID yang menahan port dan hentikan seluruh pohon prosesnya."""
+    if os.name == "nt":
+        try:
+            out = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=3.0,
+            ).stdout
+            pids = set()
+            for line in out.splitlines():
+                if f":{port} " in line and "LISTENING" in line:
+                    parts = line.strip().split()
+                    if parts:
+                        pids.add(parts[-1])
+            for pid in pids:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", pid],
+                    capture_output=True,
+                    timeout=3.0,
+                )
+            return bool(pids)
+        except Exception:
+            return False
+    else:
+        try:
+            res = subprocess.run(
+                ["lsof", "-ti", f":{port}"],
+                capture_output=True,
+                text=True,
+                timeout=3.0,
+            )
+            pids = [p.strip() for p in res.stdout.splitlines() if p.strip()]
+            for pid in pids:
+                try:
+                    ipid = int(pid)
+                    try:
+                        pgid = os.getpgid(ipid)
+                        os.killpg(pgid, signal.SIGKILL)
+                    except Exception:
+                        os.kill(ipid, signal.SIGKILL)
+                except Exception:
+                    pass
+            return bool(pids)
+        except Exception:
+            return False
+
+
+def terminate_running_server(host: str, port: int, timeout: float = 3.0) -> bool:
+    """Hentikan server AegisCode yang sedang berjalan pada host dan port tertentu (Zero-Zombie)."""
+    if not port_in_use(host, port):
+        info(f"Tidak ada server yang sedang berjalan pada {host}:{port}.")
+        return True
+
+    # 1. Coba hentikan secara aman melalui endpoint HTTP POST /api/server/terminate
+    target_host = "127.0.0.1" if host in ("0.0.0.0", "::", "") else host
+    url = f"http://{target_host}:{port}/api/server/terminate"
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({"force": False}).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=2.0) as resp:
+            if resp.status == 200:
+                info(f"Sinyal terminasi berhasil dikirim ke server pada {url}.")
+    except Exception as exc:
+        warn(f"Panggilan API terminasi ({url}) tidak dapat diselesaikan: {exc}")
+
+    # 2. Tunggu pelepasan port hingga batas waktu (3 detik)
+    deadline = time.time() + max(1.0, float(timeout))
+    while time.time() < deadline:
+        if not port_in_use(host, port):
+            info(f"Port {port} telah bebas.")
+            return True
+        time.sleep(0.2)
+
+    # 3. Fallback OS-level tree-kill bila port masih tertahan
+    warn(f"Server masih menahan port {port} setelah {timeout} detik. Menjalankan process tree-kill paksa...")
+    _kill_process_by_port(port)
+    time.sleep(0.5)
+
+    if not port_in_use(host, port):
+        info(f"Port {port} berhasil dilepaskan melalui process tree-kill.")
+        return True
+
+    error(f"Gagal membebaskan port {port}.")
+    return False
+
+
 def launch(root: Path, python: Path, host: str, port: int | None = None, open_browser: bool = True) -> int:
     app_dir = django_app_dir(root)
     if not (app_dir / "manage.py").exists():
@@ -376,13 +542,11 @@ def launch(root: Path, python: Path, host: str, port: int | None = None, open_br
         return 1
 
     # Port AKTUAL: port dari `data/settings.json` (bila CLI tidak menentukan),
-    # dengan fallback otomatis ke port bebas berikutnya. Dari titik ini seluruh
-    # pesan (URL & perintah runserver) memakai port yang BENAR-BENAR dipakai.
+    # dengan fallback otomatis ke port bebas berikutnya.
     actual_port, fallback = resolve_port(root, host, port)
 
     env = os.environ.copy()
     env.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-    # ALLOWED_HOSTS: jangan timpa bila user sudah menyetelnya sendiri.
     env.setdefault("DJANGO_ALLOWED_HOSTS", f"{host},localhost")
 
     url = f"http://{host}:{actual_port}/"
@@ -390,21 +554,65 @@ def launch(root: Path, python: Path, host: str, port: int | None = None, open_br
     if fallback:
         warn(
             f"port {port if port is not None else port_from_settings(root)} sedang dipakai; "
-            f"AETHER memakai port alternatif {actual_port}."
+            f"AegisCode memakai port alternatif {actual_port}."
         )
     info("Backend started")
     info("Frontend ready")
     info(f"URL: {url}")
-    info("Tekan Ctrl+C di jendela ini untuk menghentikan AETHER.")
+    info("Tekan Ctrl+C di jendela ini untuk menghentikan AegisCode.")
 
     if open_browser:
         _open_browser_later(url)
 
     argv = [str(python), "manage.py", "runserver", f"{host}:{actual_port}"]
+
+    popen_kwargs: dict[str, Any] = {
+        "cwd": str(app_dir),
+        "env": env,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
+
     try:
-        return _run_command(argv, cwd=app_dir, env=env).returncode
+        proc = subprocess.Popen(argv, **popen_kwargs)
+    except Exception as exc:
+        error(f"Gagal menjalankan server: {exc}")
+        return 1
+
+    interrupted = False
+
+    def _sig_handler(signum: int, frame: Any) -> None:
+        nonlocal interrupted
+        interrupted = True
+        info("Sinyal penghentian diterima. Menjalankan process tree-kill...")
+        terminate_process_tree(proc, timeout=3.0)
+
+    old_sigint = signal.signal(signal.SIGINT, _sig_handler)
+    old_sigterm = signal.signal(signal.SIGTERM, _sig_handler)
+    old_sighup = None
+    if hasattr(signal, "SIGHUP"):
+        old_sighup = signal.signal(signal.SIGHUP, _sig_handler)
+
+    try:
+        while proc.poll() is None and not interrupted:
+            try:
+                proc.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
     except KeyboardInterrupt:
-        return 0
+        interrupted = True
+        info("Ctrl+C terdeteksi. Menghentikan seluruh proses anak...")
+    finally:
+        terminate_process_tree(proc, timeout=3.0)
+        signal.signal(signal.SIGINT, old_sigint)
+        signal.signal(signal.SIGTERM, old_sigterm)
+        if old_sighup is not None:
+            signal.signal(signal.SIGHUP, old_sighup)
+
+    info("AegisCode server telah berhenti (Zero-Zombie exit).")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -714,6 +922,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rebuild-frontend", action="store_true", help="Paksa build ulang frontend.")
     parser.add_argument("--force-deps", action="store_true", help="Paksa pip install ulang dependency.")
     parser.add_argument("--no-browser", action="store_true", help="Jangan buka browser otomatis.")
+    parser.add_argument(
+        "--terminate",
+        "--stop",
+        dest="terminate",
+        action="store_true",
+        help="Hentikan server AegisCode yang sedang berjalan (Zero-Zombie process tree kill).",
+    )
     return parser
 
 
@@ -731,6 +946,18 @@ def main(argv: list[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     args = build_parser().parse_args(_normalize_argv(raw_argv))
     root = Path(args.root).resolve() if args.root else project_root_default()
+
+    # Opsi terminasi server mandiri (Zero-Zombie)
+    if args.terminate:
+        target_port = args.port if args.port is not None else port_from_settings(root)
+        info(f"Menghentikan server AegisCode pada {args.host}:{target_port}...")
+        success = terminate_running_server(args.host, target_port)
+        if success:
+            info(f"Server pada port {target_port} berhasil dihentikan (Zero-Zombie verified).")
+            return 0
+        else:
+            error(f"Gagal menghentikan server pada port {target_port}.")
+            return 1
 
     # Mode simulasi (dry-run): offline, read-only, tanpa mutasi. Root boleh
     # belum ada karena langkah pertama (git clone) memang belum dijalankan.

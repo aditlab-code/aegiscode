@@ -193,7 +193,7 @@ async function createNewSession() {
       {
         role: "assistant",
         text:
-          "Halo! Saya **AETHER Consultant**. Saya bisa menganalisa project, " +
+          "Halo! Saya **AEGIS Consultant**. Saya bisa menganalisa project, " +
           "melakukan investigasi, memvalidasi temuan, dan menyusun Task Proposal " +
           "untuk Agent. Pilih mode **⚡ Quick** (Project Bible saja, cepat) atau " +
           "**🔍 Investigate** (boleh memeriksa project). Apa yang ingin Anda " +
@@ -739,7 +739,7 @@ onMounted(() => {
     messages.value.push({
       role: "assistant",
       text:
-        "Halo! Saya **AETHER Consultant**. Saya bisa menganalisa project, " +
+        "Halo! Saya **AEGIS Consultant**. Saya bisa menganalisa project, " +
         "melakukan investigasi, memvalidasi temuan, dan menyusun Task Proposal " +
         "untuk Agent. Pilih mode **⚡ Quick** (Project Bible saja, cepat) atau " +
         "**🔍 Investigate** (boleh memeriksa project). Apa yang ingin Anda " +
@@ -763,14 +763,14 @@ onMounted(() => {
       :class="{ 'consultant-embedded-pane': embedded, 'modal consultant-m': !embedded }"
       :role="embedded ? 'region' : 'dialog'"
       :aria-modal="!embedded ? 'true' : undefined"
-      aria-label="AETHER Consultant"
+      aria-label="AEGIS Consultant"
     >
       <!-- Standalone Modal Header & Modes (When !embedded) -->
       <template v-if="!embedded">
         <div class="consultant-head">
           <div class="consultant-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22l-.75-12.07A4.001 4.001 0 0 1 12 2z"/><circle cx="12" cy="6" r="1.5" fill="currentColor" stroke="none"/><path d="M9 14l-3 3 3 3M15 14l3 3-3 3"/></svg>
-            AETHER Consultant
+            AEGIS Consultant
           </div>
           <div class="consultant-selects">
             <label class="consultant-select">
@@ -862,7 +862,7 @@ onMounted(() => {
         <div class="consultant-chat">
           <div class="consultant-messages" ref="scroller">
         <div v-for="(msg, i) in messages" :key="i" class="cmsg" :class="msg.role">
-          <span class="crole">{{ msg.role === "assistant" ? "AETHER Consultant" : "You" }}</span>
+          <span class="crole">{{ msg.role === "assistant" ? "AEGIS Consultant" : "You" }}</span>
           <div v-if="msg.role === 'user' && msg.images && msg.images.length" class="cmsg-images">
             <img
               v-for="(src, ii) in msg.images"
