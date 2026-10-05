@@ -109,10 +109,20 @@ if IS_PRODUCTION:
         )
 
 INSTALLED_APPS = [
+    "daphne",
+    "channels",
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "api",
 ]
+
+ASGI_APPLICATION = "config.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",

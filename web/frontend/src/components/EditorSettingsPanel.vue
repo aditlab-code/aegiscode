@@ -70,13 +70,12 @@ function applyAndSave() {
 }
 
 // Sample code preview lines
-const sampleCode = `// AETHER Agent — Autonomous Reasoning & Execution
-import { AgentOrchestrator } from "agent_ai/runtime";
+const sampleCode = `// AegisCode Studio — Workbench Code Sample
+import { defineTask } from "./tasks.js";
 
 export async function executeTask(task) {
-  const orchestrator = new AgentOrchestrator({ mode: "autonomous" });
-  console.log("Analyzing task requirements with local model pipeline...");
-  const result = await orchestrator.run(task);
+  console.log("Analyzing task requirements with local pipeline...");
+  const result = await defineTask(task);
   return { success: true, verified: result.status === "completed" };
 }`;
 

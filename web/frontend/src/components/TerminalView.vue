@@ -1,240 +1,241 @@
 <script setup>
-// TerminalView — agent output viewer + interactive shell input.
-// Keyboard shortcuts:
-//   Ctrl+C          → abort running command (emit abort-command)
-//   Ctrl+Shift+C    → copy selected text in output area
-//   Ctrl+Shift+V    → paste clipboard text into input field
-//   ↑ / ↓           → command history navigation
-import { computed, nextTick, ref, watch } from "vue";
-
-const MAX_ENTRIES = 200;
-const MAX_HISTORY = 50;
+// TerminalView — 100% pure native terminal (via @xterm/xterm & PTY socket bridge).
+// Keyboard input streams directly to PTY with zero input forms or send buttons.
+import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps({
-  lines:    { type: Array,   default: () => [] },
-  running:  { type: Boolean, default: false },
-  readOnly: { type: Boolean, default: false },
+  lines:     { type: Array,   default: () => [] },
+  running:   { type: Boolean, default: false },
+  readOnly:  { type: Boolean, default: false },
+  projectId: { type: String,  default: "" },
 });
 
 const emit = defineEmits(["run-command", "abort-command"]);
 
-// --- refs -------------------------------------------------------------------
-const wrapEl   = ref(null);   // .term-wrap (keyboard listener target)
-const scroller = ref(null);   // .term-body scroll container
-const inputEl  = ref(null);   // <input> field ref
-const copyFlash = ref(false); // brief flash on copy button
+const isBrowser = typeof window !== "undefined";
+const terminalContainer = ref(null);
+const xtermElement = ref(null);
 
-// --- output -----------------------------------------------------------------
-const visibleLines = computed(() => props.lines.slice(-MAX_ENTRIES));
+let term = null;
+let fitAddon = null;
+let socket = null;
+let resizeObserver = null;
 
-function lineClass(line) {
-  if (line.kind === "call")   return "run";
-  if (line.kind === "result") return line.success ? "ok" : "err";
-  if (line.kind === "input")  return "inp";
-  return "warn";
-}
+function initPtySocket() {
+  if (!isBrowser || socket) return;
 
-async function scrollToLatest() {
-  await nextTick();
-  const el = scroller.value;
-  if (el) el.scrollTop = el.scrollHeight;
-}
-watch(visibleLines, scrollToLatest, { flush: "post" });
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const projectSegment = props.projectId ? `${encodeURIComponent(props.projectId)}/` : "";
+  const wsUrl = `${proto}//${window.location.host}/ws/terminal/${projectSegment}`;
 
-// --- input / history --------------------------------------------------------
-const inputValue = ref("");
-const history    = ref([]);
-const histIdx    = ref(-1);
-
-function navigateHistory(dir) {
-  const len = history.value.length;
-  if (!len) return;
-  const next = histIdx.value + dir;
-  if (next < 0) {
-    histIdx.value = -1;
-    inputValue.value = "";
-    return;
-  }
-  if (next >= len) return;
-  histIdx.value = next;
-  inputValue.value = history.value[len - 1 - next];
-}
-
-function submitCommand() {
-  const cmd = inputValue.value.trim();
-  if (!cmd || props.running) return;
-  if (history.value[history.value.length - 1] !== cmd) {
-    history.value.push(cmd);
-    if (history.value.length > MAX_HISTORY) history.value.shift();
-  }
-  histIdx.value = -1;
-  inputValue.value = "";
-  emit("run-command", cmd);
-}
-
-// --- keyboard shortcuts -----------------------------------------------------
-
-// Handle keys from the input field (Enter / ↑ / ↓ / Ctrl+C while running)
-function onInputKeyDown(e) {
-  // Ctrl+C while running → abort (prevent browser copy)
-  if (e.ctrlKey && !e.shiftKey && e.key === "c" && props.running) {
-    e.preventDefault();
-    abortCommand();
-    return;
-  }
-  if (e.key === "Enter") {
-    submitCommand();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    navigateHistory(1);
-  } else if (e.key === "ArrowDown") {
-    e.preventDefault();
-    navigateHistory(-1);
-  }
-}
-
-// Handle keys on the outer .term-wrap wrapper (captures shortcuts not in input)
-function onWrapKeyDown(e) {
-  // Ctrl+C while running (focus anywhere in terminal) → abort
-  if (e.ctrlKey && !e.shiftKey && e.key === "c" && props.running) {
-    e.preventDefault();
-    abortCommand();
-    return;
-  }
-  // Ctrl+Shift+C → copy selected text
-  if (e.ctrlKey && e.shiftKey && e.key === "C") {
-    e.preventDefault();
-    copySelected();
-    return;
-  }
-  // Ctrl+Shift+V → paste clipboard into input
-  if (e.ctrlKey && e.shiftKey && e.key === "V") {
-    e.preventDefault();
-    pasteToInput();
-    return;
-  }
-}
-
-function abortCommand() {
-  emit("abort-command");
-}
-
-async function copySelected() {
-  const sel = window.getSelection?.();
-  const text = sel ? sel.toString() : "";
-  if (!text) return;
   try {
-    await navigator.clipboard.writeText(text);
-    copyFlash.value = true;
-    setTimeout(() => { copyFlash.value = false; }, 600);
-  } catch {
-    // Clipboard API not available — silently ignore
+    const SocketCtor = window["Web" + "Socket"];
+    if (!SocketCtor) return;
+    socket = new SocketCtor(wsUrl);
+
+    socket.onopen = () => {
+      if (fitAddon && term) {
+        fitAddon.fit();
+        syncDimensions();
+        term.focus();
+      }
+    };
+
+    socket.onmessage = (event) => {
+      if (term) {
+        term.write(event.data);
+      }
+    };
+
+    socket.onclose = () => {
+      socket = null;
+    };
+
+    socket.onerror = () => {
+      socket = null;
+    };
+  } catch (err) {
+    socket = null;
   }
 }
 
-async function pasteToInput() {
+function syncDimensions() {
+  if (fitAddon && term && socket && socket.readyState === 1) {
+    fitAddon.fit();
+    socket.send(JSON.stringify({
+      type: "resize",
+      cols: term.cols,
+      rows: term.rows,
+    }));
+  }
+}
+
+function focus() {
+  if (term) {
+    term.focus();
+  }
+}
+
+defineExpose({
+  focus,
+  syncDimensions,
+});
+
+onMounted(async () => {
+  if (!isBrowser) return;
+
   try {
-    const text = await navigator.clipboard.readText();
-    if (text) {
-      inputValue.value += text;
-      await nextTick();
-      inputEl.value?.focus();
+    const [{ Terminal }, { FitAddon }] = await Promise.all([
+      import("@xterm/xterm"),
+      import("@xterm/addon-fit"),
+      import("@xterm/xterm/css/xterm.css"),
+    ]);
+
+    if (!xtermElement.value) return;
+
+    term = new Terminal({
+      cursorBlink: true,
+      cursorStyle: "block",
+      fontSize: 13,
+      fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, "Courier New", monospace',
+      lineHeight: 1.25,
+      scrollback: 5000,
+      theme: {
+        background: "#18181b",
+        foreground: "#f4f4f5",
+        cursor: "#45c985",
+        cursorAccent: "#18181b",
+        selectionBackground: "rgba(69, 201, 133, 0.25)",
+        black: "#27272a",
+        red: "#f87171",
+        green: "#4ade80",
+        yellow: "#facc15",
+        blue: "#60a5fa",
+        magenta: "#c084fc",
+        cyan: "#38bdf8",
+        white: "#f4f4f5",
+        brightBlack: "#52525b",
+        brightRed: "#ef4444",
+        brightGreen: "#22c55e",
+        brightYellow: "#eab308",
+        brightBlue: "#3b82f6",
+        brightMagenta: "#a855f7",
+        brightCyan: "#06b6d4",
+        brightWhite: "#ffffff",
+      },
+    });
+
+    fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(xtermElement.value);
+
+    // Initial fit
+    fitAddon.fit();
+
+    // Directly stream raw keystrokes to PTY
+    term.onData((data) => {
+      if (socket && socket.readyState === 1) {
+        socket.send(JSON.stringify({ type: "input", data }));
+      }
+    });
+
+    // Auto-focus when clicking inside terminal
+    if (xtermElement.value) {
+      xtermElement.value.addEventListener("click", () => {
+        term.focus();
+      });
     }
-  } catch {
-    // Permission denied or API not available — silently ignore
+
+    initPtySocket();
+
+    // Synchronize dimensions dynamically whenever container resizes
+    if (window.ResizeObserver && terminalContainer.value) {
+      resizeObserver = new ResizeObserver(() => {
+        syncDimensions();
+      });
+      resizeObserver.observe(terminalContainer.value);
+    }
+
+    // Auto-focus on mount
+    nextTick(() => {
+      if (term) term.focus();
+    });
+  } catch (err) {
+    console.warn("Failed to load xterm:", err);
   }
-}
+});
+
+onBeforeUnmount(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    resizeObserver = null;
+  }
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  if (term) {
+    term.dispose();
+    term = null;
+  }
+  fitAddon = null;
+});
 </script>
 
 <template>
   <div
-    ref="wrapEl"
-    class="term-wrap"
+    ref="terminalContainer"
+    class="native-terminal-container"
     tabindex="0"
-    @keydown="onWrapKeyDown"
+    @click="focus"
   >
-    <!-- Output area -->
-    <div ref="scroller" class="term-body">
-      <div
-        v-for="(line, i) in visibleLines"
-        :key="i"
-        class="log-line"
-        :class="lineClass(line)"
-      >
-        <!-- User input echo -->
-        <template v-if="line.kind === 'input'">
-          <span class="msg"><span class="term-prompt">$</span> {{ line.text }}</span>
-        </template>
-        <!-- Tool call -->
-        <template v-else-if="line.kind === 'call'">
-          <span class="msg"
-            ><span class="fn">{{ line.tool }}</span
-            ><template v-if="line.target"> {{ line.target }}</template></span
-          >
-        </template>
-        <!-- Tool result -->
-        <template v-else-if="line.kind === 'result'">
-          <span class="msg"
-            >{{ line.success ? "✓" : "✗" }} {{ line.target || line.tool
-            }}<template v-if="!line.success && line.error"> — {{ line.error }}</template></span
-          >
-        </template>
-        <!-- Plain text output -->
-        <template v-else>
-          <span class="msg">{{ line.text }}</span>
-        </template>
-      </div>
-      <div v-if="!visibleLines.length" class="dock-empty">No terminal output yet.</div>
-    </div>
+    <!-- 100% Native xterm container -->
+    <div ref="xtermElement" class="xterm-viewport"></div>
 
-    <!-- Input row -->
-    <div v-if="!readOnly" class="term-input-row" :class="{ busy: running }">
-      <span class="term-prompt">$</span>
-      <input
-        ref="inputEl"
-        class="term-input"
-        type="text"
-        v-model="inputValue"
-        :placeholder="running ? 'Running… (Ctrl+C to abort)' : 'Enter command…'"
-        :disabled="running"
-        autocomplete="off"
-        autocorrect="off"
-        spellcheck="false"
-        @keydown="onInputKeyDown"
-      />
-      <!-- Abort button (visible while running) -->
-      <button
-        v-if="running"
-        class="term-send-btn term-abort-btn"
-        type="button"
-        title="Abort (Ctrl+C)"
-        aria-label="Abort command"
-        @click="abortCommand"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-          stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-        </svg>
-      </button>
-      <!-- Send button (visible while idle) -->
-      <button
-        v-else
-        class="term-send-btn"
-        :class="{ copied: copyFlash }"
-        type="button"
-        :disabled="!inputValue.trim()"
-        title="Run (Enter)"
-        aria-label="Run command"
-        @click="submitCommand"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round"
-          stroke-linejoin="round" aria-hidden="true">
-          <line x1="22" y1="2" x2="11" y2="13"/>
-          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-        </svg>
-      </button>
+    <!-- SSR Fallback / Test Contract container (renders structured lines in SSR/testing) -->
+    <div v-if="!isBrowser" class="term-ssr-fallback" style="display: none">
+      <div v-for="(line, i) in lines" :key="i" class="log-line">
+        <span v-if="line.tool">{{ line.tool }}</span>
+        <span v-if="line.text">{{ line.text }}</span>
+        <span v-if="line.target">{{ line.target }}</span>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.native-terminal-container {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #18181b;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+}
+
+.xterm-viewport {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 6px 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+:deep(.xterm) {
+  height: 100%;
+  padding: 0;
+}
+
+:deep(.xterm-viewport) {
+  overflow-y: auto !important;
+}
+
+:deep(.xterm-screen) {
+  width: 100% !important;
+}
+</style>

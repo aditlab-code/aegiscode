@@ -2124,6 +2124,7 @@ defineExpose({
           :editor-diagnostics="activeEditorDiagnostics"
           :problems="effectiveProblems"
           :terminal-running="terminalRunning"
+          :project-id="activeProject?.id || ''"
           @update:open="bottomDockOpen = $event"
           @update:active-tab="dockActiveTab = $event"
           @clear="handleClearDock"

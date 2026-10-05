@@ -38,6 +38,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  projectId: {
+    type: String,
+    default: "",
+  },
 });
 
 const emit = defineEmits([
@@ -327,6 +331,7 @@ function handleClose() {
         <TerminalView
           :lines="terminalLines"
           :running="terminalRunning"
+          :project-id="projectId"
           @run-command="emit('run-command', $event)"
           @abort-command="emit('abort-command')"
         />

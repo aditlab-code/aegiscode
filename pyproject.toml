@@ -16,6 +16,8 @@ authors = [{ name = "AegisCode Authors" }]
 # disertakan di sini agar instalasi dari root project langsung siap pakai.
 dependencies = [
     "Django>=4.2,<5.1",
+    "channels>=4.0.0",
+    "daphne>=4.0.0",
     "python-dotenv>=1.0",
     "requests>=2.28",
     "Pillow>=9.0",
