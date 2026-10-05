@@ -44,6 +44,7 @@ class Symbol:
     line: int
     parent: Optional[str] = None
     signature: Optional[str] = None
+    end_line: Optional[int] = None
 
     @property
     def qualified_name(self) -> str:
@@ -58,7 +59,9 @@ class Symbol:
             "line": self.line,
             "parent": self.parent,
             "signature": self.signature,
+            "end_line": self.end_line,
         }
+
 
 
 @dataclass

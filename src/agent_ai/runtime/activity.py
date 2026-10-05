@@ -53,6 +53,10 @@ _TOOL_ACTIVITY = {
     "rig_query": ActivityPhase.INSPECTING,
     "project_map_status": ActivityPhase.INSPECTING,
     "refresh_project_map": ActivityPhase.INSPECTING,
+    # Semantic Search & Vector DB (Phase 2.1)
+    "semantic_search": ActivityPhase.INSPECTING,
+    "refresh_semantic_index": ActivityPhase.INSPECTING,
+
     # --- Editing (mutasi workspace) ---
     "write_file": ActivityPhase.EDITING,
     "edit_file": ActivityPhase.EDITING,

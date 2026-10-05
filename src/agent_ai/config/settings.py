@@ -1199,6 +1199,24 @@ class Settings:
     # Permission / Safety Policy Layer (#54)
     permission: PermissionConfig = field(default_factory=PermissionConfig)
 
+    # Local Semantic Embeddings (Phase 2.1)
+    embed_model: str = field(default_factory=lambda: _get("AEGIS_EMBED_MODEL", "BAAI/bge-small-en-v1.5"))
+    embed_cache: str = field(default_factory=lambda: _get("AEGIS_EMBED_CACHE", ""))
+
+    @property
+    def EMBED_MODEL(self) -> str:
+        return self.embed_model
+
+    @property
+    def EMBED_CACHE(self) -> str:
+        return self.embed_cache
+
 
 # Instance global yang bisa di-import: `from config.settings import settings`
 settings = Settings()
+
+#: Model embedding lokal Phase 2.1 (fastembed).
+EMBED_MODEL: str = os.getenv("AEGIS_EMBED_MODEL", "BAAI/bge-small-en-v1.5")
+#: Direktori cache model; kosong = <AEGIS_ROOT>/data/models.
+EMBED_CACHE: str = os.getenv("AEGIS_EMBED_CACHE", "")
+

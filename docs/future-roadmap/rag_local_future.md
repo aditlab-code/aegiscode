@@ -35,14 +35,14 @@ graph LR
 ### Phase 1: Vector Infrastructure & Local LLM Embeddings
 *Goal*: Establish an independent, on-device vector database and embedding pipeline with zero external API dependencies.
 
-- [ ] Initialize `sqlite-vec` embedded database inside `.aegis/vectors.db` (with backward-compatible fallback to `.aether/vectors.db`).
-- [ ] Integrate `fastembed` for fast, lightweight on-device embeddings.
-- [ ] Implement local runner adapters for Ollama and llama.cpp (`providers/local/`).
-- [ ] Provide auto-detection and health checks for local runner availability.
+- [x] Initialize `sqlite-vec` embedded database inside `.aegis/vectors.db` (with backward-compatible fallback to `.aether/vectors.db` and `BruteForceVectorStore` dual-engine).
+- [x] Integrate `fastembed` for fast, lightweight on-device embeddings (`BAAI/bge-small-en-v1.5`, 384 dim, ~67MB).
+- [ ] Implement local runner adapters for Ollama and llama.cpp (`providers/local/`) *(Ditunda ke Phase 2.2 / Pasca-MVP)*.
+- [ ] Provide auto-detection and health checks for local runner availability *(Ditunda ke Phase 2.2 / Pasca-MVP)*.
 
 | Property | Details |
 | :--- | :--- |
-| **Impacted Modules** | `src/agent_ai/providers/local/`, `src/agent_ai/repointel/semantic/` |
+| **Impacted Modules** | `src/agent_ai/repointel/semantic/`, `src/agent_ai/runtime/telemetry/hardware.py` |
 | **Unit Test Focus** | • **Vector DB I/O**: Verify insertion consistency, indexing speed, and mock vector cosine retrieval.<br>• **Runner Auto-Detection**: Validate behavior when local port (e.g. `11434`) is offline, busy, or times out. |
 
 ---
@@ -50,14 +50,15 @@ graph LR
 ### Phase 2: AST Chunking & Ingestion Pipeline
 *Goal*: Chunk source files along syntactic boundaries (functions, classes) rather than raw character counts to preserve code semantics.
 
-- [ ] Implement language-aware AST parsers to slice code into logical function and class units.
-- [ ] Bind relational metadata from `atlas.json` (symbol hierarchy, file path, line spans) to every chunk.
-- [ ] Introduce SHA-256 content hashing to ensure idempotent incremental indexing (skip unchanged files).
+- [x] Implement language-aware AST parsers to slice code into logical function and class units (Python AST stdlib, JS/TS brace-matching, LangChain text splitter fallback).
+- [x] Bind relational metadata from symbol hierarchy, file path, and line spans to every chunk.
+- [x] Introduce SHA-256 content hashing to ensure idempotent incremental indexing (skip unchanged files).
 
 | Property | Details |
 | :--- | :--- |
-| **Impacted Modules** | `src/agent_ai/repointel/indexer.py`, `src/agent_ai/repointel/ast/` |
-| **Unit Test Focus** | • **AST Boundary Preservation**: Verify that large functions retain complete signatures, docstrings, and return statements without mid-statement splits.<br>• **Hash Idempotency**: Verify modifying 1 line in file A triggers re-indexing solely for file A while file B is bypassed. |
+| **Impacted Modules** | `src/agent_ai/repointel/semantic/chunker.py`, `src/agent_ai/repointel/semantic/indexer.py` |
+| **Unit Test Focus** | • **AST Boundary Preservation**: Verify that functions and methods retain complete signatures, docstrings, and return statements without mid-statement splits.<br>• **Hash Idempotency**: Verify modifying 1 line in file A triggers re-indexing solely for file A while file B is bypassed. |
+
 
 ---
 

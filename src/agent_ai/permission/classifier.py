@@ -58,7 +58,18 @@ _PROJECT_MAP_WRITE_TOOLS = frozenset({
     "refresh_project_map",
 })
 
+#: Tool Semantic Search read-only (Phase 2.1).
+_SEMANTIC_READ_TOOLS = frozenset({
+    "semantic_search",
+})
+
+#: Tool Semantic Index write (Phase 2.1).
+_SEMANTIC_WRITE_TOOLS = frozenset({
+    "refresh_semantic_index",
+})
+
 #: Tool Skill System (Task 04): catalog + progressive loading — READ-ONLY,
+
 #: dipakai Agent & Consultant via SATU SkillStore yang sama (thin adapter
 #: di `tools/skills.py`). Tidak ada heuristic / auto-selector.
 _SKILL_READ_TOOLS = frozenset({
@@ -123,7 +134,12 @@ class ActionClassifier:
             return ActionClass.READ_ONLY
         if name in _PROJECT_MAP_WRITE_TOOLS:
             return ActionClass.WORKSPACE_WRITE
+        if name in _SEMANTIC_READ_TOOLS:
+            return ActionClass.READ_ONLY
+        if name in _SEMANTIC_WRITE_TOOLS:
+            return ActionClass.WORKSPACE_WRITE
         if name in _SKILL_READ_TOOLS:
+
             return ActionClass.READ_ONLY
         if name in _SKILL_LIFECYCLE_WRITE_TOOLS:
             return ActionClass.WORKSPACE_WRITE

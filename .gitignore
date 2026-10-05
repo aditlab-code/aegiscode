@@ -51,6 +51,8 @@ data/aegis.db
 data/*.db
 data/consultant_sessions.json
 data/settings.json
+data/models/
+
 
 # Frontend caches
 .vite/

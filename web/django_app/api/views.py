@@ -574,6 +574,7 @@ def tasks(request: HttpRequest, service: GatewayService) -> JsonResponse:
     # Attachment gambar (multimodal, opsional). Daftar {data, mime_type,
     # filename?}; divalidasi/dinormalisasi service (batas sama Consultant).
     images = body.get("images")
+    active_file = body.get("active_file")
     if execution_mode is None and metadata and isinstance(metadata, dict):
         execution_mode = metadata.get("execution_mode")
     if metadata is not None and not isinstance(metadata, dict):
@@ -586,6 +587,7 @@ def tasks(request: HttpRequest, service: GatewayService) -> JsonResponse:
         metadata=metadata,
         execution_mode=execution_mode,
         images=images,
+        active_file=active_file,
     )
     return _json_response(record, status=201)
 
@@ -1071,6 +1073,7 @@ def consultant_consult(request: HttpRequest, service: GatewayService) -> JsonRes
             project_id=body.get("project_id") or None,
             mode=body.get("mode") or None,
             images=body.get("images") or None,
+            active_file=body.get("active_file") or None,
         )
     )
 

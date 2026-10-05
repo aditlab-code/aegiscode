@@ -302,7 +302,7 @@ export function discardProjectGitChanges(projectId, filePath = null) {
   );
 }
 
-export function createTask(task, projectId = null, metadata = null, executionMode = null, images = null) {
+export function createTask(task, projectId = null, metadata = null, executionMode = null, images = null, activeFile = null) {
   const body = { task };
   if (projectId) body.project_id = projectId;
   if (metadata) body.metadata = metadata;
@@ -314,6 +314,7 @@ export function createTask(task, projectId = null, metadata = null, executionMod
   // mime_type, filename?}. Dikirim hanya bila ada; backend memvalidasi &
   // meneruskan image parts ke jalur Agent Task (sama seperti Consultant).
   if (images && images.length) body.images = images;
+  if (activeFile) body.active_file = activeFile;
   return request("/tasks", { method: "POST", body: JSON.stringify(body) });
 }
 
@@ -463,6 +464,7 @@ export function consult(
     projectId = null,
     mode = "quick",
     images = null,
+    activeFile = null,
   } = {}
 ) {
   const body = { message };
@@ -472,6 +474,7 @@ export function consult(
   if (projectId) body.project_id = projectId;
   if (mode) body.mode = mode;
   if (images && images.length) body.images = images;
+  if (activeFile) body.active_file = activeFile;
   return request("/consultant/consult", { method: "POST", body: JSON.stringify(body) });
 }
 

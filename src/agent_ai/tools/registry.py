@@ -273,12 +273,23 @@ def build_registry(
     # Project Map (Agent): termasuk refresh_project_map (Agent-only).
     for tool in build_project_map_tools(root=resolved, include_refresh=True):
         reg.register(tool)
+    # Semantic Search & Vector DB (Agent): termasuk refresh_semantic_index (Phase 2.1).
+    from agent_ai.repointel.semantic.availability import is_available
+    import os as _os
+
+    if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
+        from agent_ai.tools.semantic import build_semantic_tools
+
+        for tool in build_semantic_tools(root=resolved, include_refresh=True, read_only=False):
+            reg.register(tool)
+
     # Skill System (Agent): SATU mekanisme Skill yang sama — catalog + progressive
     # loading di atas SkillStore existing. Thin adapter, tidak ada heuristic.
     # Task 05: lifecycle (create/update/delete) hanya tersedia pada Agent,
     #         LLM-driven, thin wrapper di atas SkillStore existing. Consultant
     #         tetap read-only (build_skill_tools default tanpa lifecycle).
     from agent_ai.tools.skills import build_skill_tools
+
 
     for tool in build_skill_tools(root=resolved, include_lifecycle=True):
         reg.register(tool)

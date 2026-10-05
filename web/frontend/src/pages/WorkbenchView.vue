@@ -443,6 +443,7 @@ const effectiveTaskModel = computed(() => {
 
 const effectiveConsultantProps = computed(() => {
   const base = props.consultantProps || {};
+  const currentTab = activeTab.value;
   return {
     ...base,
     activeSessionId: activeConsultantSessionId.value || base.activeSessionId || "",
@@ -454,6 +455,13 @@ const effectiveConsultantProps = computed(() => {
     runningTaskId: base.runningTaskId || props.task?.id || "",
     providerLabel: effectiveTaskProvider.value,
     modelLabel: effectiveTaskModel.value,
+    activeTabPath: currentTab ? currentTab.path : "",
+    activeFile: currentTab
+      ? {
+          path: currentTab.path,
+          content: currentTab.content || null,
+        }
+      : null,
   };
 });
 

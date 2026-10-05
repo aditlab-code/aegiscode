@@ -1569,6 +1569,7 @@ class GatewayService:
         metadata: Optional[Dict[str, Any]] = None,
         execution_mode: Optional[str] = None,
         images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Buat task: validasi + siapkan via TaskPreparation, lalu eksekusi.
 
@@ -1625,8 +1626,12 @@ class GatewayService:
 
         task_root = self._resolve_workspace_root(project_id)
         from agent_ai.contextbuilder.mention import resolve_file_mentions
+        from agent_ai.consultant.service import _build_active_file_context
 
         enriched_task, _ = resolve_file_mentions(task.strip(), task_root)
+        active_block = _build_active_file_context(active_file, task_root)
+        if active_block:
+            enriched_task = enriched_task + "\n" + active_block
 
         task_id = new_task_id()
         prepared = self.preparation.prepare(enriched_task, task_id=task_id)
@@ -2854,6 +2859,7 @@ class GatewayService:
         images: Optional[List[Dict[str, Any]]] = None,
         provider: Optional[Any] = None,
         root: Optional[str] = None,
+        active_file: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Jalankan satu giliran konsultasi Consultant.
 
@@ -2920,6 +2926,7 @@ class GatewayService:
                 project_id=project_id,
                 mode=mode,
                 images=normalized_images,
+                active_file=active_file,
             )
         except ValidationError:
             raise

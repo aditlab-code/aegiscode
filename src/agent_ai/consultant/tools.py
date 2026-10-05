@@ -418,6 +418,19 @@ def build_consultant_registry(
     for tool in _build_skill_tools(root=resolved):
         registry.register(tool)
 
+    # Semantic Search READ-ONLY (Phase 2.1): semantic_search (tanpa refresh_semantic_index).
+    # Tersedia di SEMUA mode (quick & investigate). Read-only terhadap basis data vektor.
+    from agent_ai.repointel.semantic.availability import is_available
+    import os as _os
+
+    if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
+        from agent_ai.tools.semantic import build_semantic_tools as _build_semantic_tools
+
+        for tool in _build_semantic_tools(root=resolved, include_refresh=False, read_only=True):
+            registry.register(tool)
+
+
+
     if normalized == MODE_INVESTIGATE:
         from agent_ai.tools.filesystem import (
             ListFilesTool,

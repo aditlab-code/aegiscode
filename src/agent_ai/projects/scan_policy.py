@@ -146,6 +146,7 @@ EXCLUDED_DIR_NAMES = frozenset(
         ".settings",
         # --- Metadata AegisCode -------------------------------------------
         ".aegis",
+        ".aether",
         # --- Workspace testing terisolasi AegisCode -----------------------
         "dummy_test",
     }

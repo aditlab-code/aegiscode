@@ -127,3 +127,48 @@ The loop runs without heuristic "done" detectors:
 AegisCode features a developer-first IDE workbench (**AegisCode Studio**):
 - **Backend Gateway:** Django application (`web/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
 - **Frontend:** Modern Vue 3 + Vite single-page application (`web/frontend/`) featuring a VS Code-style 3-column layout (Monaco Editor, Monaco Diff Editor, interactive PTY terminal via `@xterm/xterm`, HITL DiffModal, and Git Source Control drawer).
+
+---
+
+## 5. Local Semantic Index & Vector Database (Phase 2.1)
+
+Phase 2.1 establishes an independent, entirely on-device semantic search and vector database pipeline located in `src/agent_ai/repointel/semantic/`.
+
+### 5.1 Architecture Diagram
+```mermaid
+flowchart TD
+    subgraph ClientAndTools ["Clients & Tools Layer"]
+        A_TOOL["semantic_search (Agent)"] --> SVC["SemanticIndexService"]
+        R_TOOL["refresh_semantic_index (Agent)"] --> SVC
+        C_TOOL["semantic_search (Consultant read-only)"] --> SVC
+    end
+
+    subgraph CoreSemanticEngine ["Semantic Engine (src/agent_ai/repointel/semantic/)"]
+        SVC --> IDX["SemanticIndexer (Incremental)"]
+        IDX --> CHK["chunker.py (AST + Brace-Matching + Splitter)"]
+        IDX --> FP["FingerprintTable (SHA-256)"]
+        CHK --> EMB["FastEmbedEmbeddings (BAAI/bge-small-en-v1.5)"]
+        EMB --> STORE{"Dual-Engine Selector"}
+        STORE -->|"sqlean.py + sqlite-vec"| VEC["AegisSQLiteVec"]
+        STORE -->|"stdlib sqlite3 fallback"| BF["BruteForceVectorStore (Cosine Similarity)"]
+    end
+
+    subgraph LocalStorage ["Persistent Local Storage"]
+        VEC --> DB[(".aegis/vectors.db / fallback .aether/vectors.db")]
+        BF --> DB
+    end
+```
+
+### 5.2 Storage & Schema Specifications
+The vector database is housed inside `<project_root>/.aegis/vectors.db` (with transparent fallback to `.aether/vectors.db`):
+- **`aegis_chunks`**: Stores code chunk text, structured metadata JSON (file path, symbol name, symbol kind, line span), and raw float32 embedding BLOBs.
+- **`file_fingerprints`**: Tracks `path`, `sha256`, `chunk_count`, and `indexed_at` timestamps for sub-second incremental indexing bypassing unchanged files.
+- **`index_meta`**: Tracks `schema_version` (2.1), active `model_name`, and active `backend` engine. Changing model configuration triggers an automatic full index rebuild.
+
+### 5.3 Deterministic AST Chunking
+Code chunking operates on semantic unit boundaries:
+- **Python:** Standard library `ast.parse` isolates top-level functions and class methods with decorators, signatures, docstrings, and bodies preserved. Classes generate dedicated header chunks (signatures + docstrings + class attributes).
+- **JavaScript & TypeScript:** Regex symbol boundary detection paired with lexical brace-matching (`_match_braces`) ignoring string literals, template strings, and comments.
+- **Size Bounds:** Chunks exceeding ~450 tokens (~1,800 characters) are partitioned using LangChain's `RecursiveCharacterTextSplitter.from_language` while preserving line number mapping.
+- **Context Header:** Every chunk prepends a structured symbol header (`# path: <path> | symbol: <symbol> | kind: <kind>\n<code>`) to maximize embedding retrieval precision.
+

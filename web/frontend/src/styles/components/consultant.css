@@ -416,3 +416,32 @@ select.input-a {
   background: var(--accent, #2d7d4e);
   color: #ffffff;
 }
+
+/* Active file chip in ConsultantChat */
+.chat-active-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-soft, #cccccc);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.12));
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-active-file-chip svg {
+  flex-shrink: 0;
+  color: var(--accent, #5ebd87);
+}
+
+.active-file-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

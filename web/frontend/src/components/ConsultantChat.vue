@@ -54,6 +54,8 @@ const props = defineProps({
   // Session konsultan yang SEDANG aktif (di-persist App.vue, mis. localStorage)
   // agar switch/New bertahan antar-reload. Anak meng-Emit update bila berubah.
   activeSessionId: { type: String, default: "" },
+  activeTabPath: { type: String, default: "" },
+  activeFile: { type: Object, default: () => null },
 });
 
 const emit = defineEmits([
@@ -579,6 +581,7 @@ async function send() {
       modelId: props.modelId || null,
       projectId: props.projectId || null,
       mode: mode.value,
+      activeFile: props.activeFile || (props.activeTabPath ? { path: props.activeTabPath } : null),
       images: pending.length
         ? pending.map((a) => ({
             data: a.base64,
@@ -1099,6 +1102,13 @@ onMounted(() => {
         </div>
 
         <div class="chat-card-body">
+          <div v-if="activeTabPath" class="chat-active-file-chip" :title="`Berkas aktif: ${activeTabPath}`">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
+            </svg>
+            <span class="active-file-chip-label">Active: {{ activeTabPath }}</span>
+          </div>
           <textarea
             ref="composer"
             v-model="input"
@@ -1180,6 +1190,13 @@ onMounted(() => {
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           </button>
+          <div v-if="activeTabPath" class="chat-active-file-chip standalone-chip" :title="`Berkas aktif: ${activeTabPath}`">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+              <polyline points="13 2 13 9 20 9"></polyline>
+            </svg>
+            <span class="active-file-chip-label">Active: {{ activeTabPath }}</span>
+          </div>
           <textarea
             ref="composer"
             v-model="input"
