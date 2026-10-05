@@ -582,7 +582,7 @@ export function resolveExtensionResult(payload) {
 // --- #51 SSE ---------------------------------------------------------------
 // Membuka EventSource ke /api/events (opsional filter session_id/task_id).
 // Mengembalikan EventSource agar pemanggil dapat menutupnya (disconnect).
-export function openEventStream({ sessionId = null, taskId = null, onEvent } = {}) {
+export function openEventStream({ sessionId = null, taskId = null, onEvent = null, onOpen = null, onError = null } = {}) {
   const params = new URLSearchParams();
   if (sessionId) params.set("session_id", sessionId);
   if (taskId) params.set("task_id", taskId);
@@ -590,6 +590,9 @@ export function openEventStream({ sessionId = null, taskId = null, onEvent } = {
   const url = `${BASE}/events${qs ? `?${qs}` : ""}`;
 
   const source = new EventSource(url);
+  if (typeof onOpen === "function") source.addEventListener("open", onOpen);
+  if (typeof onError === "function") source.addEventListener("error", onError);
+
   // Event AETHER dikirim dengan `event: <event_type>`. Kita dengarkan tipe
   // yang dikenal (#51) tanpa mengasumsikan semuanya selalu ada.
   const KNOWN_EVENTS = [

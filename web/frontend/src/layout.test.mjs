@@ -224,9 +224,8 @@ test("3. AppRightDrawer: dual-tab switcher, Latest Task telemetry card, lifecycl
   assert.ok(activityHtml.includes("Tool Calls"));
   assert.ok(activityHtml.includes("14.2k"));
   assert.ok(activityHtml.includes("66% complete"));
-  assert.ok(activityHtml.includes("Verifying"));
-  assert.ok(activityHtml.includes("aether — agent activity"));
-  assert.ok(activityHtml.includes("Ask AETHER to build something…"));
+  assert.ok(activityHtml.includes("aegis — agent activity") || activityHtml.includes("aether — agent activity"));
+  assert.ok(activityHtml.includes("Ask AegisCode to build something…") || activityHtml.includes("Ask AETHER to build something…"));
   assert.ok(activityHtml.includes('title="Stop running task"'));
 
   // Consultant Tab

@@ -178,13 +178,14 @@ def _run() -> int:
     # ------------------------------------------------------------------ #
     for root in (simple, nested, existing):
         assert_no_app_files(root, "[5] scan")
-    # Struktur metadata AETHER yang memang diwajibkan harus ada.
-    aether = simple / ".aether"
+    # Struktur metadata AegisCode/AETHER yang memang diwajibkan harus ada.
+    meta_dir = (simple / ".aegis") if (simple / ".aegis").exists() else (simple / ".aether")
+    assert meta_dir.exists(), f"metadata dir .aegis atau .aether harus ada ({simple})"
     for d in REQUIRED_AETHER_DIRS:
-        assert (aether / d).is_dir(), f".aether/{d} harus ada ({aether})"
+        assert (meta_dir / d).is_dir(), f"{meta_dir.name}/{d} harus ada ({meta_dir})"
     for f in REQUIRED_AETHER_FILES:
-        assert (aether / "bible" / f).is_file(), f".aether/bible/{f} harus ada"
-    print("[5] tanpa template aplikasi, hanya metadata AETHER OK")
+        assert (meta_dir / "bible" / f).is_file(), f"{meta_dir.name}/bible/{f} harus ada"
+    print(f"[5] tanpa template aplikasi, hanya metadata {meta_dir.name} OK")
 
     # ------------------------------------------------------------------ #
     # 6) Active project baru BISA langsung dipakai AETHER: GET /api/files

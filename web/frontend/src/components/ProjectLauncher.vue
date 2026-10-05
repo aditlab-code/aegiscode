@@ -129,7 +129,7 @@ function doDelete() {
     <!-- ===================== TOP BAR ===================== -->
     <header class="pl-topbar">
       <div class="pl-brand">
-        <span class="pl-logo">A</span>
+        <span class="pl-logo">AE</span>
         <span class="pl-brand-name">AegisCode</span>
         <span class="pl-brand-sub">PROJECTS</span>
       </div>

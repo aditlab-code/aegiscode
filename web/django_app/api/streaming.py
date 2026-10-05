@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
-from typing import Any, Dict, Iterator, Optional
+from typing import Any, AsyncIterator, Dict, Iterator, Optional
 
 from agent_ai.session.events import ExecutionEvent
 from agent_ai.session.store import SessionStore
@@ -130,38 +130,99 @@ class EventSubscription:
             return None
 
 
+class SSEStream:
+    """Stream SSE hybrid (sinkron dan asinkron) untuk kompatibilitas penuh.
+
+    Mendukung konsumsi sinkron (Iterator[str], next, close) untuk runner/testing
+    maupun konsumsi asinkron (AsyncIterator[str], anext) untuk ASGI Daphne
+    tanpa memblokir thread saat client disconnect.
+    """
+
+    def __init__(
+        self,
+        subscription: EventSubscription,
+        *,
+        heartbeat: float = DEFAULT_HEARTBEAT_SECONDS,
+        is_disconnected: Optional[Any] = None,
+    ) -> None:
+        self.subscription = subscription
+        self.heartbeat = heartbeat
+        self.is_disconnected = is_disconnected
+        self._last_heartbeat = 0.0
+
+    def __iter__(self) -> "SSEStream":
+        return self
+
+    def __next__(self) -> str:
+        import time
+
+        if self._last_heartbeat == 0.0:
+            self._last_heartbeat = time.time()
+
+        while True:
+            if self.is_disconnected is not None and self.is_disconnected():
+                self.close()
+                raise StopIteration
+            if self.subscription.closed:
+                raise StopIteration
+
+            event = self.subscription.get(timeout=min(self.heartbeat, 0.2))
+            now = time.time()
+            if event is None:
+                if now - self._last_heartbeat >= self.heartbeat:
+                    self._last_heartbeat = now
+                    return format_comment("heartbeat")
+                continue
+            self._last_heartbeat = now
+            return format_sse(event)
+
+    def __aiter__(self) -> "SSEStream":
+        return self
+
+    async def __anext__(self) -> str:
+        import asyncio
+        import time
+
+        if self._last_heartbeat == 0.0:
+            self._last_heartbeat = time.time()
+
+        while True:
+            if self.is_disconnected is not None and self.is_disconnected():
+                self.close()
+                raise StopAsyncIteration
+            if self.subscription.closed:
+                raise StopAsyncIteration
+
+            try:
+                event = await asyncio.to_thread(self.subscription.get, min(self.heartbeat, 0.2))
+            except (asyncio.CancelledError, GeneratorExit):
+                self.close()
+                raise StopAsyncIteration
+
+            now = time.time()
+            if event is None:
+                if now - self._last_heartbeat >= self.heartbeat:
+                    self._last_heartbeat = now
+                    return format_comment("heartbeat")
+                continue
+            self._last_heartbeat = now
+            return format_sse(event)
+
+    def close(self) -> None:
+        """Tutup stream dan unsubscribe dari session store."""
+        self.subscription.close()
+
+
 def sse_stream(
     subscription: EventSubscription,
     *,
     heartbeat: float = DEFAULT_HEARTBEAT_SECONDS,
     is_disconnected: Optional[Any] = None,
-) -> Iterator[str]:
-    """Generator SSE: yield frame dari subscription sampai client disconnect.
+) -> SSEStream:
+    """Factory pembuat SSEStream hybrid (Iterator + AsyncIterator)."""
+    return SSEStream(
+        subscription,
+        heartbeat=heartbeat,
+        is_disconnected=is_disconnected,
+    )
 
-    Args:
-        subscription: EventSubscription aktif.
-        heartbeat: interval heartbeat (detik).
-        is_disconnected: callable opsional `() -> bool` untuk mendeteksi
-            disconnect (mis. dari Django request). Bila None, generator berhenti
-            saat subscription ditutup.
-
-    Yields:
-        Frame SSE (str).
-
-    Catatan:
-        Generator ini TIDAK membuat thread permanen. Ia memblokir pada queue
-        dengan timeout (bounded) dan memeriksa disconnect secara berkala.
-    """
-    try:
-        while True:
-            if is_disconnected is not None and is_disconnected():
-                break
-            event = subscription.get(timeout=heartbeat)
-            if event is None:
-                # Tidak ada event dalam interval -> kirim heartbeat.
-                yield format_comment("heartbeat")
-                continue
-            yield format_sse(event)
-    finally:
-        # Selalu unsubscribe saat generator berhenti (disconnect/close).
-        subscription.close()

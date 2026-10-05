@@ -1193,7 +1193,13 @@ class GatewayService:
         """
         active = self.get_active_project()
         if active is None:
-            raise NotFoundError("Tidak ada active project.")
+            return {
+                "path": path or ".",
+                "count": 0,
+                "total": 0,
+                "truncated": False,
+                "entries": [],
+            }
 
         from pathlib import Path as _Path
 

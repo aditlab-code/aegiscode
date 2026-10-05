@@ -6,7 +6,7 @@
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { AEGIS_VERSION } from "./version.js";
+import { AEGIS_VERSION, AETHER_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
 import AppFooter from "./components/layout/AppFooter.vue";
@@ -21,7 +21,7 @@ import { useAuth } from "./services/authService.js";
 import {
   openEventStream, getProjects, createProject, deleteProject, getActiveProject, setActiveProject, closeActiveProject, pickFolder,
   createTask, cancelTask, listTaskHistory, clearTaskHistory, deleteTaskHistory, getTaskReport, getConfig, getTaskActivity, getLLMProviders,
-  getProjectGitBranches,
+  getProjectGitBranches, listTaskQueue,
 } from "./api.js";
 import { playStatusSound } from "./audioRegistry.js";
 import { createDurationTicker, eventTimeMs, formatDuration } from "./timeUtils.js";
@@ -39,11 +39,7 @@ const composerOpen = ref(false), commandPaletteOpen = ref(false), commandPalette
 const closeConfirmOpen = ref(false), stopConfirmOpen = ref(false), policyProject = ref(null);
 const reportTaskId = ref(""), currentReport = ref(""), workbenchRef = ref(null);
 const notice = ref(""), error = ref(""), cursorPos = ref({ ln: 1, col: 1 }), activeLanguage = ref("Vue 3");
-
-// Project State
-const activeProject = ref(null), projects = ref([]), lastProject = ref(null), launcherBusy = ref(false);
-
-// Antigravity & Google OAuth State (docs/Oauth-Google.md, Phase 0)
+const activeProject = ref(null), projects = ref([]), lastProject = ref(null), launcherBusy = ref(false);// Antigravity & Google OAuth State (docs/Oauth-Google.md, Phase 0)
 const {
   currentUser, authLoading, authLoadingMessage, authError, authChecking,
   isAuthenticated, handleLogout, initAuth,
@@ -157,9 +153,18 @@ function handleEvent(evt) {
 
 function connectStream() {
   if (eventSource) eventSource.close();
-  eventSource = openEventStream({ onEvent: handleEvent, onError: () => { connected.value = false; } });
-  eventSource.onopen = () => { connected.value = true; };
-  eventSource.onerror = () => { connected.value = false; };
+  eventSource = openEventStream({ onEvent: handleEvent, onOpen: () => { connected.value = true; }, onError: () => { connected.value = false; } });
+  eventSource.onopen = () => { connected.value = true; }; eventSource.onerror = () => { connected.value = false; };
+}
+async function syncActiveRunningTask() {
+  try {
+    const res = await listTaskQueue(activeProject.value?.id || null);
+    const active = (res?.tasks || []).find((t) => ["running", "validating"].includes(t.status));
+    if (active && (!task.id || task.status === "idle")) {
+      task.id = active.task_id || active.id; task.prompt = active.prompt || active.task || ""; task.status = active.status;
+      runningTaskId.value = task.id; if (!taskStartedAt.value) taskStartedAt.value = Date.now(); durationTicker.start();
+    }
+  } catch (_) {}
 }
 
 async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null) {
@@ -233,7 +238,7 @@ async function handleOpenProject(target) {
   try {
     const res = await setActiveProject(id);
     activeProject.value = res?.active_project || (typeof target === "object" ? target : null) || projects.value.find((p) => p.id === id) || null;
-    lastProject.value = activeProject.value; resetTaskState(); await refreshTaskHistory(); fetchWorkspaceFiles(true);
+    lastProject.value = activeProject.value; resetTaskState(); await refreshTaskHistory(); await syncActiveRunningTask(); fetchWorkspaceFiles(true);
   } catch (err) { error.value = `Failed to open project: ${err.message || err}`; }
   finally { launcherBusy.value = false; }
 }
@@ -356,6 +361,7 @@ onMounted(async () => {
   await loadProjects();
   await refreshAllConfig();
   if (activeProject.value) await refreshTaskHistory();
+  await syncActiveRunningTask();
   initAuth();
 });
 onBeforeUnmount(() => {
@@ -417,26 +423,18 @@ onBeforeUnmount(() => {
       @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
     />
 
-    <!-- Task Composer Modal -->
     <AppModal v-if="composerOpen" :model-value="composerOpen" title="New Agent Task" max-width="640px" @close="composerOpen = false">
       <TaskComposer :running="isRunning" :config="config" :providers="llmProviders" :task-history="taskHistory" v-model:provider-instance-id="selectedProviderInstanceId" v-model:model-id="selectedModelId" v-model:mode="selectedMode" v-model:execution-mode="selectedExecutionMode" @submit="handleComposerSubmit" @stop="requestStop" />
     </AppModal>
-    <!-- Report Viewer Modal -->
     <ReportViewer v-if="reportTaskId" :task-id="reportTaskId" :status="task.status" :report="currentReport" @close="reportTaskId = ''" />
-    <!-- Project Policy Modal -->
     <ProjectPolicyPanel v-if="policyProject" :project="policyProject" @close="policyProject = null" />
-    <!-- Command Palette -->
     <AppCommandPalette v-model="commandPaletteOpen" v-model:mode="commandPaletteMode" :files="workspaceFiles" :commands="defaultCommands" @close="commandPaletteOpen = false" @select-file="(f) => workbenchRef?.handleOpenFile?.(f)" />
-    <!-- Close Project Confirm Modal -->
     <AppModal v-if="closeConfirmOpen" :model-value="closeConfirmOpen" title="Close Workspace" max-width="420px" @close="closeConfirmOpen = false">
       <div class="confirm-dialog-content"><p>Close workspace "{{ activeProject?.name }}"?</p><div class="confirm-dialog-actions"><button type="button" class="btn btn-ghost" @click="closeConfirmOpen = false">Cancel</button><button type="button" class="btn btn-danger" @click="handleCloseProject">Close</button></div></div>
     </AppModal>
-    <!-- Stop Task Confirm Modal -->
     <AppModal v-if="stopConfirmOpen" :model-value="stopConfirmOpen" title="Stop Task" max-width="420px" @close="stopConfirmOpen = false">
       <div class="confirm-dialog-content"><p>Stop running task?</p><div class="confirm-dialog-actions"><button type="button" class="btn btn-ghost" @click="stopConfirmOpen = false">Cancel</button><button type="button" class="btn btn-danger" :disabled="stopInProgress" @click="requestStop">Stop</button></div></div>
     </AppModal>
-
-    <!-- UI Refactor & Token Verifier Compliance Anchor -->
     <table v-if="false"><thead><tr><th class="th-actions">Actions</th></tr></thead><tbody><tr><td><button class="hist-report-btn">Report</button></td></tr></tbody></table>
   </div>
 </template>
