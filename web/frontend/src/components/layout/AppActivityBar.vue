@@ -16,10 +16,6 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  isWallpaperEnabled: {
-    type: Boolean,
-    default: true,
-  },
   queueCount: {
     type: Number,
     default: 0,
@@ -32,7 +28,6 @@ const props = defineProps({
 
 const emit = defineEmits([
   "update:activeNav",
-  "toggle-wallpaper",
   "toggle-theme",
   "open-settings",
   "open-sidebar",
@@ -170,33 +165,6 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="act-bar-bottom">
-      <!-- Wallpaper Toggle -->
-      <button
-        type="button"
-        class="act-btn"
-        :class="{ active: isWallpaperEnabled }"
-        :title="isWallpaperEnabled ? 'Disable Wallpaper' : 'Enable Wallpaper'"
-        aria-label="Toggle Wallpaper"
-        @click="emit('toggle-wallpaper')"
-      >
-        <svg
-          class="act-ico"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-          <circle cx="8.5" cy="8.5" r="1.5" />
-          <polyline points="21 15 16 10 5 21" />
-        </svg>
-      </button>
-
       <!-- Theme Toggle -->
       <button
         type="button"

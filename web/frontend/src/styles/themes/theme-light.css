@@ -1,77 +1,64 @@
-/* AETHER Light Theme Tokens & Component Overrides ([data-theme="light"]) */
+/* AegisCode Tokyo Night Light Theme Tokens & Component Overrides ([data-theme="light"]) */
 
 [data-theme="light"] {
-  /* AETHER Sunlit Sunset-Lofi (Light) — based on Aether-light.jpeg */
-  --bg:        #fdfbf7;   /* Warm sunlit linen / cream base canvas */
-  --bg-panel:  #f4ede4;   /* Soft sand / oat panel surface */
-  --bg-surface:#f4ede4;   /* Layout components surface */
-  --bg-header: #ede4d8;   /* Top navbar, tab bars, activity bar */
-  --bg-elev:   #fdfbf7;   /* Active tab, elevated card surface */
-  --bg-card:   #fbf7f0;   /* Card surface */
-  --bg-hover:  #e5dacb;   /* Warm honey-sand hover state */
-  --bg-deep:   #efe6db;   /* Form inputs background */
-  --bg-secondary: #ede4d8; /* Secondary surface for top navbar and footer */
+  /* AegisCode Tokyo Night Light */
+  --bg:        #e6e7ed;   /* Light base canvas */
+  --bg-panel:  #d6d8df;   /* Light panel surface */
+  --bg-surface:#d6d8df;   /* Layout components surface */
+  --bg-header: #cdced1;   /* Top navbar, tab bars, activity bar */
+  --bg-elev:   #f5f6f9;   /* Active tab, elevated card surface */
+  --bg-card:   #d6d8df;   /* Card surface */
+  --bg-hover:  #d0d2db;   /* Hover state */
+  --bg-deep:   #d0d2db;   /* Form inputs background */
+  --bg-secondary: #cdced1; /* Secondary surface */
 
-  /* Borders — Crisp High-Contrast Solid Warm Slate boundaries */
-  --border:      #c8bba9;  /* Crisp component outline */
-  --border-soft: #dcd1c3;  /* Inner row dividers */
-  --border-subtle:#e8ded2;
-  --border-hover: #9a602c;  /* Amber-slate border hover */
+  /* Borders — Tokyo Night Cool Silver */
+  --border:      #c1c2c7;  /* Component outline */
+  --border-soft: #d0d2db;  /* Inner row dividers */
+  --border-subtle:#d6d8df; /* Subtle border */
+  --border-hover: #a9abb3;  /* Border hover */
 
-  /* Typography — deep espresso timber for crisp contrast */
-  --text:       #180c06;   /* Rich deep espresso brown for maximum contrast on frosted glass */
-  --text-dim:   #4a3628;   /* Warm slate secondary typography */
-  --text-faint: #785e4c;   /* Muted metadata / inactive text */
+  /* Typography */
+  --text:       #343b59;   /* Deep slate typography */
+  --text-dim:   #565a6e;   /* Secondary typography */
+  --text-faint: #707280;   /* Muted metadata / inactive text */
 
-  /* Accent 1: Sunset Amber Gold (Golden hour window glow & desk lighting) */
-  --accent:     #d97706;   /* Primary sunset amber gold */
-  --accent-dim: #b45309;   /* Darker warm amber for pressed/active */
-  --accent-soft: rgba(217, 119, 6, 0.14); /* Soft warm amber tint */
-  --accent-muted:#b45309;  /* High-contrast amber text */
-  --dioptase-green: #d97706;
-  --dioptase-bright:#f59e0b;
+  /* Accent 1: Tokyo Night Light Blue */
+  --accent:     #2959aa;   /* Electric Blue */
+  --accent-dim: #1e4080;
+  --accent-soft: rgba(41, 89, 170, 0.16);
+  --accent-muted:#2959aa;
+  --dioptase-green: #2959aa;
+  --dioptase-bright:#3d59a1;
 
-  /* Accent 2: Dusty Mauve Violet (Cozy hoodie, room neon, AI consultant tags) */
-  --accent-2:     #7c3aed; /* Dusty mauve violet */
+  /* Accent 2: Tokyo Night Violet / Magenta */
+  --accent-2:     #7c3aed; /* Violet / Magenta */
   --accent-2-dim: #6d28d9;
-  --accent-2-soft:rgba(124, 58, 237, 0.14);
+  --accent-2-soft:rgba(124, 58, 237, 0.16);
   --accent-2-bright:#8b5cf6;
 
   /* Status */
-  --ok:   #059669;  /* Forest sage green */
-  --warn: #d97706;  /* Sunset amber warning */
-  --err:  #dc2626;  /* Sunset crimson error */
+  --ok:   #485e30;  /* Tokyo Night Light Green */
+  --warn: #8f5e15;  /* Tokyo Night Light Amber */
+  --err:  #8c4351;  /* Tokyo Night Light Red */
 
-  --act-ts:    #291811;
-  --act-agent: #7c3aed;   /* Mauve agent identifier */
-  --act-obs:   #b45309;   /* Warm amber observation */
+  --act-ts:    #343b59;
+  --act-agent: #7c3aed;   /* Magenta agent identifier */
+  --act-obs:   #2959aa;   /* Blue observation */
 
-  /* Alert tokens — Warm Sunlit */
-  --alert-ok-text:   #047857;
-  --alert-ok-bg:     rgba(5, 150, 105, 0.12);
-  --alert-ok-border: rgba(5, 150, 105, 0.40);
-  --alert-err-text:  #b91c1c;
-  --alert-err-bg:    rgba(220, 38, 38, 0.10);
-  --alert-err-border:rgba(220, 38, 38, 0.40);
+  /* Alert tokens */
+  --alert-ok-text:   #485e30;
+  --alert-ok-bg:     rgba(72, 94, 48, 0.12);
+  --alert-ok-border: rgba(72, 94, 48, 0.40);
+  --alert-err-text:  #8c4351;
+  --alert-err-bg:    rgba(140, 67, 81, 0.10);
+  --alert-err-border:rgba(140, 67, 81, 0.40);
 
-  --dot-ok:   #059669;
-  --dot-warn: #d97706;
-  --dot-err:  #dc2626;
+  --dot-ok:   #485e30;
+  --dot-warn: #8f5e15;
+  --dot-err:  #8c4351;
 
-  --shadow-pop: 0 4px 18px -4px rgba(69, 43, 34, 0.14);
-
-  /* Background Artwork Wallpaper & Glassmorphism (Light) */
-  --bg-wallpaper: url('/backgrounds/Aegis-light.jpeg');
-  --wallpaper-overlay: rgba(253, 251, 247, 0.15);
-  --glass-panel-bg: rgba(253, 249, 243, 0.88);
-  --glass-header-bg: rgba(244, 237, 228, 0.75);
-  --glass-editor-bg: rgba(253, 251, 247, 0.85);
-  --glass-border: rgba(69, 43, 34, 0.12);
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(69, 43, 34, 0.06);
-  --glass-blur: 24px;
-  --glass-editor-blur: 32px;
-  --glass-saturate: 180%;
-  --glass-card-bg: rgba(255, 255, 255, 0.50);
+  --shadow-pop: 0 4px 18px -4px rgba(52, 59, 89, 0.14);
 }
 
 /* Badges & Slider Tracks */
@@ -236,7 +223,7 @@
 }
 
 [data-theme="light"] .breadcrumb-current {
-  color: var(--accent-dim, #059669);
+  color: var(--accent-dim, #1e4080);
 }
 
 [data-theme="light"] .wb-editor-tabs {

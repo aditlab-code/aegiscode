@@ -52,8 +52,11 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             workspace_root=workspace_root,
             on_output=self._handle_pty_output,
         )
+        from api.lifecycle import get_lifecycle_manager
+
         try:
             self.pty.start()
+            get_lifecycle_manager().register_pty(self.pty)
         except Exception as exc:
             logger.error("Failed to start PTY session: %s", exc)
             await self.send(
@@ -111,5 +114,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code: int) -> None:
         if self.pty is not None:
+            from api.lifecycle import get_lifecycle_manager
+
+            get_lifecycle_manager().unregister_pty(self.pty)
             self.pty.terminate()
             self.pty = None

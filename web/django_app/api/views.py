@@ -1213,8 +1213,16 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
         checker = getattr(request, "is_disconnected", None)
         return bool(checker()) if callable(checker) else False
 
+    stream = sse_stream(subscription, is_disconnected=is_disconnected)
+
+    async def sse_event_stream():
+        # Kirim comment frame inisial agar Daphne/reverse proxy langsung flush status HTTP 200 dan headers ke client
+        yield ": connected\n\n"
+        async for chunk in stream:
+            yield chunk
+
     response = StreamingHttpResponse(
-        sse_stream(subscription, is_disconnected=is_disconnected),
+        sse_event_stream(),
         content_type="text/event-stream",
     )
     response["Cache-Control"] = "no-cache"
@@ -1471,4 +1479,28 @@ def auth_me(request: HttpRequest) -> JsonResponse:
 def auth_logout(request: HttpRequest) -> JsonResponse:
     """Stateless logout endpoint."""
     return _json_response({"success": True})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def server_terminate(request: HttpRequest, service: GatewayService) -> JsonResponse:
+    """POST /api/server/terminate -> inisiasi penghentian aman server AegisCode (zero-zombie)."""
+    import os
+    from api.lifecycle import get_lifecycle_manager
+
+    body = _parse_json_body(request) if request.body else {}
+    force = bool(body.get("force", False))
+    delay = float(body.get("delay", 0.3))
+
+    lifecycle = get_lifecycle_manager()
+    pid = os.getpid()
+    lifecycle.trigger_server_shutdown(delay=delay)
+
+    return _json_response({
+        "status": "terminating",
+        "message": "Penghentian server AegisCode telah diinisiasi.",
+        "pid": pid,
+        "force": force,
+    })
 

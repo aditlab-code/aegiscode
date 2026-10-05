@@ -13,11 +13,35 @@
 // agar tidak menjadi satu halaman panjang, dengan label + deskripsi jelas.
 import { computed, onMounted, reactive, ref } from "vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
+import { terminateServer, isTerminating, serverTerminated } from "../services/serverService.js";
 
 const loading = ref(false);
 const busy = ref(false);
 const error = ref("");
 const notice = ref("");
+const showTerminateConfirm = ref(false);
+
+function confirmTerminateServer() {
+  showTerminateConfirm.value = true;
+}
+
+function cancelTerminateServer() {
+  showTerminateConfirm.value = false;
+}
+
+async function executeTerminateServer() {
+  showTerminateConfirm.value = false;
+  busy.value = true;
+  error.value = "";
+  notice.value = "";
+  const res = await terminateServer();
+  busy.value = false;
+  if (!res.success) {
+    error.value = `Gagal menghentikan server: ${res.error}`;
+  } else {
+    notice.value = "Server AegisCode berhasil dihentikan. Seluruh sub-proses telah dibersihkan.";
+  }
+}
 
 // Nilai AKTUAL dari backend (sumber kebenaran tampilan; bukan nilai lokal UI).
 const actual = ref({
@@ -171,6 +195,36 @@ onMounted(load);
             step="1"
             inputmode="numeric"
           />
+        </div>
+      </div>
+
+      <div class="gs-row">
+        <div class="gs-label">
+          <div class="gs-name">Terminasi Server</div>
+          <div class="gs-help">
+            Hentikan server AegisCode beserta seluruh sub-proses anak (PTY slave, background tasks) secara deterministik (Zero-Zombie). Port akan segera dilepaskan.
+          </div>
+        </div>
+        <div class="gs-control">
+          <button
+            class="btn-aether btn-danger-a"
+            :disabled="isTerminating || serverTerminated"
+            @click="confirmTerminateServer"
+          >
+            {{ isTerminating ? "Menghentikan..." : (serverTerminated ? "Server Berhenti" : "Hentikan Server") }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Konfirmasi Penghentian Server -->
+      <div v-if="showTerminateConfirm" class="gs-confirm-box">
+        <div class="gs-confirm-title">Konfirmasi Penghentian Server</div>
+        <div class="gs-confirm-desc">
+          Apakah Anda yakin ingin menghentikan server AegisCode? Seluruh koneksi dan sesi terminal PTY aktif akan ditutup secara aman.
+        </div>
+        <div class="gs-confirm-actions">
+          <button class="btn-aether btn-ghost-a" @click="cancelTerminateServer">Batal</button>
+          <button class="btn-aether btn-danger-a" @click="executeTerminateServer">Ya, Hentikan Server</button>
         </div>
       </div>
 
@@ -518,5 +572,50 @@ onMounted(load);
   font-weight: 500;
   color: var(--text-dim);
   min-width: 66px;
+}
+
+.btn-danger-a {
+  background: rgba(220, 53, 69, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  padding: 6px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-danger-a:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.28);
+  border-color: #ff6b6b;
+}
+.btn-danger-a:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.gs-confirm-box {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(220, 53, 69, 0.35);
+  background: rgba(220, 53, 69, 0.08);
+}
+.gs-confirm-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: #ff6b6b;
+  margin-bottom: 4px;
+}
+.gs-confirm-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.gs-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

@@ -658,8 +658,8 @@ watch(
   <div ref="scroller" class="act-body">
     <!-- Empty state -->
     <div v-if="empty" class="vtl-empty">
-      <template v-if="status === 'running'">AETHER is working…</template>
-      <template v-else>Give AETHER a task to begin. Its activity will appear here.</template>
+      <template v-if="status === 'running'">AEGIS is working…</template>
+      <template v-else>Give AEGIS a task to begin. Its activity will appear here.</template>
     </div>
 
     <!-- Vertical Timeline -->

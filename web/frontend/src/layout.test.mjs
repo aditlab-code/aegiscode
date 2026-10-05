@@ -41,7 +41,6 @@ test("1. AppActivityBar: 48px navigation icons, badges, active highlight, theme 
   assert.ok(comp, "AppActivityBar should export default component");
   assert.ok(comp.emits, "AppActivityBar should define emits");
   assert.ok(comp.emits.includes("update:activeNav"), "Emits update:activeNav");
-  assert.ok(comp.emits.includes("toggle-wallpaper"), "Emits toggle-wallpaper");
   assert.ok(comp.emits.includes("toggle-theme"), "Emits toggle-theme");
   assert.ok(comp.emits.includes("open-settings"), "Emits open-settings");
 
@@ -55,7 +54,6 @@ test("1. AppActivityBar: 48px navigation icons, badges, active highlight, theme 
   assert.ok(defaultHtml.includes("Source Control &amp; Changes") || defaultHtml.includes("Source Control & Changes"));
   assert.ok(defaultHtml.includes("Task Queue"));
   assert.ok(defaultHtml.includes("Settings"));
-  assert.ok(defaultHtml.includes("Toggle Wallpaper"));
   assert.ok(defaultHtml.includes("Switch to Light Theme"));
 
   // Check active highlight for explorer: Vue SSR renders dynamic classes merged

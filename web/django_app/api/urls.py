@@ -190,4 +190,6 @@ urlpatterns = [
     path("events", views.events, name="events"),
     # Terminal: user-initiated command execution (streaming SSE)
     path("terminal/run", views.terminal_run, name="terminal_run"),
+    # Server lifecycle termination (Zero-Zombie process tree kill)
+    path("server/terminate", views.server_terminate, name="server_terminate"),
 ]

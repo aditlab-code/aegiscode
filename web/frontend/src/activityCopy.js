@@ -223,7 +223,7 @@ function buildAgentHeader(meta) {
   add("LLM Rounds", m.llmRounds);
   add("Tool Calls", m.toolCalls);
   add("Tokens", m.tokens);
-  return ["AETHER AGENT ACTIVITY", "", "[AGENT]", ...rows].join("\n");
+  return ["AEGIS AGENT ACTIVITY", "", "[AGENT]", ...rows].join("\n");
 }
 
 // Snapshot lengkap Agent Activity untuk clipboard, ≤ MAX characters.

@@ -17,7 +17,7 @@ import ReportViewer from "./components/ReportViewer.vue";
 import ProjectPolicyPanel from "./components/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
-import { useAuth } from "./services/authService.js";
+import { useAuth } from "./services/authService.js"; import { startServerHealthMonitor } from "./services/serverService.js";
 import {
   openEventStream, getProjects, createProject, deleteProject, getActiveProject, setActiveProject, closeActiveProject, pickFolder,
   createTask, cancelTask, listTaskHistory, clearTaskHistory, deleteTaskHistory, getTaskReport, getConfig, getTaskActivity, getLLMProviders,
@@ -59,7 +59,8 @@ const activeProviderLabel = computed(() => activeProvider.value?.name || config.
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
 const taskTelemetry = reactive({ rounds: 0, toolCalls: 0, observations: 0 });
 const taskStartedAt = ref(null), taskEndedAt = ref(null), durationNow = ref(Date.now());
-let eventSource = null, liveFsChangeSeq = 0;
+let eventSource = null, liveFsChangeSeq = 0, stopHealthMonitor = null;
+const gatewayAddress = computed(() => (typeof window !== "undefined" ? window.location.host : ""));
 
 const durationTicker = createDurationTicker(() => { durationNow.value = Date.now(); });
 const taskDurationLabel = computed(() => {
@@ -357,16 +358,18 @@ onMounted(async () => {
   responsive.bindResizeListener();
   if (typeof window !== "undefined") window.addEventListener("keydown", onKeyDown);
   connectStream();
-  await loadActiveProject();
-  await loadProjects();
-  await refreshAllConfig();
+  stopHealthMonitor = startServerHealthMonitor((ok) => {
+    if (ok) { connected.value = true; if (!eventSource || eventSource.readyState === 2) connectStream(); }
+    else connected.value = false;
+  }, 5000);
+  await loadActiveProject(); await loadProjects(); await refreshAllConfig();
   if (activeProject.value) await refreshTaskHistory();
-  await syncActiveRunningTask();
-  initAuth();
+  await syncActiveRunningTask(); initAuth();
 });
 onBeforeUnmount(() => {
   responsive.unbindResizeListener();
   if (typeof window !== "undefined") window.removeEventListener("keydown", onKeyDown);
+  if (stopHealthMonitor) { stopHealthMonitor(); stopHealthMonitor = null; }
   if (eventSource) { eventSource.close(); eventSource = null; }
   durationTicker.stop();
 });
@@ -385,10 +388,8 @@ onBeforeUnmount(() => {
         v-model:active-nav="activeNav"
         :sidebar-open="responsive.sidebarOpen.value"
         :is-dark="themeState.isDark.value"
-        :is-wallpaper-enabled="themeState.isWallpaperEnabled.value"
         :changes-count="changes.length"
         @toggle-theme="themeState.toggleTheme()"
-        @toggle-wallpaper="themeState.toggleWallpaper()"
         @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
         @toggle-sidebar="toggleSidebarAction"
         @open-sidebar="toggleSidebarAction(true)"
@@ -418,7 +419,7 @@ onBeforeUnmount(() => {
 
     <AppFooter
       :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
-      :task-status="task.status" :connected="connected" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
+      :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
       :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
       @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
     />

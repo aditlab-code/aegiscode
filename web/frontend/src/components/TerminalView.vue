@@ -20,6 +20,64 @@ let term = null;
 let fitAddon = null;
 let socket = null;
 let resizeObserver = null;
+let themeObserver = null;
+
+const TOKYO_NIGHT_STORM_TERMINAL = {
+  background: "#24283b",
+  foreground: "#c0caf5",
+  cursor: "#c0caf5",
+  cursorAccent: "#24283b",
+  selectionBackground: "rgba(122, 162, 247, 0.25)",
+  black: "#1d202f",
+  red: "#f7768e",
+  green: "#9ece6a",
+  yellow: "#e0af68",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
+  cyan: "#7dcfff",
+  white: "#a9b1d6",
+  brightBlack: "#414868",
+  brightRed: "#f7768e",
+  brightGreen: "#9ece6a",
+  brightYellow: "#e0af68",
+  brightBlue: "#7aa2f7",
+  brightMagenta: "#bb9af7",
+  brightCyan: "#7dcfff",
+  brightWhite: "#c0caf5",
+};
+
+const TOKYO_NIGHT_LIGHT_TERMINAL = {
+  background: "#e6e7ed",
+  foreground: "#343b59",
+  cursor: "#343b59",
+  cursorAccent: "#e6e7ed",
+  selectionBackground: "rgba(41, 89, 170, 0.25)",
+  black: "#e6e7ed",
+  red: "#8c4351",
+  green: "#485e30",
+  yellow: "#8f5e15",
+  blue: "#2959aa",
+  magenta: "#5a3e8e",
+  cyan: "#0f4b6e",
+  white: "#343b59",
+  brightBlack: "#9699a3",
+  brightRed: "#8c4351",
+  brightGreen: "#485e30",
+  brightYellow: "#8f5e15",
+  brightBlue: "#2959aa",
+  brightMagenta: "#5a3e8e",
+  brightCyan: "#0f4b6e",
+  brightWhite: "#343b59",
+};
+
+function getActiveTerminalTheme() {
+  if (typeof document !== "undefined" && document.documentElement) {
+    const isLight = document.documentElement.dataset?.theme === "light" ||
+                    document.documentElement.getAttribute("data-theme") === "light";
+    return isLight ? TOKYO_NIGHT_LIGHT_TERMINAL : TOKYO_NIGHT_STORM_TERMINAL;
+  }
+  return TOKYO_NIGHT_STORM_TERMINAL;
+}
 
 function initPtySocket() {
   if (!isBrowser || socket) return;
@@ -100,29 +158,7 @@ onMounted(async () => {
       fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, "Courier New", monospace',
       lineHeight: 1.25,
       scrollback: 5000,
-      theme: {
-        background: "#18181b",
-        foreground: "#f4f4f5",
-        cursor: "#45c985",
-        cursorAccent: "#18181b",
-        selectionBackground: "rgba(69, 201, 133, 0.25)",
-        black: "#27272a",
-        red: "#f87171",
-        green: "#4ade80",
-        yellow: "#facc15",
-        blue: "#60a5fa",
-        magenta: "#c084fc",
-        cyan: "#38bdf8",
-        white: "#f4f4f5",
-        brightBlack: "#52525b",
-        brightRed: "#ef4444",
-        brightGreen: "#22c55e",
-        brightYellow: "#eab308",
-        brightBlue: "#3b82f6",
-        brightMagenta: "#a855f7",
-        brightCyan: "#06b6d4",
-        brightWhite: "#ffffff",
-      },
+      theme: getActiveTerminalTheme(),
     });
 
     fitAddon = new FitAddon();
@@ -146,6 +182,19 @@ onMounted(async () => {
       });
     }
 
+    // Dynamic theme switching observer
+    if (typeof MutationObserver !== "undefined" && document.documentElement) {
+      themeObserver = new MutationObserver(() => {
+        if (term) {
+          term.options.theme = getActiveTerminalTheme();
+        }
+      });
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+    }
+
     initPtySocket();
 
     // Synchronize dimensions dynamically whenever container resizes
@@ -166,6 +215,10 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -210,7 +263,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #18181b;
+  background: var(--bg-deep, #16161e);
   position: relative;
   overflow: hidden;
   outline: none;

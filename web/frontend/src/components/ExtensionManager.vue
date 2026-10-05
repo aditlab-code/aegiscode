@@ -179,7 +179,7 @@ async function doUpdate(ext, repositoryUrl = null, refVal = null) {
   try {
     const res = await updateExtension(id, repositoryUrl, refVal);
     if (res.restart_required) {
-      setNotice(`Update completed for ${id}. Restart AETHER to activate the new Python code.`);
+      setNotice(`Update completed for ${id}. Restart AEGIS to activate the new Python code.`);
     } else {
       setNotice(`Updated ${id}`);
     }
@@ -341,7 +341,7 @@ defineExpose({ refresh });
       <div class="ext-mgmt-title">
         <div class="title">Extensions</div>
         <div class="desc">
-          Manage AETHER extensions. Install from Git URL, enable/disable, update, or remove.
+          Manage AEGIS extensions. Install from Git URL, enable/disable, update, or remove.
           <span v-if="failedCount" class="ext-badge-failed">{{ failedCount }} failed</span>
         </div>
       </div>

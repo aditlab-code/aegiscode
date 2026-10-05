@@ -222,8 +222,8 @@ class AntigravityProvider(BaseProvider):
 
     def _resolve_cli_path(self) -> Optional[str]:
         """Temukan executable agy di sistem."""
-        if self.config.cli_path and os.path.exists(self.config.cli_path):
-            return self.config.cli_path
+        if self.config.cli_path:
+            return self.config.cli_path if os.path.exists(self.config.cli_path) else None
 
         found = shutil.which("agy")
         if found and os.path.exists(found):
