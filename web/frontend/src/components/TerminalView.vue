@@ -22,61 +22,61 @@ let socket = null;
 let resizeObserver = null;
 let themeObserver = null;
 
-const GRUVBOX_DARK_TERMINAL = {
-  background: "#282828",
-  foreground: "#ebdbb2",
-  cursor: "#ebdbb2",
-  cursorAccent: "#282828",
-  selectionBackground: "rgba(235, 219, 178, 0.25)",
-  black: "#282828",
-  red: "#cc241d",
-  green: "#98971a",
-  yellow: "#d79921",
-  blue: "#458588",
-  magenta: "#b16286",
-  cyan: "#689d6a",
-  white: "#a89984",
-  brightBlack: "#928374",
-  brightRed: "#fb4934",
-  brightGreen: "#b8bb26",
-  brightYellow: "#fabd2f",
-  brightBlue: "#83a598",
-  brightMagenta: "#d3869b",
-  brightCyan: "#8ec07c",
-  brightWhite: "#ebdbb2",
+const TOKYO_NIGHT_STORM_TERMINAL = {
+  background: "#24283b",
+  foreground: "#c0caf5",
+  cursor: "#c0caf5",
+  cursorAccent: "#24283b",
+  selectionBackground: "rgba(122, 162, 247, 0.25)",
+  black: "#1d202f",
+  red: "#f7768e",
+  green: "#9ece6a",
+  yellow: "#e0af68",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
+  cyan: "#7dcfff",
+  white: "#a9b1d6",
+  brightBlack: "#414868",
+  brightRed: "#f7768e",
+  brightGreen: "#9ece6a",
+  brightYellow: "#e0af68",
+  brightBlue: "#7aa2f7",
+  brightMagenta: "#bb9af7",
+  brightCyan: "#7dcfff",
+  brightWhite: "#c0caf5",
 };
 
-const GRUVBOX_LIGHT_TERMINAL = {
-  background: "#fbf1c7",
-  foreground: "#3c3836",
-  cursor: "#3c3836",
-  cursorAccent: "#fbf1c7",
-  selectionBackground: "rgba(60, 56, 54, 0.25)",
-  black: "#fbf1c7",
-  red: "#cc241d",
-  green: "#98971a",
-  yellow: "#d79921",
-  blue: "#458588",
-  magenta: "#b16286",
-  cyan: "#689d6a",
-  white: "#7c6f64",
-  brightBlack: "#928374",
-  brightRed: "#9d0006",
-  brightGreen: "#79740e",
-  brightYellow: "#b57614",
-  brightBlue: "#076678",
-  brightMagenta: "#8f3f71",
-  brightCyan: "#427b58",
-  brightWhite: "#3c3836",
+const TOKYO_NIGHT_LIGHT_TERMINAL = {
+  background: "#e6e7ed",
+  foreground: "#343b59",
+  cursor: "#343b59",
+  cursorAccent: "#e6e7ed",
+  selectionBackground: "rgba(41, 89, 170, 0.25)",
+  black: "#e6e7ed",
+  red: "#8c4351",
+  green: "#485e30",
+  yellow: "#8f5e15",
+  blue: "#2959aa",
+  magenta: "#5a3e8e",
+  cyan: "#0f4b6e",
+  white: "#343b59",
+  brightBlack: "#9699a3",
+  brightRed: "#8c4351",
+  brightGreen: "#485e30",
+  brightYellow: "#8f5e15",
+  brightBlue: "#2959aa",
+  brightMagenta: "#5a3e8e",
+  brightCyan: "#0f4b6e",
+  brightWhite: "#343b59",
 };
 
 function getActiveTerminalTheme() {
   if (typeof document !== "undefined" && document.documentElement) {
     const isLight = document.documentElement.dataset?.theme === "light" ||
                     document.documentElement.getAttribute("data-theme") === "light";
-    return isLight ? GRUVBOX_LIGHT_TERMINAL : GRUVBOX_DARK_TERMINAL;
+    return isLight ? TOKYO_NIGHT_LIGHT_TERMINAL : TOKYO_NIGHT_STORM_TERMINAL;
   }
-  return GRUVBOX_DARK_TERMINAL;
+  return TOKYO_NIGHT_STORM_TERMINAL;
 }
 
 function initPtySocket() {
@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-deep, #282828);
+  background: var(--bg-deep, #16161e);
   position: relative;
   overflow: hidden;
   outline: none;

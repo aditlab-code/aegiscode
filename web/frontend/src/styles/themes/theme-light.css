@@ -1,64 +1,64 @@
-/* AegisCode Gruvbox Light Theme Tokens & Component Overrides ([data-theme="light"]) */
+/* AegisCode Tokyo Night Light Theme Tokens & Component Overrides ([data-theme="light"]) */
 
 [data-theme="light"] {
-  /* AegisCode Gruvbox Light Medium */
-  --bg:        #fbf1c7;   /* Light0 base canvas */
-  --bg-panel:  #f2e5bc;   /* Light0_soft panel surface */
-  --bg-surface:#f2e5bc;   /* Layout components surface */
-  --bg-header: #f9f5d7;   /* Light0_hard top navbar, tab bars, activity bar */
-  --bg-elev:   #fbf1c7;   /* Light0 active tab, elevated card surface */
-  --bg-card:   #f2e5bc;   /* Light0_soft card surface */
-  --bg-hover:  #ebdbb2;   /* Light1 hover state */
-  --bg-deep:   #ebdbb2;   /* Light1 form inputs background */
-  --bg-secondary: #f9f5d7; /* Light0_hard secondary surface */
+  /* AegisCode Tokyo Night Light */
+  --bg:        #e6e7ed;   /* Light base canvas */
+  --bg-panel:  #d6d8df;   /* Light panel surface */
+  --bg-surface:#d6d8df;   /* Layout components surface */
+  --bg-header: #cdced1;   /* Top navbar, tab bars, activity bar */
+  --bg-elev:   #f5f6f9;   /* Active tab, elevated card surface */
+  --bg-card:   #d6d8df;   /* Card surface */
+  --bg-hover:  #d0d2db;   /* Hover state */
+  --bg-deep:   #d0d2db;   /* Form inputs background */
+  --bg-secondary: #cdced1; /* Secondary surface */
 
-  /* Borders — Gruvbox Light Slate boundaries */
-  --border:      #d5c4a1;  /* Light2 component outline */
-  --border-soft: #ebdbb2;  /* Light1 inner row dividers */
-  --border-subtle:#f2e5bc; /* Light0_soft subtle border */
-  --border-hover: #bdae93;  /* Light3 border hover */
+  /* Borders — Tokyo Night Cool Silver */
+  --border:      #c1c2c7;  /* Component outline */
+  --border-soft: #d0d2db;  /* Inner row dividers */
+  --border-subtle:#d6d8df; /* Subtle border */
+  --border-hover: #a9abb3;  /* Border hover */
 
   /* Typography */
-  --text:       #282828;   /* Dark0 deep contrast typography */
-  --text-dim:   #504945;   /* Dark2 secondary typography */
-  --text-faint: #7c6f64;   /* Dark4 muted metadata / inactive text */
+  --text:       #343b59;   /* Deep slate typography */
+  --text-dim:   #565a6e;   /* Secondary typography */
+  --text-faint: #707280;   /* Muted metadata / inactive text */
 
-  /* Accent 1: Gruvbox Aqua/Green (Faded/Neutral) */
-  --accent:     #427b58;   /* Faded Aqua */
-  --accent-dim: #427b58;
-  --accent-soft: rgba(66, 123, 88, 0.16);
-  --accent-muted:#427b58;
-  --dioptase-green: #427b58;
-  --dioptase-bright:#689d6a;
+  /* Accent 1: Tokyo Night Light Blue */
+  --accent:     #2959aa;   /* Electric Blue */
+  --accent-dim: #1e4080;
+  --accent-soft: rgba(41, 89, 170, 0.16);
+  --accent-muted:#2959aa;
+  --dioptase-green: #2959aa;
+  --dioptase-bright:#3d59a1;
 
-  /* Accent 2: Gruvbox Orange (Faded/Neutral) */
-  --accent-2:     #af3a03; /* Faded Orange */
-  --accent-2-dim: #af3a03;
-  --accent-2-soft:rgba(175, 58, 3, 0.16);
-  --accent-2-bright:#d65d0e;
+  /* Accent 2: Tokyo Night Violet / Magenta */
+  --accent-2:     #7c3aed; /* Violet / Magenta */
+  --accent-2-dim: #6d28d9;
+  --accent-2-soft:rgba(124, 58, 237, 0.16);
+  --accent-2-bright:#8b5cf6;
 
   /* Status */
-  --ok:   #79740e;  /* Faded Green */
-  --warn: #b57614;  /* Faded Yellow */
-  --err:  #9d0006;  /* Faded Red */
+  --ok:   #485e30;  /* Tokyo Night Light Green */
+  --warn: #8f5e15;  /* Tokyo Night Light Amber */
+  --err:  #8c4351;  /* Tokyo Night Light Red */
 
-  --act-ts:    #3c3836;
-  --act-agent: #af3a03;   /* Gruvbox Orange agent identifier */
-  --act-obs:   #427b58;   /* Gruvbox Aqua observation */
+  --act-ts:    #343b59;
+  --act-agent: #7c3aed;   /* Magenta agent identifier */
+  --act-obs:   #2959aa;   /* Blue observation */
 
   /* Alert tokens */
-  --alert-ok-text:   #79740e;
-  --alert-ok-bg:     rgba(121, 116, 14, 0.12);
-  --alert-ok-border: rgba(121, 116, 14, 0.40);
-  --alert-err-text:  #9d0006;
-  --alert-err-bg:    rgba(157, 0, 6, 0.10);
-  --alert-err-border:rgba(157, 0, 6, 0.40);
+  --alert-ok-text:   #485e30;
+  --alert-ok-bg:     rgba(72, 94, 48, 0.12);
+  --alert-ok-border: rgba(72, 94, 48, 0.40);
+  --alert-err-text:  #8c4351;
+  --alert-err-bg:    rgba(140, 67, 81, 0.10);
+  --alert-err-border:rgba(140, 67, 81, 0.40);
 
-  --dot-ok:   #79740e;
-  --dot-warn: #b57614;
-  --dot-err:  #9d0006;
+  --dot-ok:   #485e30;
+  --dot-warn: #8f5e15;
+  --dot-err:  #8c4351;
 
-  --shadow-pop: 0 4px 18px -4px rgba(60, 56, 54, 0.14);
+  --shadow-pop: 0 4px 18px -4px rgba(52, 59, 89, 0.14);
 }
 
 /* Badges & Slider Tracks */
@@ -223,7 +223,7 @@
 }
 
 [data-theme="light"] .breadcrumb-current {
-  color: var(--accent-dim, #427b58);
+  color: var(--accent-dim, #1e4080);
 }
 
 [data-theme="light"] .wb-editor-tabs {

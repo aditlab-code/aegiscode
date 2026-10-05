@@ -42,6 +42,6 @@ if getattr(settings, "FRONTEND_DIST_EXISTS", False):
         path("", serve_frontend, {"document_root": _dist, "path": "index.html"}),
         re_path(r"^(?P<path>assets/.*)$", serve_frontend, {"document_root": _dist}),
         re_path(r"^(?P<path>backgrounds/.*)$", serve_frontend, {"document_root": _dist}),
-        re_path(r"^(?P<path>favicon\.ico)$", serve_frontend, {"document_root": _dist}),
+        re_path(r"^(?P<path>favicon\.(?:ico|svg))$", serve_frontend, {"document_root": _dist}),
         re_path(r"^(?P<path>index\.html)$", serve_frontend, {"document_root": _dist}),
     ]

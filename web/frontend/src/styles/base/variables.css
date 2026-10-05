@@ -1,67 +1,67 @@
 /* AegisCode Design System — Core Variables & Tokens
-   Baseline dark theme variables (Gruvbox Dark Medium). */
+   Baseline dark theme variables (Tokyo Night Storm). */
 
 :root {
-  /* Canvas & Panel Colors (Gruvbox Dark Medium) */
-  --bg:         #282828;   /* Dark0 base canvas */
-  --bg-panel:   #32302f;   /* Dark0_soft sidebars, drawers, widget containers */
-  --bg-surface: #32302f;   /* Layout surfaces */
-  --bg-header:  #1d2021;   /* Dark0_hard top navbar, tab bars, activity bar */
-  --bg-elev:    #3c3836;   /* Dark1 elevated dialogs, active tab, popovers */
-  --bg-hover:   #504945;   /* Dark2 list & button hover state */
-  --bg-deep:    #1d2021;   /* Dark0_hard form inputs, deep embedded containers */
-  --bg-card:    #32302f;   /* Dark0_soft card background */
-  --bg-secondary: #1d2021; /* Secondary surface for top navbar and footer */
+  /* Canvas & Panel Colors (Tokyo Night Storm) */
+  --bg:         #24283b;   /* Storm base canvas */
+  --bg-panel:   #1f2335;   /* Sidebars, drawers, widget containers */
+  --bg-surface: #1f2335;   /* Layout surfaces */
+  --bg-header:  #1a1b26;   /* Classic dark top navbar, tab bars, activity bar */
+  --bg-elev:    #292e42;   /* Elevated dialogs, active tab, popovers */
+  --bg-hover:   #2f354f;   /* List & button hover state */
+  --bg-deep:    #16161e;   /* Form inputs, deep embedded containers */
+  --bg-card:    #1f2335;   /* Card background */
+  --bg-secondary: #1a1b26; /* Secondary surface for top navbar and footer */
 
-  /* Borders — Gruvbox Crisp Contrast */
-  --border:        #504945;  /* Dark2 component outline */
-  --border-soft:   #3c3836;  /* Dark1 inner row dividers */
-  --border-subtle: #32302f;  /* Dark0_soft subtle boundary */
-  --border-hover:  #7c6f64;  /* Dark4 interactive border hover */
+  /* Borders — Tokyo Night Cool Slate */
+  --border:        #292e42;  /* Component outline */
+  --border-soft:   #1f2335;  /* Inner row dividers */
+  --border-subtle: #16161e;  /* Subtle boundary */
+  --border-hover:  #3b4261;  /* Interactive border hover */
 
   /* Typography */
-  --text:       #ebdbb2;   /* Light1 primary text */
-  --text-dim:   #d5c4a1;   /* Light2 secondary / muted labels */
-  --text-faint: #a89984;   /* Light4 activity bar inactive / timestamps */
+  --text:       #c0caf5;   /* Primary crisp text */
+  --text-dim:   #9aa5ce;   /* Secondary / muted labels */
+  --text-faint: #565f89;   /* Inactive / timestamps / comments */
 
-  /* Accent 1: Gruvbox Aqua/Green */
-  --accent:          #8ec07c;   /* Bright Aqua */
-  --accent-dim:      #689d6a;   /* Neutral Aqua */
-  --accent-soft:     rgba(142, 192, 124, 0.16);
-  --accent-muted:    #8ec07c;
-  --dioptase-green:  #8ec07c;
-  --dioptase-bright: #b8bb26;
+  /* Accent 1: Tokyo Night Electric Blue */
+  --accent:          #7aa2f7;   /* Electric Blue */
+  --accent-dim:      #3d59a1;   /* Deeper Blue */
+  --accent-soft:     rgba(122, 162, 247, 0.16);
+  --accent-muted:    #7aa2f7;
+  --dioptase-green:  #7aa2f7;
+  --dioptase-bright: #7dcfff;
 
-  /* Accent 2: Gruvbox Orange */
-  --accent-2:        #fe8019;   /* Bright Orange */
-  --accent-2-dim:    #d65d0e;   /* Neutral Orange */
-  --accent-2-soft:   rgba(254, 128, 25, 0.16);
-  --accent-2-bright: #fe8019;
+  /* Accent 2: Neon Magenta / Violet */
+  --accent-2:        #bb9af7;   /* Neon Magenta */
+  --accent-2-dim:    #9d7cd8;   /* Deeper Violet */
+  --accent-2-soft:   rgba(187, 154, 247, 0.16);
+  --accent-2-bright: #bb9af7;
 
   /* Status Colors */
-  --ok:   #b8bb26;  /* Bright Green */
-  --warn: #fabd2f;  /* Bright Yellow */
-  --err:  #fb4934;  /* Bright Red */
+  --ok:   #9ece6a;  /* Tokyo Night Green */
+  --warn: #e0af68;  /* Tokyo Night Amber/Yellow */
+  --err:  #f7768e;  /* Tokyo Night Red/Pink */
 
   /* Activity timeline tokens */
-  --act-ts:    #ebdbb2;
-  --act-agent: #fe8019;   /* Gruvbox Orange agent identifier */
-  --act-obs:   #8ec07c;   /* Gruvbox Aqua observation / tool output */
+  --act-ts:    #c0caf5;
+  --act-agent: #bb9af7;   /* Neon Magenta agent identifier */
+  --act-obs:   #7aa2f7;   /* Electric Blue observation / tool output */
 
   /* Alert tokens */
-  --alert-ok-text:   #b8bb26;
-  --alert-ok-bg:     rgba(184, 187, 38, 0.14);
-  --alert-ok-border: rgba(184, 187, 38, 0.45);
-  --alert-err-text:  #fb4934;
-  --alert-err-bg:    rgba(251, 73, 52, 0.14);
-  --alert-err-border:rgba(251, 73, 52, 0.45);
+  --alert-ok-text:   #9ece6a;
+  --alert-ok-bg:     rgba(158, 206, 106, 0.14);
+  --alert-ok-border: rgba(158, 206, 106, 0.45);
+  --alert-err-text:  #f7768e;
+  --alert-err-bg:    rgba(247, 118, 142, 0.14);
+  --alert-err-border:rgba(247, 118, 142, 0.45);
 
   /* Status dot flat colors */
-  --dot-ok:   #b8bb26;
-  --dot-warn: #fabd2f;
-  --dot-err:  #fb4934;
+  --dot-ok:   #9ece6a;
+  --dot-warn: #e0af68;
+  --dot-err:  #f7768e;
 
-  --shadow-pop: 0 4px 18px -4px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 4px 18px -4px rgba(13, 15, 23, 0.7);
 
   /* Layout Dimensions & Radius */
   --sidebar-w:   260px;

@@ -81,41 +81,46 @@ AegisCode Studio menggunakan tata letak multi-panel berbasis grid dan flexbox ya
 
 ## 4. Filosofi Desain & Palet Warna (Design Tokens)
 
-AegisCode Studio mengadopsi estetika *Solid Matte Retro* berbasis palet resmi [morhetz/gruvbox](https://github.com/morhetz/gruvbox) varian Medium untuk mode Dark dan Light:
+AegisCode Studio mengadopsi estetika *Cyberpunk Midnight* berbasis palet resmi [tokyo-night/tokyo-night-vscode-theme](https://github.com/tokyo-night/tokyo-night-vscode-theme) dengan varian Storm untuk mode Dark dan varian Light untuk mode Light:
 
-### 4.1. Gruvbox Dark (Medium)
-- **Background Utama (`--bg`)**: `#282828` (dark0)
-- **Surface / Panel (`--bg-panel`, `--bg-surface`, `--bg-card`)**: `#32302f` (dark0_soft)
-- **Header & Container Tertanam (`--bg-header`, `--bg-deep`, `--bg-secondary`)**: `#1d2021` (dark0_hard)
-- **Elevated Surfaces (`--bg-elev`)**: `#3c3836` (dark1)
-- **Hover State (`--bg-hover`)**: `#504945` (dark2)
-- **Border & Pembatas (`--border`)**: `#504945` (dark2)
-- **Inner Dividers (`--border-soft`)**: `#3c3836` (dark1)
-- **Tipografi Utama (`--text`)**: `#ebdbb2` (light1)
-- **Tipografi Sekunder (`--text-dim`)**: `#d5c4a1` (light2)
-- **Aksen Primer (`--accent`)**: `#8ec07c` (Bright Aqua) / `#b8bb26` (Bright Green)
-- **Aksen Sekunder (`--accent-2`)**: `#fe8019` (Bright Orange)
-- **Status Sukses (`--ok`)**: `#b8bb26` (Bright Green)
-- **Status Peringatan (`--warn`)**: `#fabd2f` (Bright Yellow)
-- **Status Bahaya / Error (`--err`)**: `#fb4934` (Bright Red)
+### 4.1. Tokyo Night Storm (Dark Mode)
+- **Background Utama (`--bg`)**: `#24283b` (Storm background)
+- **Surface / Panel (`--bg-panel`, `--bg-surface`, `--bg-card`)**: `#1f2335` (Sidebar & drawers)
+- **Header & Navbar (`--bg-header`, `--bg-secondary`)**: `#1a1b26` (Classic dark top navbar)
+- **Elevated Surfaces (`--bg-elev`)**: `#292e42` (Elevated cards & dialogs)
+- **Hover State (`--bg-hover`)**: `#2f354f` (Hover highlight)
+- **Deep Containers & Inputs (`--bg-deep`)**: `#16161e` (Form inputs & embedded widgets)
+- **Border & Pembatas (`--border`)**: `#292e42`
+- **Inner Dividers (`--border-soft`)**: `#1f2335`
+- **Subtle Boundaries (`--border-subtle`)**: `#16161e`
+- **Tipografi Utama (`--text`)**: `#c0caf5` (Crisp light blue-white)
+- **Tipografi Sekunder (`--text-dim`)**: `#9aa5ce` (Slate secondary labels)
+- **Tipografi Redup / Inaktif (`--text-faint`)**: `#565f89` (Muted comments/timestamps)
+- **Aksen Primer (`--accent`)**: `#7aa2f7` (Tokyo Night Electric Blue)
+- **Aksen Sekunder (`--accent-2`)**: `#bb9af7` (Neon Magenta / Violet)
+- **Status Sukses (`--ok`)**: `#9ece6a` (Tokyo Night Green)
+- **Status Peringatan (`--warn`)**: `#e0af68` (Tokyo Night Amber/Yellow)
+- **Status Bahaya / Error (`--err`)**: `#f7768e` (Tokyo Night Red/Pink)
 
-### 4.2. Gruvbox Light (Medium)
-- **Background Utama (`--bg`)**: `#fbf1c7` (light0)
-- **Surface / Panel (`--bg-panel`, `--bg-surface`, `--bg-card`)**: `#f2e5bc` (light0_soft)
-- **Header & Navbar (`--bg-header`, `--bg-secondary`)**: `#f9f5d7` (light0_hard)
-- **Elevated Surfaces (`--bg-elev`)**: `#fbf1c7` (light0)
-- **Hover & Inputs (`--bg-hover`, `--bg-deep`)**: `#ebdbb2` (light1)
-- **Border & Pembatas (`--border`)**: `#d5c4a1` (light2)
-- **Inner Dividers (`--border-soft`)**: `#ebdbb2` (light1)
-- **Tipografi Utama (`--text`)**: `#282828` (dark0)
-- **Tipografi Sekunder (`--text-dim`)**: `#504945` (dark2)
-- **Aksen Primer (`--accent`)**: `#427b58` (Faded Aqua) / `#689d6a` (Neutral Aqua)
-- **Aksen Sekunder (`--accent-2`)**: `#af3a03` (Faded Orange) / `#d65d0e` (Neutral Orange)
-- **Status Sukses (`--ok`)**: `#79740e` (Faded Green)
-- **Status Peringatan (`--warn`)**: `#b57614` (Faded Yellow)
-- **Status Bahaya / Error (`--err`)**: `#9d0006` (Faded Red)
+### 4.2. Tokyo Night Light (Light Mode)
+- **Background Utama (`--bg`)**: `#e6e7ed` (Light canvas)
+- **Surface / Panel (`--bg-panel`, `--bg-surface`, `--bg-card`)**: `#d6d8df` (Light slate panels)
+- **Header & Navbar (`--bg-header`, `--bg-secondary`)**: `#cdced1` (Header boundaries)
+- **Elevated Surfaces (`--bg-elev`)**: `#f5f6f9` (Elevated cards)
+- **Hover & Inputs (`--bg-hover`, `--bg-deep`)**: `#d0d2db`
+- **Border & Pembatas (`--border`)**: `#c1c2c7` (Cool silver outline)
+- **Inner Dividers (`--border-soft`)**: `#d0d2db`
+- **Tipografi Utama (`--text`)**: `#343b59` (Deep slate typography)
+- **Tipografi Sekunder (`--text-dim`)**: `#565a6e`
+- **Tipografi Redup / Inaktif (`--text-faint`)**: `#707280`
+- **Aksen Primer (`--accent`)**: `#2959aa` (Deep Electric Blue)
+- **Aksen Sekunder (`--accent-2`)**: `#7c3aed` (Violet / Magenta)
+- **Status Sukses (`--ok`)**: `#485e30` (Forest Green)
+- **Status Peringatan (`--warn`)**: `#8f5e15` (Amber Brown)
+- **Status Bahaya / Error (`--err`)**: `#8c4351` (Crimson Rose)
 
 ### 4.3. Tipografi
 - **Antarmuka (Sans)**: `Inter`, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif
 - **Kode & Terminal (Mono)**: `JetBrains Mono`, `SFMono-Regular`, Consolas, `Liberation Mono`, monospace
+
 
