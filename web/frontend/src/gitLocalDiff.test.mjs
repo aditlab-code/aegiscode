@@ -7,7 +7,19 @@ import {
   openDiffTab,
   closeTab,
   getActiveTab,
+  setTabConflict,
 } from "./services/editorTabsService.js";
+
+import {
+  getOrCreateModel,
+  releaseModel,
+  getModel,
+  isShared,
+  markSaved,
+  isDirty,
+  applyExternalContent,
+  clearRegistryForTesting,
+} from "./services/monacoModelRegistry.js";
 
 import {
   getProjectGitStatus,
@@ -253,4 +265,68 @@ test("8. non-overlay inline in-place discard confirmation state transitions", ()
   confirmingFile = "server.py";
   assert.equal(confirmingFile, "server.py");
 });
+
+test("9. editorTabsService: conflict property on openTab and setTabConflict tracking", () => {
+  const state = createEditorTabsState();
+  const tab = openTab(state, "src/agent_ai/runtime.py");
+
+  assert.ok(tab);
+  assert.equal(tab.conflict, false, "tab baru memiliki conflict: false");
+
+  const marked = setTabConflict(state, "src/agent_ai/runtime.py", true);
+  assert.equal(marked, true);
+  assert.equal(tab.conflict, true, "tab.conflict berhasil ditandai true");
+
+  setTabConflict(state, "src/agent_ai/runtime.py", false);
+  assert.equal(tab.conflict, false, "tab.conflict berhasil di-reset");
+
+  const notFound = setTabConflict(state, "nonexistent.py", true);
+  assert.equal(notFound, false);
+});
+
+test("10. monacoModelRegistry: lifecycle, refCount, shared detection, markSaved, isDirty, applyExternalContent", () => {
+  clearRegistryForTesting();
+
+  // 1. Pembuatan model pertama kali
+  const entry1 = getOrCreateModel(null, "src/core/main.py", "initial content", "python");
+  assert.ok(entry1);
+  assert.equal(entry1.refCount, 1);
+  assert.equal(isShared("src/core/main.py"), false, "Awalnya belum shared");
+  assert.equal(isDirty("src/core/main.py"), false, "Awalnya bersih (tidak dirty)");
+
+  // 2. Window 2 membuka berkas yang sama -> model di-share, refCount bertambah
+  const entry2 = getOrCreateModel(null, "src/core/main.py");
+  assert.equal(entry2, entry1, "Model adalah instance tunggal yang sama");
+  assert.equal(entry1.refCount, 2);
+  assert.equal(isShared("src/core/main.py"), true, "Terdeteksi shared di kedua window");
+
+  // 3. User mengubah konten model (simulasi dirty)
+  const model = getModel("src/core/main.py");
+  assert.ok(model);
+  assert.equal(model.getValue(), "initial content");
+  model.setValue("modified by user");
+  assert.equal(isDirty("src/core/main.py"), true, "Model terdeteksi dirty");
+
+  // 4. Simpan berkas -> markSaved
+  markSaved("src/core/main.py", model.getAlternativeVersionId());
+  assert.equal(isDirty("src/core/main.py"), false, "Setelah markSaved, tidak lagi dirty");
+
+  // 5. Agen memodifikasi file -> applyExternalContent
+  const applied = applyExternalContent("src/core/main.py", "updated by agent");
+  assert.equal(applied, true);
+  assert.equal(model.getValue(), "updated by agent");
+
+  // 6. Release model dari Window 1
+  releaseModel("src/core/main.py");
+  assert.equal(entry1.refCount, 1);
+  assert.equal(isShared("src/core/main.py"), false, "Hanya tinggal 1 window, tidak lagi shared");
+  assert.ok(getModel("src/core/main.py"), "Model tetap ada di registry selama refCount > 0");
+
+  // 7. Release model dari Window 2 -> refCount 0, model di-dispose dan dihapus dari registry
+  releaseModel("src/core/main.py");
+  assert.equal(getModel("src/core/main.py"), null, "Model dibersihkan saat seluruh tab ditutup");
+
+  clearRegistryForTesting();
+});
+
 

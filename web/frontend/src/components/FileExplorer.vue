@@ -556,11 +556,11 @@ watch(
       <div v-show="!openEditorsCollapsed" class="open-editors-list">
         <!-- Dual groups when split is active -->
         <template v-if="splitActive">
-          <!-- Group Tab 1 -->
+          <!-- Group Window 1 -->
           <div class="oe-group" :class="{ 'is-active-pane': activePane === 'pane1' }">
             <div class="oe-group-header" @click.stop="toggleGroup('tab1')">
               <span class="sec-caret" aria-hidden="true">{{ groupCollapsed.tab1 ? "▸" : "▾" }}</span>
-              <span class="oe-group-title">Tab 1</span>
+              <span class="oe-group-title">Window 1</span>
               <span class="drawer-badge oe-group-badge">{{ openTabs.length }}</span>
             </div>
             <div v-show="!groupCollapsed.tab1" class="oe-group-items">
@@ -586,6 +586,7 @@ watch(
                 >
                   {{ gitStatusMap[normalizeRel(tab.filePath || tab.path)] }}
                 </span>
+                <span v-if="tab.conflict" class="oe-conflict-dot" title="Agent modified this file while you have unsaved edits">!</span>
                 <span v-if="tab.dirty" class="oe-dirty-dot" title="Unsaved changes">●</span>
                 <button
                   type="button"
@@ -600,15 +601,15 @@ watch(
                   </svg>
                 </button>
               </div>
-              <div v-if="openTabs.length === 0" class="oe-empty-hint">No open tabs in Tab 1</div>
+              <div v-if="openTabs.length === 0" class="oe-empty-hint">No open tabs in Window 1</div>
             </div>
           </div>
 
-          <!-- Group Tab 2 -->
+          <!-- Group Window 2 -->
           <div class="oe-group" :class="{ 'is-active-pane': activePane === 'pane2' }">
             <div class="oe-group-header" @click.stop="toggleGroup('tab2')">
               <span class="sec-caret" aria-hidden="true">{{ groupCollapsed.tab2 ? "▸" : "▾" }}</span>
-              <span class="oe-group-title">Tab 2</span>
+              <span class="oe-group-title">Window 2</span>
               <span class="drawer-badge oe-group-badge">{{ openTabs2.length }}</span>
             </div>
             <div v-show="!groupCollapsed.tab2" class="oe-group-items">
@@ -634,6 +635,7 @@ watch(
                 >
                   {{ gitStatusMap[normalizeRel(tab.filePath || tab.path)] }}
                 </span>
+                <span v-if="tab.conflict" class="oe-conflict-dot" title="Agent modified this file while you have unsaved edits">!</span>
                 <span v-if="tab.dirty" class="oe-dirty-dot" title="Unsaved changes">●</span>
                 <button
                   type="button"
@@ -648,17 +650,17 @@ watch(
                   </svg>
                 </button>
               </div>
-              <div v-if="openTabs2.length === 0" class="oe-empty-hint">No open tabs in Tab 2</div>
+              <div v-if="openTabs2.length === 0" class="oe-empty-hint">No open tabs in Window 2</div>
             </div>
           </div>
         </template>
 
-        <!-- Single Window Mode: Single list under Tab 1 -->
+        <!-- Single Window Mode: Single list under Window 1 -->
         <template v-else>
           <div class="oe-group is-active-pane">
             <div class="oe-group-header" @click.stop="toggleGroup('tab1')">
               <span class="sec-caret" aria-hidden="true">{{ groupCollapsed.tab1 ? "▸" : "▾" }}</span>
-              <span class="oe-group-title">Tab 1</span>
+              <span class="oe-group-title">Window 1</span>
               <span class="drawer-badge oe-group-badge">{{ openTabs.length }}</span>
             </div>
             <div v-show="!groupCollapsed.tab1" class="oe-group-items">
