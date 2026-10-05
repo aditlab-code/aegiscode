@@ -8,7 +8,30 @@ Repository ini adalah ekosistem pengembangan **AegisCode** (AegisCode Studio & A
 - **Mutu & YAGNI**: Zero-orphan code, tanpa pustaka berlebih, zero-zombie process tree kill, backward-compatibility `.aegis/` dan `.aether/`, serta pengujian berstandar strict stop-gate.
 ---
 
-## 2. Framework Multi-Agent
+## 2. Strategi dan Regulasi Branch Git (Khusus Branch 'master')
+
+Repositori ini beroperasi di bawah arsitektur tiga cabang (tri-branch) dengan pemisahan tugas yang tegas:
+
+### 2.1. Branch `master` (Development Hub)
+- **Tujuan**: Pusat integrasi dan pengembangan seluruh fitur baru, perbaikan bug, dan dokumentasi arsitektur.
+- **Cakupan Dokumen**: Seluruh berkas dokumentasi (`docs/`, `AGENTS.md`, `Roadmap.md`) diperbolehkan dan wajib dikelola di branch ini.
+- **Alur Dua Arah**: Bertindak sebagai simpul pusat yang mengalirkan pembaruan ke edisi komunitas (`main`) dan edisi enterprise (`release`).
+
+### 2.2. Branch `main` (Community Publish Edition)
+- **Tujuan**: Rilis publik untuk komunitas sumber terbuka dengan filosofi **Bring Your Own Key (BYOK)**.
+- **Larangan Ketat**: Dilarang keras memuat folder `docs/`, `AGENTS.md`, maupun `Roadmap.md` di tingkat root.
+- **Berkas yang Diizinkan di Root**: Hanya berkas `README.md` versi komunitas (yang memuat panduan setup, konsep BYOK, dan arsitektur publik tanpa dokumen internal perusahaan).
+- **Prosedur Kontribusi**: Setiap perubahan dari komunitas wajib melalui proses issue dan Pull Request (PR) dengan review ketat sebelum digabungkan ke remote.
+- **Mekanisme Filtrasi**: Sinkronisasi dari `master` ke `main` menggunakan pembatasan `.gitattributes` (`export-ignore`) dan `git sparse-checkout` untuk memastikan berkas dokumentasi internal tidak terbawa.
+
+### 2.3. Branch `release` (Enterprise MVP Bundle)
+- **Tujuan**: Jalur rilis enterprise untuk mendistribusikan aplikasi desktop native minimal MVP dalam format `.dmg` (macOS) secara lokal via Tauri v2.
+- **Konfigurasi Produksi**: Seluruh modul debug dinonaktifkan (`debug = false`, logger verbose dimatikan).
+- **Status Operasional**: Disiapkan sebagai kerangka siaga (standby bundle) untuk pengemasan aplikasi native.
+
+---
+
+## 3. Framework Multi-Agent
 
 Antigravity bertindak sebagai **`semar-orchestrator`** (Lead Orchestrator), mengendalikan sub-agents via PreToolUse Hooks (`.agents/hooks.json`, `~/.gemini/hooks.json`).
 
@@ -52,7 +75,7 @@ Antigravity bertindak sebagai **`semar-orchestrator`** (Lead Orchestrator), meng
 
 ---
 
-## 3. Protokol RTK (Rust Token Killer)
+## 4. Protokol RTK (Rust Token Killer)
 
 Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
@@ -70,7 +93,7 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
 ---
 
-## 4. Protokol Pengujian & Backward-Compatibility
+## 5. Protokol Pengujian & Backward-Compatibility
 
 - **Runner**: Node.js Native (`node:test`, `node:assert`) dan Python (`pytest`) — tanpa dependensi pihak ketiga yang tidak perlu.
 - **Cakupan wajib**:
@@ -83,7 +106,7 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 - **Strict Stop-Gate**: Tugas TIDAK boleh dinyatakan selesai sebelum semua pengujian lulus (exit code 0). Assertion dilarang dimatikan.
 ---
 
-## 5. Aturan Komunikasi & Output
+## 6. Aturan Komunikasi & Output
 
 | Aturan | Ketentuan |
 |--------|-----------|
@@ -96,7 +119,7 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
 ---
 
-## 6. Alur Kerja Verifikasi & Eksekusi
+## 7. Alur Kerja Verifikasi & Eksekusi
 
 1. **Inspeksi dulu**: Verifikasi simbol via `rtk rg` / `rtk find` sebelum menyunting.
 2. **Jangan sembunyikan galat**: Selalu baca seluruh log build/test saat gagal.
