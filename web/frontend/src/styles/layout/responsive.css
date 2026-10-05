@@ -1,0 +1,14 @@
+/* AETHER Responsive Tiers & Docked Columns */
+
+.tier-mobile .wb-left-column {
+  width: 240px !important;
+  max-width: 70vw;
+  flex-shrink: 0;
+}
+
+.tier-compact .wb-right-column,
+.tier-mobile .wb-right-column {
+  width: 320px !important;
+  max-width: 75vw;
+  flex-shrink: 0;
+}

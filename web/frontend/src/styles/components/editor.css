@@ -1,0 +1,750 @@
+/* AETHER Monaco Editor Tabs Strip, Action Bar, and Breadcrumbs */
+
+/* Breadcrumbs bar in center column — VS Code flat style */
+.wb-breadcrumbs-bar {
+  flex: 0 0 auto;
+  height: 26px;
+  background: var(--bg-panel, #141318);
+  border-bottom: 1px solid var(--border-soft, #383447);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+.app-breadcrumbs {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.breadcrumb-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.breadcrumb-crumb:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.breadcrumb-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.breadcrumb-sep {
+  color: var(--text-faint);
+  margin: 0 2px;
+  user-select: none;
+  opacity: 0.6;
+}
+
+.breadcrumb-current {
+  font-weight: 600;
+  color: var(--accent, #10f09a);
+  cursor: default;
+}
+
+.breadcrumb-current:hover {
+  background: var(--accent-soft, rgba(16, 240, 154, 0.12));
+  color: var(--accent, #10f09a);
+}
+
+.breadcrumbs-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.crumb-item {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.crumb-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.crumb-separator {
+  color: var(--text-faint);
+  margin: 0 2px;
+  user-select: none;
+  opacity: 0.6;
+}
+
+.crumb-file.current {
+  font-weight: 600;
+  color: var(--accent, #10f09a);
+  cursor: default;
+}
+
+.crumb-file.current:hover {
+  background: var(--accent-soft, rgba(16, 240, 154, 0.12));
+}
+
+/* Monaco Editor Tab Strip */
+.wb-editor-tabs-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  background: var(--bg-panel, #141318);
+  border-bottom: 1px solid var(--border-soft, #383447);
+  box-sizing: border-box;
+}
+
+.wb-editor-tabs-bar .wb-editor-tabs {
+  flex: 1 1 auto;
+  border-bottom: none;
+  height: 100%;
+}
+
+.wb-editor-tabs {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  background: var(--bg-panel, #141318);
+  border-bottom: 1px solid var(--border-soft, #383447);
+  overflow-x: auto;
+  overflow-y: hidden;
+  user-select: none;
+  scrollbar-width: none;
+}
+
+.wb-editor-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.wb-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  height: 100%;
+  background: transparent;
+  color: var(--text-dim, #bcb8cf);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-right: 1px solid var(--border-soft, #383447);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+
+.wb-tab-item:hover {
+  color: var(--text, #f5f3fa);
+  background: var(--bg-hover, #262332);
+}
+
+.wb-tab-item.active {
+  color: var(--text, #f5f3fa);
+  background: var(--bg, #0e0d14);
+  border-bottom-color: var(--accent, #2d7d4e);
+}
+
+.wb-tab-item .tab-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-faint, #9592a8);
+}
+
+.wb-tab-item.active .tab-icon {
+  color: var(--accent-muted, #5ebd87);
+}
+
+.wb-tab-item .tab-title {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-tab-item .tab-dot {
+  font-size: 9px;
+  color: var(--accent-muted, #5ebd87);
+  margin-left: -2px;
+  line-height: 1;
+}
+
+.wb-tab-item .tab-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint, #9592a8);
+  font-size: 15px;
+  line-height: 1;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.wb-tab-item .tab-close-btn:hover {
+  color: var(--text, #f5f3fa);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wb-tab-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  height: 100%;
+}
+
+.wb-tab-action-btn,
+.wb-tab-save-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-dim, #bcb8cf);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.wb-tab-action-btn:hover,
+.wb-tab-save-btn:hover:not(:disabled) {
+  color: var(--text, #f5f3fa);
+  background: var(--bg-hover, #262332);
+}
+
+.wb-tab-action-btn.active {
+  color: var(--text, #f5f3fa);
+  background: var(--bg-card);
+}
+
+.wb-tab-action-btn .btn-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 12px;
+  height: 12px;
+  line-height: 12px;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+  background: var(--warn, #d97706);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 0 2px;
+}
+
+.wb-tab-save-btn.dirty {
+  color: var(--accent, #2d7d4e);
+}
+
+.wb-tab-save-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.wb-tab-save-btn .save-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  font-size: 7px;
+  color: var(--accent, #2d7d4e);
+  line-height: 1;
+}
+
+/* Inline Unsaved Tab Close Popover */
+.wb-tab-inline-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 170px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft, #383447);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wb-tab-inline-popover .pop-msg {
+  font-size: 11.5px;
+  color: var(--text, #f5f3fa);
+  font-weight: 500;
+  white-space: normal;
+}
+
+.wb-tab-inline-popover .pop-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wb-tab-inline-popover .pop-btn {
+  padding: 3px 7px;
+  font-size: 11px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.wb-tab-inline-popover .pop-save {
+  background: var(--accent, #2d7d4e);
+  color: #fff;
+}
+
+.wb-tab-inline-popover .pop-discard {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--danger, #f85149);
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.wb-tab-inline-popover .pop-cancel {
+  background: transparent;
+  color: var(--text-dim, #bcb8cf);
+  border-color: var(--border-soft, #383447);
+}
+
+/* ===================================================================== */
+/* CODE EDITOR (Monaco) — embedded in Workbench & modal fallback        */
+/* ===================================================================== */
+
+.ed-root-embedded {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.ed-root-embedded .ed-head {
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ed-root-embedded .ed-status {
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.ed-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.ed-monaco {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Pesan load/error menimpa area editor (container Monaco tetap ada di DOM). */
+.ed-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: rgba(10, 9, 17, 0.8);
+  z-index: 10;
+}
+
+.ed-msg.ed-err {
+  color: #fca5a5;
+}
+
+.ed-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 11px;
+  color: var(--text-dim);
+  box-sizing: border-box;
+}
+
+.ed-lang {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+
+.ed-sep {
+  color: var(--border-soft);
+}
+
+.ed-enc {
+  color: var(--text-faint);
+}
+
+.ed-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.ed-pos {
+  font-family: var(--mono);
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+.ed-err-inline {
+  color: #fca5a5;
+  max-width: 46vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Konfirmasi unsaved changes (memakai pola .modal AETHER existing). */
+.modal.ed-confirm {
+  max-width: 430px;
+}
+
+/* Fallback Modal Editor Styles */
+.modal.editor-m {
+  width: min(1180px, 94vw);
+  height: min(760px, 88vh);
+  max-width: none;
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.ed-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(0, 0, 0, 0.2);
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.ed-ico {
+  display: grid;
+  place-items: center;
+  color: var(--accent-2);
+  flex: 0 0 auto;
+}
+
+.ed-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text);
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ed-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: transparent;
+  flex: 0 0 auto;
+  transition: background 0.15s ease;
+}
+
+.ed-dot.on {
+  background: var(--warn);
+}
+
+.ed-path {
+  font-size: 11px;
+  color: var(--text-faint);
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ed-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+}
+
+.ed-state {
+  font-size: 11px;
+  color: var(--text-faint);
+  transition: color 0.15s ease;
+}
+
+.ed-state.on {
+  color: var(--warn);
+}
+
+.ed-save {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+@media (max-width: 900px) {
+  .modal.editor-m {
+    width: 96vw;
+    height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px);
+  }
+  .ed-title {
+    max-width: 30%;
+  }
+  .ed-err-inline {
+    max-width: 30vw;
+  }
+}
+
+/* ===================================================================== */
+/* RESPONSIVE SPLIT EDITOR TABS                                         */
+/* ===================================================================== */
+
+.wb-tab-split-btn,
+.wb-tab-orient-btn {
+  color: var(--text-dim, #bcb8cf);
+}
+
+.wb-tab-split-btn.active {
+  color: var(--accent, #2d7d4e);
+  background: var(--bg-hover, #262332);
+}
+
+.wb-split-editor-container {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg, #0e0d14);
+}
+
+/* Side by side (vertical split) */
+.wb-split-editor-container.split-vertical {
+  flex-direction: row;
+}
+
+/* Stacked (horizontal split) */
+.wb-split-editor-container.split-horizontal {
+  flex-direction: column;
+}
+
+/* Responsive tier fallback: on compact / mobile, force column layout */
+.wb-split-editor-container.split-tier-mobile,
+.wb-split-editor-container.split-tier-compact {
+  flex-direction: column !important;
+}
+
+@media (max-width: 768px) {
+  .wb-split-editor-container {
+    flex-direction: column !important;
+  }
+}
+
+.wb-split-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.wb-split-pane.is-focused-pane {
+  outline: 1px solid var(--accent, #10f09a);
+  outline-offset: -1px;
+}
+
+.wb-split-pane.is-focused-pane .wb-pane-tabs-bar {
+  border-top: 2px solid var(--accent, #10f09a);
+}
+
+.wb-pane-tabs-bar {
+  flex: 0 0 auto;
+  border-top: 2px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.wb-pane-editor-canvas {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.empty-split-pane {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-faint, #9592a8);
+  font-size: 13px;
+  background: var(--bg-canvas, #0e0d13);
+  user-select: none;
+}
+
+.empty-split-pane p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-dim, #bcb8cf);
+}
+
+.empty-split-pane span {
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+
+/* Split Divider */
+.wb-split-divider {
+  flex: 0 0 auto;
+  background: var(--border-soft, #383447);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  z-index: 5;
+  transition: background 0.15s ease;
+}
+
+.wb-split-divider:hover {
+  background: var(--accent, #2d7d4e);
+}
+
+.wb-split-divider.divider-vertical {
+  width: 4px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.wb-split-divider.divider-horizontal {
+  height: 4px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.divider-handle {
+  width: 2px;
+  height: 20px;
+  border-radius: 1px;
+  background: var(--text-faint, #9592a8);
+  opacity: 0.5;
+}
+
+.wb-split-divider.divider-horizontal .divider-handle {
+  width: 20px;
+  height: 2px;
+}
+
+@media (max-width: 768px) {
+  .wb-split-divider.divider-vertical {
+    height: 4px !important;
+    width: 100% !important;
+    cursor: row-resize !important;
+  }
+  .wb-split-divider.divider-vertical .divider-handle {
+    width: 20px !important;
+    height: 2px !important;
+  }
+}
+
+.split-pane-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim, #bcb8cf);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.split-pane-close-btn:hover {
+  color: var(--danger, #f85149);
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.split-breadcrumbs {
+  border-bottom: 1px solid var(--border-soft, #383447);
+}
+
+
+

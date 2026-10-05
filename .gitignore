@@ -1,0 +1,56 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.aether/
+.aegis/
+upload_repo.bat
+update_repo.bat
+save_ui.bat
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Continue local configuration / session data
+.continue/
+
+# Workspace testing terisolasi (BUKAN bagian source AETHER)
+dummy_test/
+
+# User project workspaces
+# Folder projects tetap ada di repository,
+# tetapi seluruh isi/subfolder project tidak di-upload.
+projects/*
+!projects/.gitkeep
+# Local runtime databases & configurations
+data/aether.db
+data/aegis.db
+data/*.db
+data/consultant_sessions.json
+data/settings.json
+
+# Frontend caches
+.vite/

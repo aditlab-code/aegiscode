@@ -1,0 +1,88 @@
+"""Registry provider AI.
+
+Mendaftarkan provider berdasarkan nama dan mengambilnya kembali.
+Agent Core cukup memanggil `get_provider("ollama")` lalu memakai
+`provider.generate(...)`. Nama provider WAJIB eksplisit: pemilihan provider
+aktif berasal dari Provider Instance + Model (SQLite), bukan dari .env.
+"""
+
+from __future__ import annotations
+
+from typing import Dict, List, Optional, Type
+
+from agent_ai.providers.base import BaseProvider
+from agent_ai.providers.custom import CustomOpenAIProvider
+from agent_ai.providers.antigravity import AntigravityProvider
+from agent_ai.providers.deepseek import DeepSeekProvider
+from agent_ai.providers.ollama import OllamaProvider
+from agent_ai.providers.openai_compatible import OpenAICompatibleProvider
+from agent_ai.providers.opencode import OpenCodeProvider
+from agent_ai.providers.openrouter import OpenRouterProvider
+from agent_ai.providers.nine_router import NineRouterProvider
+
+
+class ProviderRegistry:
+    """Kumpulan provider yang terdaftar, diakses lewat nama unik."""
+
+    def __init__(self) -> None:
+        self._providers: Dict[str, Type[BaseProvider]] = {}
+
+    def register(self, provider_cls: Type[BaseProvider]) -> None:
+        """Daftarkan sebuah kelas provider berdasarkan atribut `name`."""
+        name = getattr(provider_cls, "name", None)
+        if not name or name == "base":
+            raise ValueError("Provider harus punya atribut 'name' yang unik dan bukan 'base'.")
+        self._providers[name.lower()] = provider_cls
+
+    def get(self, name: str) -> BaseProvider:
+        """Ambil instance provider berdasarkan nama.
+
+        Raises:
+            KeyError: bila nama provider belum terdaftar.
+        """
+        key = (name or "").lower()
+        if key not in self._providers:
+            available = ", ".join(sorted(self._providers)) or "(kosong)"
+            raise KeyError(f"Provider '{name}' tidak terdaftar. Tersedia: {available}")
+        return self._providers[key]()
+
+    def list_providers(self) -> List[str]:
+        """Daftar nama provider yang terdaftar."""
+        return sorted(self._providers)
+
+    def has(self, name: str) -> bool:
+        """Cek apakah provider terdaftar."""
+        return (name or "").lower() in self._providers
+
+
+# ---------------------------------------------------------------------------
+# Registry global + pendaftaran provider bawaan
+# ---------------------------------------------------------------------------
+registry = ProviderRegistry()
+registry.register(OllamaProvider)
+registry.register(DeepSeekProvider)
+registry.register(OpenRouterProvider)
+registry.register(OpenAICompatibleProvider)
+registry.register(NineRouterProvider)
+registry.register(CustomOpenAIProvider)
+registry.register(OpenCodeProvider)
+registry.register(AntigravityProvider)
+
+
+def get_provider(name: str) -> BaseProvider:
+    """Ambil provider berdasarkan nama (WAJIB eksplisit).
+
+    Pemilihan provider aktif berasal dari Provider Instance + Model (SQLite),
+    bukan dari .env. Tidak ada fallback ke provider default.
+
+    Raises:
+        ValueError: bila `name` kosong.
+        KeyError: bila nama provider belum terdaftar.
+    """
+    if not name or not str(name).strip():
+        raise ValueError(
+            "Nama provider wajib diisi. Provider aktif ditentukan oleh "
+            "Provider Instance + Model (SQLite), bukan .env."
+        )
+    return registry.get(name)
+
