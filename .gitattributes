@@ -1,0 +1,4 @@
+# Git export-ignore untuk rilis publik komunitas
+docs export-ignore
+AGENTS.md export-ignore
+Roadmap.md export-ignore
