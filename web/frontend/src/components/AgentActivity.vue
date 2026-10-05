@@ -80,7 +80,12 @@ const TOOL_META = {
   write_file: { icon: "edit", verb: "Editing files" },
   edit_file: { icon: "edit", verb: "Editing files" },
   run_command: { icon: "play", verb: "Running command" },
+  hybrid_search: { icon: "search", verb: "Hybrid search" },
+  semantic_search: { icon: "search", verb: "Semantic search" },
+  atlas_query: { icon: "target", verb: "Querying Code Atlas" },
+  rig_query: { icon: "target", verb: "Querying RIG graph" },
 };
+
 
 // Ikon SVG terpadu (gaya Lucide, stroke currentColor) pengganti emotikon.
 const ICON_PATHS = {
@@ -175,9 +180,16 @@ function measure(tool, content) {
   if (tool === "search_code" && typeof obj.count === "number") {
     return { matches: obj.count };
   }
+  if ((tool === "hybrid_search" || tool === "semantic_search") && typeof obj.total_results === "number") {
+    return { matches: obj.total_results };
+  }
+  if (tool === "atlas_query" && typeof obj.returned === "number") {
+    return { matches: obj.returned };
+  }
   if (typeof obj.total_lines === "number") return { lines: obj.total_lines };
   return null;
 }
+
 
 function isRepeatContent(content) {
   const obj = asObject(content);
@@ -312,7 +324,12 @@ function countLabel(group) {
     if (dirs) parts.push(`${dirs} director${dirs === 1 ? "y" : "ies"}`);
     return parts.join(", ");
   }
-  if (group.tool === "search_code") {
+  if (
+    group.tool === "search_code" ||
+    group.tool === "hybrid_search" ||
+    group.tool === "semantic_search" ||
+    group.tool === "atlas_query"
+  ) {
     const total = group.measures.reduce((acc, m) => acc + (m.matches || 0), 0);
     return total ? `${total} match${total === 1 ? "" : "es"}` : "";
   }
@@ -327,7 +344,15 @@ function countLabel(group) {
 // Scope ringkas (direktori bersama, file tunggal, query, atau command).
 function scopeLabel(tool, targets) {
   if (!targets.length) return "";
-  if (tool === "search_code" || tool === "run_command") return targets[0];
+  if (
+    tool === "search_code" ||
+    tool === "run_command" ||
+    tool === "hybrid_search" ||
+    tool === "semantic_search" ||
+    tool === "atlas_query" ||
+    tool === "rig_query"
+  ) return targets[0];
+
   if (targets.length === 1) return targets[0];
   const dirs = uniqueList(
     targets.map((target) => {

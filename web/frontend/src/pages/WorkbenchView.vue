@@ -266,6 +266,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  mode: {
+    type: String,
+    default: "balanced",
+  },
 });
 
 const emit = defineEmits([
@@ -2528,6 +2532,7 @@ defineExpose({
           :providers="effectiveProviderList"
           :provider-instance-id="effectiveProviderInstanceId"
           :model-id="effectiveModelId"
+          :mode="props.mode || props.config?.mode || 'balanced'"
           @close="toggleAssistant(false)"
           @open-composer="emit('open-composer')"
           @request-stop="emit('request-stop')"
@@ -2540,6 +2545,7 @@ defineExpose({
           @apply-to-editor="handleApplyToEditor"
           @update:provider-instance-id="emit('update:provider-instance-id', $event)"
           @update:model-id="emit('update:model-id', $event)"
+          @update:mode="emit('update:mode', $event)"
           @update:active-session-id="activeConsultantSessionId = $event"
         />
       </aside>

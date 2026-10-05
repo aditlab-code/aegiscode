@@ -367,6 +367,7 @@ def build_project_map_tools(
     root: Optional[Any] = None,
     service: Any = None,
     include_refresh: bool = False,
+    include_hybrid: bool = False,
 ) -> List[BaseTool]:
     """Bangun daftar capability Project Map (satu sumber konstruksi tool).
 
@@ -379,10 +380,12 @@ def build_project_map_tools(
         service: `ProjectMapService` opsional (mis. override engine dir).
         include_refresh: bila True, sertakan `refresh_project_map` (menulis
             map). Registry Consultant TIDAK boleh memakai True.
+        include_hybrid: bila True, sertakan `hybrid_search` (Phase 3).
 
     Returns:
         List tool: atlas_query, rig_query, project_map_status
-        (+ refresh_project_map bila include_refresh).
+        (+ refresh_project_map bila include_refresh)
+        (+ hybrid_search bila include_hybrid).
     """
     tools: List[BaseTool] = [
         AtlasQueryTool(root=root, service=service),
@@ -391,6 +394,10 @@ def build_project_map_tools(
     ]
     if include_refresh:
         tools.append(RefreshProjectMapTool(root=root, service=service))
+    if include_hybrid:
+        from agent_ai.tools.semantic import HybridSearchTool
+
+        tools.append(HybridSearchTool(root=root))
     return tools
 
 
@@ -398,6 +405,7 @@ def build_project_map_registry(
     root: Optional[Any] = None,
     service: Any = None,
     include_refresh: bool = False,
+    include_hybrid: bool = False,
 ) -> Any:
     """Bangun ToolRegistry berisi capability Project Map.
 
@@ -408,6 +416,7 @@ def build_project_map_registry(
         root: root project target (lokasi `.aegis/map/`).
         service: `ProjectMapService` opsional (mis. untuk override engine dir).
         include_refresh: sertakan `refresh_project_map` (HANYA untuk Agent).
+        include_hybrid: sertakan `hybrid_search` (HANYA bila diminta).
 
     Returns:
         `ToolRegistry` berisi capability Project Map.
@@ -416,7 +425,10 @@ def build_project_map_registry(
 
     registry = ToolRegistry()
     for tool in build_project_map_tools(
-        root=root, service=service, include_refresh=include_refresh
+        root=root,
+        service=service,
+        include_refresh=include_refresh,
+        include_hybrid=include_hybrid,
     ):
         registry.register(tool)
     return registry
@@ -430,3 +442,4 @@ __all__ = [
     "build_project_map_tools",
     "build_project_map_registry",
 ]
+

@@ -65,14 +65,16 @@ graph LR
 ### Phase 3: Hybrid Retrieval Orchestration
 *Goal*: Combine exact lexical lookup (TOC/Map) with semantic similarity (VectorDB) using Reciprocal Rank Fusion.
 
-- [ ] Implement dual query routing: Lexical keyword search across `atlas.json` + semantic search in `sqlite-vec`.
-- [ ] Implement **Reciprocal Rank Fusion (RRF)** to normalize and interleave ranked candidate lists.
-- [ ] Register hybrid retrieval capabilities as tools in `ToolRegistry` (`tools/project_map.py`, `tools/semantic.py`).
+- [x] Implement dual query routing: Lexical keyword search across `atlas.json` + semantic search in `sqlite-vec`.
+- [x] Implement **Reciprocal Rank Fusion (RRF)** to normalize and interleave ranked candidate lists (`src/agent_ai/repointel/semantic/rrf.py`).
+- [x] Register hybrid retrieval capabilities as tools in `ToolRegistry` (`tools/project_map.py`, `tools/semantic.py`).
 
 | Property | Details |
 | :--- | :--- |
-| **Impacted Modules** | `src/agent_ai/tools/project_map.py`, `src/agent_ai/tools/semantic.py`, `src/agent_ai/runtime/` |
-| **Unit Test Focus** | • **RRF Ranking Precision**: Verify exact symbol name queries rank TOC matches above loose vector embeddings.<br>• **Tool Schema Validation**: Ensure JSON-RPC tool schemas match OpenAI and Claude function calling formats. |
+| **Impacted Modules** | `src/agent_ai/repointel/semantic/rrf.py`, `src/agent_ai/repointel/semantic/hybrid.py`, `src/agent_ai/tools/project_map.py`, `src/agent_ai/tools/semantic.py`, `src/agent_ai/tools/registry.py` |
+| **Unit Test Focus** | • **RRF Ranking Precision**: Verify exact symbol name queries rank TOC matches above loose vector embeddings (`tests/test_rrf_ranker.py`).<br>• **Tool Schema Validation**: Ensure JSON-RPC tool schemas match OpenAI and Claude function calling formats. |
+| **Status** | **Selesai (Completed)** |
+
 
 ---
 

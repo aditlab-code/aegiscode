@@ -23,7 +23,12 @@ const TOOL_VERB = {
   write_file: "Editing",
   edit_file: "Editing",
   run_command: "Running command",
+  hybrid_search: "Hybrid search",
+  semantic_search: "Semantic search",
+  atlas_query: "Querying Code Atlas",
+  rig_query: "Querying RIG graph",
 };
+
 
 // Mode label untuk activity copy
 const MODE_LABEL_COPY = {

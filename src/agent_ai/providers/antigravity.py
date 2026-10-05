@@ -105,9 +105,16 @@ def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
         return str(params.get("CommandLine") or params.get("command") or "")
     if tool_name == "list_files":
         return str(params.get("DirectoryPath") or params.get("path") or params.get("dir") or "")
-    if tool_name == "search_code":
+    if tool_name in (
+        "search_code",
+        "hybrid_search",
+        "semantic_search",
+        "atlas_query",
+        "rig_query",
+    ):
         return str(params.get("Query") or params.get("query") or params.get("pattern") or "")
     return str(params.get("path") or params.get("command") or params.get("target") or "")
+
 
 def _extract_tool_call_dict(tc: Any) -> Dict[str, Any]:
     """Ekstrak nama, arguments, dan id dari dict atau objek ToolCall."""

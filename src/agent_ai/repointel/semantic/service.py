@@ -166,5 +166,22 @@ class SemanticIndexService:
 
         return formatted
 
+    def close(self) -> None:
+        """Tutup koneksi basis data SQLite dan lepas file lock."""
+        with self._lock:
+            if self.conn is not None:
+                try:
+                    self.conn.close()
+                except Exception:
+                    pass
+                self.conn = None
+
+    def __enter__(self) -> "SemanticIndexService":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
+
 
 __all__ = ["SemanticIndexService"]
+

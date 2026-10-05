@@ -280,7 +280,9 @@ def build_registry(
     if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
         from agent_ai.tools.semantic import build_semantic_tools
 
-        for tool in build_semantic_tools(root=resolved, include_refresh=True, read_only=False):
+        for tool in build_semantic_tools(
+            root=resolved, include_refresh=True, read_only=False, include_hybrid=True
+        ):
             reg.register(tool)
 
     # Skill System (Agent): SATU mekanisme Skill yang sama — catalog + progressive

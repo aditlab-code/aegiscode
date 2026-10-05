@@ -53,7 +53,25 @@ const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache } = useWorkspac
 const activityEvents = ref([]), activityPhase = ref(""), lifecycleMilestones = ref([]), changes = ref([]);
 const validation = reactive({ state: "pending" }), liveFsChange = ref(null);
 const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
-const llmProviders = ref([]), selectedProviderInstanceId = ref(""), selectedModelId = ref(""), selectedMode = ref("balanced"), selectedExecutionMode = ref("queue");
+const savedExecutionMode = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_execution_mode")) || "";
+const savedProviderInstanceId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_provider_instance_id")) || "";
+const savedModelId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_model_id")) || "";
+const llmProviders = ref([]), selectedProviderInstanceId = ref(savedProviderInstanceId), selectedModelId = ref(savedModelId), selectedMode = ref(savedExecutionMode || "balanced"), selectedExecutionMode = ref("queue");
+watch(selectedMode, (val) => {
+  if (typeof localStorage !== "undefined" && val) {
+    try { localStorage.setItem("aegis_execution_mode", val); } catch (_) {}
+  }
+});
+watch(selectedProviderInstanceId, (val) => {
+  if (typeof localStorage !== "undefined" && val) {
+    try { localStorage.setItem("aegis_provider_instance_id", val); } catch (_) {}
+  }
+});
+watch(selectedModelId, (val) => {
+  if (typeof localStorage !== "undefined" && val) {
+    try { localStorage.setItem("aegis_model_id", val); } catch (_) {}
+  }
+});
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
 const activeProviderLabel = computed(() => activeProvider.value?.name || config.value.provider || "");
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
@@ -135,7 +153,7 @@ function handleEvent(evt) {
       validation.state = p.success === false ? "err" : "ok";
       break;
     case "change_detected":
-      if (p.path && !p.path.includes(".aether/")) {
+      if (p.path && !p.path.includes(".aegis/")) {
         const idx = changes.value.findIndex((c) => c.path === p.path), item = { kind: p.kind || "change", path: p.path, diff: p.diff };
         if (idx >= 0) changes.value[idx] = item; else changes.value.push(item);
         liveFsChange.value = { seq: ++liveFsChangeSeq, path: p.path, kind: p.kind || "change" };
@@ -239,7 +257,14 @@ async function handleOpenProject(target) {
   try {
     const res = await setActiveProject(id);
     activeProject.value = res?.active_project || (typeof target === "object" ? target : null) || projects.value.find((p) => p.id === id) || null;
-    lastProject.value = activeProject.value; resetTaskState(); await refreshTaskHistory(); await syncActiveRunningTask(); fetchWorkspaceFiles(true);
+    lastProject.value = activeProject.value;
+    resetTaskState();
+    workbenchRef.value?.clearAllTabs?.();
+    invalidateFileCache();
+    await refreshAllConfig();
+    await refreshTaskHistory();
+    await syncActiveRunningTask();
+    fetchWorkspaceFiles(true);
   } catch (err) { error.value = `Failed to open project: ${err.message || err}`; }
   finally { launcherBusy.value = false; }
 }
@@ -285,14 +310,22 @@ function resetTaskState() {
 }
 
 async function handleViewTask(t) {
-  if (!t || !t.task_id) return;
-  task.id = t.task_id; task.prompt = t.prompt || t.task || ""; task.status = t.status || "completed";
-  runningTaskId.value = t.status === "running" ? t.task_id : "";
+  if (!t) return;
+  const taskId = typeof t === "string" ? t : (t.task_id || t.id);
+  if (!taskId) return;
+  const prompt = typeof t === "object" ? (t.prompt || t.task || "") : "";
+  const status = typeof t === "object" ? (t.status || "completed") : "completed";
+  task.id = taskId;
+  task.prompt = prompt;
+  task.status = status;
+  runningTaskId.value = status === "running" ? taskId : "";
   try {
-    const res = await getTaskActivity(t.task_id, activeProject.value?.id || null);
+    const res = await getTaskActivity(taskId, activeProject.value?.id || null);
     activityEvents.value = res.events || [];
     const tel = computeTaskTelemetry(activityEvents.value);
-    taskTelemetry.rounds = tel.rounds; taskTelemetry.toolCalls = tel.toolCalls; taskTelemetry.observations = tel.observations;
+    taskTelemetry.rounds = tel.rounds;
+    taskTelemetry.toolCalls = tel.toolCalls;
+    taskTelemetry.observations = tel.observations;
   } catch (_) { activityEvents.value = []; }
   if (settingsOpen.value) settingsOpen.value = false;
 }
@@ -315,7 +348,7 @@ async function handleClearHistory() {
 async function loadConfig() {
   try {
     config.value = (await getConfig()) || {};
-    if (config.value.mode) selectedMode.value = config.value.mode;
+    if (config.value.mode && !savedExecutionMode) selectedMode.value = config.value.mode;
     if (config.value.provider_instance_id && !selectedProviderInstanceId.value) selectedProviderInstanceId.value = config.value.provider_instance_id;
     if (config.value.model_id && !selectedModelId.value) selectedModelId.value = config.value.model_id;
   } catch (_) { config.value = {}; }
@@ -397,7 +430,7 @@ onBeforeUnmount(() => {
 
       <WorkbenchView
         ref="workbenchRef" :active-project="activeProject" :projects="projects" :selected-project-id="activeProject?.id || ''"
-        :config="config" :providers="llmProviders" :provider-instance-id="selectedProviderInstanceId" :model-id="selectedModelId"
+        :config="config" :providers="llmProviders" :provider-instance-id="selectedProviderInstanceId" :model-id="selectedModelId" :mode="selectedMode"
         :task-provider="activeProviderLabel" :task-model="activeModelLabel"
         :task-history="taskHistory" :settings-tab="settingsTab" :active-nav="activeNav" :changes="changes" :validation="validation"
         :explorer-refresh="explorerRefresh" :live-fs-change="liveFsChange" :queue-refresh="queueRefresh" :connected="connected" :agent-status="agentStatus"
