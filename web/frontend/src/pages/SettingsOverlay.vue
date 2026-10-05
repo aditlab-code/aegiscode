@@ -19,12 +19,17 @@ import AgentSettingsPanel from "../components/AgentSettingsPanel.vue";
 import ExtensionManager from "../components/ExtensionManager.vue";
 import EditorSettingsPanel from "../components/EditorSettingsPanel.vue";
 import AboutSettingsPanel from "../components/AboutSettingsPanel.vue";
+import ProjectPolicyPanel from "../components/ProjectPolicyPanel.vue";
+import AppButton from "../components/ui/AppButton.vue";
+import AppCard from "../components/ui/AppCard.vue";
 import {
   groupTaskHistory,
   statusTagClass,
   executionLabel,
   formatTs,
 } from "../services/taskService.js";
+import { getTaskReport } from "../api.js";
+import { renderMarkdown } from "../markdown.js";
 
 const props = defineProps({
   open: { type: Boolean, default: true },
@@ -65,61 +70,61 @@ const NAV_TABS = [
   {
     id: "providers",
     label: "Providers & Models",
-    description: "LLM instance configurations, models, credentials",
+    description: "LLM models, API keys, and providers",
     icon: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2v-2h2zm0-4h-2V7h2z",
-  },
-  {
-    id: "editor",
-    label: "Text Editor",
-    description: "Typography, word wrap, line height, and minimap",
-    icon: "M16 18l6-6-6-6M8 6l-6 6 6 6",
-  },
-  {
-    id: "globals",
-    label: "Global Settings",
-    description: "Server, conversation, logging, and retry parameters",
-    icon: "M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
   },
   {
     id: "agent",
     label: "Agent Instructions",
-    description: "System prompt and agent behavior defaults",
+    description: "System prompt and agent defaults",
     icon: "M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4zm-6 13a6 6 0 0 1 12 0v3H6v-3z",
+  },
+  {
+    id: "globals",
+    label: "Global Settings",
+    description: "Server runtime, logs, and retries",
+    icon: "M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
+  },
+  {
+    id: "editor",
+    label: "Text Editor",
+    description: "Code editor typography and layout",
+    icon: "M16 18l6-6-6-6M8 6l-6 6 6 6",
   },
   {
     id: "projects",
     label: "Project Registry",
-    description: "Registered workspaces and permission policies",
+    description: "Workspaces and permission matrix",
     icon: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
   },
   {
     id: "history",
     label: "Task History",
-    description: "Recorded tasks, reports, and execution logs",
+    description: "Task history and execution reports",
     icon: "M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z",
   },
   {
     id: "extensions",
     label: "Extensions Manager",
-    description: "Installed tools, capabilities, and lifecycle",
+    description: "Tools, MCP plugins, and capabilities",
     icon: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z",
-  },
-  {
-    id: "overview",
-    label: "Overview",
-    description: "Project summary, capabilities, and version info",
-    icon: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2v-2h2zm0-4h-2V7h2z",
   },
   {
     id: "architecture",
     label: "Architecture",
-    description: "OMC 13-agent star topology and runtime loop",
+    description: "System model and core subsystems",
     icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
+  },
+  {
+    id: "overview",
+    label: "Overview",
+    description: "Project summary and runtime status",
+    icon: "M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.5h-2v-2h2zm0-4h-2V7h2z",
   },
   {
     id: "license",
     label: "License",
-    description: "Official MIT License and open source credits",
+    description: "MIT License and legal notices",
     icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8",
   },
 ];
@@ -179,9 +184,58 @@ function handleCopyPrompt(task) {
   }
 }
 
+const selectedReportTask = ref(null);
+const reportContent = ref("");
+const reportLoading = ref(false);
+const reportPopupOpen = ref(false);
+
+const selectedPolicyProject = ref(null);
+
+function openProjectPolicy(project) {
+  selectedPolicyProject.value = project;
+}
+
+function closeProjectPolicy() {
+  selectedPolicyProject.value = null;
+}
+
+async function openTaskReport(task) {
+  if (!task?.task_id) return;
+  selectedReportTask.value = task;
+  reportPopupOpen.value = true;
+  reportLoading.value = true;
+  reportContent.value = "";
+  try {
+    const res = await getTaskReport(task.task_id, props.activeProject?.id || null);
+    reportContent.value = res?.report || "";
+  } catch (err) {
+    reportContent.value = `Gagal memuat laporan: ${err?.message || err}`;
+  } finally {
+    reportLoading.value = false;
+  }
+}
+
+function closeTaskReport() {
+  reportPopupOpen.value = false;
+  selectedReportTask.value = null;
+  reportContent.value = "";
+}
+
 function onKeyDown(e) {
-  if (e.key === "Escape" && props.open) {
-    emit("close");
+  if (e.key === "Escape") {
+    if (selectedPolicyProject.value) {
+      e.stopPropagation();
+      closeProjectPolicy();
+      return;
+    }
+    if (reportPopupOpen.value) {
+      e.stopPropagation();
+      closeTaskReport();
+      return;
+    }
+    if (props.open) {
+      emit("close");
+    }
   }
 }
 
@@ -222,9 +276,10 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="settings-header-actions" style="display: flex; align-items: center; gap: 8px;">
-          <button
-            type="button"
-            class="settings-close-btn btn-aether btn-ghost-a"
+          <AppButton
+            variant="ghost"
+            size="sm"
+            class="settings-close-btn"
             title="Close Settings (Esc)"
             aria-label="Close settings"
             @click="emit('close')"
@@ -235,7 +290,7 @@ onBeforeUnmount(() => {
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-          </button>
+          </AppButton>
         </div>
       </header>
 
@@ -327,13 +382,15 @@ onBeforeUnmount(() => {
 
           <!-- Sub-Tab 4: Project Registry -->
           <section v-else-if="currentTab === 'projects'" class="settings-tab-pane">
-            <div class="panel settings-panel">
-              <div class="panel-head">
-                <div>
-                  <div class="title">Project Registry</div>
-                  <div class="desc">{{ projects.length }} workspace(s) registered in AEGIS.</div>
+            <AppCard variant="panel" class="settings-panel">
+              <template #header>
+                <div class="panel-head">
+                  <div>
+                    <div class="title">Project Registry</div>
+                    <div class="desc">{{ projects.length }} workspace(s) registered in AEGIS.</div>
+                  </div>
                 </div>
-              </div>
+              </template>
               <div v-if="!projects.length" class="panel-body">
                 <div class="wb-empty">No projects yet.</div>
               </div>
@@ -364,21 +421,21 @@ onBeforeUnmount(() => {
                     <td><span class="mono">{{ p.root || p.path }}</span></td>
                     <td class="td-actions">
                       <div class="row-actions">
-                        <button
-                          type="button"
-                          class="icon-btn policy"
+                        <AppButton
+                          variant="icon"
+                          class="policy"
                           title="Project Settings / Policy"
                           aria-label="Project Settings / Policy"
-                          @click.stop="emit('open-project-policy', p)"
+                          @click.stop="openProjectPolicy(p)"
                         >
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3" />
                             <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
                           </svg>
-                        </button>
-                        <button
-                          type="button"
-                          class="icon-btn danger"
+                        </AppButton>
+                        <AppButton
+                          variant="icon"
+                          class="danger"
                           title="Hapus dari daftar AEGIS (file/folder di disk tidak dihapus)"
                           aria-label="Hapus project dari daftar AEGIS"
                           @click.stop="emit('delete-project', p)"
@@ -386,35 +443,46 @@ onBeforeUnmount(() => {
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                           </svg>
-                        </button>
+                        </AppButton>
                       </div>
                     </td>
                   </tr>
                 </tbody>
               </table>
-            </div>
+            </AppCard>
+
+            <!-- Standardized Unified In-Situ Project Policy Popup -->
+            <ProjectPolicyPanel
+              v-if="selectedPolicyProject"
+              :project="selectedPolicyProject"
+              :embedded="true"
+              @close="closeProjectPolicy"
+            />
           </section>
 
           <!-- Sub-Tab 5: Task History -->
           <section v-else-if="currentTab === 'history'" class="settings-tab-pane">
-            <div class="panel settings-panel">
-              <div class="panel-head">
-                <div>
-                  <div class="title">Task History</div>
-                  <div class="desc">{{ taskHistory.length }} recorded task(s) in history log.</div>
+            <AppCard variant="panel" class="settings-panel">
+              <template #header>
+                <div class="panel-head">
+                  <div>
+                    <div class="title">Task History</div>
+                    <div class="desc">{{ taskHistory.length }} recorded task(s) in history log.</div>
+                  </div>
                 </div>
-              </div>
+              </template>
 
               <div v-if="taskHistory.length" class="hist-toolbar">
                 <span class="meta">{{ taskHistory.length }} recorded task(s)</span>
-                <button
-                  type="button"
-                  class="btn danger btn-sm hist-clear-btn"
+                <AppButton
+                  variant="danger"
+                  size="sm"
+                  class="hist-clear-btn"
                   :disabled="historyActionBusy"
                   @click="emit('clear-history')"
                 >
                   Clear History
-                </button>
+                </AppButton>
               </div>
 
               <div v-if="!taskHistory.length" class="panel-body">
@@ -464,8 +532,8 @@ onBeforeUnmount(() => {
                         <td><span class="mono meta">{{ formatTs(t.last_timestamp) }}</span></td>
                         <td class="td-actions hist-actions-cell">
                           <div class="hist-actions">
-                            <button
-                              type="button"
+                            <AppButton
+                              variant="icon"
                               class="q-copy-btn hist-copy"
                               :class="{ copied: copiedTaskId === t.task_id }"
                               :title="copiedTaskId === t.task_id ? 'Copied' : 'Copy prompt'"
@@ -479,13 +547,13 @@ onBeforeUnmount(() => {
                                 <rect x="9" y="9" width="12" height="12" rx="2" />
                                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                               </svg>
-                            </button>
-                            <button
-                              type="button"
+                            </AppButton>
+                            <AppButton
+                              variant="icon"
                               class="q-icon-btn hist-report-btn"
                               title="View Agent Report"
                               aria-label="View Agent Report"
-                              @click.stop="emit('open-report', t.task_id)"
+                              @click.stop="openTaskReport(t)"
                             >
                               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -494,9 +562,9 @@ onBeforeUnmount(() => {
                                 <line x1="16" y1="17" x2="8" y2="17" />
                                 <line x1="10" y1="9" x2="8" y2="9" />
                               </svg>
-                            </button>
-                            <button
-                              type="button"
+                            </AppButton>
+                            <AppButton
+                              variant="icon"
                               class="q-icon-btn hist-delete-btn"
                               title="Delete task history"
                               aria-label="Delete task history"
@@ -506,12 +574,52 @@ onBeforeUnmount(() => {
                                 <polyline points="3 6 5 6 21 6" />
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                               </svg>
-                            </button>
+                            </AppButton>
                           </div>
                         </td>
                       </tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </AppCard>
+
+            <!-- Standardized Unified Responsive Report Popup -->
+            <div
+              v-if="reportPopupOpen"
+              class="unified-popup-backdrop hist-report-popup-backdrop"
+              @click.self="closeTaskReport"
+            >
+              <div class="unified-popup-card hist-report-popup-card" role="dialog" aria-modal="true" aria-label="Task Report Popup">
+                <div class="unified-popup-head hist-report-popup-head">
+                  <div class="unified-popup-meta hist-report-popup-meta">
+                    <span class="unified-popup-title hist-report-title">Agent Report</span>
+                    <span v-if="selectedReportTask?.status" class="status-tag" :class="statusTagClass(selectedReportTask.status)">
+                      {{ selectedReportTask.status }}
+                    </span>
+                    <span class="mono unified-popup-id hist-report-id" :title="selectedReportTask?.task_id">{{ selectedReportTask?.task_id }}</span>
+                  </div>
+                  <AppButton
+                    variant="icon"
+                    class="unified-popup-close-btn hist-report-close-btn"
+                    title="Close report"
+                    aria-label="Close report"
+                    @click="closeTaskReport"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </AppButton>
+                </div>
+                <div class="unified-popup-body hist-report-popup-body">
+                  <div v-if="reportLoading" class="hist-report-loading">
+                    <span class="hist-spinner" aria-hidden="true"></span>
+                    <span>Memuat ringkasan laporan agent...</span>
+                  </div>
+                  <div v-else-if="!reportContent" class="wb-empty">Tidak ada laporan yang tersedia untuk task ini.</div>
+                  <!-- eslint-disable-next-line vue/no-v-html -->
+                  <div v-else class="md hist-report-md" v-html="renderMarkdown(reportContent)"></div>
                 </div>
               </div>
             </div>

@@ -5,7 +5,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
+  background: var(--bg-drawer, #13141f);
   border-left: none;
   box-sizing: border-box;
   overflow: hidden;
@@ -19,7 +19,7 @@
   height: 38px;
   padding: 0 10px;
   border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-card);
+  background: var(--bg-deep, #101018);
 }
 
 .right-drawer-tabs {
@@ -50,7 +50,7 @@
 
 .rd-tab-btn.active {
   color: var(--text, #ffffff);
-  background: var(--bg-surface);
+  background: var(--bg-drawer, #13141f);
 }
 
 .rd-close-btn {
@@ -121,13 +121,25 @@
   margin: 0;
   border-radius: 0;
   border: none;
-  background: var(--bg-panel, #141318);
+  background: var(--bg-drawer, #13141f);
   display: flex;
   flex-direction: column;
   box-shadow: none;
   overflow: hidden;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.right-drawer-body,
+.rd-activity-view,
+.rd-scroll-area,
+.rd-consultant-view,
+.consultant-wrapper.consultant-embedded,
+.consultant-content-pane.consultant-embedded-pane,
+.consultant-body.embedded-view,
+.consultant-embedded-pane .consultant-chat,
+.consultant-embedded-pane .consultant-messages {
+  background: var(--bg-drawer, #13141f);
 }
 
 /* ---- Integrated Interactive Chat Card (Shared between Agents & Ask) ---- */
@@ -436,7 +448,7 @@
   font-size: 11px;
   font-weight: 500;
   background: var(--accent, #2d7d4e);
-  color: #ffffff;
+  color: var(--text, #ffffff);
   border: none;
   cursor: pointer;
   transition: filter 0.15s ease, opacity 0.15s ease;

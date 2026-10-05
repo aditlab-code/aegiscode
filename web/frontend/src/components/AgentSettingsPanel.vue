@@ -14,6 +14,7 @@
 // oleh backend runtime AETHER seperti sebelumnya — frontend TIDAK menjalankan
 // logic agent apa pun di sini.
 import { computed, onMounted, ref } from "vue";
+import AppButton from "./ui/AppButton.vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 
 const loading = ref(false);
@@ -118,9 +119,9 @@ onMounted(load);
           membuat system message.
         </div>
       </div>
-      <button class="btn-aether btn-ghost-a" :disabled="loading || busy" @click="load">
+      <AppButton variant="ghost" size="sm" :disabled="loading || busy" @click="load">
         Refresh
-      </button>
+      </AppButton>
     </div>
     <div class="panel-body">
       <div v-if="error" class="as-alert err">{{ error }}</div>
@@ -190,15 +191,15 @@ onMounted(load);
         </div>
 
         <div class="as-actions">
-          <button class="btn-aether btn-ghost-a" :disabled="busy" @click="restoreDefault">
+          <AppButton variant="ghost" :disabled="busy" @click="restoreDefault">
             Restore default
-          </button>
-          <button class="btn-aether btn-ghost-a" :disabled="busy || !dirty" @click="reset">
+          </AppButton>
+          <AppButton variant="ghost" :disabled="busy || !dirty" @click="reset">
             Reset
-          </button>
-          <button class="btn-aether btn-primary-a" :disabled="!canSave" @click="save">
+          </AppButton>
+          <AppButton variant="primary" :disabled="!canSave" @click="save">
             Save
-          </button>
+          </AppButton>
         </div>
         <div v-if="isDefaultValue" class="as-hint">
           Editor sedang memuat System Prompt bawaan AEGIS.
@@ -332,7 +333,7 @@ onMounted(load);
   color: var(--text-faint);
 }
 .as-dirty {
-  color: #fcd34d;
+  color: var(--warn);
 }
 .as-clean {
   color: var(--ok);
@@ -374,7 +375,7 @@ onMounted(load);
 }
 
 .status-tag.ok {
-  color: #86efac;
+  color: var(--ok);
 }
 .status-tag.idle {
   opacity: 0.7;

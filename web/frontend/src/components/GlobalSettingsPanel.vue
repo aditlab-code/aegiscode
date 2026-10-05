@@ -14,6 +14,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 import { terminateServer, isTerminating, serverTerminated } from "../services/serverService.js";
+import AppButton from "./ui/AppButton.vue";
 
 const loading = ref(false);
 const busy = ref(false);
@@ -169,9 +170,9 @@ onMounted(load);
         <div class="title">Server</div>
         <div class="desc">Port lokal yang dipakai AegisCode saat dijalankan.</div>
       </div>
-      <button class="btn-aether btn-ghost-a" :disabled="loading || busy" @click="load">
+      <AppButton variant="ghost" :disabled="loading || busy" @click="load">
         Refresh
-      </button>
+      </AppButton>
     </div>
     <div class="panel-body">
       <div v-if="error" class="gs-alert err">{{ error }}</div>
@@ -206,13 +207,13 @@ onMounted(load);
           </div>
         </div>
         <div class="gs-control">
-          <button
-            class="btn-aether btn-danger-a"
+          <AppButton
+            variant="danger"
             :disabled="isTerminating || serverTerminated"
             @click="confirmTerminateServer"
           >
             {{ isTerminating ? "Menghentikan..." : (serverTerminated ? "Server Berhenti" : "Hentikan Server") }}
-          </button>
+          </AppButton>
         </div>
       </div>
 
@@ -223,18 +224,18 @@ onMounted(load);
           Apakah Anda yakin ingin menghentikan server AegisCode? Seluruh koneksi dan sesi terminal PTY aktif akan ditutup secara aman.
         </div>
         <div class="gs-confirm-actions">
-          <button class="btn-aether btn-ghost-a" @click="cancelTerminateServer">Batal</button>
-          <button class="btn-aether btn-danger-a" @click="executeTerminateServer">Ya, Hentikan Server</button>
+          <AppButton variant="ghost" @click="cancelTerminateServer">Batal</AppButton>
+          <AppButton variant="danger" @click="executeTerminateServer">Ya, Hentikan Server</AppButton>
         </div>
       </div>
 
       <div class="gs-actions">
-        <button class="btn-aether btn-ghost-a" :disabled="busy" @click="reset">
+        <AppButton variant="ghost" :disabled="busy" @click="reset">
           Reset
-        </button>
-        <button class="btn-aether btn-primary-a" :disabled="busy" @click="saveServer">
+        </AppButton>
+        <AppButton variant="primary" :disabled="busy" @click="saveServer">
           Save
-        </button>
+        </AppButton>
       </div>
     </div>
   </section>
@@ -266,12 +267,12 @@ onMounted(load);
       </div>
 
       <div class="gs-actions">
-        <button class="btn-aether btn-ghost-a" :disabled="busy" @click="reset">
+        <AppButton variant="ghost" :disabled="busy" @click="reset">
           Reset
-        </button>
-        <button class="btn-aether btn-primary-a" :disabled="busy" @click="saveConversation">
+        </AppButton>
+        <AppButton variant="primary" :disabled="busy" @click="saveConversation">
           Save
-        </button>
+        </AppButton>
       </div>
     </div>
   </section>
@@ -305,12 +306,12 @@ onMounted(load);
       </div>
 
       <div class="gs-actions">
-        <button class="btn-aether btn-ghost-a" :disabled="busy" @click="reset">
+        <AppButton variant="ghost" :disabled="busy" @click="reset">
           Reset
-        </button>
-        <button class="btn-aether btn-primary-a" :disabled="busy" @click="saveLogging">
+        </AppButton>
+        <AppButton variant="primary" :disabled="busy" @click="saveLogging">
           Save
-        </button>
+        </AppButton>
       </div>
     </div>
   </section>
@@ -369,12 +370,12 @@ onMounted(load);
       </div>
 
       <div class="gs-actions">
-        <button class="btn-aether btn-ghost-a" :disabled="busy" @click="reset">
+        <AppButton variant="ghost" :disabled="busy" @click="reset">
           Reset
-        </button>
-        <button class="btn-aether btn-primary-a" :disabled="busy" @click="saveRetry">
+        </AppButton>
+        <AppButton variant="primary" :disabled="busy" @click="saveRetry">
           Save
-        </button>
+        </AppButton>
       </div>
     </div>
   </section>
@@ -554,17 +555,17 @@ onMounted(load);
 }
 .gs-switch input:checked + .gs-track,
 .slider-toggle input:checked + .slider-track {
-  background: #2d7d4e;
-  border-color: #2d7d4e;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .gs-switch input:checked + .gs-track .gs-thumb,
 .slider-toggle input:checked + .slider-track .slider-thumb {
   transform: translateX(18px);
-  background: #ffffff;
+  background: var(--text);
 }
 .gs-switch input:focus-visible + .gs-track,
 .slider-toggle input:focus-visible + .slider-track {
-  box-shadow: 0 0 0 3px rgba(45, 125, 78, 0.28);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .gs-state,
 .slider-state {
@@ -575,9 +576,9 @@ onMounted(load);
 }
 
 .btn-danger-a {
-  background: rgba(220, 53, 69, 0.15);
-  color: #ff6b6b;
-  border: 1px solid rgba(220, 53, 69, 0.35);
+  background: var(--alert-err-bg);
+  color: var(--err);
+  border: 1px solid var(--alert-err-border);
   padding: 6px 14px;
   border-radius: 7px;
   font-size: 12px;
@@ -586,8 +587,8 @@ onMounted(load);
   transition: all 0.15s ease;
 }
 .btn-danger-a:hover:not(:disabled) {
-  background: rgba(220, 53, 69, 0.28);
-  border-color: #ff6b6b;
+  background: var(--alert-err-bg);
+  border-color: var(--err);
 }
 .btn-danger-a:disabled {
   opacity: 0.5;
@@ -598,13 +599,13 @@ onMounted(load);
   margin: 12px 0;
   padding: 12px 14px;
   border-radius: 9px;
-  border: 1px solid rgba(220, 53, 69, 0.35);
-  background: rgba(220, 53, 69, 0.08);
+  border: 1px solid var(--alert-err-border);
+  background: var(--alert-err-bg);
 }
 .gs-confirm-title {
   font-size: 13px;
   font-weight: 650;
-  color: #ff6b6b;
+  color: var(--err);
   margin-bottom: 4px;
 }
 .gs-confirm-desc {

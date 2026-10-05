@@ -237,10 +237,55 @@ class GithubBackupStore:
         }
 
 
+def ensure_git_exclude_ignored(root: Union[str, Path]) -> bool:
+    """Pastikan `.git/info/exclude` project memuat metadata internal Aegis/Aether.
+
+    Ini sangat penting terutama ketika folder proyek berada di luar folder root,
+    sehingga Git secara lokal mengabaikan metadata internal tanpa memodifikasi
+    atau mengotori `.gitignore` publik repositori.
+    """
+    root_path = Path(root)
+    git_dir = root_path / ".git"
+    if not git_dir.exists():
+        return False
+    if git_dir.is_file():
+        try:
+            content = git_dir.read_text(encoding="utf-8").strip()
+            if content.startswith("gitdir:"):
+                git_dir = (root_path / content[7:].strip()).resolve()
+        except Exception:
+            return False
+    exclude_file = git_dir / "info" / "exclude"
+    try:
+        exclude_file.parent.mkdir(parents=True, exist_ok=True)
+        existing = exclude_file.read_text(encoding="utf-8") if exclude_file.exists() else ""
+        rules = [
+            ".aegis/",
+            ".aether/",
+            ".aegis_tmp_*",
+            ".aether_tmp_*",
+            "*.swp",
+            "data/aegis.db",
+            "data/aether.db",
+        ]
+        to_add = [r for r in rules if r not in existing]
+        if not to_add:
+            return False
+        addition = ("\n" if existing and not existing.endswith("\n") else "")
+        addition += "# AegisCode local repository metadata ignore\n"
+        addition += "\n".join(to_add) + "\n"
+        with open(exclude_file, "a", encoding="utf-8") as f:
+            f.write(addition)
+        return True
+    except Exception:
+        return False
+
+
 def ensure_aegis_ignored(root: Union[str, Path]) -> bool:
-    """Pastikan `.gitignore` project memuat rule mandatory `.aegis/`.
+    """Pastikan `.gitignore` dan `.git/info/exclude` project memuat rule mandatory `.aegis/`.
 
     Perilaku:
+        - Selalu memastikan `.git/info/exclude` di repo Git terisi agar tidak bocor.
         - Bila `.gitignore` belum ada -> dibuat dengan perubahan minimal.
         - Bila sudah ada -> isi existing TIDAK di-overwrite; rule `.aegis/`
           ditambahkan HANYA bila belum ada.
@@ -250,6 +295,7 @@ def ensure_aegis_ignored(root: Union[str, Path]) -> bool:
     Returns:
         True bila file `.gitignore` diubah, False bila rule sudah ada.
     """
+    ensure_git_exclude_ignored(root)
     root_path = Path(root)
     gitignore = root_path / ".gitignore"
 

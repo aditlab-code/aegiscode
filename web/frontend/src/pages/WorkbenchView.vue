@@ -663,6 +663,53 @@ const splitDirection = ref(props.initialSplitDirection || "vertical");
 const splitRatio = ref(50);
 const activePane = ref("pane1"); // "pane1" (Tab 1 / Left) or "pane2" (Tab 2 / Right)
 
+// Effective split direction responsive to tier/mobile/compact
+const effectiveSplitDirection = computed(() => {
+  if (props.tier === "mobile" || props.tier === "compact") {
+    return "horizontal"; // stacked on smaller screens
+  }
+  return splitDirection.value;
+});
+
+const pane1Style = computed(() => {
+  if (effectiveSplitDirection.value === "vertical") {
+    return {
+      width: `calc(${splitRatio.value}% - 2px)`,
+      height: "100%",
+      flex: `0 0 calc(${splitRatio.value}% - 2px)`,
+      minWidth: "0",
+    };
+  }
+  return {
+    height: `calc(${splitRatio.value}% - 2px)`,
+    width: "100%",
+    flex: `0 0 calc(${splitRatio.value}% - 2px)`,
+    minHeight: "0",
+  };
+});
+
+const pane2Style = computed(() => {
+  if (effectiveSplitDirection.value === "vertical") {
+    return {
+      width: `calc(${100 - splitRatio.value}% - 2px)`,
+      height: "100%",
+      flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
+      minWidth: "0",
+    };
+  }
+  return {
+    height: `calc(${100 - splitRatio.value}% - 2px)`,
+    width: "100%",
+    flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
+    minHeight: "0",
+  };
+});
+
+function triggerEditorLayout() {
+  activeCodeEditorRef.value?.layout?.();
+  splitCodeEditorRef.value?.layout?.();
+}
+
 // Initialize initial tabs if provided for Pane 1
 if (props.initialTabs && props.initialTabs.length > 0) {
   for (const t of props.initialTabs) {
@@ -801,7 +848,7 @@ function onSplitDividerMouseDown(e) {
   const container = e.currentTarget.parentElement;
   if (!container) return;
   const rect = container.getBoundingClientRect();
-  const isVert = splitDirection.value === "vertical";
+  const isVert = effectiveSplitDirection.value === "vertical";
 
   function onMouseMove(moveEvt) {
     if (!isDraggingSplit) return;
@@ -1160,7 +1207,8 @@ watch(
 
 function openSettings(tabName = "providers") {
   settingsSubTab.value = tabName;
-  openTab(editorTabsState, {
+  activePane.value = "pane1";
+  openTab(pane1TabsState, {
     path: "aegis://settings",
     name: "Settings",
   });
@@ -1376,15 +1424,24 @@ function onKeyDown(e) {
   }
 }
 
+watch(
+  [() => props.tier, effectiveSplitDirection],
+  () => {
+    nextTick(() => triggerEditorLayout());
+  }
+);
+
 onMounted(() => {
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", triggerEditorLayout);
   }
 });
 
 onBeforeUnmount(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("resize", triggerEditorLayout);
   }
 });
 
@@ -1689,7 +1746,7 @@ defineExpose({
             v-else-if="splitActive"
             class="wb-split-editor-container"
             :class="[
-              `split-${splitDirection}`,
+              `split-${effectiveSplitDirection}`,
               `split-tier-${tier}`,
               { 'pane-primary-active': activePane === 'pane1', 'pane-split-active': activePane === 'pane2' }
             ]"
@@ -1698,9 +1755,7 @@ defineExpose({
             <div
               class="wb-split-pane wb-split-pane-primary"
               :class="{ 'is-focused-pane': activePane === 'pane1' }"
-              :style="splitDirection === 'vertical'
-                ? { width: `calc(${splitRatio}% - 2px)`, height: '100%', flex: `0 0 calc(${splitRatio}% - 2px)` }
-                : { height: `calc(${splitRatio}% - 2px)`, width: '100%', flex: `0 0 calc(${splitRatio}% - 2px)` }"
+              :style="pane1Style"
               @click="activePane = 'pane1'"
             >
               <!-- Primary Pane Tab Strip -->
@@ -1815,7 +1870,18 @@ defineExpose({
 
               <!-- Primary Breadcrumbs Bar -->
               <div v-if="pane1ActiveTabPath" class="wb-breadcrumbs-bar">
+                <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+                  <span class="crumb-item crumb-root">Preferences</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Settings</span>
+                </div>
+                <div v-else-if="pane1ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+                  <span class="crumb-item crumb-root">AEGIS</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Welcome</span>
+                </div>
                 <AppBreadcrumbs
+                  v-else
                   :path="pane1ActiveTabPath"
                   :root="projectRootName"
                   @navigate="handleBreadcrumbNavigate"
@@ -1825,6 +1891,31 @@ defineExpose({
 
               <!-- Primary Editor Canvas -->
               <div class="wb-pane-editor-canvas">
+                <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
+                  <SettingsOverlay
+                    embedded
+                    :open="true"
+                    :config="config"
+                    :projects="projects"
+                    :task-history="taskHistory"
+                    :active-project="activeProject"
+                    :provider-instance-id="providerInstanceId"
+                    :model-id="modelId"
+                    :mode="config?.mode"
+                    v-model:active-tab="settingsSubTab"
+                    @close="handleCloseTab('aegis://settings', 'pane1')"
+                    @refresh-config="emit('refresh-config')"
+                    @update:provider-instance-id="emit('update:provider-instance-id', $event)"
+                    @update:model-id="emit('update:model-id', $event)"
+                    @update:mode="emit('update:mode', $event)"
+                    @open-report="emit('open-report', $event)"
+                    @open-history-task="emit('open-history-task', $event)"
+                    @delete-history="emit('delete-history', $event)"
+                    @clear-history="emit('clear-history')"
+                    @open-project-policy="emit('open-project-policy', $event)"
+                    @delete-project="emit('delete-project', $event)"
+                  />
+                </div>
                 <MonacoDiffEditor
                   v-if="pane1ActiveTab?.isDiff || pane1ActiveTabPath.startsWith('diff://')"
                   :key="'p1-diff-' + pane1ActiveTabPath"
@@ -1863,9 +1954,9 @@ defineExpose({
             <!-- Draggable / Responsive Split Divider -->
             <div
               class="wb-split-divider"
-              :class="[`divider-${splitDirection}`]"
+              :class="[`divider-${effectiveSplitDirection}`]"
               role="separator"
-              :aria-orientation="splitDirection"
+              :aria-orientation="effectiveSplitDirection"
               title="Drag to resize split, double click to center"
               @mousedown="onSplitDividerMouseDown"
               @dblclick="onSplitDividerDblClick"
@@ -1877,9 +1968,7 @@ defineExpose({
             <div
               class="wb-split-pane wb-split-pane-secondary"
               :class="{ 'is-focused-pane': activePane === 'pane2' }"
-              :style="splitDirection === 'vertical'
-                ? { width: `calc(${100 - splitRatio}% - 2px)`, height: '100%', flex: `0 0 calc(${100 - splitRatio}% - 2px)` }
-                : { height: `calc(${100 - splitRatio}% - 2px)`, width: '100%', flex: `0 0 calc(${100 - splitRatio}% - 2px)` }"
+              :style="pane2Style"
               @click="activePane = 'pane2'"
             >
               <!-- Secondary Pane Tab Strip -->
@@ -1987,7 +2076,18 @@ defineExpose({
 
               <!-- Secondary Breadcrumbs Bar -->
               <div v-if="pane2ActiveTabPath" class="wb-breadcrumbs-bar split-breadcrumbs">
+                <div v-if="pane2ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+                  <span class="crumb-item crumb-root">Preferences</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Settings</span>
+                </div>
+                <div v-else-if="pane2ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+                  <span class="crumb-item crumb-root">AEGIS</span>
+                  <span class="crumb-separator" aria-hidden="true">›</span>
+                  <span class="crumb-item crumb-file current">Welcome</span>
+                </div>
                 <AppBreadcrumbs
+                  v-else
                   :path="pane2ActiveTabPath"
                   :root="projectRootName"
                   @navigate="handleBreadcrumbNavigate"
@@ -1997,6 +2097,31 @@ defineExpose({
 
               <!-- Secondary Editor Canvas -->
               <div class="wb-pane-editor-canvas">
+                <div v-if="pane2ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
+                  <SettingsOverlay
+                    embedded
+                    :open="true"
+                    :config="config"
+                    :projects="projects"
+                    :task-history="taskHistory"
+                    :active-project="activeProject"
+                    :provider-instance-id="providerInstanceId"
+                    :model-id="modelId"
+                    :mode="config?.mode"
+                    v-model:active-tab="settingsSubTab"
+                    @close="handleCloseTab('aegis://settings', 'pane2')"
+                    @refresh-config="emit('refresh-config')"
+                    @update:provider-instance-id="emit('update:provider-instance-id', $event)"
+                    @update:model-id="emit('update:model-id', $event)"
+                    @update:mode="emit('update:mode', $event)"
+                    @open-report="emit('open-report', $event)"
+                    @open-history-task="emit('open-history-task', $event)"
+                    @delete-history="emit('delete-history', $event)"
+                    @clear-history="emit('clear-history')"
+                    @open-project-policy="emit('open-project-policy', $event)"
+                    @delete-project="emit('delete-project', $event)"
+                  />
+                </div>
                 <MonacoDiffEditor
                   v-if="pane2ActiveTab?.isDiff || pane2ActiveTabPath.startsWith('diff://')"
                   :key="'p2-diff-' + pane2ActiveTabPath"

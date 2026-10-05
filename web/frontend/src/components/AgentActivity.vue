@@ -4,11 +4,11 @@
 // Semua aktivitas satu Task ditampilkan dalam SATU alur chronological, tetapi
 // tiap aktivitas adalah BARIS RINGKAS (bukan blok besar):
 //
-//   [05:38:26] 📖 Reading source   src/core         10 files      ✓ completed  ▸ detail
-//   [05:38:29] 🔎 Searching code   needle           13 matches    ✓ completed  ▸ detail
-//   [05:38:38] 📂 Exploring files  .                4 directories ✓ completed  ▸ detail
-//   [05:38:36] ▶ Running command   npm run build                  ✓ completed  ▸ detail
-//   [05:39:25] ✓ Task completed
+//   [05:38:26] Reading source   src/core         10 files      completed  ▸ detail
+//   [05:38:29] Searching code   needle           13 matches    completed  ▸ detail
+//   [05:38:38] Exploring files  .                4 directories completed  ▸ detail
+//   [05:38:36] Running command   npm run build                  completed  ▸ detail
+//   [05:39:25] Task completed
 //
 // Dua lapisan informasi (pola CLI/agent modern):
 //   1. Baris ringkas   : waktu + ikon + aksi manusiawi + scope + hasil + status
@@ -74,13 +74,34 @@ function normalize(e) {
 // Label manusiawi per tool (menggantikan nama tool mentah di baris utama).
 // ---------------------------------------------------------------------------
 const TOOL_META = {
-  list_files: { icon: "📂", verb: "Exploring files" },
-  read_file: { icon: "📖", verb: "Reading source" },
-  search_code: { icon: "🔎", verb: "Searching code" },
-  write_file: { icon: "✏", verb: "Editing files" },
-  edit_file: { icon: "✏", verb: "Editing files" },
-  run_command: { icon: "▶", verb: "Running command" },
+  list_files: { icon: "folder", verb: "Exploring files" },
+  read_file: { icon: "book", verb: "Reading source" },
+  search_code: { icon: "search", verb: "Searching code" },
+  write_file: { icon: "edit", verb: "Editing files" },
+  edit_file: { icon: "edit", verb: "Editing files" },
+  run_command: { icon: "play", verb: "Running command" },
 };
+
+// Ikon SVG terpadu (gaya Lucide, stroke currentColor) pengganti emotikon.
+const ICON_PATHS = {
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  book: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  search: '<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  warn: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  brain: '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M9 15c1.5 1 4.5 1 6 0"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+};
+
+function iconSvg(name) {
+  return ICON_PATHS[name] || ICON_PATHS.tool;
+}
 
 // Label event mentah (dipakai di layer detail) — mempertahankan istilah yang
 // sudah dipakai timeline Aegis.
@@ -319,26 +340,26 @@ function scopeLabel(tool, targets) {
 }
 
 function describeTool(group, status) {
-  const meta = TOOL_META[group.tool] || { icon: "🔧", verb: group.tool || "Tool" };
+  const meta = TOOL_META[group.tool] || { icon: "tool", verb: group.tool || "Tool" };
   const targets = uniqueList(group.targets);
   const failed = !group.success;
   const running = !failed && group.done === 0 && status === "running";
 
   let state = "ok";
   let stateText = "completed";
-  let stateIcon = "✓";
+  let stateIcon = "check";
   if (failed) {
     state = "err";
     stateText = "failed";
-    stateIcon = "✕";
+    stateIcon = "x";
   } else if (running) {
     state = "run";
     stateText = "running";
-    stateIcon = "⏳";
+    stateIcon = "clock";
   } else if (group.repeated) {
     state = "warn";
     stateText = "repeated";
-    stateIcon = "⚠";
+    stateIcon = "warn";
   }
 
   return {
@@ -371,13 +392,13 @@ function describeEvent(e, index) {
         ...base,
         key: `agent-${index}`,
         kind: "reasoning",
-        icon: "🤔",
+        icon: "brain",
         title: "Reasoning",
         detailText: text,
       };
     }
     case "task_started":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "▶", title: "Task started" };
+      return { ...base, key: `status-${index}`, kind: "status", icon: "play", title: "Task started" };
     case "task_completed": {
       // Agent Report final = data.result (isi UTUH dari log/SSE, bukan preview
       // terpotong). Dirender penuh sebagai Markdown; teks aslinya disimpan
@@ -387,30 +408,30 @@ function describeEvent(e, index) {
         ...base,
         key: `status-${index}`,
         kind: "status",
-        icon: "✓",
+        icon: "check",
         title: "Task completed",
         reportText: report,
         reportHtml: report ? renderMarkdown(report) : "",
       };
     }
     case "task_failed":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "✕", title: "Task failed" };
+      return { ...base, key: `status-${index}`, kind: "status", icon: "x", title: "Task failed" };
     case "task_cancelled":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "⚠", title: "Task cancelled" };
+      return { ...base, key: `status-${index}`, kind: "status", icon: "warn", title: "Task cancelled" };
     case "validation_started":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "✓", title: "Validating" };
+      return { ...base, key: `notice-${index}`, kind: "notice", icon: "check", title: "Validating" };
     case "validation_completed":
       return {
         ...base,
         key: `notice-${index}`,
         kind: "notice",
-        icon: d.success === false ? "✕" : "✓",
+        icon: d.success === false ? "x" : "check",
         title: d.success === false ? "Validation failed" : "Validation completed",
       };
     case "recovery_started":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "⚠", title: "Recovery started" };
+      return { ...base, key: `notice-${index}`, kind: "notice", icon: "warn", title: "Recovery started" };
     case "recovery_completed":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "✓", title: "Recovery completed" };
+      return { ...base, key: `notice-${index}`, kind: "notice", icon: "check", title: "Recovery completed" };
     case "policy_applied": {
       const req = d.requested_mode ? (d.requested_mode.charAt(0).toUpperCase() + d.requested_mode.slice(1)) : "Balanced";
       const eff = d.effective_mode ? (d.effective_mode.charAt(0).toUpperCase() + d.effective_mode.slice(1)) : "Balanced";
@@ -420,7 +441,7 @@ function describeEvent(e, index) {
         ...base,
         key: `policy-${index}`,
         kind: "notice",
-        icon: isEscalated ? "⚡" : "🎯",
+        icon: isEscalated ? "zap" : "target",
         title: isEscalated ? `Policy: ${req} → ${eff}` : `Policy: ${eff}`,
         scope: isEscalated ? `Escalated to ${eff}` : `Mode: ${eff}`,
         detailText: act || (isEscalated
@@ -436,7 +457,7 @@ function describeEvent(e, index) {
         ...base,
         key: `policy-esc-${index}`,
         kind: "notice",
-        icon: "⚡",
+        icon: "zap",
         title: `Policy escalated: ${from} → ${to}`,
         scope: `Escalated: ${from} → ${to}`,
         detailText: act || `[POLICY]\nEscalated:\n${from} → ${to}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`,
@@ -599,12 +620,12 @@ function rawText(ev) {
   if (ev.type === "tool_completed") {
     const ok = d.success !== false;
     const error = !ok && d.error ? ` — ${d.error}` : "";
-    return `${ok ? "✓" : "✕"} ${tool}${target}${error}`.trim();
+    return `${ok ? "check" : "x"} ${tool}${target}${error}`.trim();
   }
   if (ev.type === "observation_received") {
     const ok = d.success !== false;
     const body = rawPreview(d.content);
-    const head = `${ok ? "✓" : "✕"} ${tool}`;
+    const head = `${ok ? "check" : "x"} ${tool}`;
     return body ? `${head} → ${body}` : head;
   }
   return "";
@@ -672,7 +693,7 @@ watch(
             <div class="vtl-dot vtl-ms-dot"></div>
           </div>
           <span class="vtl-ms-label">{{ item.title }}</span>
-          <span v-if="item.state === 'done'" class="vtl-ms-badge done">✓</span>
+          <span v-if="item.state === 'done'" class="vtl-ms-badge done"><svg class="act-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="iconSvg('check')"></svg></span>
           <span v-else-if="item.state === 'active'" class="vtl-ms-badge active">running</span>
         </div>
 
@@ -684,12 +705,12 @@ watch(
             </div>
             <div class="vtl-content">
               <span class="act-time">{{ stamp(item.ts) }}</span>
-              <span class="act-ico" aria-hidden="true">{{ item.icon }}</span>
+              <span class="act-ico" aria-hidden="true"><svg class="act-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="iconSvg(item.icon)"></svg></span>
               <span class="act-title" :title="item.title">{{ item.title }}</span>
               <span v-if="item.scope" class="act-scope" :title="item.scope">{{ item.scope }}</span>
               <span v-if="item.count" class="act-count">{{ item.count }}</span>
               <span v-if="item.error" class="act-error" :title="item.error">{{ item.error }}</span>
-              <span v-if="item.stateText" class="act-state" :class="item.state">{{ item.stateIcon }} {{ item.stateText }}</span>
+              <span v-if="item.stateText" class="act-state" :class="item.state"><svg class="act-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="iconSvg(item.stateIcon)"></svg> {{ item.stateText }}</span>
               <button
                 v-if="hasDetail(item)"
                 type="button"
@@ -751,10 +772,10 @@ watch(
           <div class="vtl-dot"></div>
         </div>
         <div class="vtl-content">
-          <span class="act-ico" aria-hidden="true">⚠</span>
+          <span class="act-ico" aria-hidden="true"><svg class="act-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="iconSvg('warn')"></svg></span>
           <span class="act-title">Repeated reads</span>
           <span v-for="(rep, ri) in repeats" :key="ri" class="act-repeat-item">
-            {{ rep.name }} ×{{ rep.count }}
+            {{ rep.name }}
           </span>
         </div>
       </div>
@@ -770,7 +791,7 @@ watch(
           <div class="vtl-dot vtl-reasoning-dot"></div>
         </div>
         <div class="vtl-content">
-          <span class="act-ico" aria-hidden="true">🤔</span>
+          <span class="act-ico" aria-hidden="true"><svg class="act-svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="iconSvg('brain')"></svg></span>
           <span class="act-text reasoning-text">
             Agent reasoning<span class="reasoning-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
           </span>

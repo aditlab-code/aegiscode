@@ -264,7 +264,10 @@ test("8b. SettingsOverlay: renders Overview, Architecture, and License panels", 
     archHtml.includes("System Architecture &amp; Execution Model") || archHtml.includes("System Architecture & Execution Model"),
     "Architecture renders title"
   );
-  assert.ok(archHtml.includes("OMC Corporate Hierarchy"), "Architecture renders OMC hierarchy");
+  assert.ok(
+    archHtml.includes("Hybrid Asymmetric Split-Brain Model"),
+    "Architecture renders split-brain model"
+  );
 
   const licenseHtml = await renderComponent("/src/pages/SettingsOverlay.vue", {
     activeTab: "license",

@@ -10,6 +10,8 @@
   --bg-elev:    #292e42;   /* Elevated dialogs, active tab, popovers */
   --bg-hover:   #2f354f;   /* List & button hover state */
   --bg-deep:    #16161e;   /* Form inputs, deep embedded containers */
+  --bg-sidebar: #13141f;   /* Deeper contrast for left tool sidebar */
+  --bg-drawer:  #13141f;   /* Deeper contrast for right AI assistant drawer */
   --bg-card:    #1f2335;   /* Card background */
   --bg-secondary: #1a1b26; /* Secondary surface for top navbar and footer */
 

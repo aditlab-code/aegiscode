@@ -60,8 +60,8 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
-  background: var(--bg-panel, #141318);
-  border-right: 1px solid var(--border-soft, #383447);
+  background: var(--bg-sidebar, #13141f);
+  border-right: 1px solid var(--border, #292e42);
   z-index: 10;
 }
 
@@ -72,8 +72,8 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
-  background: var(--bg-panel, #141318);
-  border-left: 1px solid var(--border-soft, #383447);
+  background: var(--bg-drawer, #13141f);
+  border-left: 1px solid var(--border, #292e42);
   z-index: 10;
 }
 

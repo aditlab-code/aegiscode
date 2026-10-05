@@ -11,6 +11,8 @@
   --bg-hover:  #d0d2db;   /* Hover state */
   --bg-deep:   #d0d2db;   /* Form inputs background */
   --bg-secondary: #cdced1; /* Secondary surface */
+  --bg-sidebar: #cdced1;   /* Deeper contrast for left tool sidebar in light mode */
+  --bg-drawer:  #cdced1;   /* Deeper contrast for right AI assistant drawer in light mode */
 
   /* Borders — Tokyo Night Cool Silver */
   --border:      #c1c2c7;  /* Component outline */
@@ -169,7 +171,7 @@
 
 /* Left Sidebar */
 [data-theme="light"] .app-left-sidebar {
-  background: var(--bg-panel);
+  background: var(--bg-sidebar);
   border-right: none;
 }
 
@@ -262,7 +264,7 @@
 
 /* Right Drawer */
 [data-theme="light"] .app-right-drawer {
-  background: var(--bg-panel);
+  background: var(--bg-drawer);
   border-left: none;
 }
 
@@ -281,8 +283,17 @@
 }
 
 [data-theme="light"] .rd-tab-btn.active {
-  background: var(--bg-hover);
+  background: var(--bg-drawer);
   color: var(--text);
+}
+
+[data-theme="light"] .rd-consultant-view,
+[data-theme="light"] .consultant-wrapper.consultant-embedded,
+[data-theme="light"] .consultant-content-pane.consultant-embedded-pane,
+[data-theme="light"] .consultant-body.embedded-view,
+[data-theme="light"] .consultant-embedded-pane .consultant-chat,
+[data-theme="light"] .consultant-embedded-pane .consultant-messages {
+  background: var(--bg-drawer);
 }
 
 [data-theme="light"] .rd-close-btn {

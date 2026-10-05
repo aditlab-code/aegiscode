@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import { AEGIS_VERSION } from "../version.js";
+import AppCard from "./ui/AppCard.vue";
 
 const props = defineProps({
   section: {
@@ -79,37 +80,56 @@ async function copyLicense() {
           </p>
 
           <div class="about-grid">
-            <div class="about-card">
-              <div class="card-icon">🧠</div>
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2v2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2v1a4 4 0 0 0 8 0v-1h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2v-2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/>
+                </svg>
+              </div>
               <div class="card-head">Hybrid 5-Stage CoT Protocol</div>
               <div class="card-text">
                 Enforces systematic reasoning: Intent Assessment &rarr; Architectural Analysis (YAGNI Check) &rarr; Step Action Planning &rarr; Execution Reflection Loop &rarr; Independent Verification.
               </div>
-            </div>
+            </AppCard>
 
-            <div class="about-card">
-              <div class="card-icon">🏢</div>
-              <div class="card-head">Oh My Company (OMC) Hierarchy</div>
-              <div class="card-text">
-                Organizes 13 specialized autonomous agents across Executive, Production, Operations, and QA/Security departments structured in a resilient star topology.
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
               </div>
-            </div>
+              <div class="card-head">Hybrid Asymmetric Split-Brain</div>
+              <div class="card-text">
+                Decouples cloud LLM reasoning with a strict context budget (&lt; 4,000 tokens) from deterministic local execution (AST parsing, PTY terminal, and FileWriteLock).
+              </div>
+            </AppCard>
 
-            <div class="about-card">
-              <div class="card-icon">⚡</div>
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </div>
               <div class="card-head">Dual-Stack Verification</div>
               <div class="card-text">
                 Guarantees zero regressions across both Python backend (Pytest / Django REST API) and modern frontend (Vite / Vue 3 / Monaco Editor / Vitest).
               </div>
-            </div>
+            </AppCard>
 
-            <div class="about-card">
-              <div class="card-icon">🔒</div>
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+              </div>
               <div class="card-head">Strict Security &amp; Policy</div>
               <div class="card-text">
                 Read-before-write invariant, workspace sandbox boundaries, environment variable secret masking, and real-time state synchronization via RTK Protocol.
               </div>
-            </div>
+            </AppCard>
           </div>
         </div>
       </div>
@@ -121,65 +141,104 @@ async function copyLicense() {
         <div class="panel-head">
           <div>
             <div class="title">System Architecture &amp; Execution Model</div>
-            <div class="desc">Detailed architectural pipeline of the AegisCode autonomous platform.</div>
+            <div class="desc">Detailed architectural pipeline of the AegisCode autonomous platform based on docs/architecture.md.</div>
           </div>
         </div>
 
         <div class="panel-body">
           <div class="arch-section">
-            <div class="arch-title">1. OMC Corporate Hierarchy (Star Topology)</div>
-            <div class="arch-box mono">
-              Executive Department:
-                CEO [adit-ceo] &lt;---&gt; CTO [nisa-cto]
-                                          |
-                      +-------------------+-------------------+
-                      |                   |                   |
-               Production Dept     Operations Dept     QA &amp; Security Dept
-               - citra-lead        - rini-lead         - owi-lead
-               - dani-architect    - putri-architect   - pentester
-               - gita-coder        - taufik-coder      - budi-devops
-               - hadi-tester       - umar-tester
+            <div class="arch-title">1. Hybrid Asymmetric Split-Brain Model</div>
+            <div class="arch-box mono">LLM (Brain) — Cloud Orchestrator:
+  • Autonomous Reasoning &amp; Diff Synthesis
+  • Tool Selection &amp; Argument Construction
+  • Budgeted Context Window (&lt; 4,000 tokens)
+                  ▲
+                  │ JSON-RPC / API
+                  ▼
+Aegis Agent (Hands) — Local Worker:
+  • AST Parsing, Semantic Vector Discovery &amp; FastEmbed
+  • Interactive PTY Terminal (@xterm/xterm, zero-zombie)
+  • FileWriteLock &amp; HITL Diff Approval (Supervised)
+  • Context Budget Compaction, RRF Ranking &amp; Rollback Stash</div>
+          </div>
+
+          <div class="arch-section">
+            <div class="arch-title">2. Aegis Agent Core Subsystems (src/agent_ai/)</div>
+            <div class="arch-subsystems-grid">
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">runtime/</span>
+                <span class="subsys-desc">Core execution loop, turn controller, working state</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">planning/</span>
+                <span class="subsys-desc">Task decomposition, milestone tracking, replanning</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">contextbuilder/</span>
+                <span class="subsys-desc">Repo context compilation, system prompts, @file mentions</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">contextbudget/</span>
+                <span class="subsys-desc">Sliding window compaction, tool pruning (&lt; 4,000 tokens)</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">tools/</span>
+                <span class="subsys-desc">Filesystem, interactive terminal, source symbols, MCP</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">providers/</span>
+                <span class="subsys-desc">Unified LLM abstraction (Antigravity, Anthropic, OpenAI, Ollama)</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">repointel/</span>
+                <span class="subsys-desc">AST parsing, symbol indexing, repository graph</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">permission/</span>
+                <span class="subsys-desc">Policy gateway, path whitelists, command safety sandbox</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">validation/</span>
+                <span class="subsys-desc">Verification guards, syntax check, checkpoint recovery</span>
+              </div>
+              <div class="arch-subsystem-card">
+                <span class="subsys-name">recovery/</span>
+                <span class="subsys-desc">Loop breaker detection, backoff, and runtime self-healing</span>
+              </div>
             </div>
           </div>
 
           <div class="arch-section">
-            <div class="arch-title">2. 4-Role Core Delivery Pipeline</div>
+            <div class="arch-title">3. 4-Phase Execution Lifecycle</div>
             <div class="arch-steps">
               <div class="arch-step">
                 <span class="step-num">1</span>
                 <div>
-                  <div class="step-name">Lead Orchestration</div>
-                  <div class="step-desc">Decomposition, scope curation, task boundary assignment.</div>
+                  <div class="step-name">Task Preparation</div>
+                  <div class="step-desc">Sanitization, repointel symbol map discovery, sandbox initialization.</div>
                 </div>
               </div>
               <div class="arch-step">
                 <span class="step-num">2</span>
                 <div>
-                  <div class="step-name">Architect Design</div>
-                  <div class="step-desc">Interface definitions, dependency tree mapping, YAGNI check.</div>
+                  <div class="step-name">Context &amp; Budget</div>
+                  <div class="step-desc">Assembly of prompts, contextbudget sliding compaction (&lt; 4,000 tokens).</div>
                 </div>
               </div>
               <div class="arch-step">
                 <span class="step-num">3</span>
                 <div>
-                  <div class="step-name">Coder Implementation</div>
-                  <div class="step-desc">Lean, production-grade code adhering strictly to contracts.</div>
+                  <div class="step-name">Continuous Execution Loop</div>
+                  <div class="step-desc">Streaming CoT reasoning, structured tool execution, observation feedback, replanner.</div>
                 </div>
               </div>
               <div class="arch-step">
                 <span class="step-num">4</span>
                 <div>
-                  <div class="step-name">QA Tester Verification</div>
-                  <div class="step-desc">Independent validation, automated test suites, clean exit check.</div>
+                  <div class="step-name">Termination &amp; Validation</div>
+                  <div class="step-desc">Deterministic completion, syntax/test sanity validation, final report streaming.</div>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div class="arch-section">
-            <div class="arch-title">3. Continuous Runtime Loop</div>
-            <div class="arch-box mono">
-              LLM Call &rarr; Tool Invocation &rarr; Observation &rarr; Reflection &rarr; Dynamic Replanning
             </div>
           </div>
         </div>
@@ -334,13 +393,42 @@ async function copyLicense() {
 
 .arch-box {
   padding: 12px 14px;
-  background: var(--bg-deep, #100e18);
+  background: var(--bg-deep);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
   font-size: 11.5px;
   color: var(--text-dim);
   white-space: pre-wrap;
   line-height: 1.5;
+}
+
+.arch-subsystems-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.arch-subsystem-card {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subsys-name {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.subsys-desc {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  line-height: 1.35;
 }
 
 .arch-steps {
@@ -365,7 +453,7 @@ async function copyLicense() {
   height: 22px;
   border-radius: 50%;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--text);
   font-size: 11px;
   font-weight: 700;
   flex: 0 0 auto;
@@ -386,7 +474,7 @@ async function copyLicense() {
 
 .license-card {
   padding: 14px 16px;
-  background: var(--bg-deep, #100e18);
+  background: var(--bg-deep);
   border: 1px solid var(--border-soft);
   border-radius: 8px;
   margin-bottom: 16px;

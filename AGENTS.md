@@ -150,3 +150,27 @@ Untuk menjaga kepatuhan batas kuota konteks LLM (< 4.000 token), pembacaan dokum
 | **Peta Jalan Masa Depan & RAG Semantik** | `docs/future-roadmap/future_roadmap.md` | `semar-orchestrator`, `kresna-architect` |
 | **Riwayat Implementasi Selesai** | `docs/history/completed-features.md` | `hanoman-scout`, `widura-auditor` |
 | **Indeks Navigasi Lengkap Dokumentasi** | `docs/README.md` | Seluruh Agen |
+
+---
+
+## 9. Pedoman Standarisasi & Modifikasi Front-End (UI/UX)
+
+Setiap agen yang melakukan perubahan pada front-end AegisCode Studio (`web/frontend/`) **WAJIB** mematuhi pedoman baku berikut:
+
+### 9.1. Simetri Desain Dual-Theme (Dark & Light Mode)
+- **Definisi Token Ganda**: Setiap penambahan atau modifikasi token warna kontainer/latar belakang (misalnya `--bg-drawer`, `--bg-sidebar`, `--bg-panel`, `--bg-card`, `--bg-deep`) **wajib** didefinisikan secara berpasangan dan simetris di kedua berkas tema:
+  - `web/frontend/src/styles/base/variables.css` (tema gelap dasar: Tokyo Night Storm).
+  - `web/frontend/src/styles/themes/theme-light.css` (tema terang `[data-theme="light"]`: Tokyo Night Light).
+- **Larangan Fallback Statis Kontras Gelap**: Dilarang keras mengandalkan nilai fallback heksadesimal gelap (seperti `#13141f` atau `#101018`) pada deklarasi `var()` tanpa memastikan token tersebut terdefinisi secara adaptif di `[data-theme="light"]`.
+
+### 9.2. Harmonisasi Background Drawer Right (Tab 'Agent' & Tab 'Ask')
+- **Satu Kesatuan Latar Belakang**: Tab 'Agent' (`.rd-activity-view`, `.rd-scroll-area`) dan Tab 'Ask' (`.rd-consultant-view`, `.consultant-wrapper.consultant-embedded`, `.consultant-content-pane.consultant-embedded-pane`, `.consultant-messages`) **wajib** memiliki latar belakang yang sama persis menggunakan token `var(--bg-drawer)` pada mode gelap maupun terang.
+- **Embedded Isolation**: Komponen obrolan tertanam (`ConsultantChat` dalam mode `embedded: true`) dilarang memiliki background independen yang membuat kontras visual terpisah dari drawer.
+- **Left Sidebar**: Panel kiri (`.app-left-sidebar`) wajib konsisten menggunakan token `var(--bg-sidebar)` pada kedua mode.
+
+### 9.3. Komponen Terpadu (Unified Components) & YAGNI
+- **Tombol**: Gunakan `AppButton.vue` (`variant="primary" | "ghost" | "danger" | "icon"`, `size="sm" | "md"`). Dilarang menyisipkan tag `<button class="btn-aether">` atau tag `<button>` polosan baru.
+- **Panel & Kartu**: Gunakan `AppCard.vue` (`variant="card"` atau `variant="panel"`).
+- **Dialog & Popover**: Gunakan sistem kelas in-situ `.unified-popup-*` (`.unified-popup-backdrop`, `.unified-popup-card`, `.unified-popup-head`, `.unified-popup-body`, `.unified-popup-close-btn`). Dilarang memunculkan mekanisme modal overlay penuh di tingkat aplikasi untuk dialog lokal.
+- **Bebas Warna Hardcoded**: Dilarang menuliskan kode warna heksadesimal mentah di berkas `.vue`. Selalu gunakan variabel CSS dari `variables.css`.
+- **Zero Emoji**: Seluruh ikon wajib berbasis SVG inline terstandarisasi. Emotikon atau emoji unicode dilarang keras di seluruh antarmuka pengguna.

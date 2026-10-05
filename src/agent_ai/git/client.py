@@ -90,6 +90,34 @@ class GitClient(ABC):
         raise NotImplementedError
 
 
+def _is_internal_ignored_path(path: str) -> bool:
+    """True bila path merupakan direktori atau file internal Aegis/Git yang tidak boleh bocor.
+
+    Menangani backward compatibility (.aegis dan .aether), temporary swap files (.aegis_tmp_*),
+    database lokal (data/aegis.db, data/aether.db), git internals, dan path traversal.
+    """
+    clean = str(path).strip().replace("\\", "/").rstrip("/")
+    if not clean or clean.startswith("..") or "/../" in clean or clean == "..":
+        return True
+    parts = [seg for seg in clean.split("/") if seg]
+    if not parts:
+        return True
+    first = parts[0]
+    last = parts[-1]
+    # Direktori internal pada root
+    if first in (".aegis", ".aether", ".git", ".gemini", ".continue", ".ipynb_checkpoints", "__pycache__"):
+        return True
+    if first.startswith((".aegis", ".aether")):
+        return True
+    # Berkas temporer atomik atau swap
+    if last.startswith((".aegis_tmp_", ".aether_tmp_")) or last.endswith(".swp"):
+        return True
+    # Database lokal Aegis/Aether
+    if clean in ("data/aegis.db", "data/aether.db") or clean.startswith(("data/aegis.db-", "data/aether.db-")):
+        return True
+    return False
+
+
 class SubprocessGitClient(GitClient):
     """Implementasi GitClient via executable `git` (subprocess).
 
@@ -287,17 +315,9 @@ class SubprocessGitClient(GitClient):
                     continue
                 file_path = raw_path
 
-            # Saring direktori internal Aegis (.aegis), Git (.git), dan path traversal/kosong
+            # Saring direktori/berkas internal Aegis/Git/Aether dan path traversal
             clean_fp = file_path.strip().rstrip("/")
-            if (
-                not clean_fp
-                or clean_fp == ".aegis"
-                or clean_fp.startswith(".aegis/")
-                or clean_fp == ".git"
-                or clean_fp.startswith(".git/")
-                or clean_fp.startswith("..")
-                or "/../" in clean_fp
-            ):
+            if _is_internal_ignored_path(clean_fp):
                 i += 1
                 continue
             untracked = x == "?" and y == "?"
@@ -347,15 +367,7 @@ class SubprocessGitClient(GitClient):
                 file_path = raw_path
 
             clean_fp = file_path.strip().rstrip("/")
-            if (
-                not clean_fp
-                or clean_fp == ".aegis"
-                or clean_fp.startswith(".aegis/")
-                or clean_fp == ".git"
-                or clean_fp.startswith(".git/")
-                or clean_fp.startswith("..")
-                or "/../" in clean_fp
-            ):
+            if _is_internal_ignored_path(clean_fp):
                 continue
             additions = int(add_raw) if add_raw.isdigit() else 0
             deletions = int(del_raw) if del_raw.isdigit() else 0
@@ -371,7 +383,7 @@ class SubprocessGitClient(GitClient):
 
     def show_file(self, path: Path, file_path: str, ref: str = "HEAD") -> Optional[str]:
         clean_path = file_path.strip().lstrip("./")
-        if not clean_path:
+        if not clean_path or _is_internal_ignored_path(clean_path):
             return None
         try:
             return self._run(["show", f"{ref}:./{clean_path}"], path)
@@ -384,6 +396,8 @@ class SubprocessGitClient(GitClient):
     def diff_unified(self, path: Path, file_path: Optional[str] = None) -> str:
         if file_path:
             clean_path = file_path.strip().lstrip("./")
+            if _is_internal_ignored_path(clean_path):
+                return ""
             target_path = clean_path if clean_path else "."
             args = ["diff", "HEAD", "--", target_path]
             try:

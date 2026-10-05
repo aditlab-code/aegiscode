@@ -195,11 +195,9 @@ async function createNewSession() {
       {
         role: "assistant",
         text:
-          "Halo! Saya **AEGIS Consultant**. Saya bisa menganalisa project, " +
-          "melakukan investigasi, memvalidasi temuan, dan menyusun Task Proposal " +
-          "untuk Agent. Pilih mode **⚡ Quick** (Project Bible saja, cepat) atau " +
-          "**🔍 Investigate** (boleh memeriksa project). Apa yang ingin Anda " +
-          "ketahui atau kerjakan?",
+          "Halo! Saya **AEGIS Ask**. Saya siap membantu menganalisis arsitektur proyek, " +
+          "menjelaskan alur kode, atau menyusun rekomendasi teknis. Pilih mode **Quick** (ringkas berbasis konteks proyek) " +
+          "atau **Deep** (investigasi mendalam dengan inspeksi berkas kode). Apa yang ingin Anda diskusikan?",
         tools: [],
         taskProposal: null,
       },
@@ -261,22 +259,22 @@ function resetComposer() {
   el.style.overflowY = "hidden";
 }
 
-// Mode Consultant: "quick" (default) atau "investigate".
-// - quick       : Consultant memakai Project Bible + percakapan saja
-//                 (backend TIDAK menyediakan tool investigasi project).
-// - investigate : Project Bible sebagai konteks awal, lalu boleh memakai tool
-//                 project yang tersedia bila perlu verifikasi/investigasi.
-// Mengganti mode TIDAK mereset sesi/konteks Consultant.
+// Mode Ask: "quick" (Ringkas) atau "investigate" (Mendalam / Deep).
+// - quick       : Analisis ringkas berbasis Project Bible & konteks proyek.
+// - investigate : Investigasi mendalam dengan akses pembacaan & penelusuran kode proyek.
+// Mengganti mode TIDAK mereset sesi/konteks percakapan.
 const mode = ref("quick");
 const MODES = [
   { id: "quick", label: "Quick" },
-  { id: "investigate", label: "Investigate" },
+  { id: "investigate", label: "Deep" },
 ];
 function setMode(id) {
-  if (id === "quick" || id === "investigate") mode.value = id;
+  if (id === "quick" || id === "investigate" || id === "deep") {
+    mode.value = id === "deep" ? "investigate" : id;
+  }
 }
 
-const inputPlaceholder = computed(() => "Ask Consultant anything…");
+const inputPlaceholder = computed(() => "Ask anything…");
 
 const providerOptions = computed(() =>
   (props.providers || []).filter((p) => p.enabled !== false)
@@ -742,11 +740,9 @@ onMounted(() => {
     messages.value.push({
       role: "assistant",
       text:
-        "Halo! Saya **AEGIS Consultant**. Saya bisa menganalisa project, " +
-        "melakukan investigasi, memvalidasi temuan, dan menyusun Task Proposal " +
-        "untuk Agent. Pilih mode **⚡ Quick** (Project Bible saja, cepat) atau " +
-        "**🔍 Investigate** (boleh memeriksa project). Apa yang ingin Anda " +
-        "ketahui atau kerjakan?",
+        "Halo! Saya **AEGIS Ask**. Saya siap membantu menganalisis arsitektur proyek, " +
+        "menjelaskan alur kode, atau menyusun rekomendasi teknis. Pilih mode **Quick** (ringkas berbasis konteks proyek) " +
+        "atau **Deep** (investigasi mendalam dengan inspeksi berkas kode). Apa yang ingin Anda diskusikan?",
       tools: [],
       taskProposal: null,
     });
@@ -766,14 +762,14 @@ onMounted(() => {
       :class="{ 'consultant-embedded-pane': embedded, 'modal consultant-m': !embedded }"
       :role="embedded ? 'region' : 'dialog'"
       :aria-modal="!embedded ? 'true' : undefined"
-      aria-label="AEGIS Consultant"
+      aria-label="AEGIS Ask"
     >
       <!-- Standalone Modal Header & Modes (When !embedded) -->
       <template v-if="!embedded">
         <div class="consultant-head">
           <div class="consultant-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93L12 22l-.75-12.07A4.001 4.001 0 0 1 12 2z"/><circle cx="12" cy="6" r="1.5" fill="currentColor" stroke="none"/><path d="M9 14l-3 3 3 3M15 14l3 3-3 3"/></svg>
-            AEGIS Consultant
+            AEGIS Ask
           </div>
           <div class="consultant-selects">
             <label class="consultant-select">
@@ -808,7 +804,7 @@ onMounted(() => {
           </button>
         </div>
 
-        <div class="consultant-modes" role="group" aria-label="Consultant mode">
+        <div class="consultant-modes" role="group" aria-label="AEGIS mode">
           <span class="cm-label">Mode</span>
           <button
             v-for="m in MODES"
@@ -817,7 +813,7 @@ onMounted(() => {
             class="mode-btn"
             :class="{ active: mode === m.id }"
             :aria-pressed="mode === m.id ? 'true' : 'false'"
-            :title="m.id === 'quick' ? 'Quick: Project Bible + conversation only' : 'Investigate: may inspect the project when needed'"
+            :title="m.id === 'quick' ? 'Quick: Ringkas (analisis konteks)' : 'Deep: Mendalam (investigasi kode)'"
             :disabled="sending"
             @click="setMode(m.id)"
           >
@@ -856,7 +852,7 @@ onMounted(() => {
             <span class="mb-label">{{ m.label }}</span>
           </button>
           <span class="cm-hint">
-            {{ mode === "quick" ? "Bible + chat only" : "Bible first, then project tools" }}
+            {{ mode === "quick" ? "Ringkas: konteks proyek" : "Mendalam: inspeksi kode" }}
           </span>
         </div>
       </template>
@@ -865,7 +861,7 @@ onMounted(() => {
         <div class="consultant-chat">
           <div class="consultant-messages" ref="scroller">
         <div v-for="(msg, i) in messages" :key="i" class="cmsg" :class="msg.role">
-          <span class="crole">{{ msg.role === "assistant" ? "AEGIS Consultant" : "You" }}</span>
+          <span class="crole">{{ msg.role === "assistant" ? "AEGIS Ask" : "You" }}</span>
           <div v-if="msg.role === 'user' && msg.images && msg.images.length" class="cmsg-images">
             <img
               v-for="(src, ii) in msg.images"
@@ -1022,7 +1018,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="sending" class="consultant-thinking">Consultant is investigating…</div>
+        <div v-if="sending" class="consultant-thinking">{{ mode === 'quick' ? 'AEGIS is analyzing…' : 'AEGIS is investigating…' }}</div>
       </div>
 
       <div v-if="error" class="wb-error">{{ error }}</div>
@@ -1124,16 +1120,16 @@ onMounted(() => {
 
         <div class="chat-card-actions">
           <div class="chat-card-actions-left">
-            <!-- Mode dropdown: 'Quick' / 'Investigate' as compact select on the left of Send -->
+            <!-- Mode dropdown: 'Quick' / 'Deep' as compact select on the left of Send -->
             <select
               v-model="mode"
               class="consultant-mode-select"
-              title="Consultant Mode"
-              aria-label="Consultant Mode"
+              title="AEGIS Mode: Quick or Deep"
+              aria-label="AEGIS Mode"
               :disabled="sending"
             >
-              <option value="quick">⚡ Quick</option>
-              <option value="investigate">🔍 Investigate</option>
+              <option value="quick">Quick</option>
+              <option value="investigate">Deep</option>
             </select>
           </div>
 
@@ -1142,7 +1138,7 @@ onMounted(() => {
               type="button"
               class="chat-send-btn"
               :disabled="sending || !input.trim()"
-              title="Send prompt to Consultant (Enter)"
+              title="Send prompt (Enter)"
               aria-label="Send Message"
               @click="send"
             >

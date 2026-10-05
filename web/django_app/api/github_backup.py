@@ -374,8 +374,11 @@ def _matches_exclude(path: str, patterns: List[str]) -> bool:
 
 
 def _is_aegis_metadata(path: str) -> bool:
-    """True bila path berada di dalam `.aegis/` (metadata private)."""
+    """True bila path berada di dalam `.aegis/`, `.aether/`, atau metadata internal."""
+    from agent_ai.git.client import _is_internal_ignored_path
     p = _normalize_rel(path)
+    if _is_internal_ignored_path(p):
+        return True
     return p == AEGIS_DIR_NAME or p.startswith(AEGIS_DIR_NAME + "/")
 
 
