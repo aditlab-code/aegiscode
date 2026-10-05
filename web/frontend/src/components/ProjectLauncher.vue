@@ -22,9 +22,8 @@ const props = defineProps({
   lastProject: { type: Object, default: null },
   busy: { type: Boolean, default: false },
   isDark: { type: Boolean, default: true },
-  isWallpaper: { type: Boolean, default: true },
 });
-const emit = defineEmits(["open", "create", "delete", "setTheme", "toggleWallpaper"]);
+const emit = defineEmits(["open", "create", "delete", "setTheme"]);
 
 const name = ref("");
 const path = ref("");
@@ -166,20 +165,6 @@ function doDelete() {
               <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
             </svg>
             <span>Light</span>
-          </button>
-          <button
-            class="theme-toggle-btn"
-            :class="{ active: isWallpaper }"
-            type="button"
-            @click="emit('toggleWallpaper')"
-            title="Toggle artwork wallpaper"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            <span>Wallpaper</span>
           </button>
         </div>
         <span class="pl-pill"><span class="pl-dot"></span> Local</span>

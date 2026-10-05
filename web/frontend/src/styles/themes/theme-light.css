@@ -1,77 +1,64 @@
-/* AETHER Light Theme Tokens & Component Overrides ([data-theme="light"]) */
+/* AegisCode Gruvbox Light Theme Tokens & Component Overrides ([data-theme="light"]) */
 
 [data-theme="light"] {
-  /* AETHER Sunlit Sunset-Lofi (Light) — based on Aether-light.jpeg */
-  --bg:        #fdfbf7;   /* Warm sunlit linen / cream base canvas */
-  --bg-panel:  #f4ede4;   /* Soft sand / oat panel surface */
-  --bg-surface:#f4ede4;   /* Layout components surface */
-  --bg-header: #ede4d8;   /* Top navbar, tab bars, activity bar */
-  --bg-elev:   #fdfbf7;   /* Active tab, elevated card surface */
-  --bg-card:   #fbf7f0;   /* Card surface */
-  --bg-hover:  #e5dacb;   /* Warm honey-sand hover state */
-  --bg-deep:   #efe6db;   /* Form inputs background */
-  --bg-secondary: #ede4d8; /* Secondary surface for top navbar and footer */
+  /* AegisCode Gruvbox Light Medium */
+  --bg:        #fbf1c7;   /* Light0 base canvas */
+  --bg-panel:  #f2e5bc;   /* Light0_soft panel surface */
+  --bg-surface:#f2e5bc;   /* Layout components surface */
+  --bg-header: #f9f5d7;   /* Light0_hard top navbar, tab bars, activity bar */
+  --bg-elev:   #fbf1c7;   /* Light0 active tab, elevated card surface */
+  --bg-card:   #f2e5bc;   /* Light0_soft card surface */
+  --bg-hover:  #ebdbb2;   /* Light1 hover state */
+  --bg-deep:   #ebdbb2;   /* Light1 form inputs background */
+  --bg-secondary: #f9f5d7; /* Light0_hard secondary surface */
 
-  /* Borders — Crisp High-Contrast Solid Warm Slate boundaries */
-  --border:      #c8bba9;  /* Crisp component outline */
-  --border-soft: #dcd1c3;  /* Inner row dividers */
-  --border-subtle:#e8ded2;
-  --border-hover: #9a602c;  /* Amber-slate border hover */
+  /* Borders — Gruvbox Light Slate boundaries */
+  --border:      #d5c4a1;  /* Light2 component outline */
+  --border-soft: #ebdbb2;  /* Light1 inner row dividers */
+  --border-subtle:#f2e5bc; /* Light0_soft subtle border */
+  --border-hover: #bdae93;  /* Light3 border hover */
 
-  /* Typography — deep espresso timber for crisp contrast */
-  --text:       #180c06;   /* Rich deep espresso brown for maximum contrast on frosted glass */
-  --text-dim:   #4a3628;   /* Warm slate secondary typography */
-  --text-faint: #785e4c;   /* Muted metadata / inactive text */
+  /* Typography */
+  --text:       #282828;   /* Dark0 deep contrast typography */
+  --text-dim:   #504945;   /* Dark2 secondary typography */
+  --text-faint: #7c6f64;   /* Dark4 muted metadata / inactive text */
 
-  /* Accent 1: Sunset Amber Gold (Golden hour window glow & desk lighting) */
-  --accent:     #d97706;   /* Primary sunset amber gold */
-  --accent-dim: #b45309;   /* Darker warm amber for pressed/active */
-  --accent-soft: rgba(217, 119, 6, 0.14); /* Soft warm amber tint */
-  --accent-muted:#b45309;  /* High-contrast amber text */
-  --dioptase-green: #d97706;
-  --dioptase-bright:#f59e0b;
+  /* Accent 1: Gruvbox Aqua/Green (Faded/Neutral) */
+  --accent:     #427b58;   /* Faded Aqua */
+  --accent-dim: #427b58;
+  --accent-soft: rgba(66, 123, 88, 0.16);
+  --accent-muted:#427b58;
+  --dioptase-green: #427b58;
+  --dioptase-bright:#689d6a;
 
-  /* Accent 2: Dusty Mauve Violet (Cozy hoodie, room neon, AI consultant tags) */
-  --accent-2:     #7c3aed; /* Dusty mauve violet */
-  --accent-2-dim: #6d28d9;
-  --accent-2-soft:rgba(124, 58, 237, 0.14);
-  --accent-2-bright:#8b5cf6;
+  /* Accent 2: Gruvbox Orange (Faded/Neutral) */
+  --accent-2:     #af3a03; /* Faded Orange */
+  --accent-2-dim: #af3a03;
+  --accent-2-soft:rgba(175, 58, 3, 0.16);
+  --accent-2-bright:#d65d0e;
 
   /* Status */
-  --ok:   #059669;  /* Forest sage green */
-  --warn: #d97706;  /* Sunset amber warning */
-  --err:  #dc2626;  /* Sunset crimson error */
+  --ok:   #79740e;  /* Faded Green */
+  --warn: #b57614;  /* Faded Yellow */
+  --err:  #9d0006;  /* Faded Red */
 
-  --act-ts:    #291811;
-  --act-agent: #7c3aed;   /* Mauve agent identifier */
-  --act-obs:   #b45309;   /* Warm amber observation */
+  --act-ts:    #3c3836;
+  --act-agent: #af3a03;   /* Gruvbox Orange agent identifier */
+  --act-obs:   #427b58;   /* Gruvbox Aqua observation */
 
-  /* Alert tokens — Warm Sunlit */
-  --alert-ok-text:   #047857;
-  --alert-ok-bg:     rgba(5, 150, 105, 0.12);
-  --alert-ok-border: rgba(5, 150, 105, 0.40);
-  --alert-err-text:  #b91c1c;
-  --alert-err-bg:    rgba(220, 38, 38, 0.10);
-  --alert-err-border:rgba(220, 38, 38, 0.40);
+  /* Alert tokens */
+  --alert-ok-text:   #79740e;
+  --alert-ok-bg:     rgba(121, 116, 14, 0.12);
+  --alert-ok-border: rgba(121, 116, 14, 0.40);
+  --alert-err-text:  #9d0006;
+  --alert-err-bg:    rgba(157, 0, 6, 0.10);
+  --alert-err-border:rgba(157, 0, 6, 0.40);
 
-  --dot-ok:   #059669;
-  --dot-warn: #d97706;
-  --dot-err:  #dc2626;
+  --dot-ok:   #79740e;
+  --dot-warn: #b57614;
+  --dot-err:  #9d0006;
 
-  --shadow-pop: 0 4px 18px -4px rgba(69, 43, 34, 0.14);
-
-  /* Background Artwork Wallpaper & Glassmorphism (Light) */
-  --bg-wallpaper: url('/backgrounds/Light.png');
-  --wallpaper-overlay: rgba(253, 251, 247, 0.15);
-  --glass-panel-bg: rgba(253, 249, 243, 0.88);
-  --glass-header-bg: rgba(244, 237, 228, 0.75);
-  --glass-editor-bg: rgba(253, 251, 247, 0.85);
-  --glass-border: rgba(69, 43, 34, 0.12);
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 32px rgba(69, 43, 34, 0.06);
-  --glass-blur: 24px;
-  --glass-editor-blur: 32px;
-  --glass-saturate: 180%;
-  --glass-card-bg: rgba(255, 255, 255, 0.50);
+  --shadow-pop: 0 4px 18px -4px rgba(60, 56, 54, 0.14);
 }
 
 /* Badges & Slider Tracks */
@@ -236,7 +223,7 @@
 }
 
 [data-theme="light"] .breadcrumb-current {
-  color: var(--accent-dim, #059669);
+  color: var(--accent-dim, #427b58);
 }
 
 [data-theme="light"] .wb-editor-tabs {

@@ -20,6 +20,64 @@ let term = null;
 let fitAddon = null;
 let socket = null;
 let resizeObserver = null;
+let themeObserver = null;
+
+const GRUVBOX_DARK_TERMINAL = {
+  background: "#282828",
+  foreground: "#ebdbb2",
+  cursor: "#ebdbb2",
+  cursorAccent: "#282828",
+  selectionBackground: "rgba(235, 219, 178, 0.25)",
+  black: "#282828",
+  red: "#cc241d",
+  green: "#98971a",
+  yellow: "#d79921",
+  blue: "#458588",
+  magenta: "#b16286",
+  cyan: "#689d6a",
+  white: "#a89984",
+  brightBlack: "#928374",
+  brightRed: "#fb4934",
+  brightGreen: "#b8bb26",
+  brightYellow: "#fabd2f",
+  brightBlue: "#83a598",
+  brightMagenta: "#d3869b",
+  brightCyan: "#8ec07c",
+  brightWhite: "#ebdbb2",
+};
+
+const GRUVBOX_LIGHT_TERMINAL = {
+  background: "#fbf1c7",
+  foreground: "#3c3836",
+  cursor: "#3c3836",
+  cursorAccent: "#fbf1c7",
+  selectionBackground: "rgba(60, 56, 54, 0.25)",
+  black: "#fbf1c7",
+  red: "#cc241d",
+  green: "#98971a",
+  yellow: "#d79921",
+  blue: "#458588",
+  magenta: "#b16286",
+  cyan: "#689d6a",
+  white: "#7c6f64",
+  brightBlack: "#928374",
+  brightRed: "#9d0006",
+  brightGreen: "#79740e",
+  brightYellow: "#b57614",
+  brightBlue: "#076678",
+  brightMagenta: "#8f3f71",
+  brightCyan: "#427b58",
+  brightWhite: "#3c3836",
+};
+
+function getActiveTerminalTheme() {
+  if (typeof document !== "undefined" && document.documentElement) {
+    const isLight = document.documentElement.dataset?.theme === "light" ||
+                    document.documentElement.getAttribute("data-theme") === "light";
+    return isLight ? GRUVBOX_LIGHT_TERMINAL : GRUVBOX_DARK_TERMINAL;
+  }
+  return GRUVBOX_DARK_TERMINAL;
+}
 
 function initPtySocket() {
   if (!isBrowser || socket) return;
@@ -100,29 +158,7 @@ onMounted(async () => {
       fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, "Courier New", monospace',
       lineHeight: 1.25,
       scrollback: 5000,
-      theme: {
-        background: "#18181b",
-        foreground: "#f4f4f5",
-        cursor: "#45c985",
-        cursorAccent: "#18181b",
-        selectionBackground: "rgba(69, 201, 133, 0.25)",
-        black: "#27272a",
-        red: "#f87171",
-        green: "#4ade80",
-        yellow: "#facc15",
-        blue: "#60a5fa",
-        magenta: "#c084fc",
-        cyan: "#38bdf8",
-        white: "#f4f4f5",
-        brightBlack: "#52525b",
-        brightRed: "#ef4444",
-        brightGreen: "#22c55e",
-        brightYellow: "#eab308",
-        brightBlue: "#3b82f6",
-        brightMagenta: "#a855f7",
-        brightCyan: "#06b6d4",
-        brightWhite: "#ffffff",
-      },
+      theme: getActiveTerminalTheme(),
     });
 
     fitAddon = new FitAddon();
@@ -146,6 +182,19 @@ onMounted(async () => {
       });
     }
 
+    // Dynamic theme switching observer
+    if (typeof MutationObserver !== "undefined" && document.documentElement) {
+      themeObserver = new MutationObserver(() => {
+        if (term) {
+          term.options.theme = getActiveTerminalTheme();
+        }
+      });
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["data-theme"],
+      });
+    }
+
     initPtySocket();
 
     // Synchronize dimensions dynamically whenever container resizes
@@ -166,6 +215,10 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (themeObserver) {
+    themeObserver.disconnect();
+    themeObserver = null;
+  }
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -210,7 +263,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #18181b;
+  background: var(--bg-deep, #282828);
   position: relative;
   overflow: hidden;
   outline: none;
