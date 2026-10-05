@@ -384,7 +384,7 @@ class TestPlaywrightToolLayer(unittest.TestCase):
     def test_all_tools_namespaced(self):
         self.assertTrue(self.tools)
         for name in self.tools:
-            self.assertTrue(name.startswith("aether.playwright."))
+            self.assertTrue(name.startswith("aegis.playwright."))
 
     def test_expected_operations_present(self):
         for suffix in (
@@ -401,32 +401,32 @@ class TestPlaywrightToolLayer(unittest.TestCase):
             "page_forward",
             "page_close",
         ):
-            self.assertIn("aether.playwright." + suffix, self.tools)
+            self.assertIn("aegis.playwright." + suffix, self.tools)
 
     def test_tool_execution_flow(self):
-        launch = self.tools["aether.playwright.browser_launch"]
+        launch = self.tools["aegis.playwright.browser_launch"]
         result = launch.execute()
         self.assertIn("browser_id", result)
 
-        create = self.tools["aether.playwright.session_create"]
+        create = self.tools["aegis.playwright.session_create"]
         session = create.execute(browser_id=result["browser_id"])
         self.assertIn("session_id", session)
 
-        new_page = self.tools["aether.playwright.page_new"]
+        new_page = self.tools["aegis.playwright.page_new"]
         page = new_page.execute(session_id=session["session_id"])
         self.assertIn("page_id", page)
 
-        nav = self.tools["aether.playwright.page_navigate"]
+        nav = self.tools["aegis.playwright.page_navigate"]
         state = nav.execute(page_id=page["page_id"], url="https://tool.example")
         self.assertEqual(state["url"], "https://tool.example")
 
-        listing = self.tools["aether.playwright.page_list"].execute()
+        listing = self.tools["aegis.playwright.page_list"].execute()
         self.assertEqual(listing["count"], 1)
 
     def test_navigate_requires_fields(self):
         from agent_ai.tools.base import ToolValidationError
 
-        nav = self.tools["aether.playwright.page_navigate"]
+        nav = self.tools["aegis.playwright.page_navigate"]
         with self.assertRaises(ToolValidationError):
             nav.validate({})  # missing page_id + url
 

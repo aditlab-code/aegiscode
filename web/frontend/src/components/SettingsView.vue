@@ -505,7 +505,7 @@ watch(activeTab, (tab) => {
     <div class="panel-head">
       <div>
         <div class="title">Configuration</div>
-        <div class="desc">Provider, model, dan credential yang dipakai AETHER.</div>
+        <div class="desc">Provider, model, dan credential yang dipakai AegisCode.</div>
       </div>
       <div class="sv-config-head-actions">
         <button
@@ -798,7 +798,7 @@ watch(activeTab, (tab) => {
     <div class="panel-head">
       <div>
         <div class="title">API Credentials</div>
-        <div class="desc">Disimpan di .env AETHER. Nilai secret tidak pernah ditampilkan.</div>
+        <div class="desc">Disimpan di .env AegisCode. Nilai secret tidak pernah ditampilkan.</div>
       </div>
     </div>
     <div class="panel-body">

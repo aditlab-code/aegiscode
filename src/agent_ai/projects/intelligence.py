@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from agent_ai.projects.aether_store import BibleStore
+from agent_ai.projects.aegis_store import BibleStore
 from agent_ai.projects.models import (
     BIBLE_CATEGORIES,
     CATEGORY_ALIASES,

@@ -32,7 +32,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
-from agent_ai.projects.aether_store import AetherProjectStore, _atomic_write
+from agent_ai.projects.aegis_store import (
+    AegisProjectStore,
+    AetherProjectStore,
+    _atomic_write,
+)
 
 #: Timeout satu probe versi tool (detik). Bounded, tidak menggantung.
 _VERSION_TIMEOUT = 5.0

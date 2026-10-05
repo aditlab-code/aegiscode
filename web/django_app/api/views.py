@@ -40,7 +40,11 @@ def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
     """
     from api.services import ValidationError
 
-    max_bytes = getattr(settings, "AETHER_GATEWAY_MAX_BODY_BYTES", 1_000_000)
+    max_bytes = getattr(
+        settings,
+        "AEGIS_GATEWAY_MAX_BODY_BYTES",
+        getattr(settings, "AETHER_GATEWAY_MAX_BODY_BYTES", 1_000_000),
+    )
     if len(request.body) > max_bytes:
         raise ValidationError(f"Body request melebihi batas {max_bytes} bytes.")
 

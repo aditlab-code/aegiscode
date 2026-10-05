@@ -1,7 +1,6 @@
-# AETHER Workbench IDE Features & Runtime Guardrails
+# AegisCode Studio Workbench IDE Features & Runtime Guardrails
 
-This document describes the modern AI-first IDE capabilities, interactive subsystems, and execution guardrails implemented across the **AETHER Engineering Workbench** (`web/frontend` and `web/django_app`).
-
+This document describes the modern AI-first IDE capabilities, interactive subsystems, and execution guardrails implemented across the **AegisCode Studio Workbench** (`web/frontend` and `web/django_app`).
 ---
 
 ## 1. Background Execution & Assistant Guardrail Architecture
@@ -17,12 +16,11 @@ graph TD
         Toast["Floating Completion Toast (wb-bg-toast)"]
     end
 
-    subgraph Backend ["AETHER Runtime & Gateway"]
-        TaskQueue["Task Queue & Execution Loop"]
+    subgraph Backend ["Aegis Agent Runtime & Gateway"]
+        TaskQueue["Task Queue & FileWriteLock"]
         ConsultantService["Consultant Reasoning Service"]
-        SSE["SSE / HTTP Streaming Connection"]
+        SSE["SSE / WebSocket PTY Bridge"]
     end
-
     Drawer --> Chat
     Chat <--> SSE
     SSE <--> TaskQueue
@@ -59,7 +57,7 @@ graph TD
 
 ## 2. Prompt Autocomplete & Context Mention Engine (`@file` and `/template`)
 
-AETHER features an integrated suggestion and context-resolution pipeline:
+AegisCode Studio features an integrated suggestion and context-resolution pipeline:
 
 ```mermaid
 sequenceDiagram
@@ -100,22 +98,30 @@ sequenceDiagram
 
 ---
 
-## 3. Interactive Terminal & Process Streaming Subsystem
+## 3. Interactive PTY Terminal & Process Streaming Subsystem
 
 Located inside the collapsible [`AppBottomDock.vue`](file:///Users/aditwicaksono/Documents/Project-AI/Aether-Agent/web/frontend/src/components/layout/AppBottomDock.vue):
 
-- **Backend Streaming (`web/django_app/api/views.py`)**:
-  - Endpoint `/api/terminal/stream/`: Streams sub-process output over HTTP/SSE chunk-by-chunk.
-  - Endpoint `/api/terminal/input/`: Writes user input into the running process's `stdin`.
-  - Endpoint `/api/terminal/cancel/`: Terminates active processes cleanly (`SIGTERM` / `SIGKILL`).
+- **Backend PTY Bridge (`web/django_app/api/views.py`)**:
+  - Endpoint `/api/terminal/stream/`: Streams sub-process and interactive PTY output over WebSocket/SSE.
+  - Endpoint `/api/terminal/input/`: Writes user input into the running process's interactive PTY session.
+  - Endpoint `/api/terminal/cancel/`: Terminates active processes cleanly with **zero-zombie process tree kill** (`SIGTERM` / `SIGKILL`).
 - **Frontend Console (`TerminalView.vue`)**:
-  - Real-time ANSI escape code color rendering.
-  - Interactive command prompt with history recall.
-  - Clear and auto-scroll controls.
+  - Full `@xterm/xterm` interactive terminal emulation with real-time ANSI escape code color rendering.
+  - Interactive command prompt with history recall (50 entries) and keyboard shortcuts.
+  - Clear, auto-scroll, and copy/paste controls.
 
 ---
 
-## 4. Diagnostics & Problems Engine
+## 4. Human-in-the-Loop (HITL) Guardrails & Supervised Mode
+
+To prevent unauthorized filesystem destruction and ensure high-trust autonomous coding:
+- **Supervised Mode Policy**: When supervised mode is enabled, `write_file`, `edit_file`, and `delete_file` are intercepted prior to disk mutation.
+- **Interactive Diff Modal (`DiffModal.vue`)**: Surfaces side-by-side or unified diff previews directly to the developer for explicit approval or rejection.
+- **1-Click Rollback**: Automatically captures Git checkpoint stashes before each task turn, enabling one-click instant rollback of unwanted code alterations.
+---
+
+## 5. Diagnostics & Problems Engine
 
 The workbench incorporates client-side static analysis and Monaco marker synchronization:
 
@@ -128,7 +134,7 @@ The workbench incorporates client-side static analysis and Monaco marker synchro
 
 ---
 
-## 5. Welcome Canvas & Project Onboarding
+## 6. Welcome Canvas & Project Onboarding
 
 - [`WelcomeView.vue`](file:///Users/aditwicaksono/Documents/Project-AI/Aether-Agent/web/frontend/src/components/WelcomeView.vue):
   - Renders when no editor tabs are open.

@@ -201,14 +201,14 @@ class TestSnapshotInteractionReal(unittest.TestCase):
 
     def test_snapshot_tool_layer_flow(self):
         tools = {tool.name: tool for tool in build_playwright_tools(self.service)}
-        snap = tools["aether.playwright.browser_snapshot"].execute(page_id=self.page_id)
+        snap = tools["aegis.playwright.browser_snapshot"].execute(page_id=self.page_id)
         self.assertIn("refs", snap)
         refs = snap["refs"]
         email_ref = next(r for r, i in refs.items() if i["name"] == "Email")
-        tools["aether.playwright.browser_fill"].execute(
+        tools["aegis.playwright.browser_fill"].execute(
             page_id=self.page_id, ref=email_ref, value="tool@example.com"
         )
-        extracted = tools["aether.playwright.browser_extract"].execute(
+        extracted = tools["aegis.playwright.browser_extract"].execute(
             page_id=self.page_id, ref=email_ref, what="value"
         )
         self.assertEqual(extracted["value"], "tool@example.com")

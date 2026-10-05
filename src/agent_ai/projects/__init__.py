@@ -11,7 +11,9 @@ Tahap ini hanya fondasi storage + registry + loading (markdown Bible + JSON
 legacy). Belum ada database, RAG/vector DB, embeddings, atau autonomous learning.
 """
 
-from agent_ai.projects.aether_store import (
+from agent_ai.projects.aegis_store import (
+    AEGIS_DIR_NAME,
+    AegisProjectStore,
     AetherProjectStore,
     AetherTaskLog,
     BIBLE_SKILLS_DIR_NAME,
@@ -220,6 +222,8 @@ __all__ = [
     "INTELLIGENCE_CATEGORIES",
     "BIBLE_CATEGORIES",
     "CATEGORY_ALIASES",
+    "AEGIS_DIR_NAME",
+    "AegisProjectStore",
     "AetherProjectStore",
     "AetherTaskLog",
     "BibleStore",

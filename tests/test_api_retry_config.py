@@ -328,6 +328,9 @@ def test_retry_counter_resets_for_next_request():
 # Logging response API existing tetap mencatat SETIAP attempt
 # --------------------------------------------------------------------------- #
 def _response_path(root: Path, task_id: str) -> Path:
+    p = root / ".aegis" / "log" / "response" / f"{task_id}.json"
+    if p.exists():
+        return p
     return root / ".aether" / "log" / "response" / f"{task_id}.json"
 
 

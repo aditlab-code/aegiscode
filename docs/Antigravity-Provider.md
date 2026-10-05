@@ -1,7 +1,6 @@
 # Google Antigravity Provider Guide
 
-Panduan resmi integrasi **Google Antigravity** sebagai AI Model Provider di **AETHER**.
-
+Panduan resmi integrasi **Google Antigravity** sebagai AI Model Provider di **AegisCode** (AegisCode Studio & Aegis Agent).
 ---
 
 ## 1. Ringkasan & Arsitektur
@@ -11,15 +10,14 @@ Panduan resmi integrasi **Google Antigravity** sebagai AI Model Provider di **AE
 - **Reasoning / Thinking Models**: `claude-sonnet-4-6`, `claude-opus-4-6-thinking`.
 - **Open Weights**: `gpt-oss-120b-medium`.
 
-Di AETHER, Antigravity **BUKAN** gerbang login web (*auth gatekeeper*) yang memblokir workbench, melainkan **penyedia model AI** (seperti halnya Ollama, DeepSeek, OpenCode Zen, dan OpenAI-compatible).
+Di AegisCode, Antigravity **BUKAN** gerbang login web (*auth gatekeeper*) yang memblokir workbench, melainkan **penyedia model AI** (seperti halnya Ollama, DeepSeek, OpenCode Zen, dan OpenAI-compatible).
 
 ```mermaid
 graph LR
-    subgraph AETHER ["AETHER Agent Runtime"]
+    subgraph AegisCode ["Aegis Agent Runtime"]
         TC["Task Composer"] --> AP["AntigravityProvider"]
         ST["Settings UI"] --> AP
     end
-
     subgraph Auth ["Authentication Paths"]
         CLI["1. Native agy CLI Bridge<br/>(OAuth Token via ~/.gemini/oauth_creds.json)"]
         API["2. ANTIGRAVITY_API_KEY<br/>(.env / Settings Bearer Token)"]
@@ -47,7 +45,7 @@ graph LR
 CLI Antigravity (`agy`) mengelola otentikasi akun Google Anda di tingkat sistem operasi:
 
 1. **Jalankan `agy` di Terminal**:
-   Buka terminal di komputer Anda (di luar AETHER) dan jalankan:
+   Buka terminal di komputer Anda (di luar AegisCode) dan jalankan:
    ```bash
    agy
    ```
@@ -64,8 +62,7 @@ CLI Antigravity (`agy`) mengelola otentikasi akun Google Anda di tingkat sistem 
 5. **Tempel (*Paste*) ke Terminal**:
    Kembali ke terminal tempat perintah `agy` berjalan, tempel token, lalu tekan **Enter**.
 6. **Otomatis Terhubung**:
-   Kredensial disimpan dengan aman di `~/.gemini/oauth_creds.json`. AETHER akan **otomatis mendeteksi** sesi aktif ini tanpa konfigurasi tambahan!
-
+   Kredensial disimpan dengan aman di `~/.gemini/oauth_creds.json`. AegisCode akan **otomatis mendeteksi** sesi aktif ini tanpa konfigurasi tambahan!
 ---
 
 ### Jalur 2: Konfigurasi API Key / Token Manual (`.env` / Settings)
@@ -78,7 +75,7 @@ Jika Anda memiliki API Key atau Bearer Token dari Google Cloud / Gemini Enterpri
    ANTIGRAVITY_BASE_URL=https://antigravity.google/api/v1
    ANTIGRAVITY_MODEL=gemini-3.8-flash-medium
    ```
-2. Atau konfigurasi via menu **Settings &rarr; Providers & Models &rarr; Google Antigravity** di AETHER Workbench.
+2. Atau konfigurasi via menu **Settings &rarr; Providers & Models &rarr; Google Antigravity** di AegisCode Studio Workbench.
 
 ---
 
@@ -96,7 +93,7 @@ Berdasarkan [Dokumentasi Enterprise Google Antigravity](https://antigravity.goog
    export GOOGLE_CLOUD_PROJECT=nama-project-anda
    export GOOGLE_CLOUD_LOCATION=global  # Opsi: global, us, eu
    ```
-3. AETHER akan otomatis meneruskan variabel lingkungan ini saat memanggil model.
+3. Aegis Agent akan otomatis meneruskan variabel lingkungan ini saat memanggil model.
 
 ---
 
@@ -113,10 +110,10 @@ Berdasarkan [Dokumentasi Enterprise Google Antigravity](https://antigravity.goog
 
 ---
 
-## 4. Penggunaan di AETHER Workbench
+## 4. Penggunaan di AegisCode Studio Workbench
 
-1. Buka AETHER Workbench di browser (`http://localhost:8478`).
+1. Buka AegisCode Studio di browser (`http://localhost:8478`).
 2. Buka dialog **New Task** (tombol *New Task* atau shortcut `Cmd+K` / `Ctrl+K`).
 3. Pada dropdown **Provider**, pilih **Google Antigravity**.
 4. Pilih model (misal `gemini-3.8-flash-medium`).
-5. Ketik instruksi dan kirim task. AETHER akan langsung mengeksekusi instruksi melalui model Antigravity!
+5. Ketik instruksi dan kirim task. Aegis Agent akan langsung mengeksekusi instruksi melalui model Antigravity!

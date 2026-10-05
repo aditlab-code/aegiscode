@@ -327,9 +327,9 @@ class TestDebugToolRegistration(unittest.TestCase):
             "browser_trace_stop",
         ]
         for suffix in expected:
-            self.assertIn("aether.playwright." + suffix, tools)
+            self.assertIn("aegis.playwright." + suffix, tools)
         for name in tools:
-            self.assertTrue(name.startswith("aether.playwright."))
+            self.assertTrue(name.startswith("aegis.playwright."))
 
     def test_tool_schemas(self):
         tools = {t.name: t for t in build_playwright_tools(PlaywrightService())}
@@ -339,14 +339,14 @@ class TestDebugToolRegistration(unittest.TestCase):
             "browser_dom_inspect",
             "browser_screenshot",
         ):
-            schema = tools["aether.playwright." + suffix].input_schema
+            schema = tools["aegis.playwright." + suffix].input_schema
             self.assertIn("page_id", schema["required"])
         # trace tools are session-scoped, no page_id required
         self.assertNotIn(
-            "page_id", tools["aether.playwright.browser_trace_start"].input_schema.get("required", [])
+            "page_id", tools["aegis.playwright.browser_trace_start"].input_schema.get("required", [])
         )
         self.assertNotIn(
-            "page_id", tools["aether.playwright.browser_trace_stop"].input_schema.get("required", [])
+            "page_id", tools["aegis.playwright.browser_trace_stop"].input_schema.get("required", [])
         )
 
     def test_validation_rejects_missing_required(self):
@@ -354,7 +354,7 @@ class TestDebugToolRegistration(unittest.TestCase):
 
         tools = {t.name: t for t in build_playwright_tools(PlaywrightService())}
         with self.assertRaises(ToolValidationError):
-            tools["aether.playwright.browser_console"].validate({})
+            tools["aegis.playwright.browser_console"].validate({})
 
 
 class TestConsoleCapture(unittest.TestCase):
@@ -682,7 +682,7 @@ class TestToolLayer(unittest.TestCase):
 
     def test_console_tool(self):
         self.page.emit("console", FakeConsoleMessage("log", "from tool"))
-        result = self.tools["aether.playwright.browser_console"].execute(
+        result = self.tools["aegis.playwright.browser_console"].execute(
             page_id=self.page_id, type="log"
         )
         self.assertEqual(result["messages"][0]["text"], "from tool")
@@ -691,29 +691,29 @@ class TestToolLayer(unittest.TestCase):
         request = FakeRequest("http://local.test/api")
         self.page.emit("request", request)
         self.page.emit("response", FakeResponse(request, status=200))
-        result = self.tools["aether.playwright.browser_network"].execute(
+        result = self.tools["aegis.playwright.browser_network"].execute(
             page_id=self.page_id, url="/api"
         )
         self.assertEqual(result["count"], 1)
 
     def test_dom_inspect_tool(self):
-        result = self.tools["aether.playwright.browser_dom_inspect"].execute(
+        result = self.tools["aegis.playwright.browser_dom_inspect"].execute(
             page_id=self.page_id, locator={"css": "#go"}
         )
         self.assertEqual(result["tag"], "button")
 
     def test_screenshot_tool(self):
-        result = self.tools["aether.playwright.browser_screenshot"].execute(
+        result = self.tools["aegis.playwright.browser_screenshot"].execute(
             page_id=self.page_id, full_page=True
         )
         self.assertTrue(Path(result["path"]).exists())
         self.assertEqual(result["mime_type"], "image/png")
 
     def test_trace_tools(self):
-        self.tools["aether.playwright.browser_trace_start"].execute(
+        self.tools["aegis.playwright.browser_trace_start"].execute(
             session_id=self.session_id
         )
-        result = self.tools["aether.playwright.browser_trace_stop"].execute(
+        result = self.tools["aegis.playwright.browser_trace_stop"].execute(
             session_id=self.session_id
         )
         self.assertTrue(Path(result["path"]).exists())

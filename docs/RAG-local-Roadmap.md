@@ -1,22 +1,20 @@
-# Local Hybrid RAG & Asymmetric Split-Brain Engine Roadmap
+# AegisCode Local Hybrid RAG & Asymmetric Split-Brain Engine Roadmap
 
-This document establishes the comprehensive architectural roadmap, implementation checklist, and deterministic verification framework for the **Local Hybrid RAG (Retrieval-Augmented Generation)** and **Asymmetric Split-Brain Engine** in AETHER.
-
+This document establishes the comprehensive architectural roadmap, implementation checklist, and deterministic verification framework for the **Local Hybrid RAG (Retrieval-Augmented Generation)** and **Asymmetric Split-Brain Engine** in AegisCode (Aegis Agent & AegisCode Studio).
 ---
 
 ## 1. Executive Summary & Design Principles
 
 Retrieval for code requires high precision and deterministic behavior: identical queries against an unchanging codebase must return consistent chunk structures and ranked file lists. 
 
-AETHER adopts a **Hybrid Asymmetric Split-Brain Model** that pairs local-device retrieval with cloud reasoning:
+AegisCode adopts a **Hybrid Asymmetric Split-Brain Model** that pairs local-device retrieval with cloud reasoning:
 - **Local Worker ("The Eyes & Indexer")**: Executes on-device semantic search, AST boundary parsing, and relational TOC lookup with zero network latency or cloud bandwidth consumption.
 - **Cloud Orchestrator ("The Brain & Hands")**: Receives compact, pre-budgeted context (< 4,000 tokens) to perform high-level Chain-of-Thought planning, architectural synthesis, and precise code modifications.
-
 ```mermaid
 graph LR
     subgraph LocalWorker ["Local Worker (On-Device)"]
         FS["Workspace Filesystem"] --> AST["AST Parser & Chunking"]
-        AST --> VEC["sqlite-vec (.aether/vectors.db)"]
+        AST --> VEC["sqlite-vec (.aegis/vectors.db / fallback .aether)"]
         AST --> TOC["atlas.json / rig.json"]
         VEC & TOC --> RRF["Hybrid Retrieval (RRF)"]
         RRF --> Budget["Context Budgeter (< 4k tokens)"]
@@ -37,7 +35,7 @@ graph LR
 ### Phase 1: Vector Infrastructure & Local LLM Embeddings
 *Goal*: Establish an independent, on-device vector database and embedding pipeline with zero external API dependencies.
 
-- [ ] Initialize `sqlite-vec` embedded database inside `.aether/vectors.db`.
+- [ ] Initialize `sqlite-vec` embedded database inside `.aegis/vectors.db` (with backward-compatible fallback to `.aether/vectors.db`).
 - [ ] Integrate `fastembed` for fast, lightweight on-device embeddings.
 - [ ] Implement local runner adapters for Ollama and llama.cpp (`providers/local/`).
 - [ ] Provide auto-detection and health checks for local runner availability.

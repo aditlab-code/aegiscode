@@ -23,7 +23,7 @@ class TestPlaywrightExtensionFoundation(unittest.TestCase):
         cls.extension_instance = cls.extension_mod.extension
 
     def test_manifest_fields(self):
-        self.assertEqual(self.manifest.id, "aether.playwright")
+        self.assertEqual(self.manifest.id, "aegis.playwright")
         self.assertEqual(self.manifest.api_version, "1")
         self.assertTrue(self.manifest.version)
         self.assertTrue(self.manifest.name)
@@ -32,7 +32,7 @@ class TestPlaywrightExtensionFoundation(unittest.TestCase):
         # The exported variable should be an Extension subclass instance
         from agent_ai.extensions.base import Extension
         self.assertIsInstance(self.extension_instance, Extension)
-        self.assertEqual(self.extension_instance.extension_id, "aether.playwright")
+        self.assertEqual(self.extension_instance.extension_id, "aegis.playwright")
 
     def test_register_creates_config_and_service(self):
         reg = CapabilityRegistry()

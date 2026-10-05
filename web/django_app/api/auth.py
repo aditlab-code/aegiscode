@@ -101,8 +101,12 @@ def create_aether_session_token(
     user_info: Dict[str, Any],
     expiry_seconds: Optional[int] = None,
 ) -> str:
-    """Issue a signed AETHER session JWT for the authenticated user."""
-    ttl = expiry_seconds or getattr(settings, "AETHER_AUTH_TOKEN_EXPIRY", 604800)
+    """Issue a signed AegisCode session JWT for the authenticated user."""
+    ttl = expiry_seconds or getattr(
+        settings,
+        "AEGIS_AUTH_TOKEN_EXPIRY",
+        getattr(settings, "AETHER_AUTH_TOKEN_EXPIRY", 604800),
+    )
     now = int(time.time())
     payload = {
         "sub": str(user_info.get("sub", "")),

@@ -1,12 +1,11 @@
-# AGENTS.md — Oh My Javanese (OMJ) Operational Guide
+# AGENTS.md — AegisCode & Oh My Javanese (OMJ) Operational Guide
 
 ## 1. Project Purpose
 
-Repository ini adalah kerangka orkestrasi multi-agent **Oh My Javanese (OMJ)** untuk Antigravity CLI dengan tiga tujuan utama:
+Repository ini adalah ekosistem pengembangan **AegisCode** (AegisCode Studio & Aegis Agent) dengan kerangka orkestrasi multi-agent **Oh My Javanese (OMJ)** untuk Google Antigravity CLI dengan tiga tujuan utama:
 - **Agent Build Hub**: Mengelola 6 wayang, skills, rules, dan PreToolUse hooks berbasis RTK.
-- **Efisiensi Token**: Memanfaatkan Rust Token Killer (RTK) untuk meminimalkan beban konteks LLM.
-- **Mutu & YAGNI**: Zero-orphan code, tanpa pustaka berlebih, pengujian berstandar strict stop-gate.
-
+- **Efisiensi Token**: Memanfaatkan Rust Token Killer (RTK) dan arsitektur Asymmetric Split-Brain (< 4.000 tokens) untuk meminimalkan beban konteks LLM.
+- **Mutu & YAGNI**: Zero-orphan code, tanpa pustaka berlebih, zero-zombie process tree kill, backward-compatibility `.aegis/` dan `.aether/`, serta pengujian berstandar strict stop-gate.
 ---
 
 ## 2. Framework Multi-Agent
@@ -71,16 +70,17 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
 ---
 
-## 4. Protokol Pengujian (Werkudara-Tester)
+## 4. Protokol Pengujian & Backward-Compatibility
 
-- **Runner**: Node.js Native (`node:test`, `node:assert`) — tanpa test runner pihak ketiga.
+- **Runner**: Node.js Native (`node:test`, `node:assert`) dan Python (`pytest`) — tanpa dependensi pihak ketiga yang tidak perlu.
 - **Cakupan wajib**:
   1. Integritas `templates/agents/*.agent.md` (metadata tools valid).
   2. Kepatuhan `templates/skills/*/SKILL.md` (frontmatter YAML valid).
   3. Validitas `hooks.json` (JSON valid + pemicu `rtk-hook.js` ada).
   4. Exit code 0 untuk `oh-my-javanese init|verify|uninstall|render`.
+  5. Dukungan state discovery dua arah: `.aegis/` (primer) dengan fallback transparan ke `.aether/`, serta `data/aegis.db` (primer) dengan fallback ke `data/aether.db`.
+  6. Kebersihan proses sistem: zero-zombie process lifecycle pada penutupan sesi.
 - **Strict Stop-Gate**: Tugas TIDAK boleh dinyatakan selesai sebelum semua pengujian lulus (exit code 0). Assertion dilarang dimatikan.
-
 ---
 
 ## 5. Aturan Komunikasi & Output

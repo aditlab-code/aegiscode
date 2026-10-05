@@ -76,8 +76,9 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from agent_ai.projects import scan_policy
 
-#: Nama folder root metadata project (sama dengan aether_store.AETHER_DIR_NAME).
-AETHER_DIR_NAME = ".aether"
+#: Nama folder root metadata project.
+AEGIS_DIR_NAME = ".aegis"
+AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Subfolder hasil Project Map.
 MAP_DIR_NAME = "map"
 
@@ -87,7 +88,7 @@ MAP_TYPE_RIG = "rig"
 #: Urutan tipe map (deterministik).
 MAP_TYPES: Tuple[str, ...] = (MAP_TYPE_ATLAS, MAP_TYPE_RIG)
 
-#: Nama file hasil per tipe map (di dalam `.aether/map/`).
+#: Nama file hasil per tipe map (di dalam `.aegis/map/`).
 MAP_FILE_NAMES: Dict[str, str] = {
     MAP_TYPE_ATLAS: "atlas.json",
     MAP_TYPE_RIG: "rig.json",
@@ -101,23 +102,22 @@ ENGINE_ENTRY_FILES: Dict[str, str] = {
 
 #: Environment variable untuk lokasi repo engine (opsional).
 ENV_ENGINE_DIRS: Dict[str, str] = {
-    MAP_TYPE_ATLAS: "AETHER_CODE_ATLAS_DIR",
-    MAP_TYPE_RIG: "AETHER_MAP_CODE_RIG_DIR",
+    MAP_TYPE_ATLAS: "AEGIS_CODE_ATLAS_DIR",
+    MAP_TYPE_RIG: "AEGIS_MAP_CODE_RIG_DIR",
 }
 
-#: Root repository AETHER. File ini berada di
+#: Root repository AegisCode. File ini berada di
 #: `src/agent_ai/projects/project_map.py`, sehingga `parents[3]` = root repo.
-#: Dipakai agar engine default dihitung RELATIF terhadap repository
-#: (tidak ada drive/path machine-specific yang di-hardcode).
-_AETHER_ROOT: Path = Path(__file__).resolve().parents[3]
+_AEGIS_ROOT: Path = Path(__file__).resolve().parents[3]
+_AETHER_ROOT: Path = _AEGIS_ROOT
 
 #: Default lokasi repo engine (bila tidak di-override via env/konstruktor).
-#: Engine Atlas/RIG dibundel DI DALAM repository AETHER (vendored):
-#:     <AETHER_ROOT>/vendor/CODE_ATLAS
-#:     <AETHER_ROOT>/vendor/MAP_CODE_RIG
+#: Engine Atlas/RIG dibundel DI DALAM repository AegisCode (vendored):
+#:     <AEGIS_ROOT>/vendor/CODE_ATLAS
+#:     <AEGIS_ROOT>/vendor/MAP_CODE_RIG
 DEFAULT_ENGINE_DIRS: Dict[str, str] = {
-    MAP_TYPE_ATLAS: str(_AETHER_ROOT / "vendor" / "CODE_ATLAS"),
-    MAP_TYPE_RIG: str(_AETHER_ROOT / "vendor" / "MAP_CODE_RIG"),
+    MAP_TYPE_ATLAS: str(_AEGIS_ROOT / "vendor" / "CODE_ATLAS"),
+    MAP_TYPE_RIG: str(_AEGIS_ROOT / "vendor" / "MAP_CODE_RIG"),
 }
 
 #: Status keberadaan/validitas map (berbasis file lokal).
@@ -260,8 +260,8 @@ class ProjectMapService:
     # Path helpers
     # ------------------------------------------------------------------ #
     def get_map_dir(self, project_path: ProjectPath) -> Path:
-        """Folder penyimpanan map: `<project>/.aether/map/` (tidak dibuat)."""
-        return Path(project_path) / AETHER_DIR_NAME / MAP_DIR_NAME
+        """Folder penyimpanan map: `<project>/.aegis/map/` (tidak dibuat)."""
+        return Path(project_path) / AEGIS_DIR_NAME / MAP_DIR_NAME
 
     def get_map_path(self, project_path: ProjectPath, map_type: str) -> Path:
         """Path file map: `<project>/.aether/map/<atlas|rig>.json`."""
@@ -650,12 +650,12 @@ class ProjectMapService:
         # Satu sumber policy: `agent_ai.projects.scan_policy`.
         engine_env = os.environ.copy()
         try:
-            engine_env[scan_policy.AETHER_SCAN_POLICY_ENV] = json.dumps(
-                scan_policy.to_payload(), ensure_ascii=True
-            )
-            engine_env[scan_policy.AETHER_SCAN_POLICY_PATH_ENV] = str(
-                scan_policy.module_path()
-            )
+            payload_str = json.dumps(scan_policy.to_payload(), ensure_ascii=True)
+            mod_path_str = str(scan_policy.module_path())
+            engine_env[scan_policy.AEGIS_SCAN_POLICY_ENV] = payload_str
+            engine_env[scan_policy.AEGIS_SCAN_POLICY_PATH_ENV] = mod_path_str
+            engine_env[scan_policy.AETHER_SCAN_POLICY_ENV] = payload_str
+            engine_env[scan_policy.AETHER_SCAN_POLICY_PATH_ENV] = mod_path_str
         except (TypeError, ValueError, OSError):
             pass
 

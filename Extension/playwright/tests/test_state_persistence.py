@@ -249,10 +249,10 @@ class TestFacadeBackedStore(unittest.TestCase):
         project = str(Path(tmp.name) / "proj")
         Path(project).mkdir(parents=True, exist_ok=True)
 
-        facade = ExtensionStorage(extension_id="aether.playwright")
+        facade = ExtensionStorage(extension_id="aegis.playwright")
         service = PlaywrightService(
             storage=facade,
-            extension_id="aether.playwright",
+            extension_id="aegis.playwright",
             runtime_factory=FakePlaywright,
             artifact_dir=tmp.name,
         )
@@ -274,10 +274,10 @@ class TestFacadeBackedStore(unittest.TestCase):
 
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        facade = ExtensionStorage(extension_id="aether.playwright")
+        facade = ExtensionStorage(extension_id="aegis.playwright")
         service = PlaywrightService(
             storage=facade,
-            extension_id="aether.playwright",
+            extension_id="aegis.playwright",
             runtime_factory=FakePlaywright,
             artifact_dir=tmp.name,
         )
@@ -331,18 +331,18 @@ class TestPersistenceToolLayer(unittest.TestCase):
             seed_state(service, session_id)
             tools = {tool.name: tool for tool in build_playwright_tools(service)}
 
-            saved = tools["aether.playwright.session_save_state"].execute(
+            saved = tools["aegis.playwright.session_save_state"].execute(
                 session_id=session_id, name="toollayer"
             )
             self.assertTrue(saved["saved"])
 
-            listed = tools["aether.playwright.session_state_list"].execute()
+            listed = tools["aegis.playwright.session_state_list"].execute()
             self.assertIn("toollayer", listed["states"])
 
-            restored = tools["aether.playwright.session_restore_state"].execute(name="toollayer")
+            restored = tools["aegis.playwright.session_restore_state"].execute(name="toollayer")
             self.assertTrue(restored["created_session"])
 
-            deleted = tools["aether.playwright.session_state_delete"].execute(name="toollayer")
+            deleted = tools["aegis.playwright.session_state_delete"].execute(name="toollayer")
             self.assertTrue(deleted["deleted"])
 
 

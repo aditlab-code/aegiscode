@@ -473,7 +473,9 @@ def test_policy_activity_in_task_log(tmp_path):
     result = runtime.run(PreparedTask(task="kerjakan", task_id="policy-log"))
     assert result.status == RuntimeStatus.COMPLETED
 
-    log_path = project / ".aether" / "log" / "policy-log.log"
+    log_path = project / ".aegis" / "log" / "policy-log.log"
+    if not log_path.is_file():
+        log_path = project / ".aether" / "log" / "policy-log.log"
     assert log_path.is_file()
     events = [
         json.loads(line)

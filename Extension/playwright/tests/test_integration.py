@@ -701,31 +701,31 @@ class TestWebProjectDebuggingWorkflow(_WebProjectDebugCase):
         self.assertEqual(set(tools), {cls.name for cls in TOOL_CLASSES})
 
         # snapshot -> interaction (click/fill/select/press) -> wait/extract
-        snapshot = tools["aether.playwright.browser_snapshot"].execute(
+        snapshot = tools["aegis.playwright.browser_snapshot"].execute(
             page_id=self.page_id
         )
         email_ref = self._ref(snapshot, "textbox", "Email")
-        tools["aether.playwright.browser_fill"].execute(
+        tools["aegis.playwright.browser_fill"].execute(
             page_id=self.page_id, ref=email_ref, value="tool@example.com"
         )
-        tools["aether.playwright.browser_press"].execute(
+        tools["aegis.playwright.browser_press"].execute(
             page_id=self.page_id, ref=email_ref, key="End"
         )
-        selected = tools["aether.playwright.browser_select"].execute(
+        selected = tools["aegis.playwright.browser_select"].execute(
             page_id=self.page_id, locator={"label": "Role"}, value="admin"
         )
         self.assertEqual(selected["selected"], ["admin"])
-        tools["aether.playwright.browser_wait"].execute(
+        tools["aegis.playwright.browser_wait"].execute(
             page_id=self.page_id, condition="visible", ref=email_ref
         )
-        value = tools["aether.playwright.browser_extract"].execute(
+        value = tools["aegis.playwright.browser_extract"].execute(
             page_id=self.page_id, ref=email_ref, what="value"
         )
         self.assertEqual(value["value"], "tool@example.com")
 
         # click (reproduce the login error) + console/network evidence
         login_ref = self._ref(snapshot, "button", "Log in")
-        tools["aether.playwright.browser_click"].execute(
+        tools["aegis.playwright.browser_click"].execute(
             page_id=self.page_id, ref=login_ref
         )
         self._wait_until(
@@ -734,56 +734,56 @@ class TestWebProjectDebuggingWorkflow(_WebProjectDebugCase):
                 for record in self._network_records(self.page_id, url="/api/login")
             )
         )
-        console = tools["aether.playwright.browser_console"].execute(
+        console = tools["aegis.playwright.browser_console"].execute(
             page_id=self.page_id, type="error"
         )
         self.assertTrue(any("APP_CONFIG" in str(m.get("text")) for m in console["messages"]))
-        network = tools["aether.playwright.browser_network"].execute(
+        network = tools["aegis.playwright.browser_network"].execute(
             page_id=self.page_id, status="5xx"
         )
         self.assertEqual(network["count"], 1)
         self.assertEqual(network["requests"][0]["url"].endswith("/api/login"), True)
 
         # DOM inspection
-        dom = tools["aether.playwright.browser_dom_inspect"].execute(
+        dom = tools["aegis.playwright.browser_dom_inspect"].execute(
             page_id=self.page_id, locator={"css": "#status"}
         )
         self.assertEqual(dom["text"], "login: 500")
 
         # screenshot + trace artifacts
-        shot = tools["aether.playwright.browser_screenshot"].execute(
+        shot = tools["aegis.playwright.browser_screenshot"].execute(
             page_id=self.page_id, full_page=True
         )
         self.assertTrue(Path(shot["path"]).exists())
-        tools["aether.playwright.browser_trace_start"].execute(session_id=self.session_id)
-        trace = tools["aether.playwright.browser_trace_stop"].execute(
+        tools["aegis.playwright.browser_trace_start"].execute(session_id=self.session_id)
+        trace = tools["aegis.playwright.browser_trace_stop"].execute(
             session_id=self.session_id
         )
         self.assertTrue(Path(trace["path"]).exists())
 
         # debug panel view model (Task 05 surface stays usable end-to-end)
-        panel = tools["aether.playwright.browser_debug_panel"].execute(
+        panel = tools["aegis.playwright.browser_debug_panel"].execute(
             session_id=self.session_id, page_id=self.page_id
         )
         self.assertIn("data", panel)
         self.assertIn("views", panel["data"])
 
         # state persistence through the tool layer
-        saved = tools["aether.playwright.session_save_state"].execute(
+        saved = tools["aegis.playwright.session_save_state"].execute(
             session_id=self.session_id, name="tool-layer", project=str(self.project_dir)
         )
         self.assertTrue(saved["saved"])
-        listed = tools["aether.playwright.session_state_list"].execute(
+        listed = tools["aegis.playwright.session_state_list"].execute(
             project=str(self.project_dir)
         )
         self.assertIn("tool-layer", listed["states"])
-        restored = tools["aether.playwright.session_restore_state"].execute(
+        restored = tools["aegis.playwright.session_restore_state"].execute(
             name="tool-layer",
             project=str(self.project_dir),
             session_id=self.session_id,
         )
         self.assertFalse(restored["created_session"])
-        deleted = tools["aether.playwright.session_state_delete"].execute(
+        deleted = tools["aegis.playwright.session_state_delete"].execute(
             name="tool-layer", project=str(self.project_dir)
         )
         self.assertTrue(deleted["deleted"])
@@ -1020,29 +1020,29 @@ class TestExtensionLifecycleIntegration(_LocalWebProjectCase):
         self.assertEqual(context.config.get_definition("browser")["type"], "enum")
         self.assertIn("chromium", context.config.get_definition("browser")["choices"])
         self.assertIsNotNone(
-            context.services.get("aether.playwright.playwright_service")
+            context.services.get("aegis.playwright.playwright_service")
         )
-        self.assertTrue(context.ui.exists("aether.playwright.debug_panel"))
+        self.assertTrue(context.ui.exists("aegis.playwright.debug_panel"))
 
         # --- enable ----------------------------------------------------
         extension.enable(context)
         tool_ids = {
             record.id
-            for record in registry.list_by_extension("aether.playwright")
+            for record in registry.list_by_extension("aegis.playwright")
             if record.type == "tool"
         }
         self.assertEqual(tool_ids, {cls.name for cls in TOOL_CLASSES})
-        service_record = context.services.get("aether.playwright.playwright_service")
+        service_record = context.services.get("aegis.playwright.playwright_service")
         self.assertIs(service_record.metadata.get("service_instance"), extension.service)
 
         # --- use (through the registered capability metadata) ----------
-        launch_record = context.tools.get("aether.playwright.browser_launch")
+        launch_record = context.tools.get("aegis.playwright.browser_launch")
         launch_tool = launch_record.metadata["_tool_instance"]
         launched = launch_tool.execute(headless=True)
         session_id = extension.service.create_session(launched["browser_id"])
         page_id = extension.service.new_page(session_id, self.app_url)
         snapshot_tool = context.tools.get(
-            "aether.playwright.browser_snapshot"
+            "aegis.playwright.browser_snapshot"
         ).metadata["_tool_instance"]
         snapshot = snapshot_tool.execute(page_id=page_id)
         self.assertEqual(snapshot["title"], "Web Debug Fixture")
@@ -1137,9 +1137,9 @@ class TestExtensionInstallLifecycle(unittest.TestCase):
 
         # --- install ---------------------------------------------------
         status = manager.install(str(self.repo_v1))
-        self.assertEqual(status["id"], "aether.playwright")
-        self.assertTrue(registry.exists("aether.playwright"))
-        installed_record = registry.get("aether.playwright")
+        self.assertEqual(status["id"], "aegis.playwright")
+        self.assertTrue(registry.exists("aegis.playwright"))
+        installed_record = registry.get("aegis.playwright")
         self.assertEqual(installed_record.manifest.version, "0.1.0")
         installed_dir = Path(installed_record.source)
         self.assertTrue((installed_dir / "manifest.json").is_file())
@@ -1147,14 +1147,14 @@ class TestExtensionInstallLifecycle(unittest.TestCase):
         self.assertTrue((installed_dir / "services" / "playwright_service.py").is_file())
 
         # --- update ----------------------------------------------------
-        manager.update("aether.playwright", str(self.repo_v2))
-        self.assertEqual(registry.get("aether.playwright").manifest.version, "0.2.0")
-        self.assertTrue(Path(registry.get("aether.playwright").source).is_dir())
+        manager.update("aegis.playwright", str(self.repo_v2))
+        self.assertEqual(registry.get("aegis.playwright").manifest.version, "0.2.0")
+        self.assertTrue(Path(registry.get("aegis.playwright").source).is_dir())
 
         # --- uninstall -------------------------------------------------
-        result = manager.uninstall("aether.playwright")
+        result = manager.uninstall("aegis.playwright")
         self.assertEqual(result["status"], "uninstalled")
-        self.assertFalse(registry.exists("aether.playwright"))
+        self.assertFalse(registry.exists("aegis.playwright"))
         self.assertFalse(installed_dir.exists())
 
 

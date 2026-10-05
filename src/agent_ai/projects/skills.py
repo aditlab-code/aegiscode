@@ -59,7 +59,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from agent_ai.projects.aether_store import (
+from agent_ai.projects.aegis_store import (
+    AegisProjectStore,
     AetherProjectStore,
     BIBLE_SKILLS_DIR_NAME,
     SKILL_FILE_NAME,

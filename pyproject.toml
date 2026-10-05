@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "AegisCode Authors" }]
 
-# Dependency runtime AETHER (core library + gateway).
+# Dependency runtime AegisCode (core library + gateway).
 # Catatan: Django hanya dipakai oleh interface layer (web/django_app), tetapi
 # disertakan di sini agar instalasi dari root project langsung siap pakai.
 dependencies = [
@@ -30,7 +30,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://example.invalid/aether"
+Homepage = "https://github.com/aditlab-code/aegiscode"
 
 # ---------------------------------------------------------------------------
 # Packaging: package `agent_ai` berada di src/ (src-layout).

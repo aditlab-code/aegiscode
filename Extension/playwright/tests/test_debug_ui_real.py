@@ -206,7 +206,7 @@ class TestDebugUIReal(unittest.TestCase):
             payload = view["data"]["payload"]
             self.assertEqual(view["type"], "file")
             self.assertEqual(payload["mime_type"], "application/zip")
-            self.assertEqual(payload["open_action"], "aether.playwright.browser_trace_open")
+            self.assertEqual(payload["open_action"], "aegis.playwright.browser_trace_open")
             path = Path(payload["path"])
             self.assertTrue(path.exists())
             self.assertEqual(path.read_bytes()[:2], b"PK")
@@ -302,26 +302,26 @@ class TestDebugUIReal(unittest.TestCase):
         page_id, _page = self._open_page()
         try:
             tools = {tool.name: tool for tool in build_playwright_tools(self.service)}
-            panel = tools["aether.playwright.browser_debug_panel"].execute(
+            panel = tools["aegis.playwright.browser_debug_panel"].execute(
                 session_id=self.session_id, page_id=page_id
             )
             self.assertEqual(panel["type"], "panel")
             self.assertEqual(panel["data"]["page_id"], page_id)
 
-            shot = tools["aether.playwright.browser_screenshot"].execute(
+            shot = tools["aegis.playwright.browser_screenshot"].execute(
                 page_id=page_id, full_page=True
             )
             self.assertTrue(Path(shot["path"]).exists())
 
-            tools["aether.playwright.browser_trace_start"].execute(session_id=self.session_id)
-            trace = tools["aether.playwright.browser_trace_stop"].execute(session_id=self.session_id)
+            tools["aegis.playwright.browser_trace_start"].execute(session_id=self.session_id)
+            trace = tools["aegis.playwright.browser_trace_stop"].execute(session_id=self.session_id)
             self.assertTrue(Path(trace["path"]).exists())
 
-            saved = tools["aether.playwright.session_save_state"].execute(
+            saved = tools["aegis.playwright.session_save_state"].execute(
                 session_id=self.session_id, name="t05-tool"
             )
             self.assertTrue(saved["saved"])
-            listed = tools["aether.playwright.session_state_list"].execute()
+            listed = tools["aegis.playwright.session_state_list"].execute()
             self.assertIn("t05-tool", listed["states"])
             self.service.delete_saved_state("t05-tool")
         finally:

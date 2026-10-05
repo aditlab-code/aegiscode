@@ -120,12 +120,19 @@ def test_global_settings_still_accepts_global_keys(settings_file):
 # --------------------------------------------------------------------------- #
 # 3. Project Policy tetap project-local & terpisah dari file global
 # --------------------------------------------------------------------------- #
+def _policy_file(root: Path) -> Path:
+    p = root / ".aegis" / PERMISSIONS_FILE_NAME
+    if p.exists():
+        return p
+    return root / ".aether" / PERMISSIONS_FILE_NAME
+
+
 def test_project_policy_writes_only_project_file(tmp_path):
     root = tmp_path / "proj"
     root.mkdir()
     store = ProjectPermissionStore(root=root)
     store.save(ProjectPolicy.from_dict(_DENY_ALL_MATRIX))
-    stored = _read(root / ".aether" / PERMISSIONS_FILE_NAME)
+    stored = _read(_policy_file(root))
     # Hanya aksi matrix yang tersimpan: TIDAK ada key Global Settings.
     assert set(stored) == set(DEFAULT_MATRIX_RULES), stored
     assert stored == _DENY_ALL_MATRIX
@@ -151,7 +158,7 @@ def test_global_settings_does_not_touch_project_policy(tmp_path, monkeypatch):
     root.mkdir()
     store = ProjectPermissionStore(root=root)
     store.save(ProjectPolicy.from_dict(_DENY_ALL_MATRIX))
-    policy_path = root / ".aether" / PERMISSIONS_FILE_NAME
+    policy_path = _policy_file(root)
     before = _read(policy_path)
 
     update_global_settings({"port": 9999})
@@ -174,8 +181,8 @@ def test_policies_isolated_across_projects(tmp_path):
 
     ProjectPermissionStore(root=root_a).save(ProjectPolicy.from_dict(_DENY_ALL_MATRIX))
 
-    path_a = root_a / ".aether" / PERMISSIONS_FILE_NAME
-    path_b = root_b / ".aether" / PERMISSIONS_FILE_NAME
+    path_a = _policy_file(root_a)
+    path_b = _policy_file(root_b)
     assert path_a != path_b
     assert _read(path_a) == _DENY_ALL_MATRIX
     assert _read(path_b) == DEFAULT_MATRIX_RULES
@@ -220,7 +227,7 @@ def test_gateway_policy_rejects_global_settings_keys(tmp_path, monkeypatch):
     pid = project["id"]
     # Policy valid -> tersimpan.
     service.save_project_policy(pid, _DENY_ALL_MATRIX)
-    policy_path = root / ".aether" / PERMISSIONS_FILE_NAME
+    policy_path = _policy_file(root)
     before = _read(policy_path)
 
     # Key Global Settings ditolak (400 ValidationError) & file policy tidak berubah.

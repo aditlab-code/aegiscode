@@ -74,7 +74,7 @@ class TaskExecutor:
         runtime_factory: callable opsional untuk membangun AgentRuntime
             (disediakan agar verifier dapat menyuntikkan runtime terkontrol).
         llm_config_service: LLMConfigService opsional (konfigurasi LLM tersimpan).
-            Bila None, dibuat lazy (database GLOBAL `data/aether.db`). Dipakai
+            Bila None, dibuat lazy (database GLOBAL `data/aegis.db`). Dipakai
             untuk merakit provider dari provider instance + model yang dipilih
             di UI konfigurasi LLM (SQLite-driven), bukan hanya dari settings.
     """
@@ -100,7 +100,7 @@ class TaskExecutor:
 
     @property
     def llm_config_service(self) -> Any:
-        """LLMConfigService efektif (lazy; database GLOBAL `data/aether.db`)."""
+        """LLMConfigService efektif (lazy; database GLOBAL `data/aegis.db`)."""
         if self._llm_config_service is None:
             from agent_ai.llm_config import LLMConfigService
 

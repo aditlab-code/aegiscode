@@ -8,7 +8,7 @@ const props = defineProps({
   },
   root: {
     type: String,
-    default: 'Aether-Agent'
+    default: 'AegisCode'
   },
   separator: {
     type: String,

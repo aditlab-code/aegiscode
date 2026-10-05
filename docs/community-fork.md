@@ -4,10 +4,9 @@ Berdasarkan perombakan yang sudah Anda buat, berikut adalah rekomendasi pemisaha
 
 ---
 
-### 1. Fitur yang Sangat Bagus Dilepas ke Komunitas (Gratis / Open Source)
+### 1. Fitur yang Sangat Bagus Dilepas ke Komunitas (AegisCode Community Edition — MIT)
 
-Fitur-fitur ini akan menjadi daya tarik utama (*magnet*) agar developer menyukai AETHER, mengumpulkan *GitHub Stars*, dan menyebarkannya dari mulut ke mulut:
-
+Fitur-fitur ini menjadi daya tarik utama (*magnet*) agar developer menyukai AegisCode, mengumpulkan *GitHub Stars*, dan menyebarkannya dari mulut ke mulut:
 * **Arsitektur Inti Agen Otonom & Runtime Loop:**
 * *Continuous Native Tool Calling loop* tanpa detektor "selesai" heuristik.
 
@@ -45,8 +44,7 @@ Fitur-fitur ini akan menjadi daya tarik utama (*magnet*) agar developer menyukai
 
 
 * **Project Memory Lokal:**
-* Struktur *Project Intelligence* transparan di folder `.aether/` (*Bible*, *Map/Atlas/RIG*, dan *Skills* dasar).
-
+* Struktur *Project Intelligence* transparan di folder `.aegis/` (dengan fallback otomatis `.aether/`: *Bible*, *Map/Atlas/RIG*, dan *Skills* dasar).
 
 
 
@@ -62,10 +60,9 @@ Fitur-fitur ini akan menjadi daya tarik utama (*magnet*) agar developer menyukai
 
 ---
 
-### 2. Fitur yang Sebaiknya Disimpan untuk Versi Berbayar (Pro / Komersial)
+### 2. Fitur yang Disimpan untuk Versi Berbayar (AegisCode Pro / Commercial Edition)
 
-Fitur-fitur ini memiliki nilai komputasi tinggi, menyasar pengguna profesional (*freelancer*, *lead engineer*), atau lingkungan perusahaan yang rela membayar:
-
+Sesuai matriks lisensi pada PRD AegisCode, fitur-fitur ini menyasar profesional, tim, dan korporat:
 * **Asymmetric Split-Brain Engine (Efisiensi Token Maksimal):**
 * *Pipeline* otomatis yang memindai repositori menggunakan *local embedding* on-device (`fastembed` + `sqlite-vec`), lalu memangkasnya menjadi paket sangat kecil (<4.000 token) untuk dikirim ke model penalaran Cloud.
 
@@ -74,8 +71,7 @@ Fitur-fitur ini memiliki nilai komputasi tinggi, menyasar pengguna profesional (
 
 
 * **Aplikasi Desktop Native 1-Klik (Tauri v2 + Rust):**
-* Lepaskan versi komunitas dalam bentuk web launcher / CLI runner (`install_aether.py` / `run.bat` / Docker).
-
+* Lepaskan versi komunitas dalam bentuk web launcher / CLI runner (`run.sh` / `run.bat` / `install_aether.py`).
 
 * Jual *installer native desktop* siap pakai (`.exe` / `.dmg`) yang sudah memaketkan Python runtime secara otomatis tanpa konfigurasi terminal. Developer profesional sangat rela membayar $39–$59 sekali beli demi kenyamanan ini.
 
@@ -89,8 +85,7 @@ Fitur-fitur ini memiliki nilai komputasi tinggi, menyasar pengguna profesional (
 
 
 * **Team & Enterprise Governance (Jika ekspansi ke tim):**
-* Sinkronisasi terpusat untuk `.aether/bible/` dan *shared skills* antar-anggota tim di satu kantor.
-* Audit log kepatuhan (pencatatan riwayat perintah dan diff untuk kebutuhan audit keamanan).
+* Sinkronisasi terpusat untuk `.aegis/bible/` dan *shared skills* antar-anggota tim di satu organisasi.
 
 
 
@@ -130,12 +125,7 @@ Memberi tahu bisa menjadi gestur profesional (*courtesy*) yang sangat baik jika:
 * Anda dan kreator upstream saling kenal atau berada di lingkaran komunitas yang sama.
 * Kreator asli masih aktif mengelola repositori lamanya.
 
-Jika ingin memberi tahu, formatnya **bukan meminta izin**, melainkan sekadar apresiasi (*courtesy notice*). Cukup sampaikan lewat pesan santai atau issue singkat:
-
-> "Halo, terima kasih banyak atas fondasi awal yang dibuat di [nama-repo-lama]. Karena kebutuhan riset dan arah pengembangan saya berkembang jauh (menambahkan runtime otonom, hybrid RAG, dan bundling desktop), saya memutuskan untuk melanjutkan pengembangannya secara independen dengan nama AETHER. Atribusi awal dan lisensi MIT tetap saya jaga sepenuhnya di README dan file LICENSE. Semoga sukses selalu untuk project upstream!"
-> 
-> 
-
+> "Halo, terima kasih banyak atas fondasi awal yang dibuat di [nama-repo-lama]. Karena kebutuhan riset dan arah pengembangan saya berkembang jauh (menambahkan runtime otonom, hybrid RAG Split-Brain, HITL guardrails, dan bundling desktop), saya memutuskan untuk melanjutkan pengembangannya secara independen dengan nama AegisCode. Atribusi awal dan lisensi MIT tetap saya jaga sepenuhnya di README dan file LICENSE. Semoga sukses selalu untuk project upstream!"
 ---
 
 ### 3. Aspek Teknis di GitHub (Disconnect Fork vs. Tetap Terhubung)
@@ -149,8 +139,7 @@ Secara teknis, memisahkan diri (*melepas stream*) dari repositori upstream biasa
 
 * **Jika Di-detach (Menjadi Standalone Repository):**
 * Tautan kecil *"forked from ..."* di bawah judul repositori akan hilang.
-* Repositori Anda dianggap sebagai proyek mandiri (terindeks penuh di pencarian GitHub, bisa menerima sponsor, isu, dan PR tanpa terkait dengan repo lama).
-* Ini opsi yang paling direkomendasikan jika sudah merombak besar-besaran dan membangun brand baru (**AETHER**). Anda cukup mengirim tiket singkat ke GitHub Support: *"Please detach my repository [user/repo] from upstream so it becomes a standalone repository."*
+* Ini opsi yang paling direkomendasikan jika sudah merombak besar-besaran dan membangun identitas baru (**AegisCode**). Anda cukup mengirim tiket singkat ke GitHub Support: *"Please detach my repository [user/repo] from upstream so it becomes a standalone repository."*
 
 
 Intinya: secara legal bebas langsung lepas, dan secara etika cukup pastikan atribusi hak cipta pembuat awal tidak dihapus dari file lisensi dan README proyek Anda.

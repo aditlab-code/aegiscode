@@ -74,7 +74,7 @@ async function handleDevClick() {
         </div>
         <div class="brand-titles">
           <span class="platform-tag">ANTIGRAVITY AI PLATFORM</span>
-          <h2 id="login-title" class="product-title">AETHER Workbench</h2>
+          <h2 id="login-title" class="product-title">AegisCode Studio</h2>
         </div>
       </div>
 

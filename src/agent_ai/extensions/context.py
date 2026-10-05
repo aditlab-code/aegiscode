@@ -46,6 +46,7 @@ class ExtensionContext:
         *,
         extension_root: Optional[Path] = None,
         manifest: Optional[Any] = None,
+        aegis_root: Optional[Path] = None,
         aether_root: Optional[Path] = None,
         extensions_dir: Optional[Path] = None,
         capability_registry: Optional[Any] = None,
@@ -57,19 +58,21 @@ class ExtensionContext:
         self.manifest = manifest
         self.extension_id: str = getattr(manifest, "id", "") if manifest is not None else ""
 
-        if aether_root is not None:
-            self.aether_root = Path(aether_root)
+        root_cand = aegis_root if aegis_root is not None else aether_root
+        if root_cand is not None:
+            self.aegis_root = Path(root_cand)
         else:
-            from agent_ai.extensions.paths import get_aether_root
+            from agent_ai.extensions.paths import get_aegis_root
 
-            self.aether_root = get_aether_root()
+            self.aegis_root = get_aegis_root()
+        self.aether_root = self.aegis_root
 
         if extensions_dir is not None:
             self.extensions_dir = Path(extensions_dir)
         else:
             from agent_ai.extensions.paths import get_extensions_dir
 
-            self.extensions_dir = get_extensions_dir(self.aether_root)
+            self.extensions_dir = get_extensions_dir(self.aegis_root)
 
         # Capability registry: use provided or global
         if capability_registry is not None:

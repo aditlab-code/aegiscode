@@ -49,7 +49,7 @@ const {
   seedHistory,
   closePopover,
 } = usePromptAutocomplete({
-  storageKey: "aether_task_prompt_history",
+  storageKey: "aegis_task_prompt_history",
   onUpdateText: (val) => {
     text.value = val;
   },
@@ -237,7 +237,7 @@ function submit() {
       v-model="text"
       class="composer-text"
       :disabled="disabled"
-      placeholder="Describe the task for AETHER…  (Enter for a new line, @ for file, / for template)"
+      placeholder="Describe the task for AegisCode…  (Enter for a new line, @ for file, / for template)"
       @input="onInput"
       @keydown="onTextareaKeydown"
       @click="onInput"

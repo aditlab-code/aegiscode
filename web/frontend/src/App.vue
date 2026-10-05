@@ -6,7 +6,7 @@
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { AETHER_VERSION } from "./version.js";
+import { AEGIS_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
 import AppFooter from "./components/layout/AppFooter.vue";

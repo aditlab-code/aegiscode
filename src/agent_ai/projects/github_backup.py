@@ -34,8 +34,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-#: Nama folder root metadata project (sama dengan aether_store.AETHER_DIR_NAME).
-AETHER_DIR_NAME = ".aether"
+#: Nama folder root metadata project.
+AEGIS_DIR_NAME = ".aegis"
+AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Subfolder metadata GitHub Backup.
 GITHUB_DIR_NAME = "github"
 #: Nama file konfigurasi non-secret.
@@ -44,9 +45,10 @@ CONFIG_FILE_NAME = "config.json"
 CREDENTIAL_FILE_NAME = "credential.enc"
 
 #: Rule mandatory yang WAJIB ada di `.gitignore` project.
-MANDATORY_IGNORE_RULE = ".aether/"
-#: Baris-baris yang dianggap sudah mewakili `.aether/` (agar tidak dobel tulis).
-_AETHER_IGNORE_EQUIVALENTS = {".aether/", ".aether", "/.aether/", "/.aether"}
+MANDATORY_IGNORE_RULE = ".aegis/"
+#: Baris-baris yang dianggap sudah mewakili `.aegis/` (agar tidak dobel tulis).
+_AEGIS_IGNORE_EQUIVALENTS = {".aegis/", ".aegis", "/.aegis/", "/.aegis", ".aether/", ".aether", "/.aether/", "/.aether"}
+_AETHER_IGNORE_EQUIVALENTS = _AEGIS_IGNORE_EQUIVALENTS
 
 
 def _normalize_exclude(exclude: Optional[Union[List[str], str]]) -> List[str]:
@@ -108,7 +110,7 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
     """Tulis bytes secara atomik (temp + os.replace)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=".aether_tmp_", suffix=".swp"
+        dir=str(path.parent), prefix=".aegis_tmp_", suffix=".swp"
     )
     try:
         with os.fdopen(fd, "wb") as handle:
@@ -125,7 +127,7 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
 
 
 class GithubBackupStore:
-    """Store project-local `<root>/.aether/github/`.
+    """Store project-local `<root>/.aegis/github/`.
 
     Args:
         root: root project target.
@@ -139,7 +141,7 @@ class GithubBackupStore:
     # ------------------------------------------------------------------ #
     @property
     def github_dir(self) -> Path:
-        return self.root / AETHER_DIR_NAME / GITHUB_DIR_NAME
+        return self.root / AEGIS_DIR_NAME / GITHUB_DIR_NAME
 
     @property
     def config_path(self) -> Path:
@@ -237,15 +239,15 @@ class GithubBackupStore:
         }
 
 
-def ensure_aether_ignored(root: Union[str, Path]) -> bool:
-    """Pastikan `.gitignore` project memuat rule mandatory `.aether/`.
+def ensure_aegis_ignored(root: Union[str, Path]) -> bool:
+    """Pastikan `.gitignore` project memuat rule mandatory `.aegis/`.
 
     Perilaku:
         - Bila `.gitignore` belum ada -> dibuat dengan perubahan minimal.
-        - Bila sudah ada -> isi existing TIDAK di-overwrite; rule `.aether/`
+        - Bila sudah ada -> isi existing TIDAK di-overwrite; rule `.aegis/`
           ditambahkan HANYA bila belum ada.
         - Rule ini tidak bisa dihapus lewat UI exclude (exclude tidak pernah
-          ditulis ke `.gitignore` oleh AETHER).
+          ditulis ke `.gitignore` oleh AegisCode).
 
     Returns:
         True bila file `.gitignore` diubah, False bila rule sudah ada.
@@ -255,7 +257,7 @@ def ensure_aether_ignored(root: Union[str, Path]) -> bool:
 
     if not gitignore.exists():
         content = (
-            "# AETHER private metadata (mandatory; jangan dihapus)\n"
+            "# AegisCode private metadata (mandatory; jangan dihapus)\n"
             f"{MANDATORY_IGNORE_RULE}\n"
         )
         _atomic_write_bytes(gitignore, content.encode("utf-8"))
@@ -267,19 +269,19 @@ def ensure_aether_ignored(root: Union[str, Path]) -> bool:
         return False
 
     for line in existing.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        if line.strip() in _AETHER_IGNORE_EQUIVALENTS:
+        if line.strip() in _AEGIS_IGNORE_EQUIVALENTS:
             return False
 
     # Tambahkan rule tanpa menimpa isi existing.
     addition = "" if existing.endswith("\n") or existing == "" else "\n"
-    addition += "\n# AETHER private metadata (mandatory; jangan dihapus)\n"
+    addition += "\n# AegisCode private metadata (mandatory; jangan dihapus)\n"
     addition += f"{MANDATORY_IGNORE_RULE}\n"
     _atomic_write_bytes(gitignore, (existing + addition).encode("utf-8"))
     return True
 
 
-def aether_is_ignored(root: Union[str, Path]) -> bool:
-    """True bila `.gitignore` project sudah memuat rule mandatory `.aether/`."""
+def aegis_is_ignored(root: Union[str, Path]) -> bool:
+    """True bila `.gitignore` project sudah memuat rule mandatory `.aegis/`."""
     gitignore = Path(root) / ".gitignore"
     if not gitignore.is_file():
         return False
@@ -288,6 +290,12 @@ def aether_is_ignored(root: Union[str, Path]) -> bool:
     except OSError:
         return False
     for line in existing.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
-        if line.strip() in _AETHER_IGNORE_EQUIVALENTS:
+        if line.strip() in _AEGIS_IGNORE_EQUIVALENTS:
             return True
     return False
+
+
+#: Alias kompatibilitas
+ensure_aether_ignored = ensure_aegis_ignored
+aether_is_ignored = aegis_is_ignored
+

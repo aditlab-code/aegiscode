@@ -73,7 +73,7 @@ function modelUri(path, suffix = "", instanceId = "") {
     .map((part) => encodeURIComponent(part))
     .join("/");
   const prefix = instanceId ? `${encodeURIComponent(instanceId)}/` : "";
-  return monaco.Uri.parse(`inmemory://aether-diff/${prefix}${clean}${suffix}`);
+  return monaco.Uri.parse(`inmemory://aegis-diff/${prefix}${clean}${suffix}`);
 }
 
 function layout() {
@@ -142,7 +142,7 @@ async function mountDiffEditor(originalText, modifiedText) {
   diffEditor = monaco.editor.createDiffEditor(container.value, {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
-    theme: isLight ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME,
+    theme: isLight ? (mod.AEGIS_LIGHT_THEME || mod.AETHER_LIGHT_THEME) : (mod.AEGIS_THEME || mod.AETHER_THEME),
     originalEditable: false,
     readOnly: true,
     renderSideBySide: sideBySide.value,
@@ -167,7 +167,11 @@ async function mountDiffEditor(originalText, modifiedText) {
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     themeObserver = new MutationObserver(() => {
       const lightNow = document.documentElement.dataset.theme === "light";
-      monaco.editor.setTheme(lightNow ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME);
+      monaco.editor.setTheme(
+        lightNow
+          ? (mod.AEGIS_LIGHT_THEME || mod.AETHER_LIGHT_THEME)
+          : (mod.AEGIS_THEME || mod.AETHER_THEME)
+      );
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,

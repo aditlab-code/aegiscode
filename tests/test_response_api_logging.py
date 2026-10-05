@@ -133,6 +133,9 @@ def _registry_with_noop() -> ToolRegistry:
 
 
 def _response_path(root: Path, task_id: str) -> Path:
+    p = root / ".aegis" / "log" / "response" / f"{task_id}.json"
+    if p.exists():
+        return p
     return root / ".aether" / "log" / "response" / f"{task_id}.json"
 
 
@@ -309,6 +312,7 @@ def test_disabled_writes_nothing(tmp_path):
     result = orch.run("kerjakan task")
     assert result.status == AgentStatus.DONE
     assert not (root / ".aether").exists()
+    assert not (root / ".aegis").exists()
 
 
 # --------------------------------------------------------------------------- #

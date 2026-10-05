@@ -385,7 +385,9 @@ def test_task_log_records_verification_strategy(tmp_path):
     result = runtime.run(PreparedTask(task="kerjakan", task_id="ver-log"))
     assert result.status == RuntimeStatus.COMPLETED
 
-    log_path = project / ".aether" / "log" / "ver-log.log"
+    log_path = project / ".aegis" / "log" / "ver-log.log"
+    if not log_path.is_file():
+        log_path = project / ".aether" / "log" / "ver-log.log"
     assert log_path.is_file()
     events = [
         json.loads(line)

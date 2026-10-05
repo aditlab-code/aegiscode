@@ -1,7 +1,7 @@
 {
-  "id": "aether.playwright",
+  "id": "aegis.playwright",
   "name": "Playwright",
   "version": "0.1.0",
-  "description": "Browser automation and web debugging extension for AETHER",
+  "description": "Browser automation and web debugging extension for AegisCode",
   "api_version": "1"
 }

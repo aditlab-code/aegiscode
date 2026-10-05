@@ -332,34 +332,34 @@ class TestDebugToolsReal(unittest.TestCase):
     def test_workflow_via_tool_layer(self):
         tools = {tool.name: tool for tool in build_playwright_tools(self.service)}
 
-        console = tools["aether.playwright.browser_console"].execute(
+        console = tools["aegis.playwright.browser_console"].execute(
             page_id=self.page_id, type="error"
         )
         self.assertTrue(any("boom" in m["text"] for m in console["messages"]))
 
-        network = tools["aether.playwright.browser_network"].execute(
+        network = tools["aegis.playwright.browser_network"].execute(
             page_id=self.page_id, status=500
         )
         self.assertEqual(network["count"], 1)
 
-        snapshot = tools["aether.playwright.browser_snapshot"].execute(
+        snapshot = tools["aegis.playwright.browser_snapshot"].execute(
             page_id=self.page_id
         )
         go_ref = next(
             ref for ref, info in snapshot["refs"].items() if info["name"] == "Go"
         )
-        dom = tools["aether.playwright.browser_dom_inspect"].execute(
+        dom = tools["aegis.playwright.browser_dom_inspect"].execute(
             page_id=self.page_id, ref=go_ref
         )
         self.assertEqual(dom["tag"], "button")
 
-        shot = tools["aether.playwright.browser_screenshot"].execute(
+        shot = tools["aegis.playwright.browser_screenshot"].execute(
             page_id=self.page_id, full_page=True
         )
         self.assertTrue(Path(shot["path"]).exists())
 
-        tools["aether.playwright.browser_trace_start"].execute(session_id=self.session_id)
-        trace = tools["aether.playwright.browser_trace_stop"].execute(
+        tools["aegis.playwright.browser_trace_start"].execute(session_id=self.session_id)
+        trace = tools["aegis.playwright.browser_trace_stop"].execute(
             session_id=self.session_id
         )
         self.assertTrue(Path(trace["path"]).exists())

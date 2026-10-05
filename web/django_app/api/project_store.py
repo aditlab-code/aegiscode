@@ -23,24 +23,18 @@ from agent_ai.projects.models import _now_iso
 
 
 def _default_db_path() -> Path:
-    """Lokasi default database AegisCode: <repo>/data/aegis.db (fallback: <repo>/data/aether.db)."""
+    """Lokasi default database AegisCode: <repo>/data/aegis.db."""
     # api/project_store.py -> api/ -> django_app/ -> web/ -> repo root
     repo_root = Path(__file__).resolve().parents[3]
     base = repo_root / "data"
-    aegis_db = base / "aegis.db"
-    aether_db = base / "aether.db"
-    if aegis_db.exists():
-        return aegis_db
-    if aether_db.exists():
-        return aether_db
-    return aegis_db
+    return base / "aegis.db"
 
 
 class ProjectStore:
     """Store SQLite untuk project launcher + active project state.
 
     Args:
-        db_path: lokasi file SQLite (default: <repo>/data/aether.db).
+        db_path: lokasi file SQLite (default: <repo>/data/aegis.db).
     """
 
     def __init__(self, db_path: Optional[Path] = None) -> None:

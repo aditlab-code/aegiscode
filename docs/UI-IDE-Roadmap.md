@@ -1,35 +1,35 @@
-# Implementation Plan - Modern AI-First IDE with Responsive Knowledge Rules
+# Implementation Plan - AegisCode Studio: Modern AI-First IDE with Responsive Knowledge Rules
 
-A comprehensive architectural implementation plan for transforming the AETHER Engineering Workbench into a tier-1 modern AI-first IDE (inspired by VS Code, Cursor, Windsurf, and Google Antigravity) with adaptive responsive knowledge rules and zero modifications to the Django backend.
-
+A comprehensive architectural implementation plan for transforming the AegisCode Engineering Workbench (AegisCode Studio) into a tier-1 modern AI-first IDE (inspired by VS Code, Cursor, Windsurf, and Google Antigravity) with adaptive responsive knowledge rules, interactive PTY terminal, and HITL diff approval guardrails.
 ---
 
 ## 1. Goal Description & Modern IDE Architecture
 
-Following our in-depth `/grill-me` design interview, the AETHER UI evolves from an asymmetrical monolith into a **Modern AI-First IDE Layout with Responsive Knowledge Rules**:
+Following our in-depth design interview, the AegisCode UI evolves into a **Modern AI-First IDE Layout with Responsive Knowledge Rules (AegisCode Studio)**:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ [⌘] AETHER WORKBENCH  —  Workspace: Aether-Agent (/Users/.../Aether-Agent)   [ ⌘K Command Palette ]│
+│ [🛡️] AEGISCODE STUDIO  —  Workspace: AegisCode (/Users/.../aegiscode)          [ ⌘K Command Palette ]│
 ├──────┬──────────────────────┬─────────────────────────────────────┬──────────────────────────────┤
 │ ACT. │ PRIMARY LEFT SIDEBAR │ CENTER CANVAS                       │ RIGHT AI ASSISTANT DRAWER    │
 │ BAR  │ (Draggable 200-450px)│ (Monaco Code Editor)                │ (Draggable 320-650px)        │
 ├──────┼──────────────────────┼─────────────────────────────────────┼──────────────────────────────┤
 │ [📁] │ Explorer View:       │ ┌─────────────────────────────────┐ │ ┌─ Tabs: Agent | Consultant ┐│
 │ Files│ • Project Switcher   │ │ 📁 src > components > App.vue   │ │ ├───────────────────────────┤│
-│      │   Dropdown           │ ├─────────────────────────────────┤ │ │ 🤖 AGENT ACTIVITY:        ││
+│      │   Dropdown           │ ├─────────────────────────────────┤ │ │ 🤖 AEGIS AGENT ACTIVITY:   ││
 │ [🔀] │ • Workspace File     │ │ [App.vue ●] [main.js] [styles]  │ │ │ • Latest Task & Telemetry ││
 │ Git  │   Tree               │ ├─────────────────────────────────┤ │ │   (Tokens, Tools, Rounds) ││
 │      │                      │ │ 1 <script setup>                │ │ │ • 6-Step Lifecycle Bar    ││
-│ [⏳] │ Source Control View: │ │ 2 import { ref } from "vue";    │ │ │ • Chronological Terminal  ││
-│ Queue│ • ChangesPanel       │ │ 3 ...                           │ │ │ • Agent Send / Stop Input ││
-│      │ • GithubBackupPanel  │ │                                 │ │ ├───────────────────────────┤│
-│ ──── │                      │ └─────────────────────────────────┘ │ │ 💬 CONSULTANT CHAT:       ││
-│ [⚙️] │ Task Queue View:     │ ┌─────────────────────────────────┐ │ │ • Session Dropdown + New  ││
-│ Sett.│ • Live Tasks Queue   │ │ ▼ BOTTOM DOCK (Ctrl+`):         │ │ │ • Mode: Ask vs Agent Pill ││
-│      │                      │ │   [Terminal] [Logs] [Problems]  │ │ │ • Collapsible Thinking... ││
-│ [🌓] │                      │ │   $ aether test execution...    │ │ │ • 1-Click 'Apply to Code' ││
-│ Theme│                      │ └─────────────────────────────────┘ │ └───────────────────────────┘│
+│ [⏳] │ Source Control View: │ │ 2 import { ref } from "vue";    │ │ │ • Monaco Diff Modal Check ││
+│ Queue│ • ChangesPanel       │ │ 3 ...                           │ │ │ • Chronological Terminal  ││
+│      │ • GithubBackupPanel  │ │                                 │ │ │ • Agent Send / Stop Input ││
+│ ──── │                      │ └─────────────────────────────────┘ │ ├───────────────────────────┤│
+│ [⚙️] │ Task Queue View:     │ ┌─────────────────────────────────┐ │ │ 💬 CONSULTANT CHAT:       ││
+│ Sett.│ • Live Tasks Queue   │ │ ▼ BOTTOM DOCK (Ctrl+`):         │ │ │ • Session Dropdown + New  ││
+│      │                      │ │   [PTY Terminal] [Logs] [Prob]  │ │ │ • Mode: Ask vs Agent Pill ││
+│ [🌓] │                      │ │   $ aegis test execution...     │ │ │ • Collapsible Thinking... ││
+│ Theme│                      │ └─────────────────────────────────┘ │ │ • 1-Click 'Apply to Code' ││
+│      │                      │                                     │ └───────────────────────────┘│
 └──────┴──────────────────────┴─────────────────────────────────────┴──────────────────────────────┘
 │ STATUSBAR: Ln 42, Col 18 | Spaces: 2 | UTF-8 | Vue 3 | Model: DeepSeek | Provider: OpenCode zen  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -89,15 +89,16 @@ graph TD
 2. **Global Floating Command Palette (`AppCommandPalette.vue`)**:
    - Shortcut `Cmd/Ctrl + P` (Quick Open Files) and `Cmd/Ctrl + K` (Agent Commands & Prompts).
    - Instant search across project files, workspace switching, and agent actions.
-3. **Collapsible Bottom Dock Panel (`AppBottomDock.vue`)**:
+3. **Collapsible Bottom Dock Panel with PTY Terminal (`AppBottomDock.vue`)**:
    - Toggled via `Ctrl+\`` or statusbar button.
-   - Houses Terminal execution logs, output streams, test runner results, and problems.
-4. **Modern Editor Chrome**:
+   - Houses fully interactive non-blocking PTY Terminal (`@xterm/xterm`), execution logs, output streams, test runner results, and problems.
+   - Zero-zombie process tree kill guarantees process termination on exit.
    - Path Breadcrumbs (`AppBreadcrumbs.vue`) above Monaco tabs with quick directory navigation.
    - Statusbar HUD (`AppFooter.vue`) displaying active cursor `Ln/Col`, indentation `Spaces: 2`, encoding `UTF-8`, language mode, and sync indicators.
-5. **Antigravity / Cursor-Style AI Assistant UX**:
+5. **Antigravity / Cursor-Style AI Assistant UX & HITL Guardrails**:
    - Collapsible Thinking Accordion (`AppThinkingBlock.vue`) for internal reasoning steps.
-   - 1-Click "Apply to Editor" and "View Diff" actions on generated code blocks.
+   - Human-in-the-Loop Diff Modal (`DiffModal.vue`) gating destructive write/delete actions in supervised mode.
+   - 1-Click "Apply to Editor", "View Diff", and 1-Click Snapshot Rollback.
    - Context attachment pills (`@file`, `@terminal`, `@docs`).
    - Consultant Mode Pill (`Mode: Ask` vs `Mode: Agent`).
 6. **Full-Page Settings View (`SettingsOverlay.vue`)**:

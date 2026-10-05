@@ -46,6 +46,10 @@ const props = defineProps({
     type: String,
     default: "0.2.01",
   },
+  aegisVersion: {
+    type: String,
+    default: "",
+  },
   bottomDockOpen: {
     type: Boolean,
     default: false,
@@ -159,9 +163,9 @@ const branchTooltip = computed(() => {
         {{ providerLabel }}
       </span>
 
-      <!-- AETHER Version -->
-      <span class="status-item version-item" title="AETHER Version">
-        v{{ aetherVersion }}
+      <!-- AegisCode Version -->
+      <span class="status-item version-item" title="AegisCode Version">
+        v{{ aegisVersion || aetherVersion }}
       </span>
     </div>
   </footer>

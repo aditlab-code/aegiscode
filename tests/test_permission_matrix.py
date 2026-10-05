@@ -267,7 +267,9 @@ def test_new_project_gets_default_matrix_file(tmp_path):
     registry = ProjectRegistry(workspace=tmp_path / "ws")
     registry.register(name="New", root=str(root))
 
-    path = root / ".aether" / PERMISSIONS_FILE_NAME
+    path = root / ".aegis" / PERMISSIONS_FILE_NAME
+    if not path.is_file():
+        path = root / ".aether" / PERMISSIONS_FILE_NAME
     assert path.is_file()
     assert json.loads(path.read_text(encoding="utf-8")) == DEFAULT_MATRIX_RULES
 

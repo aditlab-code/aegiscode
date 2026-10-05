@@ -65,8 +65,8 @@ function collapseAllFolders() {
 const contextMenu = ref(null);
 const contextOpen = ref(false);
 
-// Nama folder internal AETHER yang disembunyikan dari UI Explorer.
-const HIDDEN_NAMES = new Set([".aether"]);
+// Nama folder internal AegisCode yang disembunyikan dari UI Explorer.
+const HIDDEN_NAMES = new Set([".aegis", ".aether"]);
 
 function visibleEntries(list) {
   return (list || []).filter((e) => !HIDDEN_NAMES.has(e.name));

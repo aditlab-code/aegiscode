@@ -30,16 +30,14 @@ PathLike = Union[str, "Path"]
 
 
 def default_db_path() -> Path:
-    """Path default database global AegisCode (<repo>/data/aegis.db dengan fallback data/aether.db)."""
+    """Path default database global AegisCode (<repo>/data/aegis.db)."""
     # Import lokal: hindari siklus import saat settings dimuat.
     from agent_ai.config.settings import PROJECT_ROOT
 
     base = Path(PROJECT_ROOT) / "data"
     aegis_db = base / "aegis.db"
     aether_db = base / "aether.db"
-    if aegis_db.exists():
-        return aegis_db
-    if aether_db.exists():
+    if not aegis_db.exists() and aether_db.exists():
         return aether_db
     return aegis_db
 

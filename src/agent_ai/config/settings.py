@@ -193,8 +193,8 @@ def api_retry_failed_sleep() -> float:
 # file tidak pernah setengah tertulis. Semua batas tipe ada di sini (layer
 # konfigurasi), bukan di view/gateway, sehingga UI tetap tipis.
 # ---------------------------------------------------------------------------
-#: Default port AETHER bila `data/settings.json` tidak memuat `port`. Nilai ini
-#: SAMA dengan default launcher (run.bat / scripts/install_aether.py) sehingga
+#: Default port AegisCode bila `data/settings.json` tidak memuat `port`. Nilai ini
+#: SAMA dengan default launcher (run.bat / scripts/install_aegis.py) sehingga
 #: tidak ada dua nilai default yang berbeda.
 DEFAULT_PORT = 8000
 
@@ -211,7 +211,7 @@ _EDITABLE_SETTINGS_KEYS = frozenset(
 )
 
 #: Key yang MILIK Project Settings / Policy (project-local, disimpan di
-#: `<root>/.aether/permissions.json`) — BUKAN Global Settings AETHER.
+#: `<root>/.aegis/permissions.json`) — BUKAN Global Settings AegisCode.
 #:
 #: Ditolak eksplisit di layer konfigurasi global agar policy/permission project
 #: TIDAK PERNAH tercampur ke `data/settings.json`. Ini menegakkan pemisahan

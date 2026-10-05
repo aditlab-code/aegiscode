@@ -59,8 +59,9 @@ from agent_ai.permission.models import (
     PolicyMode,
 )
 
-#: Nama folder root metadata project (sama dengan aether_store/github_backup).
-AETHER_DIR_NAME = ".aether"
+#: Nama folder root metadata project.
+AEGIS_DIR_NAME = ".aegis"
+AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Nama file policy permission project-local.
 PERMISSIONS_FILE_NAME = "permissions.json"
 
@@ -310,7 +311,7 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
     """Tulis bytes secara atomik (temp + os.replace)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=".aether_tmp_", suffix=".swp"
+        dir=str(path.parent), prefix=".aegis_tmp_", suffix=".swp"
     )
     try:
         with os.fdopen(fd, "wb") as handle:
@@ -327,7 +328,7 @@ def _atomic_write_bytes(path: Path, data: bytes) -> None:
 
 
 class ProjectPermissionStore:
-    """Store project-local `<root>/.aether/permissions.json`.
+    """Store project-local `<root>/.aegis/permissions.json`.
 
     Args:
         root: root project target.
@@ -338,7 +339,7 @@ class ProjectPermissionStore:
 
     @property
     def path(self) -> Path:
-        return self.root / AETHER_DIR_NAME / PERMISSIONS_FILE_NAME
+        return self.root / AEGIS_DIR_NAME / PERMISSIONS_FILE_NAME
 
     def exists(self) -> bool:
         return self.path.is_file()

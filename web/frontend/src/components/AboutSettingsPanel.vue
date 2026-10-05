@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import { AETHER_VERSION } from "../version.js";
+import { AEGIS_VERSION } from "../version.js";
 
 const props = defineProps({
   section: {
@@ -66,7 +66,7 @@ async function copyLicense() {
             <div>
               <div class="hero-title">
                 AegisCode Studio Workbench
-                <span class="chip chip-sm ok">v{{ AETHER_VERSION }}</span>
+                <span class="chip chip-sm ok">v{{ AEGIS_VERSION }}</span>
               </div>
               <div class="hero-sub">Autonomous AI Coding Agent &amp; Dual-Stack Development Environment</div>
             </div>
@@ -121,7 +121,7 @@ async function copyLicense() {
         <div class="panel-head">
           <div>
             <div class="title">System Architecture &amp; Execution Model</div>
-            <div class="desc">Detailed architectural pipeline of the AETHER autonomous platform.</div>
+            <div class="desc">Detailed architectural pipeline of the AegisCode autonomous platform.</div>
           </div>
         </div>
 
@@ -192,7 +192,7 @@ async function copyLicense() {
         <div class="panel-head">
           <div>
             <div class="title">Open Source License</div>
-            <div class="desc">AETHER is open source software released under the terms of the MIT License.</div>
+            <div class="desc">AegisCode is open source software released under the terms of the MIT License.</div>
           </div>
           <button type="button" class="btn-aether btn-ghost-a" @click="copyLicense">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

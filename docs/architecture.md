@@ -1,56 +1,56 @@
-# AETHER Architecture Overview
+# AegisCode Architecture Overview
 
-This document details the architectural design, core subsystems, and runtime lifecycles of **AETHER** (Autonomous AI Coding Agent).
+This document details the architectural design, core subsystems, and runtime lifecycles of **AegisCode** (AegisCode Studio & Aegis Agent).
 
 ---
 
 ## 1. System Philosophy
-
-AETHER decouples decision-making (LLM) from physical action execution (runtime engine):
+AegisCode decouples decision-making (LLM) from physical action execution (runtime engine) and enforces a **Hybrid Asymmetric Split-Brain** model:
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                      LLM (Brain)                       │
-│    • Reasoning & Planning                              │
+│    • Cloud Orchestrator (Reasoning & Diff Synthesis)   │
 │    • Tool Selection & Argument Construction            │
-│    • Observation Synthesis & Reflection                │
+│    • Budgeted Context Window (< 4,000 tokens)          │
 └───────────────────────────▲────────────────────────────┘
                             │ JSON-RPC / API
 ┌───────────────────────────▼────────────────────────────┐
-│                    AETHER (Hands)                      │
-│    • Filesystem manipulation & Diff validation         │
-│    • Terminal command execution & Process isolation    │
-│    • Repository intelligence (AST, symbols, git)       │
-│    • Context budgeting & token compaction              │
+│                   Aegis Agent (Hands)                  │
+│    • Local Worker: AST parsing, fastembed, sqlite-vec  │
+│    • Interactive PTY Terminal (zero-zombie lifecycle)  │
+│    • FileWriteLock & HITL Diff Approval (Supervised)   │
+│    • Context budgeting, RRF ranking, & rollback stash  │
 └────────────────────────────────────────────────────────┘
 ```
 
-The LLM remains the autonomous decision-maker. AETHER provides a safe, reproducible, observable execution environment that allows the model to explore codebases, apply edits, execute test suites, and self-correct over iterative cycles.
+The LLM remains the autonomous decision-maker. Aegis Agent provides a safe, reproducible, observable execution environment that allows the model to explore codebases, apply edits under strict deterministic guardrails, execute test suites, and self-correct over iterative cycles.
 
----
+Backward-compatibility notice: For workspace state and intelligence discovery, AegisCode prioritizes `.aegis/` (`.aegis/vectors.db`, `.aegis/bible/`, `.aegis/map/`) and `data/aegis.db`, with automatic fallback to legacy `.aether/` and `data/aether.db`.
 
 ## 2. High-Level Subsystems
 
-AETHER is organized into clean, decoupled Python modules under `src/agent_ai/`:
+Aegis Agent is organized into clean, decoupled Python modules under `src/agent_ai/`:
 
 ```mermaid
 graph TD
-    Client["Client / Workbench Web UI"] --> Runtime["Runtime Orchestrator<br/>(runtime/runtime.py)"]
+    Client["AegisCode Studio (Vue 3 + Vite IDE)"] --> Gateway["Django API Gateway / PTY Bridge"]
+    Gateway --> Runtime["Aegis Agent Runtime<br/>(runtime/runtime.py)"]
     
-    subgraph CoreEngine ["AETHER Core Engine (src/agent_ai/)"]
+    subgraph CoreEngine ["Aegis Agent Core Engine (src/agent_ai/)"]
         Runtime --> ContextBuilder["Context Builder & Budget<br/>(contextbuilder / contextbudget)"]
         Runtime --> Planner["Planning & Replanner<br/>(planning/)"]
         Runtime --> ProviderRegistry["Provider Layer<br/>(providers/)"]
-        Runtime --> ToolRegistry["Tool Layer<br/>(tools/)"]
-        Runtime --> RepoIntel["Repository Intelligence<br/>(repointel / codeindex)"]
-        Runtime --> PolicyGateway["Permission & Security Gateway<br/>(permission/)"]
-        Runtime --> Validation["Validation & Recovery<br/>(validation / recovery)"]
+        Runtime --> ToolRegistry["Tool Layer & FileWriteLock<br/>(tools/)"]
+        Runtime --> RepoIntel["Repository Intelligence & Split-Brain<br/>(repointel / semantic / codeindex)"]
+        Runtime --> PolicyGateway["Permission & HITL Supervised Gate<br/>(permission/)"]
+        Runtime --> Validation["Validation & Checkpoint Recovery<br/>(validation / git/checkpoint.py)"]
     end
 
-    ToolRegistry --> FS["Filesystem & Git"]
-    ToolRegistry --> Term["Isolated Terminal"]
-    ToolRegistry --> MCP["MCP Adapters"]
-    ProviderRegistry --> LLMs["Anthropic / OpenAI / Ollama / DeepSeek"]
+    ToolRegistry --> FS["Filesystem & Git Facade"]
+    ToolRegistry --> Term["Interactive PTY Terminal (@xterm/xterm)"]
+    ToolRegistry --> MCP["MCP Adapters (.aegis/mcp.json)"]
+    ProviderRegistry --> LLMs["Google Antigravity / Anthropic / OpenAI / Ollama"]
 ```
 
 ### Module Directory Breakdown
@@ -71,15 +71,13 @@ graph TD
 ---
 
 ## 3. End-to-End Execution Lifecycle
-
-The lifecycle of an AETHER task progresses through four primary phases:
-
+The lifecycle of an AegisCode task progresses through four primary phases:
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant Workbench as Workbench / UI
-    participant Runtime as Agent Runtime
+    participant Workbench as AegisCode Studio (UI)
+    participant Runtime as Aegis Agent Runtime
     participant Context as Context Builder
     participant LLM as LLM Provider
     participant Tools as Tool Execution
@@ -124,8 +122,8 @@ The loop runs without heuristic "done" detectors:
 
 ---
 
-## 4. Web Workbench & Multi-Agent Integration
+## 4. AegisCode Studio Workbench & System Integration
 
-AETHER includes an integrated workbench UI:
-- **Backend:** Django application (`web/django_app/`) serving WebSocket and REST APIs for session lifecycle, token metrics, and real-time streaming.
-- **Frontend:** Modern Vite + React single-page application (`web/frontend/`) rendering agent activity, file diff trees, terminal streaming, and interactive consultant chats.
+AegisCode features a developer-first IDE workbench (**AegisCode Studio**):
+- **Backend Gateway:** Django application (`web/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
+- **Frontend:** Modern Vue 3 + Vite single-page application (`web/frontend/`) featuring a VS Code-style 3-column layout (Monaco Editor, Monaco Diff Editor, interactive PTY terminal via `@xterm/xterm`, HITL DiffModal, and Git Source Control drawer).

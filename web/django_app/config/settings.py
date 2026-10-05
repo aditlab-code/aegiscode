@@ -65,10 +65,11 @@ def _env_list(key: str, default: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # Environment mode
 # ---------------------------------------------------------------------------
-# AETHER_ENV: "production" | "development" (default development).
+# AEGIS_ENV: "production" | "development" (default development).
 # Production juga dapat ditandai lewat DJANGO_DEBUG=false.
-AETHER_ENV = _env("AETHER_ENV", "development").lower()
-IS_PRODUCTION = AETHER_ENV in ("production", "prod")
+AEGIS_ENV = (_env("AEGIS_ENV") or _env("AETHER_ENV") or "development").lower()
+AETHER_ENV = AEGIS_ENV
+IS_PRODUCTION = AEGIS_ENV in ("production", "prod")
 
 # ---------------------------------------------------------------------------
 # Core (dari environment; default development yang aman)
@@ -77,7 +78,7 @@ IS_PRODUCTION = AETHER_ENV in ("production", "prod")
 # `or` (bukan default os.getenv): variabel yang diset-kosong ("") HARUS jatuh ke
 # fallback — Django melempar ImproperlyConfigured saat SECRET_KEY kosong ketika
 # membangun halaman error 404/500 (lihat LazySettings.__getattr__).
-_DEV_SECRET_KEY = "aether-gateway-dev-key-not-for-production"
+_DEV_SECRET_KEY = "aegis-gateway-dev-key-not-for-production"
 SECRET_KEY = _env("DJANGO_SECRET_KEY") or _DEV_SECRET_KEY
 
 # DEBUG: default True di development, False di production.
@@ -187,7 +188,8 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if IS_PRODUCTION e
 # Gateway config (bukan logic agent; hanya batas HTTP).
 # ---------------------------------------------------------------------------
 # Batas ukuran body request (bytes) untuk mencegah payload tanpa batas.
-AETHER_GATEWAY_MAX_BODY_BYTES = int(_env("AETHER_GATEWAY_MAX_BODY_BYTES", "1000000"))
+AEGIS_GATEWAY_MAX_BODY_BYTES = int(_env("AEGIS_GATEWAY_MAX_BODY_BYTES") or _env("AETHER_GATEWAY_MAX_BODY_BYTES") or "1000000")
+AETHER_GATEWAY_MAX_BODY_BYTES = AEGIS_GATEWAY_MAX_BODY_BYTES
 
 # ---------------------------------------------------------------------------
 # Google OAuth & Identity Gateway (docs/Oauth-Google.md, Phase 0)
@@ -195,5 +197,6 @@ AETHER_GATEWAY_MAX_BODY_BYTES = int(_env("AETHER_GATEWAY_MAX_BODY_BYTES", "10000
 GOOGLE_OAUTH_CLIENT_ID = _env("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = _env("GOOGLE_OAUTH_CLIENT_SECRET")
 GOOGLE_OAUTH_REDIRECT_URI = _env("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback")
-AETHER_AUTH_TOKEN_EXPIRY = int(_env("AETHER_AUTH_TOKEN_EXPIRY", "604800"))  # 7 days in seconds
+AEGIS_AUTH_TOKEN_EXPIRY = int(_env("AEGIS_AUTH_TOKEN_EXPIRY") or _env("AETHER_AUTH_TOKEN_EXPIRY") or "604800")  # 7 days in seconds
+AETHER_AUTH_TOKEN_EXPIRY = AEGIS_AUTH_TOKEN_EXPIRY
 

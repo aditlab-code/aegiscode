@@ -18,16 +18,19 @@ import CssWorker from "monaco-editor/esm/vs/language/css/css.worker?worker";
 import HtmlWorker from "monaco-editor/esm/vs/language/html/html.worker?worker";
 import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 
-/** Nama theme Monaco AETHER (dark, konsisten dengan --bg-panel/--accent). */
-export const AETHER_THEME = "aether-dark";
-/** Nama theme Monaco AETHER (light, konsisten dengan [data-theme="light"]). */
-export const AETHER_LIGHT_THEME = "aether-light";
+/** Nama theme Monaco AegisCode (dark, konsisten dengan --bg-panel/--accent). */
+export const AEGIS_THEME = "aegis-dark";
+/** Nama theme Monaco AegisCode (light, konsisten dengan [data-theme="light"]). */
+export const AEGIS_LIGHT_THEME = "aegis-light";
+
+export const AETHER_THEME = AEGIS_THEME;
+export const AETHER_LIGHT_THEME = AEGIS_LIGHT_THEME;
 
 /** Opsi editor default. Fitur bawaan Monaco (folding, find/replace, multi
  *  cursor, minimap, shortcut standar, autocomplete language service) aktif
  *  secara default; di sini hanya dipastikan eksplisit. */
 export const EDITOR_OPTIONS = {
-  theme: AETHER_THEME,
+  theme: AEGIS_THEME,
   automaticLayout: false, // layout diurus resize handler sendiri (anti leak)
   minimap: { enabled: true },
   folding: true,

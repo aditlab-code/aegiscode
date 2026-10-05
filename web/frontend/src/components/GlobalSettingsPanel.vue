@@ -125,9 +125,9 @@ onMounted(load);
   <section class="panel">
     <div class="panel-body">
       <div class="gs-scope">
-        <span class="gs-scope-badge">Global AETHER Settings</span>
+        <span class="gs-scope-badge">Global AegisCode Settings</span>
         <span class="gs-scope-note">
-          Berlaku untuk seluruh AETHER (semua project).
+          Berlaku untuk seluruh AegisCode (semua project).
           <span class="mono">data/settings.json</span>
         </span>
         <span class="gs-scope-hint">
@@ -143,7 +143,7 @@ onMounted(load);
     <div class="panel-head">
       <div>
         <div class="title">Server</div>
-        <div class="desc">Port lokal yang dipakai AETHER saat dijalankan.</div>
+        <div class="desc">Port lokal yang dipakai AegisCode saat dijalankan.</div>
       </div>
       <button class="btn-aether btn-ghost-a" :disabled="loading || busy" @click="load">
         Refresh
@@ -157,7 +157,7 @@ onMounted(load);
         <div class="gs-label">
           <div class="gs-name">Port</div>
           <div class="gs-help">
-            Port HTTP gateway AETHER (1–65535). Perubahan berlaku saat AETHER
+            Port HTTP gateway AegisCode (1–65535). Perubahan berlaku saat AegisCode
             dijalankan ulang.
           </div>
         </div>
@@ -236,7 +236,7 @@ onMounted(load);
           <div class="gs-name">Log API responses</div>
           <div class="gs-help">
             Simpan setiap response provider ke
-            <span class="mono">.aether/log/response/&lt;task_id&gt;.json</span>
+            <span class="mono">.aegis/log/response/&lt;task_id&gt;.json</span>
             pada project target. Berguna untuk diagnosis, tetapi menambah berkas di
             disk.
           </div>
@@ -331,7 +331,7 @@ onMounted(load);
       <div>
         <div class="title">Actual values</div>
         <div class="desc">
-          Nilai yang benar-benar dibaca AETHER dari
+          Nilai yang benar-benar dibaca AegisCode dari
           <span class="mono">data/settings.json</span>.
         </div>
       </div>

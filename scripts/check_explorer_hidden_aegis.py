@@ -46,18 +46,25 @@ FRONTEND_SRC = PROJECT_ROOT / "web" / "frontend" / "src" / "components" / "FileE
 
 
 def setup_fixture() -> None:
-    """Buat fixture project dummy: punya folder `.aether` + folder biasa."""
+    """Buat fixture project dummy: punya folder `.aegis` + `.aether` + folder biasa."""
     shutil.rmtree(FIXTURE, ignore_errors=True)
+    (FIXTURE / ".aegis" / "brain").mkdir(parents=True, exist_ok=True)
     (FIXTURE / ".aether" / "brain").mkdir(parents=True, exist_ok=True)
     (FIXTURE / "src").mkdir(parents=True, exist_ok=True)
     (FIXTURE / "docs").mkdir(parents=True, exist_ok=True)
 
     (FIXTURE / "README.md").write_text("# dummy fixture\n", encoding="utf-8")
+    (FIXTURE / ".aegis" / "project.json").write_text(
+        '{ "note": "internal aegis - harus hidden" }\n', encoding="utf-8"
+    )
     (FIXTURE / ".aether" / "project.json").write_text(
         '{ "note": "internal aether - harus hidden" }\n', encoding="utf-8"
     )
+    (FIXTURE / ".aegis" / "brain" / "facts.md").write_text(
+        "- dummy fact aegis\n", encoding="utf-8"
+    )
     (FIXTURE / ".aether" / "brain" / "facts.md").write_text(
-        "- dummy fact\n", encoding="utf-8"
+        "- dummy fact aether\n", encoding="utf-8"
     )
     (FIXTURE / "src" / "main.py").write_text('print("hi")\n', encoding="utf-8")
     (FIXTURE / "docs" / "guide.md").write_text("# guide\n", encoding="utf-8")
@@ -69,18 +76,21 @@ def teardown_fixture() -> None:
 
 def _run() -> int:
     assert FIXTURE.is_dir(), f"fixture tidak ada: {FIXTURE}"
+    aegis_dir = FIXTURE / ".aegis"
     aether_dir = FIXTURE / ".aether"
+    assert aegis_dir.is_dir(), "fixture harus punya folder .aegis di disk"
     assert aether_dir.is_dir(), "fixture harus punya folder .aether di disk"
 
-    # 1) ListFilesTool root = fixture -> `.aether` HARUS hidden, lain tampil.
+    # 1) ListFilesTool root = fixture -> `.aegis` dan `.aether` HARUS hidden, lain tampil.
     tool = ListFilesTool(root=FIXTURE)
     listing = tool.execute(path=".")
     names = {e["name"] for e in listing["entries"]}
 
+    assert ".aegis" not in names, f".aegis masih muncul di list_files: {names}"
     assert ".aether" not in names, f".aether masih muncul di list_files: {names}"
     for expected in ("README.md", "src", "docs"):
         assert expected in names, f"entri normal '{expected}' hilang dari listing: {names}"
-    print(f"[1] list_files('.') menyembunyikan .aether, entri normal tampil: OK -> {sorted(names)}")
+    print(f"[1] list_files('.') menyembunyikan .aegis dan .aether, entri normal tampil: OK -> {sorted(names)}")
 
     # 2) ListFilesTool di dalam folder biasa tetap normal.
     sub = tool.execute(path="src")
@@ -88,30 +98,31 @@ def _run() -> int:
     assert "main.py" in sub_names, f"isi src/ harus tampil: {sub_names}"
     print(f"[2] list_files('src') tetap normal: OK -> {sorted(sub_names)}")
 
-    # 3) search_code TIDAK menelusuri isi `.aether`.
+    # 3) search_code TIDAK menelusuri isi `.aegis` maupun `.aether`.
     search = SearchCodeTool(root=FIXTURE)
     result = search.execute(query="dummy fact", path=".")
     hit_files = {m["file"].replace("\\", "/") for m in result["matches"]}
-    assert not any(".aether" in f for f in hit_files), (
-        f"search_code menembus .aether: {hit_files}"
+    assert not any(".aegis" in f or ".aether" in f for f in hit_files), (
+        f"search_code menembus metadata: {hit_files}"
     )
-    print("[3] search_code tidak menelusuri .aether: OK")
+    print("[3] search_code tidak menelusuri .aegis/.aether: OK")
 
-    # 4) Filesystem TIDAK berubah: folder `.aether` masih ada di disk.
-    assert aether_dir.is_dir(), "folder .aether di disk TIDAK boleh hilang"
+    # 4) Filesystem TIDAK berubah: folder `.aegis` dan `.aether` masih ada di disk.
+    assert aegis_dir.is_dir() and aether_dir.is_dir(), "folder metadata di disk TIDAK boleh hilang"
+    assert (aegis_dir / "project.json").exists()
     assert (aether_dir / "project.json").exists()
-    print("[4] folder .aether tetap ada di disk (tidak dihapus): OK")
+    print("[4] folder .aegis dan .aether tetap ada di disk (tidak dihapus): OK")
 
-    # 5) Cek statis: sumber frontend memuat filter `.aether`.
+    # 5) Cek statis: sumber frontend memuat filter `.aegis` dan `.aether`.
     src_text = FRONTEND_SRC.read_text(encoding="utf-8")
-    assert ".aether" in src_text, "FileExplorer.vue tidak memuat filter .aether"
+    assert ".aegis" in src_text and ".aether" in src_text, "FileExplorer.vue tidak memuat filter .aegis/.aether"
     assert "HIDDEN_NAMES" in src_text and "visibleEntries" in src_text, (
         "FileExplorer.vue tidak menerapkan filter HIDDEN_NAMES/visibleEntries"
     )
-    print("[5] FileExplorer.vue memuat filter .aether (HIDDEN_NAMES/visibleEntries): OK")
+    print("[5] FileExplorer.vue memuat filter .aegis/.aether (HIDDEN_NAMES/visibleEntries): OK")
 
     print()
-    print("[OK] Folder .aether tersembunyi dari File Explorer; filesystem tak berubah.")
+    print("[OK] Folder .aegis dan .aether tersembunyi dari File Explorer; filesystem tak berubah.")
     return 0
 
 

@@ -13,7 +13,7 @@
 import { computed, ref } from "vue";
 // Versi AETHER dari SINGLE SOURCE OF TRUTH `data/version.json` (sama dengan
 // footer Workbench). TIDAK ada version hardcoded di launcher ini.
-import { AETHER_VERSION } from "../version.js";
+import { AEGIS_VERSION } from "../version.js";
 import { pickFolder } from "../api.js";
 
 const props = defineProps({
@@ -130,7 +130,7 @@ function doDelete() {
     <header class="pl-topbar">
       <div class="pl-brand">
         <span class="pl-logo">A</span>
-        <span class="pl-brand-name">AETHER</span>
+        <span class="pl-brand-name">AegisCode</span>
         <span class="pl-brand-sub">PROJECTS</span>
       </div>
       <div class="pl-topbar-right">
@@ -183,14 +183,14 @@ function doDelete() {
           </button>
         </div>
         <span class="pl-pill"><span class="pl-dot"></span> Local</span>
-        <span class="pl-pill">v{{ AETHER_VERSION }}</span>
+        <span class="pl-pill">v{{ AEGIS_VERSION }}</span>
       </div>
     </header>
 
     <main class="pl-shell">
       <div class="pl-page-head">
         <h1>Projects</h1>
-        <p>Create and open AETHER workspaces.</p>
+        <p>Create and open AegisCode workspaces.</p>
       </div>
 
       <!-- ============== LAST SESSION (bila ada) ============== -->
@@ -229,7 +229,7 @@ function doDelete() {
         <div class="pl-panel-head">
           <div>
             <div class="pl-title">New Project</div>
-            <div class="pl-desc">Create a new AETHER workspace.</div>
+            <div class="pl-desc">Create a new AegisCode workspace.</div>
           </div>
         </div>
         <form class="pl-form" @submit.prevent="submitForm">

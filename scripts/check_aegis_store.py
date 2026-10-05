@@ -44,11 +44,11 @@ from agent_ai.projects import (  # noqa: E402
     ProjectIntelligence,
     TaskLog,
 )
-from agent_ai.projects.aether_store import AetherProjectStore  # noqa: E402
+from agent_ai.projects.aegis_store import AegisProjectStore, AetherProjectStore  # noqa: E402
 from agent_ai.providers.base import BaseProvider, GenerateResult  # noqa: E402
 
 DUMMY_ROOT = PROJECT_ROOT / "dummy_test"
-FIXTURE = DUMMY_ROOT / "aether_store_fixture"
+FIXTURE = DUMMY_ROOT / "aegis_store_fixture"
 
 BIBLE_JSON = json.dumps(
     {
@@ -123,24 +123,24 @@ def _read_log(path: Path):
 
 
 def main() -> int:
-    print("=== Verifikasi project-local .aether store (Task Log + Bible) ===")
+    print("=== Verifikasi project-local .aegis store (Task Log + Bible) ===")
     shutil.rmtree(FIXTURE, ignore_errors=True)
     FIXTURE.mkdir(parents=True, exist_ok=True)
     try:
-        # 1) Bilamana belum ada -> .aether dibuat otomatis.
-        assert not (FIXTURE / ".aether").exists()
-        store = AetherProjectStore(FIXTURE)
+        # 1) Bilamana belum ada -> .aegis dibuat otomatis.
+        assert not (FIXTURE / ".aegis").exists()
+        store = AegisProjectStore(FIXTURE)
         assert store.ensure() is True
-        assert (FIXTURE / ".aether" / "log").is_dir()
-        assert (FIXTURE / ".aether" / "bible").is_dir()
-        print("[1] project tanpa .aether -> otomatis dibuat OK")
+        assert (FIXTURE / ".aegis" / "log").is_dir()
+        assert (FIXTURE / ".aegis" / "bible").is_dir()
+        print("[1] project tanpa .aegis -> otomatis dibuat OK")
 
         # 5) Bible dibuat pertama kali (index + kategori).
         bible = BibleStore(FIXTURE)
         assert bible.ensure() is True
-        assert (FIXTURE / ".aether" / "bible" / "index.md").exists()
+        assert (FIXTURE / ".aegis" / "bible" / "index.md").exists()
         for category in BIBLE_CATEGORIES:
-            assert (FIXTURE / ".aether" / "bible" / f"{category}.md").exists(), category
+            assert (FIXTURE / ".aegis" / "bible" / f"{category}.md").exists(), category
         print("[5] Bible (index + kategori) dibuat pertama kali OK")
 
         # 2) + 4) execution tanpa task_id -> task_id dibuat, log memakai id tsb.
@@ -148,10 +148,10 @@ def main() -> int:
         assert result.status.value == "completed", result.status
         generated_id = runtime._current_task_id
         assert generated_id, "runtime harus membuat task_id bila tidak ada"
-        log_path = FIXTURE / ".aether" / "log" / f"{generated_id}.log"
+        log_path = FIXTURE / ".aegis" / "log" / f"{generated_id}.log"
         assert log_path.exists(), log_path
         print(f"[2] task_id dibuat otomatis -> {generated_id[:8]}... OK")
-        print(f"[4] log tersimpan di .aether/log/<task_id>.log OK -> {log_path.name}")
+        print(f"[4] log tersimpan di .aegis/log/<task_id>.log OK -> {log_path.name}")
 
         # 10) log memuat prompt/provider/status akhir.
         records = _read_log(log_path)
@@ -172,7 +172,7 @@ def main() -> int:
         runtime2, result2 = _run_task(FIXTURE, "task dengan id tetap", task_id="fixed-task-123")
         assert result2.status.value == "completed"
         assert runtime2._current_task_id == "fixed-task-123"
-        assert (FIXTURE / ".aether" / "log" / "fixed-task-123.log").exists()
+        assert (FIXTURE / ".aegis" / "log" / "fixed-task-123.log").exists()
         print("[3] execution dengan task_id memakai ID tersebut OK")
 
         # 11) log tidak membocorkan secret.
@@ -181,7 +181,7 @@ def main() -> int:
             "tool_called",
             {"tool": "http", "api_key": "SUPER-SECRET", "authorization": "Bearer TOPSECRET"},
         )
-        text = (FIXTURE / ".aether" / "log" / "secret-check.log").read_text(encoding="utf-8")
+        text = (FIXTURE / ".aegis" / "log" / "secret-check.log").read_text(encoding="utf-8")
         assert "SUPER-SECRET" not in text and "TOPSECRET" not in text, text
         assert "[redacted]" in text
         print("[11] log task tidak membocorkan secret OK")
@@ -191,13 +191,13 @@ def main() -> int:
         brain.add_verified("facts", "Python 3.12 di project ini", confidence=0.95)
         learned = brain.learn(observations=["Task: setup project", "Result: selesai"])
         assert learned.total_added >= 1, learned.to_dict()
-        facts_text = (FIXTURE / ".aether" / "bible" / "facts.md").read_text(encoding="utf-8")
+        facts_text = (FIXTURE / ".aegis" / "bible" / "facts.md").read_text(encoding="utf-8")
         assert "Python 3.12 di project ini" in facts_text
         assert "Bible fact hasil learning" in facts_text
         # Kategori Bible "ui" dan "conventions" (semantic baru) tersimpan.
-        ui_text = (FIXTURE / ".aether" / "bible" / "ui.md").read_text(encoding="utf-8")
+        ui_text = (FIXTURE / ".aegis" / "bible" / "ui.md").read_text(encoding="utf-8")
         assert "Workbench adalah layar utama" in ui_text
-        conventions = (FIXTURE / ".aether" / "bible" / "conventions.md").read_text(encoding="utf-8")
+        conventions = (FIXTURE / ".aegis" / "bible" / "conventions.md").read_text(encoding="utf-8")
         assert "Gunakan folder src/" in conventions
         ctx = brain.get_context()
         assert "Python 3.12 di project ini" in ctx.text and "Bible fact hasil learning" in ctx.text
@@ -217,7 +217,7 @@ def main() -> int:
         #    COMPLETED, dan kegagalan update Bible tercatat.
         runtime3, result3 = _run_task(FIXTURE, "task dengan learning gagal", task_id="learn-fail-1")
         assert result3.status.value == "completed", result3.status
-        rec3 = _read_log(FIXTURE / ".aether" / "log" / "learn-fail-1.log")
+        rec3 = _read_log(FIXTURE / ".aegis" / "log" / "learn-fail-1.log")
         ev3 = [r["event"] for r in rec3]
         assert "task_finished" in ev3 and "bible_update_failed" in ev3, ev3
         print("[9] kegagalan update Bible tidak merusak execution OK")
@@ -229,7 +229,7 @@ def main() -> int:
         print("[12] Bible project-local = satu-satunya source knowledge OK")
 
         print()
-        print("[OK] project-local .aether store (Task Log + AI Project Bible) bekerja.")
+        print("[OK] project-local .aegis store (Task Log + AI Project Bible) bekerja.")
         return 0
     finally:
         shutil.rmtree(FIXTURE, ignore_errors=True)

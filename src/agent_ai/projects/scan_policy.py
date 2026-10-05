@@ -34,6 +34,8 @@ __all__ = [
     "EXCLUDED_DIR_NAMES",
     "EXCLUDED_FILE_SUFFIXES",
     "GENERATED_METADATA_DIR_SUFFIXES",
+    "AEGIS_SCAN_POLICY_ENV",
+    "AEGIS_SCAN_POLICY_PATH_ENV",
     "AETHER_SCAN_POLICY_ENV",
     "AETHER_SCAN_POLICY_PATH_ENV",
     "POLICY_VERSION",
@@ -53,9 +55,13 @@ __all__ = [
 POLICY_VERSION = 1
 
 #: Environment variable berisi payload JSON policy (dibaca engine vendored).
-AETHER_SCAN_POLICY_ENV = "AETHER_SCAN_POLICY"
+AEGIS_SCAN_POLICY_ENV = "AEGIS_SCAN_POLICY"
 #: Environment variable berisi path file policy ini (dibaca engine vendored).
-AETHER_SCAN_POLICY_PATH_ENV = "AETHER_SCAN_POLICY_PATH"
+AEGIS_SCAN_POLICY_PATH_ENV = "AEGIS_SCAN_POLICY_PATH"
+
+#: Alias kompatibilitas
+AETHER_SCAN_POLICY_ENV = AEGIS_SCAN_POLICY_ENV
+AETHER_SCAN_POLICY_PATH_ENV = AEGIS_SCAN_POLICY_PATH_ENV
 
 #: Nama directory yang selalu di-exclude (dibandingkan case-insensitive).
 #:

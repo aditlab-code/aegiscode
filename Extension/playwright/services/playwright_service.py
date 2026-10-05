@@ -533,7 +533,7 @@ class _PlaywrightServiceCore:
         expect_factory: Optional[Callable[[], Any]] = None,
         storage: Optional[Any] = None,
         state_dir: Optional[str] = None,
-        extension_id: str = "aether.playwright",
+        extension_id: str = "aegis.playwright",
     ) -> None:
         cfg: Dict[str, Any] = {
             "browser": browser,
@@ -550,7 +550,7 @@ class _PlaywrightServiceCore:
         # storage facade (``context.storage``); ``state_dir`` is a plain
         # filesystem fallback so the service stays usable/testable without a
         # full ExtensionContext. Neither is required until persistence is used.
-        self._extension_id = extension_id or "aether.playwright"
+        self._extension_id = extension_id or "aegis.playwright"
         if state_dir is None:
             state_dir = self.config.get("state_dir")
         self._browser_state_store: Optional["BrowserStateStore"] = None
@@ -1294,7 +1294,7 @@ class _SnapshotInteractionMixin:
             if registry is None:
                 raise RefNotFoundError(
                     f"No snapshot refs are available for page '{page_id}'. "
-                    "Call aether.playwright.browser_snapshot first."
+                    "Call aegis.playwright.browser_snapshot first."
                 )
             return registry.to_dict()
 
@@ -1417,7 +1417,7 @@ class _SnapshotInteractionMixin:
         if registry is None:
             raise RefNotFoundError(
                 f"No snapshot refs are available for page '{page_id}'. "
-                "Call aether.playwright.browser_snapshot first."
+                "Call aegis.playwright.browser_snapshot first."
             )
         ref = str(ref)
         element = registry.refs.get(ref)
@@ -1536,7 +1536,7 @@ class _SnapshotInteractionMixin:
                 raise StaleRefError(
                     f"Ref '{element.ref}' ({element.role} \"{element.name}\") is stale: "
                     "the element is no longer in the DOM (page navigated or DOM changed). "
-                    "Call aether.playwright.browser_snapshot again and use a fresh ref."
+                    "Call aegis.playwright.browser_snapshot again and use a fresh ref."
                 )
             return raw.first
         raw = self._build_locator(page, locator)
@@ -2773,7 +2773,7 @@ class _DebugMixin:
             if self._traces.get(sid, {}).get("active"):
                 raise TraceAlreadyActiveError(
                     f"Trace is already active for session '{sid}'. "
-                    "Call aether.playwright.browser_trace_stop first."
+                    "Call aegis.playwright.browser_trace_stop first."
                 )
             context = self._contexts[sid].context
             tracing = getattr(context, "tracing", None)
@@ -2831,7 +2831,7 @@ class _DebugMixin:
             if not state or not state.get("active"):
                 raise TraceNotActiveError(
                     f"No active trace for session '{sid}'. "
-                    "Call aether.playwright.browser_trace_start first."
+                    "Call aegis.playwright.browser_trace_start first."
                 )
             context = self._contexts[sid].context
             tracing = getattr(context, "tracing", None)
@@ -3177,7 +3177,7 @@ class BrowserStateStore:
         self,
         storage: Optional[Any] = None,
         base_dir: Optional[Any] = None,
-        extension_id: str = "aether.playwright",
+        extension_id: str = "aegis.playwright",
     ) -> None:
         self._storage = storage
         self._base_dir = Path(base_dir) if base_dir else None
@@ -3270,7 +3270,7 @@ class BrowserStateStore:
         return sorted(key[len(prefix):] for key in keys if key.startswith(prefix))
 
 
-def _new_state_store(storage=None, base_dir=None, extension_id="aether.playwright") -> BrowserStateStore:
+def _new_state_store(storage=None, base_dir=None, extension_id="aegis.playwright") -> BrowserStateStore:
     """Factory used by the service to build its :class:`BrowserStateStore`."""
     return BrowserStateStore(storage=storage, base_dir=base_dir, extension_id=extension_id)
 
@@ -3472,15 +3472,15 @@ def _reveal_path(path: str) -> bool:
 
 #: Actions the debug panel exposes — each references an existing capability.
 DEBUG_PANEL_ACTIONS: List[Dict[str, Any]] = [
-    {"id": "aether.playwright.browser_debug_panel", "title": "Refresh"},
-    {"id": "aether.playwright.page_close", "title": "Close Page"},
-    {"id": "aether.playwright.browser_console", "title": "Clear Console", "arguments": {"clear": True}},
-    {"id": "aether.playwright.browser_network", "title": "Clear Network", "arguments": {"clear": True}},
-    {"id": "aether.playwright.browser_screenshot", "title": "Screenshot", "arguments": {"full_page": True}},
-    {"id": "aether.playwright.browser_trace_start", "title": "Start Trace"},
-    {"id": "aether.playwright.browser_trace_stop", "title": "Stop Trace"},
-    {"id": "aether.playwright.session_save_state", "title": "Save State"},
-    {"id": "aether.playwright.session_restore_state", "title": "Restore State"},
+    {"id": "aegis.playwright.browser_debug_panel", "title": "Refresh"},
+    {"id": "aegis.playwright.page_close", "title": "Close Page"},
+    {"id": "aegis.playwright.browser_console", "title": "Clear Console", "arguments": {"clear": True}},
+    {"id": "aegis.playwright.browser_network", "title": "Clear Network", "arguments": {"clear": True}},
+    {"id": "aegis.playwright.browser_screenshot", "title": "Screenshot", "arguments": {"full_page": True}},
+    {"id": "aegis.playwright.browser_trace_start", "title": "Start Trace"},
+    {"id": "aegis.playwright.browser_trace_stop", "title": "Stop Trace"},
+    {"id": "aegis.playwright.session_save_state", "title": "Save State"},
+    {"id": "aegis.playwright.session_restore_state", "title": "Restore State"},
 ]
 
 
@@ -3676,7 +3676,7 @@ class _DebugUIMixin:
             if not target_path:
                 raise TraceError(
                     "No trace artifact to open; call "
-                    "aether.playwright.browser_trace_stop first"
+                    "aegis.playwright.browser_trace_stop first"
                 )
             target = Path(str(target_path))
             exists = target.exists()
@@ -3704,7 +3704,7 @@ class _DebugUIMixin:
             "size_bytes": result.get("size_bytes"),
             "mime_type": result.get("mime_type"),
             "session_id": result.get("session_id"),
-            "open_action": "aether.playwright.browser_trace_open",
+            "open_action": "aegis.playwright.browser_trace_open",
         }
         artifact = {
             "artifact_id": result["filename"],

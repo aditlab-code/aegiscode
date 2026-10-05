@@ -2385,7 +2385,7 @@ class GatewayService:
         Returns:
             Daftar task info terurut terbaru ke terlama.
         """
-        from agent_ai.projects.aether_store import AetherProjectStore, TaskLogReader
+        from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
 
         # Isolasi per project: bila project_id diberikan, HANYA baca root project
         # ini. JANGAN menambahkan repo root AETHER / project terdaftar lain
@@ -2406,7 +2406,7 @@ class GatewayService:
         by_task: Dict[str, Dict[str, Any]] = {}
         for root in roots:
             try:
-                store = AetherProjectStore(root)
+                store = AegisProjectStore(root)
                 log_paths = store.list_task_logs()
             except Exception:  # noqa: BLE001 - satu root rusak tidak mengganggu root lain
                 continue
@@ -2516,7 +2516,7 @@ class GatewayService:
             Dict dengan status cleared dan jumlah task history yang dihapus.
         """
         from pathlib import Path as _Path
-        from agent_ai.projects.aether_store import AetherProjectStore
+        from agent_ai.projects.aegis_store import AegisProjectStore
         from api.services import ValidationError as _ValidationError
 
         target_roots: List[str] = []
@@ -2543,7 +2543,7 @@ class GatewayService:
         deleted_count = 0
         for root in target_roots:
             try:
-                store = AetherProjectStore(root)
+                store = AegisProjectStore(root)
                 log_paths = store.list_task_logs()
             except Exception:
                 continue
@@ -2728,7 +2728,7 @@ class GatewayService:
             Path file log jika ditemukan, None bila tidak ada.
         """
         from pathlib import Path as _Path
-        from agent_ai.projects.aether_store import safe_task_id
+        from agent_ai.projects.aegis_store import safe_task_id
 
         safe_id = safe_task_id(task_id)
         if not safe_id:
@@ -2737,7 +2737,9 @@ class GatewayService:
         for candidate in candidates:
             if not candidate:
                 continue
-            log_dir = _Path(candidate) / ".aether" / "log"
+            log_dir = _Path(candidate) / ".aegis" / "log"
+            if not log_dir.exists():
+                log_dir = _Path(candidate) / ".aether" / "log"
             if not log_dir.exists():
                 continue
             exact = log_dir / f"{safe_id}.log"
@@ -2751,7 +2753,7 @@ class GatewayService:
     def _reader_for_task(self, task_id: str, project_id: Optional[str] = None) -> Optional[Any]:
         """Buat TaskLogReader yang terikat ke file log yang benar-benar ada.
 
-        Root diturunkan dari path file (`<root>/.aether/log/<task_id>.log`)
+        Root diturunkan dari path file (`<root>/.aegis/log/<task_id>.log`)
         sehingga reader membaca file yang sama persis dengan hasil
         `_find_log_file()`. Tidak ada validasi kedua terhadap isi event yang
         bisa membuat task valid dianggap tidak ditemukan.
@@ -2759,13 +2761,13 @@ class GatewayService:
         Returns:
             TaskLogReader, atau None bila file log tidak ditemukan.
         """
-        from agent_ai.projects.aether_store import AetherProjectStore, TaskLogReader
+        from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
 
         log_file = self._find_log_file(task_id, project_id=project_id)
         if log_file is None:
             return None
-        # <root>/.aether/log/<task_id>.log -> root = parents[2] dari file dir.
-        store = AetherProjectStore(log_file.parent.parent.parent)
+        # <root>/.aegis/log/<task_id>.log -> root = parents[2] dari file dir.
+        store = AegisProjectStore(log_file.parent.parent.parent)
         return TaskLogReader(store, task_id=log_file.stem)
 
     def cancel_task(self, task_id: str) -> Dict[str, Any]:

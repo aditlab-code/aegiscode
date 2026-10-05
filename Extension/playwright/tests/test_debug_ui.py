@@ -68,7 +68,7 @@ class TestDebugPanelRegistration(unittest.TestCase):
             "screenshot_viewer",
             "trace_viewer",
         ):
-            self.assertIn("aether.playwright." + suffix, ui_ids)
+            self.assertIn("aegis.playwright." + suffix, ui_ids)
 
     def test_every_ui_type_is_valid(self):
         from agent_ai.extensions.capabilities import UI_TYPES
@@ -76,11 +76,11 @@ class TestDebugPanelRegistration(unittest.TestCase):
         _context, registry = build_context()
         for record in registry.list("ui"):
             self.assertIn(record.metadata.get("type"), UI_TYPES)
-            self.assertTrue(record.id.startswith("aether.playwright."))
+            self.assertTrue(record.id.startswith("aegis.playwright."))
 
     def test_panel_exposes_views_and_actions(self):
         _context, registry = build_context()
-        panel = registry.get("ui", "aether.playwright.debug_panel")
+        panel = registry.get("ui", "aegis.playwright.debug_panel")
         self.assertIsNotNone(panel)
         self.assertEqual(panel.metadata["type"], "panel")
         props = panel.metadata["props"]
@@ -88,13 +88,13 @@ class TestDebugPanelRegistration(unittest.TestCase):
             self.assertIn(view, props["views"])
         action_ids = {action["id"] for action in panel.metadata["actions"]}
         for required in (
-            "aether.playwright.browser_debug_panel",  # Refresh
-            "aether.playwright.page_close",  # Close Page
-            "aether.playwright.browser_console",  # Clear Console
-            "aether.playwright.browser_network",  # Clear Network
-            "aether.playwright.browser_screenshot",  # Screenshot
-            "aether.playwright.browser_trace_start",  # Start Trace
-            "aether.playwright.browser_trace_stop",  # Stop Trace
+            "aegis.playwright.browser_debug_panel",  # Refresh
+            "aegis.playwright.page_close",  # Close Page
+            "aegis.playwright.browser_console",  # Clear Console
+            "aegis.playwright.browser_network",  # Clear Network
+            "aegis.playwright.browser_screenshot",  # Screenshot
+            "aegis.playwright.browser_trace_start",  # Start Trace
+            "aegis.playwright.browser_trace_stop",  # Stop Trace
         ):
             self.assertIn(required, action_ids)
         self.assertEqual(action_ids, {a["id"] for a in DEBUG_PANEL_ACTIONS})
@@ -322,7 +322,7 @@ class TestArtifactViewers(unittest.TestCase):
         payload = view["data"]["payload"]
         self.assertTrue(Path(payload["path"]).exists())
         self.assertEqual(payload["mime_type"], "application/zip")
-        self.assertEqual(payload["open_action"], "aether.playwright.browser_trace_open")
+        self.assertEqual(payload["open_action"], "aegis.playwright.browser_trace_open")
         artifact = view["artifact"]
         self.assertEqual(artifact["mime_type"], "application/zip")
         self.assertGreater(artifact["size"], 0)
@@ -363,9 +363,9 @@ class TestDebugUIToolLayer(unittest.TestCase):
             "session_state_list",
             "session_state_delete",
         ):
-            self.assertIn("aether.playwright." + suffix, tools)
+            self.assertIn("aegis.playwright." + suffix, tools)
         for name in tools:
-            self.assertTrue(name.startswith("aether.playwright."))
+            self.assertTrue(name.startswith("aegis.playwright."))
 
     def test_panel_tool_executes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -373,7 +373,7 @@ class TestDebugUIToolLayer(unittest.TestCase):
             page_id, page = add_page(service, session_id)
             page.emit("console", FakeConsoleMessage("log", "hi"))
             tools = {tool.name: tool for tool in build_playwright_tools(service)}
-            result = tools["aether.playwright.browser_debug_panel"].execute(
+            result = tools["aegis.playwright.browser_debug_panel"].execute(
                 session_id=session_id, page_id=page_id
             )
             self.assertEqual(result["type"], "panel")
@@ -384,7 +384,7 @@ class TestDebugUIToolLayer(unittest.TestCase):
 
         tools = {tool.name: tool for tool in build_playwright_tools(PlaywrightService())}
         with self.assertRaises(ToolValidationError):
-            tools["aether.playwright.session_restore_state"].validate({})
+            tools["aegis.playwright.session_restore_state"].validate({})
 
     def test_trace_open_tool(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -393,7 +393,7 @@ class TestDebugUIToolLayer(unittest.TestCase):
             service.trace_start(session_id)
             service.trace_stop(session_id)
             tools = {tool.name: tool for tool in build_playwright_tools(service)}
-            descriptor = tools["aether.playwright.browser_trace_open"].execute(
+            descriptor = tools["aegis.playwright.browser_trace_open"].execute(
                 session_id=session_id
             )
             self.assertTrue(descriptor["exists"])

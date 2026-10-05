@@ -52,7 +52,7 @@ class LLMConfigService:
     """Facade CRUD konfigurasi LLM (SQLite) + credential (.env).
 
     Args:
-        db_path: path database SQLite. Default: database global `data/aether.db`.
+        db_path: path database SQLite. Default: database global `data/aegis.db`.
         env_path: path file `.env`. Default: `<repo>/.env`.
     """
 

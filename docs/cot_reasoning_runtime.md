@@ -1,13 +1,11 @@
-# Chain of Thought (CoT) Reasoning & Runtime Adaptation
+# Aegis Agent Chain of Thought (CoT) Reasoning & Runtime Adaptation
 
-This guide explores the design, prompting mechanisms, and dynamic adaptation of Chain of Thought (CoT) reasoning within the **AETHER** agent runtime.
-
+This guide explores the design, prompting mechanisms, and dynamic adaptation of Chain of Thought (CoT) reasoning within the **AegisCode** runtime (**Aegis Agent**).
 ---
 
-## 1. What is Chain of Thought (CoT) in AETHER?
+## 1. What is Chain of Thought (CoT) in Aegis Agent?
 
-In traditional script-based automation, decisions are statically hardcoded. In AETHER, complex problem-solving requires **emergent deliberation**:
-- The model verbalizes hypotheses, potential edge cases, and architectural trade-offs in reasoning steps before selecting tools.
+In traditional script-based automation, decisions are statically hardcoded. In Aegis Agent, complex problem-solving requires **emergent deliberation**:
 - Reasoning is not a static one-off prompt; it is an **iterative feedback loop** where every tool output acts as sensory input that updates subsequent thoughts.
 
 ```
@@ -111,14 +109,13 @@ class Replanner:
 
 ---
 
-## 4. Context Budgeting & Observation Compaction
+## 4. Context Budgeting & Split-Brain Observation Compaction
 
-Deep Chain of Thought reasoning across multiple tool execution steps can rapidly saturate LLM context windows. AETHER solves this with `src/agent_ai/contextbudget/`:
+Deep Chain of Thought reasoning across multiple tool execution steps can rapidly saturate LLM context windows. Aegis Agent's Asymmetric Split-Brain architecture enforces strict context packets (< 4,000 tokens dispatched to cloud models) using `src/agent_ai/contextbudget/`:
 
 - **Tool Result Compaction (`tool_compaction.py`):** Dumps of thousands of terminal lines or large file view outputs are trimmed to the critical error headers, stack traces, and relevant line numbers.
 - **Sliding History Compaction (`compaction.py`):** Older turns are summarized into concise conversational milestones while preserving active working state.
 - **Deduplication (`dedup.py`):** Redundant read operations on unchanged files are referenced via cache tokens instead of duplicating full file contents in the prompt.
-
 ---
 
 ## 5. Loop Detection & Safety Guards

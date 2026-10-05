@@ -37,11 +37,14 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from agent_ai.git.models import GitCommit
 from agent_ai.git.repository import GitRepositoryFacade
 from agent_ai.projects.github_backup import (
+    AEGIS_DIR_NAME,
     AETHER_DIR_NAME,
     GithubBackupConfig,
     GithubBackupStore,
     _normalize_exclude,
+    aegis_is_ignored,
     aether_is_ignored,
+    ensure_aegis_ignored,
     ensure_aether_ignored,
 )
 
@@ -106,7 +109,7 @@ class WindowsCredentialProtector:
         if not isinstance(secret, str) or not secret:
             raise CredentialProtectionError("Token tidak boleh kosong.")
         if self._crypt32 is None:
-            return b"AETHER_PLAIN_V1:" + base64.b64encode(secret.encode("utf-8"))
+            return b"AEGIS_PLAIN_V1:" + base64.b64encode(secret.encode("utf-8"))
 
         data_blob, _keep = self._make_blob(secret.encode("utf-8"))
         entropy_blob, _entropy_keep = self._entropy_blob()
@@ -134,6 +137,11 @@ class WindowsCredentialProtector:
         if not blob:
             raise CredentialProtectionError("Credential kosong.")
         blob_bytes = bytes(blob)
+        if blob_bytes.startswith(b"AEGIS_PLAIN_V1:"):
+            try:
+                return base64.b64decode(blob_bytes[len(b"AEGIS_PLAIN_V1:"):]).decode("utf-8")
+            except Exception as exc:
+                raise CredentialProtectionError("Credential tersimpan rusak.") from exc
         if blob_bytes.startswith(b"AETHER_PLAIN_V1:"):
             try:
                 return base64.b64decode(blob_bytes[len(b"AETHER_PLAIN_V1:"):]).decode("utf-8")
@@ -178,15 +186,15 @@ class WindowsCredentialProtector:
 #: Git credential helper: membaca token dari ENV (bukan dari argv/URL), agar
 #: token tidak muncul di daftar argumen proses maupun di URL remote.
 _CREDENTIAL_HELPER = (
-    "!f() { echo \"username=$AETHER_GIT_USERNAME\"; "
-    "echo \"password=$AETHER_GIT_PASSWORD\"; }; f"
+    "!f() { echo \"username=${AEGIS_GIT_USERNAME:-$AETHER_GIT_USERNAME}\"; "
+    "echo \"password=${AEGIS_GIT_PASSWORD:-$AETHER_GIT_PASSWORD}\"; }; f"
 )
 
 
 class GitBackupClient:
     """Operasi Git untuk backup (add/commit/push/restore).
 
-    Operasi READ memakai `GitRepositoryFacade` / `SubprocessGitClient` AETHER
+    Operasi READ memakai `GitRepositoryFacade` / `SubprocessGitClient`
     yang SUDAH ada (bukan Git client kedua untuk read).
     """
 
@@ -203,7 +211,7 @@ class GitBackupClient:
 
     # -- read facade (reuse) --------------------------------------------- #
     def facade(self, root: Path) -> GitRepositoryFacade:
-        """Facade read-only AETHER untuk root project (di-cache per root)."""
+        """Facade read-only untuk root project (di-cache per root)."""
         if self._facade is not None:
             return self._facade
         if self._facade_root is None or self._facade_root != Path(root):
@@ -222,6 +230,8 @@ class GitBackupClient:
         env = os.environ.copy()
         env["GIT_TERMINAL_PROMPT"] = "0"
         if token:
+            env["AEGIS_GIT_USERNAME"] = "x-access-token"
+            env["AEGIS_GIT_PASSWORD"] = token
             env["AETHER_GIT_USERNAME"] = "x-access-token"
             env["AETHER_GIT_PASSWORD"] = token
         return env
@@ -374,9 +384,14 @@ def _matches_exclude(path: str, patterns: List[str]) -> bool:
 
 
 def _is_aether_metadata(path: str) -> bool:
-    """True bila path berada di dalam `.aether/` (metadata private AETHER)."""
+    """True bila path berada di dalam `.aegis/` atau `.aether/` (metadata private)."""
     p = _normalize_rel(path)
-    return p == AETHER_DIR_NAME or p.startswith(AETHER_DIR_NAME + "/")
+    return (
+        p == AEGIS_DIR_NAME
+        or p.startswith(AEGIS_DIR_NAME + "/")
+        or p == AETHER_DIR_NAME
+        or p.startswith(AETHER_DIR_NAME + "/")
+    )
 
 
 def _github_owner_repo(url: str) -> Optional[Tuple[str, str]]:

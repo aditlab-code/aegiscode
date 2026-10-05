@@ -1,7 +1,6 @@
-# AETHER Developer Guide
+# AegisCode Developer Guide
 
-This document is the onboarding and operational guide for developers building, extending, and maintaining the **AETHER** codebase.
-
+This document is the onboarding and operational guide for developers building, extending, and maintaining the **AegisCode** codebase (AegisCode Studio & Aegis Agent).
 ---
 
 ## 1. Prerequisites & Environment Setup
@@ -16,8 +15,8 @@ This document is the onboarding and operational guide for developers building, e
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/adigayung/aether-agent.git
-   cd aether-agent
+   git clone https://github.com/aditlab-code/aether.git aegiscode
+   cd aegiscode
    ```
 
 2. **Configure Python Virtual Environment:**
@@ -51,16 +50,14 @@ This document is the onboarding and operational guide for developers building, e
    # Local Provider (Ollama)
    OLLAMA_BASE_URL=http://localhost:11434
 
-   # Runtime Settings
-   AETHER_MAX_TURNS=40
-   AETHER_LOG_LEVEL=INFO
-   ```
+   # Runtime Settings (AEGIS_* with legacy AETHER_* fallback)
+   AEGIS_MAX_TURNS=40
+   AEGIS_LOG_LEVEL=INFO
+   AEGIS_PORT=8478
 
 ---
 
-## 2. Running AETHER
-
-### Full Stack (Backend + Workbench)
+## 2. Running AegisCode
 Using the built-in startup scripts:
 ```bash
 # macOS / Linux
@@ -81,10 +78,9 @@ python scripts/check_agent_runtime.py
 
 ---
 
-## 3. Dual-Stack Testing Protocol
+## 3. Dual-Stack Testing & Lifecycle Verification
 
-Quality verification in AETHER uses a **dual-stack testing framework**: `pytest` for the Python core engine/backend, and `vitest` for the frontend workbench.
-
+Quality verification in AegisCode uses a **dual-stack testing framework**: `pytest` for the Python core engine/backend, and Node test runner / `vitest` for the frontend workbench, coupled with zero-zombie process tree kill checks.
 ### 3.1 Backend & Engine Testing (`pytest`)
 
 Backend test suites live in `tests/` and validate runtime execution, tool sandboxing, context building, and provider integrations.
@@ -107,7 +103,8 @@ pytest tests/ -m "not integration"
 #### Backend Test Conventions:
 - Place unit tests in `tests/test_<module_name>.py`.
 - Mock external LLM API calls using `unittest.mock` or pytest fixtures unless running explicit integration benchmarks.
-- Clean up any temporary directories or scratch files generated during testing.
+- Clean up any temporary directories, `.aegis/`, or scratch files generated during testing.
+- Verify zero-zombie process cleanup when testing process/terminal execution tools.
 
 ### 3.2 Frontend & Workbench Testing (Node Test Runner & Vite SSR)
 

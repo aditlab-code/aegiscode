@@ -31,14 +31,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only, avoids runtime import
     from ..services.playwright_service import PlaywrightService
 
 #: Extension namespace every tool id must start with.
-NAMESPACE = "aether.playwright."
+NAMESPACE = "aegis.playwright."
 
 
 class _PlaywrightTool(BaseTool):
     """Common base for Playwright tools: holds the shared service instance."""
 
     #: Namespaced tool id; subclasses override.
-    name: str = "aether.playwright.tool"
+    name: str = "aegis.playwright.tool"
     description: str = ""
     input_schema: Dict[str, Any] = {"type": "object", "properties": {}}
 

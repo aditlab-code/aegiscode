@@ -191,7 +191,7 @@ const {
   seedHistory,
   closePopover,
 } = usePromptAutocomplete({
-  storageKey: "aether_task_prompt_history",
+  storageKey: "aegis_task_prompt_history",
   onUpdateText: (val) => {
     promptText.value = val;
   },
@@ -460,7 +460,7 @@ const statusIcon = computed(() => {
 
           <!-- ── Unified Vertical Timeline ── -->
           <div class="rd-scroll-area">
-            <span class="sr-only">aether — agent activity</span>
+            <span class="sr-only">aegis — agent activity</span>
             <AgentActivity
               :events="activityEvents"
               :status="task.status"
@@ -516,7 +516,7 @@ const statusIcon = computed(() => {
             <button
               type="button"
               class="chat-settings-btn"
-              title="Configure Provider (Aether)"
+              title="Configure Provider (AegisCode)"
               aria-label="Configure Provider"
               @click="emit('open-settings', 'providers')"
             >
@@ -542,7 +542,7 @@ const statusIcon = computed(() => {
               v-model="promptText"
               class="chat-prompt-textarea"
               rows="2"
-              placeholder="Ask AETHER to build something… (@ for file, / for template)"
+              placeholder="Ask AegisCode to build something… (@ for file, / for template)"
               :disabled="isRunning"
               @input="onPromptInput"
               @keydown="onPromptKeydown"
@@ -567,7 +567,7 @@ const statusIcon = computed(() => {
               type="button"
               class="chat-send-btn"
               :disabled="isRunning || !promptText.trim()"
-              title="Send prompt to AETHER (Enter)"
+              title="Send prompt to AegisCode (Enter)"
               aria-label="Send Task"
               @click="handleSubmit"
             >

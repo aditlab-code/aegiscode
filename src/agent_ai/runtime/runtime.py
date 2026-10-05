@@ -922,7 +922,7 @@ class AgentRuntime:
         if not self.project_root:
             return
         try:
-            from agent_ai.projects.aether_store import TaskLog
+            from agent_ai.projects.aegis_store import TaskLog
 
             self._task_log = TaskLog(self.project_root, task_id=self._current_task_id)
             # Task Log membuat task_id bila execution masuk tanpa task_id.
@@ -935,7 +935,7 @@ class AgentRuntime:
             from agent_ai.config.settings import write_log_response_api
 
             if write_log_response_api():
-                from agent_ai.projects.aether_store import ResponseLog
+                from agent_ai.projects.aegis_store import ResponseLog
 
                 self._response_log = ResponseLog(
                     self.project_root, task_id=self._current_task_id

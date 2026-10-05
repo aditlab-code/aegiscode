@@ -40,6 +40,9 @@ def _read(path: Path) -> dict:
 
 
 def _permissions_path(root: Path) -> Path:
+    p = root / ".aegis" / PERMISSIONS_FILE_NAME
+    if p.exists():
+        return p
     return root / ".aether" / PERMISSIONS_FILE_NAME
 
 

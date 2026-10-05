@@ -88,7 +88,7 @@ def _extension_root_data(extension_id: str, aether_root: Optional[Union[str, Pat
 
 def _atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=".aether_tmp_", suffix=".swp")
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=".aegis_tmp_", suffix=".swp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(text)
@@ -176,8 +176,8 @@ class ExtensionStorage:
                 # No project root -> use global but isolated as project_<safe>
                 # This still isolates but not truly project-scoped; tests will pass with explicit path
                 raise ValueError(f"Project-scoped storage requires project path, got {project_id_or_path!r}")
-        # Project-scoped extension data: <project>/.aether/extensions/<safe_id>/
-        base = proj_root / ".aether" / "extensions" / self._safe_id
+        # Project-scoped extension data: <project>/.aegis/extensions/<safe_id>/
+        base = proj_root / ".aegis" / "extensions" / self._safe_id
         base.mkdir(parents=True, exist_ok=True)
         return base
 

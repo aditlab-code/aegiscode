@@ -1,7 +1,6 @@
 # Oh My Company (OMC) Agent Framework
 
-This document outlines the organization, persona profiles, workflow mechanics, and communication protocols for the **Oh My Company (OMC)** multi-agent system in AETHER.
-
+This document outlines the organization, persona profiles, workflow mechanics, and communication protocols for the **Oh My Company (OMC)** multi-agent system within AegisCode.
 ---
 
 ## 1. System Architecture & Topology

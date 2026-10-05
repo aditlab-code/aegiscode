@@ -1,7 +1,6 @@
-# Tool and Provider Extensibility Guide
+# AegisCode Tool and Provider Extensibility Guide
 
-AETHER is designed for clean extensibility. This guide details how to implement custom tools, connect external Model Context Protocol (MCP) servers, and register new LLM providers.
-
+AegisCode is designed for clean extensibility. This guide details how to implement custom tools, connect external Model Context Protocol (MCP) servers, and register new LLM providers within Aegis Agent.
 ---
 
 ## 1. Implementing Custom Tools
@@ -75,9 +74,9 @@ def register_default_tools(registry: ToolRegistry) -> None:
 
 ## 2. Model Context Protocol (MCP) Integration
 
-AETHER supports the Model Context Protocol (MCP), allowing the agent to consume tools and resources from external MCP servers.
+AegisCode supports the Model Context Protocol (MCP), allowing Aegis Agent to consume tools and resources from external MCP servers.
 
-Configuration in `.env` or workbench config:
+Configuration lives in `.aegis/mcp.json` (with automatic fallback to `.aether/mcp.json` or `.env`):
 ```json
 {
   "mcp_servers": {
@@ -93,13 +92,13 @@ Configuration in `.env` or workbench config:
 }
 ```
 
-AETHER's `src/agent_ai/mcp/` bridge automatically discovers external MCP capabilities and translates them into native AETHER tool definitions at runtime startup.
+AegisCode's `src/agent_ai/mcp/` bridge automatically discovers external MCP capabilities and translates them into native Aegis Agent tool definitions at runtime startup.
 
 ---
 
 ## 3. Adding New LLM Providers
 
-AETHER provides a unified interface for model backends (OpenAI, Anthropic, DeepSeek, Ollama, OpenRouter, NineRouter, etc.).
+AegisCode provides a unified interface for model backends (Google Antigravity, OpenAI, Anthropic, DeepSeek, Ollama, OpenRouter, NineRouter, etc.).
 
 ### 3.1 Base Provider Contract
 All providers extend `BaseProvider` in `src/agent_ai/providers/base.py`:
@@ -140,7 +139,7 @@ def create_provider(provider_name: str, config: Dict[str, Any]) -> BaseProvider:
 ```
 
 ### 3.3 Robustness & Retries (`retry.py`)
-Wrap outbound provider calls with AETHER's backoff utility:
+Wrap outbound provider calls with Aegis Agent's backoff utility:
 - Automatically handles HTTP 429 (Rate Limits) and HTTP 503 (Overloaded).
 - Configurable maximum retries with exponential jitter backoff.
 - Failover support: switches to a configured secondary provider if the primary provider sustains consecutive timeouts.

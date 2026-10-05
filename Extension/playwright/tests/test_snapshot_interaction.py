@@ -735,23 +735,23 @@ class TestToolRegistration(unittest.TestCase):
             "browser_dialog",
         ]
         for suffix in expected:
-            self.assertIn("aether.playwright." + suffix, tools)
+            self.assertIn("aegis.playwright." + suffix, tools)
         for name in tools:
-            self.assertTrue(name.startswith("aether.playwright."))
+            self.assertTrue(name.startswith("aegis.playwright."))
 
     def test_tool_schemas_require_page_id(self):
         tools = {t.name: t for t in build_playwright_tools(PlaywrightService())}
         for suffix in ("browser_snapshot", "browser_click", "browser_fill"):
-            schema = tools["aether.playwright." + suffix].input_schema
+            schema = tools["aegis.playwright." + suffix].input_schema
             self.assertIn("page_id", schema["required"])
-        self.assertIn("value", tools["aether.playwright.browser_fill"].input_schema["required"])
+        self.assertIn("value", tools["aegis.playwright.browser_fill"].input_schema["required"])
 
     def test_validation_rejects_missing_required(self):
         from agent_ai.tools.base import ToolValidationError
 
         tools = {t.name: t for t in build_playwright_tools(PlaywrightService())}
         with self.assertRaises(ToolValidationError):
-            tools["aether.playwright.browser_snapshot"].validate({})
+            tools["aegis.playwright.browser_snapshot"].validate({})
 
 
 class TestSnapshot(unittest.TestCase):
@@ -1206,11 +1206,11 @@ class TestExtensionRegistration(unittest.TestCase):
                 "browser_download",
                 "browser_dialog",
             ):
-                self.assertIn("aether.playwright." + suffix, registered)
+                self.assertIn("aegis.playwright." + suffix, registered)
             # namespaced capabilities only
-            self.assertTrue(all(name.startswith("aether.playwright.") for name in registered))
+            self.assertTrue(all(name.startswith("aegis.playwright.") for name in registered))
             # the service capability still exposes the live service instance
-            service_cap = context.services.get("aether.playwright.playwright_service")
+            service_cap = context.services.get("aegis.playwright.playwright_service")
             self.assertIsNotNone(service_cap)
             self.assertIsInstance(
                 service_cap.metadata.get("service_instance"), PlaywrightService

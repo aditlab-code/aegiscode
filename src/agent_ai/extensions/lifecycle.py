@@ -34,13 +34,7 @@ def _default_db_path() -> Path:
         base = Path(PROJECT_ROOT) / "data"
     except Exception:
         base = Path(__file__).resolve().parents[3] / "data"
-    aegis_db = base / "aegis.db"
-    aether_db = base / "aether.db"
-    if aegis_db.exists():
-        return aegis_db
-    if aether_db.exists():
-        return aether_db
-    return aegis_db
+    return base / "aegis.db"
 
 
 _LIFECYCLE_SCHEMA = """

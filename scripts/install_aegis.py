@@ -64,10 +64,10 @@ from pathlib import Path
 # Konstanta (portable; JANGAN hardcode path mesin)
 # ---------------------------------------------------------------------------
 MIN_PYTHON = (3, 10)
-REPO_URL = "https://github.com/adigayung/aether-agent.git"
+REPO_URL = "https://github.com/aditlab-code/aegiscode.git"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
-LOG_PREFIX = "[AETHER]"
+LOG_PREFIX = "[AegisCode]"
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +135,10 @@ def settings_file(root: Path) -> Path:
 
 
 def _deps_stamp(venv: Path) -> Path:
-    return venv / ".aether_deps_stamp"
+    stamp = venv / ".aegis_deps_stamp"
+    if not stamp.exists() and (venv / ".aether_deps_stamp").exists():
+        return venv / ".aether_deps_stamp"
+    return stamp
 
 
 # ---------------------------------------------------------------------------
@@ -407,8 +410,8 @@ def launch(root: Path, python: Path, host: str, port: int | None = None, open_br
 # ---------------------------------------------------------------------------
 # 7) Mode SIMULASI (dry-run, offline, tanpa mutasi)
 # ---------------------------------------------------------------------------
-def _aether_markers(root: Path) -> list[str]:
-    """Marker yang menandai sebuah folder sebagai instalasi AETHER (read-only)."""
+def _aegis_markers(root: Path) -> list[str]:
+    """Marker yang menandai sebuah folder sebagai instalasi AegisCode (read-only)."""
     found: list[str] = []
     if (root / "pyproject.toml").exists():
         found.append("pyproject.toml")
@@ -419,10 +422,16 @@ def _aether_markers(root: Path) -> list[str]:
     return found
 
 
-def looks_like_aether(root: Path) -> bool:
-    """True bila root memuat marker instalasi AETHER (tanpa efek samping)."""
-    markers = _aether_markers(root)
+_aether_markers = _aegis_markers
+
+
+def looks_like_aegis(root: Path) -> bool:
+    """True bila root memuat marker instalasi AegisCode (tanpa efek samping)."""
+    markers = _aegis_markers(root)
     return "pyproject.toml" in markers or "web/django_app/manage.py" in markers
+
+
+looks_like_aether = looks_like_aegis
 
 
 def port_in_use(host: str, port: int) -> bool:

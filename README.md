@@ -7,19 +7,18 @@
 **AegisCode gives an LLM the tools, project intelligence, and protective execution environment it needs to work on real software projects autonomously.**
 
 ```
-AETHER = Hands
-LLM    = Brain
+Aegis Agent = Hands
+LLM         = Brain
 ```
 
-The LLM remains the decision-maker. AETHER provides the hands: filesystem tools, terminal, project navigation, and a runtime that lets the model investigate, edit, run, and validate code over multiple rounds without human micromanagement.
-
+The LLM remains the decision-maker. Aegis Agent provides the hands: filesystem tools, interactive terminal, project intelligence, and an execution runtime that lets the model investigate, edit, run, and validate code autonomously.
 ---
 
-## What is AETHER?
+## What is AegisCode?
 
-AETHER is a coding agent engine plus a workbench for running it. You describe a task in natural language; AETHER prepares context, streams the agent's reasoning, executes tools, and reports results.
+AegisCode is an autonomous AI coding agent runtime (**Aegis Agent**) paired with a protective, developer-first IDE workbench (**AegisCode Studio**). You describe a task in natural language; AegisCode prepares context, streams the agent's reasoning, executes tools under strict deterministic guardrails, and reports results.
 
-Core idea:
+Backward-compatibility notice: For workspace state and intelligence discovery, AegisCode prioritizes the `.aegis/` configuration directory and `data/aegis.db` SQLite database, while seamlessly falling back to legacy `.aether/` and `data/aether.db` paths.
 
 ```
 User prompt
@@ -117,20 +116,18 @@ The proposal can be sent to the Agent with one click via the existing task flow.
 
 ### Project Intelligence
 
-Project-local, additive, and stored under `<project>/.aether/` — no new databases.
+Project-local, additive, and stored under `<project>/.aegis/` (with automatic fallback to `.aether/`) — no external heavy databases.
 
 | Layer | Location | Purpose |
 |-------|----------|---------| 
-| **Bible** | `.aether/bible/` | Structured markdown knowledge (`architecture.md`, `conventions.md`, `facts.md`, `decisions.md`, `learnings.md`, `problems.md`, …) plus `index.md` manifest. Read as context; updated once per task (Agent) or explicitly via Consultant. |
-| **Map** | `.aether/map/` | `atlas.json` (CODE ATLAS) + `rig.json` (MAP_CODE_RIG) + `*.meta.json` freshness metadata. Generated via vendored engines in `vendor/`. |
-| **Environment** | `.aether/ENVIRONMENT.md` | OS / shell / runtime context — built once per session, injected on the first task. |
-| **Log** | `.aether/log/<task_id>.log` | Append-only JSON Lines — source of truth for Task History, Activity, and Report. |
+| **Bible** | `.aegis/bible/` (fallback: `.aether/bible/`) | Structured markdown knowledge (`architecture.md`, `conventions.md`, `facts.md`, `decisions.md`, `learnings.md`, `problems.md`, …) plus `index.md` manifest. Read as context; updated once per task (Agent) or explicitly via Consultant. |
+| **Map** | `.aegis/map/` (fallback: `.aether/map/`) | `atlas.json` (CODE ATLAS) + `rig.json` (MAP_CODE_RIG) + `*.meta.json` freshness metadata. Generated via vendored engines in `vendor/`. |
+| **Environment** | `.aegis/ENVIRONMENT.md` (fallback: `.aether/ENVIRONMENT.md`) | OS / shell / runtime context — built once per session, injected on the first task. |
+| **Log** | `.aegis/log/<task_id>.log` (fallback: `.aether/log/`) | Append-only JSON Lines — source of truth for Task History, Activity, and Report. |
 
-**Bible = WHAT, Map = WHERE, Skill = HOW, Tool = CAPABILITY.** Map provides navigation; the LLM looks up locations and then reads the actual files. Staleness is detected deterministically (SHA-256 over `.py` source), but regeneration is never automatic — the LLM/Agent decides when to call `refresh_project_map`.
+**Bible = WHAT, Map = WHERE, Skill = HOW, Tool = CAPABILITY.** Map provides navigation; the LLM looks up locations and then reads the actual files. Staleness is detected deterministically (SHA-256 over source files), but regeneration is never automatic — the LLM/Agent decides when to call `refresh_project_map`.
 
 Relevant tools: `project_map_status`, `atlas_query`, `rig_query`, `refresh_project_map` (Agent only; Consultant gets the first three).
-
-### Skill System
 
 Dynamic, progressive, and shared by Agent and Consultant.
 
@@ -139,7 +136,7 @@ skill_catalog
 ↓
 LLM chooses 0 / 1 / N skill_ids
 ↓
-load_skill(skill_id)  →  .aether/bible/skills/<skill_id>/skill.md
+load_skill(skill_id)  →  .aegis/bible/skills/<skill_id>/skill.md (or .aether/)
 ↓
 load_skill_reference(skill_id, reference)  →  references/<reference> (on demand)
 ```
@@ -162,7 +159,7 @@ Skills are guidance/context, not a permission grant and not an auto-loaded conte
 Provider and model are configured independently.
 
 - Provider types are registered in `agent_ai.providers.registry` (`ollama`, `deepseek`, `openrouter`, `openai`, `opencode`, `9router`, `custom` / OpenAI-compatible). Adding a provider means registering a class with a unique `name` — core never imports a concrete provider.
-- **Configuration is stored in SQLite** (`data/aether.db`) via `agent_ai.llm_config.LLMConfigService`. The same database is used by the gateway launcher. Tables: `llm_provider_instances` and `llm_models`.
+- **Configuration is stored in SQLite** (`data/aegis.db`, with automatic fallback to `data/aether.db`) via `agent_ai.llm_config.LLMConfigService`. The same database is used by the gateway launcher. Tables: `llm_provider_instances` and `llm_models`.
 - Each **Provider Instance** points to an env-var name (`api_key_env`, e.g. `OPENROUTER_API_KEY`), not the secret value. The secret stays in `.env`; the DB stores only the variable name, base URL, and metadata.
 - Each instance can have multiple **Models**. Selection is `Provider Instance → Model` (one instance, many models).
 - **OpenAI-compatible / custom provider** is a first-class entry (`CustomOpenAIProvider`). Any base URL + API key + model string can be wired through it, including self-hosted OpenAI-compatible endpoints.
@@ -172,7 +169,7 @@ Provider and model are configured independently.
 
 ### Queue & Parallel Agent
 
-AETHER executes tasks in two modes that coexist:
+AegisCode executes tasks in two modes that coexist:
 
 ```
 Execution
@@ -198,7 +195,7 @@ Queue and Parallel coexist — a parallel task never blocks the queue slot and a
 
 **File Write Lock**
 
-Parallel agents share an in-process lock on write tools to prevent simultaneous writes to the same file:
+Parallel agents share an in-process lock on write tools to prevent simultaneous writes to the same file (supporting AegisCode's Deterministic Guardrails):
 
 ```
 Agent A → write_file(example.py)
@@ -225,13 +222,13 @@ Agent B → write_file(example.py)
 - Errors are returned through the existing tool error path; no new error channel. The LLM decides how to proceed (retry, pick another file, etc.).
 - This is not absolute filesystem isolation — it is a cooperative in-process guard within the same runtime process.
 
-### Modern IDE Workbench
+### Modern IDE Workbench (AegisCode Studio)
 
 Vue 3 + Vite frontend (`web/frontend`) and a thin Django gateway (`web/django_app`). No agent logic lives in the frontend. The UI follows a **VS Code-style AI-first IDE layout**:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│  [⌘] AETHER WORKBENCH  ─ Workspace  [ ⌘K Command Palette ]            │
+│  [🛡️] AEGISCODE STUDIO  ─ Workspace  [ ⌘K Command Palette ]            │
 ├──────┬─────────────────┬──────────────────────┬────────────────────────┤
 │ ACT. │ LEFT SIDEBAR    │ CENTER CANVAS        │ RIGHT AI DRAWER        │
 │ BAR  │ (200–450px)     │ Monaco Code Editor   │ (320–650px)            │
@@ -246,7 +243,6 @@ Vue 3 + Vite frontend (`web/frontend`) and a thin Django gateway (`web/django_ap
 │ STATUSBAR: Ln/Col | Language | Model | Provider | Theme | Version      │
 └────────────────────────────────────────────────────────────────────────┘
 ```
-
 **Layout components:**
 
 | Component | Description |
@@ -271,31 +267,31 @@ Vue 3 + Vite frontend (`web/frontend`) and a thin Django gateway (`web/django_ap
 - **Task input** — Task Composer modal (task text + Provider Instance + Model + Execution mode + retrieval profile).
 - **Multi-tab editor** — `EditorTabsService`: open multiple files simultaneously, tab lifecycle (open/close/activate/dirty state).
 - **Editor settings** — `EditorSettingsPanel`: Monaco live code preview, auto-save, per-project settings with VS Code-style gear menu.
-- **Light / Dark theme** — `ThemeService`: full light theme (`theme-light.css`) + wallpaper support (`Aether-dark.jpeg`, `Aether-light.jpeg`).
+- **Light / Dark theme** — `ThemeService`: full light theme (`theme-light.css`) + wallpaper support (`Aegis-dark.jpeg`, `Aegis-light.jpeg`).
 - **Agent Workbench** — Latest Task card, lifecycle progress (Planning → Completed), duration ticker, and unified Agent Activity timeline (tool calls, observations, phase changes) with compact vertical layout.
 - **Consultant** — chat modal with quick/investigate mode, image attachments, and Task Proposal → Run with the same Provider/Model selectors.
-- **Task History & Queue** — History reads from `.aether/log/` (persistent); Queue reflects `GET /api/tasks/queue` (pending/running/disabled). Both are the same global queue the backend uses.
+- **Task History & Queue** — History reads from `.aegis/log/` (fallback: `.aether/log/`, persistent); Queue reflects `GET /api/tasks/queue` (pending/running/disabled). Both are the same global queue the backend uses.
 - **Changes & Explorer** — live filesystem changes (diff, additions/deletions) and a file tree bound to the active project root. Editor is Monaco.
 - **Task status** — `prepared` / `running` / `queued` / `validating` / `completed` / `failed` / `cancelled`.
 - **Stop confirmation** — cooperative cancellation via confirmation dialog.
 
-### Interactive Terminal
+### Interactive PTY Terminal
 
-The Bottom Dock hosts a fully interactive terminal (`TerminalView`):
+The Bottom Dock hosts a fully interactive non-blocking PTY terminal powered by `@xterm/xterm` and backend PTY lifecycle management (`TerminalView`):
 
 ```
 Features:
+├── Full PTY interactive session (ANSI escape sequences, ncurses, REPL)
 ├── Shell input with prompt (run commands from workspace root)
 ├── Command history (↑/↓ navigation, last 50 entries)
-├── Ctrl+C → abort running command (SSE abort signal)
+├── Ctrl+C → abort running command (PTY SIGINT / SSE abort signal)
+├── Process lifecycle hygiene: zero-zombie guaranteed via process tree cleanup (SIGTERM/SIGKILL)
 ├── Ctrl+Shift+C → copy selected output
 ├── Ctrl+Shift+V → paste into input
-├── ANSI output rendering (ok / err / warn / input line classes)
 └── Read-only mode for passive agent output viewing
 ```
 
-Backend streams command output via SSE. The LLM's `run_command` output and user-initiated commands share the same output channel.
-
+Backend streams command output via SSE/WebSocket PTY bridge. The LLM's `run_command` output and user-initiated commands share the same output channel.
 ### Telemetry
 
 Available on the task card and via Activity / SSE events. All values are derived from existing lifecycle events, not estimates:
@@ -381,7 +377,7 @@ MCPClient (abstract interface)
   → connect() / list_tools() / call_tool(name, args) / close()
 
 MCPAdapter
-  → bridges MCP tools into AETHER's ToolRegistry
+  → bridges MCP tools into Aegis Agent's ToolRegistry
   → dynamic tool discovery on session init
 
 Transport layer
@@ -389,7 +385,7 @@ Transport layer
 ```
 
 - Fully optional — Agent Core runs without MCP; module is not imported by default.
-- Config: `.aether/mcp.json` (compatible with Claude Desktop / Cursor format).
+- Config: `.aegis/mcp.json` (fallback: `.aether/mcp.json`, compatible with Claude Desktop / Cursor format).
 - `InMemoryMCPClient` provided for testing/verification.
 
 ---
@@ -409,15 +405,15 @@ Transport layer
 
 ```mermaid
 flowchart TD
-  U[User] --> W[Workbench - Modern IDE]
+  U[User] --> W[AegisCode Studio Workbench]
   U --> C[Consultant]
   C --> T[Task]
   T --> Q[Queue - serial FIFO]
   T --> P[Parallel - concurrent]
-  Q --> R[Agent Runtime]
+  Q --> R[Aegis Agent Runtime]
   P --> R
-  R --> TL[Tools]
-  R --> PM[Project Memory\nBible / Map / Skills]
+  R --> TL[Tools & FileWriteLock]
+  R --> PM[Project Memory\nBible / Map / Skills / Vectors]
   R --> LLM[LLM Provider]
   R --> PL[Planning Module]
   R --> RL[Reliability Manager]
@@ -454,7 +450,7 @@ PreparedTask → AgentRuntime → AgentOrchestrator.run_continuous_loop
 │   ├── mcp/                 # MCP client adapter (stdio / SSE transport)
 │   ├── permission/          # Permission policy & classifier
 │   ├── planning/            # TaskPlanner + Replanner (deterministic)
-│   ├── projects/            # AetherProjectStore, Bible, Map, Skills, discovery
+│   ├── projects/            # AegisProjectStore, Bible, Map, Skills, discovery
 │   ├── providers/           # BaseProvider + ollama / openai_compatible / opencode / custom / …
 │   ├── reliability/         # ReliabilityManager, RetryController, Detector
 │   ├── resume/              # TaskResumer (safe task continuation)
@@ -475,19 +471,19 @@ PreparedTask → AgentRuntime → AgentOrchestrator.run_continuous_loop
 │           ├── pages/       # WorkbenchView, SettingsOverlay
 │           ├── services/    # commandPaletteService, editorTabsService, themeService, …
 │           └── styles/      # Modular CSS (base, components, layout, themes)
-├── scripts/                 # install_aether.py, check_*.py verifiers
+├── scripts/                 # install_aegis.py, check_*.py verifiers
 ├── tests/                   # Project tests
 ├── vendor/                  # Vendored engines: CODE_ATLAS, MAP_CODE_RIG
-├── data/                    # SQLite DB (data/aether.db), version.json
+├── data/                    # SQLite DB (data/aegis.db / fallback data/aether.db), version.json
 ├── projects/                # Example / registered project roots
 ├── run.bat                  # Self-bootstrapping launcher (Windows)
 └── run.sh                   # Self-bootstrapping launcher (macOS/Linux)
 ```
 
-`.aether` layout (created inside the active project root):
+`.aegis` layout (created inside the active project root, with backward compatibility for `.aether`):
 
 ```
-.aether/
+.aegis/
 ├── bible/
 │   ├── index.md
 │   ├── architecture.md
@@ -505,13 +501,13 @@ PreparedTask → AgentRuntime → AgentOrchestrator.run_continuous_loop
 │   ├── rig.json
 │   ├── atlas.meta.json
 │   └── rig.meta.json
+├── vectors.db                  # Local sqlite-vec semantic index
 ├── log/
 │   └── <task_id>.log
 ├── mcp.json                    # optional — MCP server config
 ├── github/                     # optional — GitHub backup config (DPAPI on Windows)
 └── ENVIRONMENT.md
 ```
-
 ---
 
 ## Getting Started
@@ -520,18 +516,18 @@ PreparedTask → AgentRuntime → AgentOrchestrator.run_continuous_loop
 
 - Python 3.10+
 - Git
-- Node.js (for frontend build — installed automatically by `run.bat` / `scripts/install_aether.py`; manual install only needed for frontend dev)
+- Node.js (for frontend build — installed automatically by `run.bat` / `scripts/install_aegis.py`; manual install only needed for frontend dev)
 
 ### 1. Get the code
 
 ```bash
-git clone https://github.com/aditlab-code/aether.git
-cd aether
+git clone https://github.com/aditlab-code/aegiscode.git
+cd aegiscode
 ```
 
 Original upstream (read-only reference): `https://github.com/adigayung/aether-agent`.
 
-Or just download and double-click `run.bat` (Windows) / `run.sh` (macOS/Linux) — it will clone to `aether-agent/` next to the launcher if no installation is found.
+Or just download and double-click `run.bat` (Windows) / `run.sh` (macOS/Linux) — it will clone to `aegiscode/` next to the launcher if no installation is found.
 
 ### 2. Configure providers
 
@@ -557,12 +553,12 @@ CONTEXT_KNOWLEDGE_MAX_TOKENS=8000
 CONTEXT_MAX_TOKENS=16000
 ```
 
-### 3. Run AETHER
+### 3. Run AegisCode
 
 Double-click `run.bat` (Windows) / `run.sh` (macOS/Linux), or from a terminal:
 
 ```bash
-python scripts/install_aether.py
+python scripts/install_aegis.py
 ```
 
 What it does (idempotent — safe to run repeatedly):
@@ -576,16 +572,16 @@ What it does (idempotent — safe to run repeatedly):
 The **server port is read from `data/settings.json`** (`port`, e.g. `"port": 8478`);
 `8000` is only the fallback when the file does not set `port`. If the configured
 port is already in use, the launcher automatically falls back to the next free
-port, and the printed/opened URL uses the port actually used. Set `AETHER_PORT`
+port, and the printed/opened URL uses the port actually used. Set `AEGIS_PORT` (or legacy `AETHER_PORT`)
 to override explicitly.
 
 Useful flags:
 
 ```bash
-python scripts/install_aether.py --check          # verify prerequisites only
-python scripts/install_aether.py --no-launch      # setup without starting server
-python scripts/install_aether.py --simulate       # dry-run (no downloads / writes)
-python scripts/install_aether.py --port 8478      # explicit port (overrides settings)
+python scripts/install_aegis.py --check          # verify prerequisites only
+python scripts/install_aegis.py --no-launch      # setup without starting server
+python scripts/install_aegis.py --simulate       # dry-run (no downloads / writes)
+python scripts/install_aegis.py --port 8478      # explicit port (overrides settings)
 ```
 
 Manual alternative (after `venv` is ready):
@@ -614,7 +610,7 @@ Deployment template: see `deployment.template` (checked in without secrets) for 
 - **Queue** — task waits for the serial slot (FIFO). Use for edits to the same area.
 - **Parallel** — task starts immediately and can run alongside others. Use for independent areas.
 
-Both appear in the global Task Queue; History is the persistent `.aether/log/` archive.
+Both appear in the global Task Queue; History is the persistent `.aegis/` log archive (with fallback to `.aether/`).
 
 ---
 
@@ -626,13 +622,13 @@ Single task:
 User:
   "Fix authentication bug — login redirect drops session after OAuth callback"
 
-AETHER:
-  → reads Project Bible / Map
+Aegis Agent:
+  → reads Project Bible / Map / Vector index
   → searches and inspects auth code
-  → edits the relevant file(s)
+  → requests edits under FileWriteLock
+  → checks Supervised Mode Diff Modal (if enabled)
   → runs validation / tests
   → reports the result with a diff summary
-```
 
 Parallel:
 
@@ -665,7 +661,7 @@ These are conceptual examples, not benchmarks.
 
 - LLM remains the decision maker — no heuristic auto-selector or forced completion.
 - Provider / tool agnostic — core never imports a concrete provider; tools are registered generically.
-- Project-first — all writes are project-local (`.aether/` inside the target root).
+- Project-first — all writes are project-local (`.aegis/` inside the target root).
 - Modular — gateway, runtime, tools, and project intelligence are thin facades over existing components.
 - Progressive disclosure — catalog before content; references on demand; no bulk injection.
 - Avoid unnecessary reads / tool calls — duplicate reads return `already_available` / `already_read` / `already_searched` and the agent is expected to use what it already has.
@@ -678,12 +674,11 @@ These are conceptual examples, not benchmarks.
 
 ## Extension System
 
-**Extension = capability package for AETHER**
+**Extension = capability package for AegisCode**
 
-AETHER can be extended by installing *extensions* – self‑contained Python packages that provide additional capabilities such as new tools, UI components, services, or storage back‑ends. The system consists of:
+AegisCode can be extended by installing *extensions* – self‑contained Python packages that provide additional capabilities such as new tools, UI components, services, or storage back‑ends. The system consists of:
 
-* **Directory layout** – extensions live under `<AETHER_ROOT>/Extension/`. Each extension is a normal Python package containing a `manifest.json` and `extension.py` which defines a subclass of `agent_ai.extensions.Extension`.
-* **Manifest** – JSON file with required fields: `id`, `name`, `version`, `description`, `api_version`. Validated on load.
+* **Directory layout** – extensions live under `<AEGIS_ROOT>/Extension/`. Each extension is a normal Python package containing a `manifest.json` and `extension.py` which defines a subclass of `agent_ai.extensions.Extension`.
 * **Discovery & loading** – at startup `ExtensionLoader` scans the extensions directory, validates manifests, imports the module, and creates an `Extension` instance.
 * **Registration** – `extension.register(context)` is called. `ExtensionContext` exposes ten facades: `tools`, `skills`, `knowledge`, `config`, `services`, `providers`, `resources`, `hooks`, `commands`, `ui`, `storage`.
 * **Lifecycle** – `ExtensionManager.enable(id)` / `disable(id)` flip the flag, invoke `on_enable` / `on_disable` hooks, and activate/deactivate all capabilities including `ToolRegistry` removal.
@@ -712,16 +707,16 @@ All operations are safe: failures during install or update roll back any partial
 
 ```
 Implemented
-├── Autonomous Agent (continuous Native Tool Calling loop)
+├── Aegis Agent (continuous Native Tool Calling loop)
 ├── Consultant (quick / investigate, read-only, Task Proposals)
 ├── Project Intelligence (Bible / Atlas / RIG / Maps with freshness)
 ├── Skill System (catalog → load_skill → load_skill_reference, Agent lifecycle)
 ├── Provider & Model architecture (instances + models in SQLite)
 │   └── OpenCode Zen provider (opencode.ai/zen, OpenAI-compatible)
 ├── Queue (serial FIFO) + Parallel Agent (concurrent, File Write Lock)
-├── Modern IDE Workbench (VS Code-style layout, Activity Bar, Left Sidebar,
+├── Modern IDE Workbench - AegisCode Studio (VS Code-style layout, Activity Bar, Left Sidebar,
 │   Right AI Drawer, Bottom Dock, Command Palette, Editor Tabs)
-├── Interactive Terminal (shell input, command history, SSE streaming, Ctrl+C abort)
+├── Interactive PTY Terminal (shell input, command history, SSE streaming, Ctrl+C abort)
 ├── Light / Dark Theme + Wallpaper system
 ├── Telemetry (provider/model/round/tool calls/tokens/duration/status)
 ├── Permission & workspace boundary
@@ -736,15 +731,12 @@ Implemented
 ### Future
 
 ```
-Future
-├── God Mode / Multi-Agent
-├── Git UI Panel (REST endpoints + badge explorer + Monaco Diff Editor)
-│   (backend GitRepositoryFacade already implemented)
-├── Skill & Knowledge UI Editor (CRUD panel for .aether/skills/ and Bible)
-├── Live Server Tab (dev server supervisor + iframe preview)
-├── Human-in-the-Loop Guardrails & Snapshot Rollback
-├── Local-First Semantic Code Search & RAG (sqlite-vec / fastembed)
-└── Desktop App (Tauri v2 + Rust + Python sidecar)
+Future (PRD Aligned)
+├── Phase 0: Google Antigravity Provider & Stateless Signed JWT OAuth
+├── Phase 1: Git Local Stage/Commit/Diff & Monaco Diff Integration
+├── Phase 2: Hybrid Asymmetric Split-Brain Engine (fastembed + sqlite-vec + RRF, < 4k context)
+├── Phase 3: Deterministic Guardrails & HITL (DiffModal.vue, Supervised Mode, 1-Click Rollback)
+└── Phase 4: Native Desktop Packaging (Tauri v2 + zero-zombie process tree kill)
 ```
 
 ---

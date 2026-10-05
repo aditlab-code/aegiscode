@@ -285,9 +285,9 @@ def build_registry(
     # Review capability (Agent): read-only, LLM-driven. Tool ini OPTIONAL
     # dan hanya dimuat bila eksplisit diaktifkan (untuk menghindari overhead
     # token definisi tool yang memengaruhi budget compaction existing test).
-    # Aktifkan dengan AETHER_ENABLE_REVIEW_TOOLS=1.
+    # Aktifkan dengan AEGIS_ENABLE_REVIEW_TOOLS=1 (atau AETHER_ENABLE_REVIEW_TOOLS=1).
     import os as _os
-    if _os.environ.get("AETHER_ENABLE_REVIEW_TOOLS") == "1":
+    if _os.environ.get("AEGIS_ENABLE_REVIEW_TOOLS") == "1" or _os.environ.get("AETHER_ENABLE_REVIEW_TOOLS") == "1":
         from agent_ai.tools.review import build_review_tools
         for tool in build_review_tools(root=resolved, change_tracker=None):
             reg.register(tool)

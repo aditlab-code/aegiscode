@@ -6,7 +6,7 @@
  * Strictly uses native inline Vue SVG icons (zero emoticons).
  */
 import { computed } from "vue";
-import { AETHER_VERSION } from "../version.js";
+import { AEGIS_VERSION } from "../version.js";
 
 const props = defineProps({
   projects: {
@@ -74,7 +74,7 @@ function handleOpenProject(p) {
         <!-- Left Column: Branding, Quick Actions, Recent Workspaces -->
         <div class="welcome-col welcome-col-main">
           <!-- Hero Header Card -->
-          <header class="welcome-card hero-card" aria-label="AETHER Workbench Overview">
+          <header class="welcome-card hero-card" aria-label="AegisCode Studio Overview">
             <div class="welcome-hero">
               <div class="hero-brand-row">
                 <div class="brand-logo-wrap" aria-hidden="true">
@@ -96,8 +96,8 @@ function handleOpenProject(p) {
                   </svg>
                 </div>
                 <div class="brand-text-block">
-                  <h1 class="brand-title welcome-title">AETHER Workbench</h1>
-                  <span class="version-tag">v{{ AETHER_VERSION }}</span>
+                  <h1 class="brand-title welcome-title">AegisCode Studio</h1>
+                  <span class="version-tag">v{{ AEGIS_VERSION }}</span>
                 </div>
               </div>
               <p class="brand-tagline welcome-project">

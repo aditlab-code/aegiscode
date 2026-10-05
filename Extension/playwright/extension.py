@@ -41,7 +41,7 @@ def _load_local(rel_path: str, dotted_suffix: str) -> Any:
             return importlib.import_module("." + dotted_suffix, package)
         except Exception:
             pass
-    mod_name = "_aether_playwright_" + dotted_suffix.replace(".", "_")
+    mod_name = "_aegis_playwright_" + dotted_suffix.replace(".", "_")
     if mod_name in sys.modules:
         return sys.modules[mod_name]
     target = _HERE / rel_path
@@ -59,10 +59,10 @@ def _load_local(rel_path: str, dotted_suffix: str) -> Any:
 
 
 class PlaywrightExtension(Extension):
-    id: str = "aether.playwright"
+    id: str = "aegis.playwright"
 
     #: Namespaced capability id for the lifecycle service.
-    SERVICE_CAPABILITY_ID = "aether.playwright.playwright_service"
+    SERVICE_CAPABILITY_ID = "aegis.playwright.playwright_service"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -168,15 +168,15 @@ class PlaywrightExtension(Extension):
     # -----------------------------------------------------------------
     #: Debug panel actions — each references an existing capability/tool.
     PANEL_ACTIONS = [
-        {"id": "aether.playwright.browser_debug_panel", "title": "Refresh"},
-        {"id": "aether.playwright.page_close", "title": "Close Page"},
-        {"id": "aether.playwright.browser_console", "title": "Clear Console", "arguments": {"clear": True}},
-        {"id": "aether.playwright.browser_network", "title": "Clear Network", "arguments": {"clear": True}},
-        {"id": "aether.playwright.browser_screenshot", "title": "Screenshot", "arguments": {"full_page": True}},
-        {"id": "aether.playwright.browser_trace_start", "title": "Start Trace"},
-        {"id": "aether.playwright.browser_trace_stop", "title": "Stop Trace"},
-        {"id": "aether.playwright.session_save_state", "title": "Save State"},
-        {"id": "aether.playwright.session_restore_state", "title": "Restore State"},
+        {"id": "aegis.playwright.browser_debug_panel", "title": "Refresh"},
+        {"id": "aegis.playwright.page_close", "title": "Close Page"},
+        {"id": "aegis.playwright.browser_console", "title": "Clear Console", "arguments": {"clear": True}},
+        {"id": "aegis.playwright.browser_network", "title": "Clear Network", "arguments": {"clear": True}},
+        {"id": "aegis.playwright.browser_screenshot", "title": "Screenshot", "arguments": {"full_page": True}},
+        {"id": "aegis.playwright.browser_trace_start", "title": "Start Trace"},
+        {"id": "aegis.playwright.browser_trace_stop", "title": "Stop Trace"},
+        {"id": "aegis.playwright.session_save_state", "title": "Save State"},
+        {"id": "aegis.playwright.session_restore_state", "title": "Restore State"},
     ]
 
     def _register_ui(self, context) -> None:
@@ -200,7 +200,7 @@ class PlaywrightExtension(Extension):
                     "placement": "right",
                     "views": ["sessions", "pages", "console", "network", "dom", "screenshot", "trace"],
                     "requires": ["session_id", "page_id"],
-                    "data_tool": "aether.playwright.browser_debug_panel",
+                    "data_tool": "aegis.playwright.browser_debug_panel",
                     "session_scoped": True,
                     "page_scoped": True,
                 },
@@ -213,14 +213,14 @@ class PlaywrightExtension(Extension):
                 "description": "Structured console/page-error events with level filter and clear.",
                 "props": {
                     "viewer_type": "log",
-                    "data_tool": "aether.playwright.browser_console",
+                    "data_tool": "aegis.playwright.browser_console",
                     "level_types": ["log", "debug", "info", "warning", "error"],
                     "filterable": True,
                     "clearable": True,
                 },
                 "actions": [
-                    {"id": "aether.playwright.browser_console", "title": "Refresh"},
-                    {"id": "aether.playwright.browser_console", "title": "Clear", "arguments": {"clear": True}},
+                    {"id": "aegis.playwright.browser_console", "title": "Refresh"},
+                    {"id": "aegis.playwright.browser_console", "title": "Clear", "arguments": {"clear": True}},
                 ],
             },
             {
@@ -229,7 +229,7 @@ class PlaywrightExtension(Extension):
                 "title": "Network Viewer",
                 "description": "Request/response records (method, url, status, resource type, failed).",
                 "props": {
-                    "data_tool": "aether.playwright.browser_network",
+                    "data_tool": "aegis.playwright.browser_network",
                     "filters": ["url", "method", "status"],
                     "columns": [
                         {"key": "method", "title": "Method"},
@@ -240,8 +240,8 @@ class PlaywrightExtension(Extension):
                     ],
                 },
                 "actions": [
-                    {"id": "aether.playwright.browser_network", "title": "Refresh"},
-                    {"id": "aether.playwright.browser_network", "title": "Clear", "arguments": {"clear": True}},
+                    {"id": "aegis.playwright.browser_network", "title": "Refresh"},
+                    {"id": "aegis.playwright.browser_network", "title": "Clear", "arguments": {"clear": True}},
                 ],
             },
             {
@@ -251,10 +251,10 @@ class PlaywrightExtension(Extension):
                 "description": "Inspect one element by ref/locator (tag, text, attributes, box, HTML).",
                 "props": {
                     "viewer_type": "json",
-                    "data_tool": "aether.playwright.browser_dom_inspect",
+                    "data_tool": "aegis.playwright.browser_dom_inspect",
                 },
                 "actions": [
-                    {"id": "aether.playwright.browser_snapshot", "title": "Snapshot"},
+                    {"id": "aegis.playwright.browser_snapshot", "title": "Snapshot"},
                 ],
             },
             {
@@ -265,10 +265,10 @@ class PlaywrightExtension(Extension):
                 "props": {
                     "viewer_type": "image",
                     "mime_type": "image/png",
-                    "data_tool": "aether.playwright.browser_screenshot",
+                    "data_tool": "aegis.playwright.browser_screenshot",
                 },
                 "actions": [
-                    {"id": "aether.playwright.browser_screenshot", "title": "Capture", "arguments": {"full_page": True}},
+                    {"id": "aegis.playwright.browser_screenshot", "title": "Capture", "arguments": {"full_page": True}},
                 ],
             },
             {
@@ -279,13 +279,13 @@ class PlaywrightExtension(Extension):
                 "props": {
                     "viewer_type": "file",
                     "mime_type": "application/zip",
-                    "data_tool": "aether.playwright.browser_trace_stop",
-                    "open_action": "aether.playwright.browser_trace_open",
+                    "data_tool": "aegis.playwright.browser_trace_stop",
+                    "open_action": "aegis.playwright.browser_trace_open",
                 },
                 "actions": [
-                    {"id": "aether.playwright.browser_trace_start", "title": "Start Trace"},
-                    {"id": "aether.playwright.browser_trace_stop", "title": "Stop Trace"},
-                    {"id": "aether.playwright.browser_trace_open", "title": "Open Trace"},
+                    {"id": "aegis.playwright.browser_trace_start", "title": "Start Trace"},
+                    {"id": "aegis.playwright.browser_trace_stop", "title": "Stop Trace"},
+                    {"id": "aegis.playwright.browser_trace_open", "title": "Open Trace"},
                 ],
             },
         ]

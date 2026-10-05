@@ -35,4 +35,5 @@ function resolveVersion() {
 }
 
 // Nilai version yang dipakai tampilan (mis. "0.1.82").
-export const AETHER_VERSION = resolveVersion();
+export const AEGIS_VERSION = resolveVersion();
+export const AETHER_VERSION = AEGIS_VERSION;
