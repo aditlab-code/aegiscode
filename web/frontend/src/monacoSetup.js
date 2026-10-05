@@ -1,4 +1,4 @@
-// AETHER Code Editor: setup Monaco Editor (sekali saja, lazy).
+// Aegis Code Editor: setup Monaco Editor (sekali saja, lazy).
 //
 // Module ini HANYA di-import secara dinamis saat editor pertama kali dibuka
 // (lihat components/CodeEditor.vue). Alasannya:
@@ -7,7 +7,7 @@
 //
 // Yang diurus di sini:
 //   1. Worker Monaco (bundler-aware via `?worker` dari Vite).
-//   2. Theme "aether-dark" agar warna editor konsisten dengan visual AETHER.
+//   2. Theme "aegis-dark" agar warna editor konsisten dengan visual AegisCode.
 //
 // Tidak ada LSP / language server / subsystem kedua: hanya konfigurasi Monaco.
 
@@ -22,9 +22,6 @@ import TsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker"
 export const AEGIS_THEME = "aegis-dark";
 /** Nama theme Monaco AegisCode (light, konsisten dengan [data-theme="light"]). */
 export const AEGIS_LIGHT_THEME = "aegis-light";
-
-export const AETHER_THEME = AEGIS_THEME;
-export const AETHER_LIGHT_THEME = AEGIS_LIGHT_THEME;
 
 /** Opsi editor default. Fitur bawaan Monaco (folding, find/replace, multi
  *  cursor, minimap, shortcut standar, autocomplete language service) aktif
@@ -81,7 +78,7 @@ export function getMonaco() {
       },
     };
 
-    monaco.editor.defineTheme(AETHER_THEME, {
+    monaco.editor.defineTheme(AEGIS_THEME, {
       base: "vs-dark",
       inherit: true,
       rules: [
@@ -119,7 +116,7 @@ export function getMonaco() {
       },
     });
 
-    monaco.editor.defineTheme(AETHER_LIGHT_THEME, {
+    monaco.editor.defineTheme(AEGIS_LIGHT_THEME, {
       base: "vs",
       inherit: true,
       rules: [

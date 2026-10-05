@@ -8,7 +8,7 @@ Yang diverifikasi:
     1. CancellationToken sebagai primitif sinyal (idempotent, satu arah).
     2. Agent berhenti SEBELUM iteration/LLM call berikutnya setelah cancel.
     3. Agent tidak melakukan tool call baru setelah cancel terdeteksi.
-    4. Cancellation tercatat di `.aether/log` (event task_cancelled) + lifecycle.
+    4. Cancellation tercatat di `.aegis/log` (event task_cancelled) + lifecycle.
     5. Gateway: RUNNING -> Stop -> CANCELLED (end-to-end lewat background thread).
     6. Task COMPLETED tidak berubah menjadi CANCELLED (cancel = no-op).
     7. Task normal (tanpa cancel) tetap COMPLETED (backward compatible).
@@ -229,7 +229,7 @@ def scenario_4_multi_tool_cancel() -> None:
 
 
 def scenario_5_runtime_log_and_lifecycle() -> None:
-    """Runtime: status CANCELLED, lifecycle CANCELLED, tercatat di `.aether/log`."""
+    """Runtime: status CANCELLED, lifecycle CANCELLED, tercatat di `.aegis/log`."""
     token = CancellationToken()
     tool = CountTool(on_execute=lambda n: token.request("user_requested"))
     provider = ScriptedProvider([tool_response("count_tool")])
@@ -247,7 +247,7 @@ def scenario_5_runtime_log_and_lifecycle() -> None:
     assert lifecycle.status == TaskStatus.CANCELLED, lifecycle.status
     assert provider.calls == 1 and tool.calls == 1
 
-    log_file = FIXTURE / ".aether" / "log" / f"{prepared.task_id}.log"
+    log_file = FIXTURE / ".aegis" / "log" / f"{prepared.task_id}.log"
     assert log_file.exists(), "log task tidak ditulis"
     events = [
         json.loads(line)
@@ -260,13 +260,13 @@ def scenario_5_runtime_log_and_lifecycle() -> None:
     finished = [e for e in events if e.get("event") == "task_finished"]
     assert finished and finished[-1]["data"].get("status") == "cancelled", finished[-1:]
 
-    from agent_ai.projects.aether_store import AetherProjectStore, TaskLogReader
+    from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
 
     info = TaskLogReader(
-        AetherProjectStore(FIXTURE), task_id=prepared.task_id
+        AegisProjectStore(FIXTURE), task_id=prepared.task_id
     ).get_task_info()
     assert info and info.get("status") == "cancelled", info
-    print("[5] runtime CANCELLED + lifecycle + `.aether/log` task_cancelled OK")
+    print("[5] runtime CANCELLED + lifecycle + `.aegis/log` task_cancelled OK")
 
 
 def scenario_6_gateway_end_to_end() -> None:
@@ -312,7 +312,7 @@ def scenario_6_gateway_end_to_end() -> None:
         f"eksekusi masih berjalan setelah cancel: {provider.calls} > {calls_at_rest}"
     )
 
-    # Event cancellation tercatat di Session/Event store AETHER existing.
+    # Event cancellation tercatat di Session/Event store AegisCode existing.
     types = [e.event_type.value for e in sessions.get_events(task_id=task_id)]
     assert "task_cancelled" in types, types
     assert "task_completed" not in types, types

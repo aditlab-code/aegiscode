@@ -1,6 +1,6 @@
 """Extension Lifecycle persistence (Task 06).
 
-Enabled state persisted in data/aether.db existing database.
+Enabled state persisted in data/aegis.db existing database.
 No ExtensionSettings.json / extensions.json per extension.
 
 State:

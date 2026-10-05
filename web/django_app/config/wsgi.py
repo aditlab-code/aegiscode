@@ -1,4 +1,4 @@
-"""WSGI config untuk AETHER Gateway (#50)."""
+"""WSGI config untuk Aegis Gateway (#50)."""
 
 from __future__ import annotations
 

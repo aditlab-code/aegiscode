@@ -419,7 +419,7 @@ class ConsultantService:
             provider: instance BaseProvider (dibangun pemanggil dari konfigurasi
                 LLM tersimpan; Consultant tidak memilih provider sendiri).
             root: root project target. Bila diisi, tool dibatasi ke root itu dan
-                Project Bible dibaca/ditulis di `<root>/.aether/bible/`.
+                Project Bible dibaca/ditulis di `<root>/.aegis/bible/`.
             session_id: id sesi konsultasi (untuk konteks lintas giliran).
             project_id: id project terkait. Dipakai untuk MENGISOLASI sesi per
                 project: sesi dengan id sama pada project berbeda tidak berbagi

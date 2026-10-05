@@ -1,4 +1,4 @@
-// AETHER Workbench — logika lifecycle (Frontend-only, TANPA Vue/DOM).
+// Aegis Workbench — logika lifecycle (Frontend-only, TANPA Vue/DOM).
 //
 // Lifecycle UI 6 step (Planning, Inspecting, Editing, Running, Validating,
 // Completed) diturunkan dari AKTIVITAS AGENT NYATA yang dikirim backend lewat

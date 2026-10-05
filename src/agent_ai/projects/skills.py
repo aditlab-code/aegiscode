@@ -1,6 +1,6 @@
 """Skill System — Foundation & Storage (Task 01) + Progressive Loading (Task 03).
 
-Fondasi Skill System AETHER sebagai kemampuan generik untuk menyimpan dan
+Fondasi Skill System AegisCode sebagai kemampuan generik untuk menyimpan dan
 mengelola Skill. Task 01 : storage, Task 02 : catalog/discovery, Task 03 :
 progressive loading dengan context safety.
 
@@ -16,7 +16,7 @@ Fokus Task 03 hanya pada:
 Struktur project-level yang dikelola (di ROOT project target)::
 
     <root project target>/
-        .aether/
+        .aegis/
             bible/
                 skills/
                     <skill_id>/
@@ -60,8 +60,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from agent_ai.projects.aegis_store import (
+    AEGIS_DIR_NAME,
     AegisProjectStore,
-    AetherProjectStore,
     BIBLE_SKILLS_DIR_NAME,
     SKILL_FILE_NAME,
     SKILL_REFERENCES_DIR_NAME,
@@ -328,28 +328,28 @@ def _skill_from_file(skill_id: str, path: Path) -> Optional[Skill]:
 class SkillStore:
     """Storage Skill berbasis filesystem project-local.
 
-    Lokasi: ``<root>/.aether/bible/skills/<skill_id>/skill.md``
+    Lokasi: ``<root>/.aegis/bible/skills/<skill_id>/skill.md``
     Setiap Skill memiliki folder sendiri + ``references/`` (opsional).
     Format ``skill.md`` adalah markdown dengan frontmatter sederhana
     (``---`` key: value ``---`` + body). Parsing toleran terhadap file rusak.
 
     Reuse pola Bible:
-        - Memakai ``AetherProjectStore`` sebagai resolver path (single source
-          untuk ``.aether``).
+        - Memakai ``AegisProjectStore`` sebagai resolver path (single source
+          untuk ``.aegis``).
         - Tulis file secara atomik via ``_atomic_write``.
         - Validasi ``skill_id`` via ``validate_skill_id`` (mirip ``safe_task_id``).
         - ``ensure()`` idempotent.
         - Tidak ada DB/vektor/embeddings.
 
     Args:
-        root: root project target (string/Path) atau instance ``AetherProjectStore``.
+        root: root project target (string/Path) atau instance ``AegisProjectStore``.
     """
 
-    def __init__(self, root: Union[str, Path, AetherProjectStore]) -> None:
-        self.store = root if isinstance(root, AetherProjectStore) else AetherProjectStore(root)
+    def __init__(self, root: Union[str, Path, AegisProjectStore]) -> None:
+        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
 
     # ------------------------------------------------------------------ #
-    # Layout helpers (reuse AetherProjectStore.bible_dir)
+    # Layout helpers (reuse AegisProjectStore.bible_dir)
     # ------------------------------------------------------------------ #
     @property
     def root(self) -> Path:
@@ -357,11 +357,11 @@ class SkillStore:
 
     @property
     def skills_dir(self) -> Path:
-        """Directory ``<root>/.aether/bible/skills``."""
+        """Directory ``<root>/.aegis/bible/skills``."""
         return self.store.bible_dir / BIBLE_SKILLS_DIR_NAME
 
     def skill_dir(self, skill_id: str) -> Path:
-        """Directory ``<root>/.aether/bible/skills/<skill_id>``."""
+        """Directory ``<root>/.aegis/bible/skills/<skill_id>``."""
         sid = validate_skill_id(skill_id)
         return self.skills_dir / sid
 
@@ -377,7 +377,7 @@ class SkillStore:
     # ensure — idempotent (reuse pola BibleStore.ensure)
     # ------------------------------------------------------------------ #
     def ensure(self) -> bool:
-        """Pastikan struktur ``.aether/bible/skills`` ada.
+        """Pastikan struktur ``.aegis/bible/skills`` ada.
 
         Returns:
             True bila struktur siap, False bila gagal (tidak melempar error).
@@ -780,7 +780,7 @@ def _to_catalog_entry(skill: Skill) -> SkillCatalogEntry:
 # ---------------------------------------------------------------------------
 # Module-level generic helpers (Task 03 contract)
 # ---------------------------------------------------------------------------
-def load_skill(root: Union[str, Path, AetherProjectStore], skill_id: str) -> Skill:
+def load_skill(root: Union[str, Path, AegisProjectStore], skill_id: str) -> Skill:
     """Helper generic progressive loading di level module.
 
     Wrapper di atas ``SkillStore(root).load_skill(skill_id)`` agar LLM/tool
@@ -788,7 +788,7 @@ def load_skill(root: Union[str, Path, AetherProjectStore], skill_id: str) -> Ski
     manual. ``skill_id`` tetap dynamic.
 
     Args:
-        root: root project atau AetherProjectStore.
+        root: root project atau AegisProjectStore.
         skill_id: identifier Skill.
 
     Returns:
@@ -801,7 +801,7 @@ def load_skill(root: Union[str, Path, AetherProjectStore], skill_id: str) -> Ski
 
 
 def load_skill_reference(
-    root: Union[str, Path, AetherProjectStore], skill_id: str, reference: str
+    root: Union[str, Path, AegisProjectStore], skill_id: str, reference: str
 ) -> str:
     """Helper generic untuk memuat satu reference spesifik.
 
@@ -809,7 +809,7 @@ def load_skill_reference(
     Generic, tidak heuristic, hanya memuat reference yang diminta.
 
     Args:
-        root: root project atau AetherProjectStore.
+        root: root project atau AegisProjectStore.
         skill_id: identifier Skill.
         reference: nama/path relatif di references/.
 
@@ -824,7 +824,7 @@ def load_skill_reference(
 
 
 def load_reference(
-    root: Union[str, Path, AetherProjectStore], skill_id: str, reference: str
+    root: Union[str, Path, AegisProjectStore], skill_id: str, reference: str
 ) -> str:
     """Alias module-level untuk ``load_skill_reference``."""
     return load_skill_reference(root, skill_id, reference)

@@ -1,7 +1,7 @@
 """Windows read-only cleanup regression tests for the Task 07 install fix.
 
 Bug: installing an Extension from a local Git repository on Windows failed with
-``[WinError 5] Access is denied: ...\\aether_ext_staging_...\\repo\\.git\\objects\\...``.
+``[WinError 5] Access is denied: ...\\aegis_ext_staging_...\\repo\\.git\\objects\\...``.
 
 Root cause: ``install()`` moved the staged repository into the extensions
 directory with ``shutil.move``. Staging lives under ``tempfile.gettempdir()``
@@ -88,7 +88,7 @@ def _make_manager(root: Path, extensions_dir: Path) -> ExtensionManager:
         registry=ExtensionRegistry(),
         capability_registry=CapabilityRegistry(),
         lifecycle_store=ExtensionLifecycleStore(db_path=root / "life.db"),
-        aether_root=root,
+        aegis_root=root,
         extensions_dir=extensions_dir,
     )
 
@@ -147,7 +147,7 @@ def test_install_succeeds_with_readonly_git_objects_cross_device(tmp_path, monke
     mgr = _make_manager(tmp_path, extensions_dir)
 
     staging_parent = Path(mgr_mod.tempfile.gettempdir())
-    before = {p.name for p in staging_parent.glob("aether_ext_staging_*")}
+    before = {p.name for p in staging_parent.glob("aegis_ext_staging_*")}
 
     result = mgr.install(str(repo))
 
@@ -158,7 +158,7 @@ def test_install_succeeds_with_readonly_git_objects_cross_device(tmp_path, monke
     assert installed.is_dir()
     assert not (installed / ".git").exists()
 
-    after = {p.name for p in staging_parent.glob("aether_ext_staging_*")}
+    after = {p.name for p in staging_parent.glob("aegis_ext_staging_*")}
     assert after <= before, f"staging directory leaked: {after - before}"
 
 
@@ -176,7 +176,7 @@ def test_primary_error_not_masked_by_cleanup_failure(tmp_path, monkeypatch):
     real_rmtree = mgr_mod._robust_rmtree
 
     def _boom(path):  # noqa: ANN001
-        if Path(path).name.startswith("aether_ext_staging_"):
+        if Path(path).name.startswith("aegis_ext_staging_"):
             raise PermissionError(5, "Access is denied (simulated cleanup failure)")
         return real_rmtree(path)
 
@@ -197,7 +197,7 @@ def test_cleanup_failure_does_not_break_successful_install(tmp_path, monkeypatch
     real_rmtree = mgr_mod._robust_rmtree
 
     def _boom(path):  # noqa: ANN001
-        if Path(path).name.startswith("aether_ext_staging_"):
+        if Path(path).name.startswith("aegis_ext_staging_"):
             raise PermissionError(5, "Access is denied (simulated cleanup failure)")
         return real_rmtree(path)
 

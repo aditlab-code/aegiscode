@@ -1,4 +1,4 @@
-"""Manifest contract for AETHER Extension.
+"""Manifest contract for Aegis Extension.
 
 Manifest is readable without importing extension implementation.
 Validates required fields and supports duplicate detection.

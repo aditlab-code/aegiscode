@@ -1,7 +1,7 @@
 """Task 04 — Extension Config / Variables / Storage validation.
 
 Covers 28 validation points from spec 28 (Config + Storage + Regression).
-Uses temporary DB/filesystem isolation to not touch data/aether.db prod.
+Uses temporary DB/filesystem isolation to not touch data/aegis.db prod.
 """
 
 import json
@@ -256,7 +256,7 @@ def test_14_duplicate_config_key(tmp_path):
 # --------------- Storage tests ---------------
 
 def test_15_state_get_set_delete(tmp_path):
-    storage = ExtensionStorage("test.storage1", aether_root=tmp_path)
+    storage = ExtensionStorage("test.storage1", aegis_root=tmp_path)
     storage.set("last_job_id", "job-42")
     assert storage.get("last_job_id") == "job-42"
     assert storage.exists("last_job_id")
@@ -265,7 +265,7 @@ def test_15_state_get_set_delete(tmp_path):
     assert storage.get("last_job_id", default="fallback") == "fallback"
 
 def test_16_cache_store_read(tmp_path):
-    storage = ExtensionStorage("test.storage2", aether_root=tmp_path)
+    storage = ExtensionStorage("test.storage2", aegis_root=tmp_path)
     storage.cache_set("meta", {"url": "http://example.com"})
     assert storage.cache_get("meta") == {"url": "http://example.com"}
     assert storage.cache_exists("meta")
@@ -273,7 +273,7 @@ def test_16_cache_store_read(tmp_path):
     assert not storage.cache_exists("meta")
 
 def test_17_temp_create_delete(tmp_path):
-    storage = ExtensionStorage("test.storage3", aether_root=tmp_path)
+    storage = ExtensionStorage("test.storage3", aegis_root=tmp_path)
     p = storage.temp_write("render.tmp", "hello temp")
     assert p.exists()
     assert storage.temp_exists("render.tmp")
@@ -282,8 +282,8 @@ def test_17_temp_create_delete(tmp_path):
     assert not storage.temp_exists("render.tmp")
 
 def test_18_storage_isolation(tmp_path):
-    sA = ExtensionStorage("ext.a", aether_root=tmp_path)
-    sB = ExtensionStorage("ext.b", aether_root=tmp_path)
+    sA = ExtensionStorage("ext.a", aegis_root=tmp_path)
+    sB = ExtensionStorage("ext.b", aegis_root=tmp_path)
     sA.set("secret", "value-a")
     sB.set("secret", "value-b")
     assert sA.get("secret") == "value-a"
@@ -292,8 +292,8 @@ def test_18_storage_isolation(tmp_path):
     assert sA.get_storage_root() != sB.get_storage_root()
 
 def test_19_no_cross_read_via_api(tmp_path):
-    sA = ExtensionStorage("aaa.ext", aether_root=tmp_path)
-    sB = ExtensionStorage("bbb.ext", aether_root=tmp_path)
+    sA = ExtensionStorage("aaa.ext", aegis_root=tmp_path)
+    sB = ExtensionStorage("bbb.ext", aegis_root=tmp_path)
     sA.set("mykey", {"x": 1})
     # B cannot read A's storage via normal API (different namespace)
     assert sB.get("mykey") is None
@@ -307,7 +307,7 @@ def test_20_project_scoped_storage(tmp_path):
     projB = tmp_path / "projB"
     projA.mkdir()
     projB.mkdir()
-    storage = ExtensionStorage("test.proj", aether_root=tmp_path)
+    storage = ExtensionStorage("test.proj", aegis_root=tmp_path)
     # Project-scoped via explicit project path
     storage.project(projA).set("profile", "profile-a")
     storage.project(projB).set("profile", "profile-b")
@@ -329,7 +329,7 @@ def test_21_disable_not_delete(tmp_path):
     ctx = ExtensionContext(manifest=manifest, capability_registry=cap_reg, config_store=store)
     ctx.config.register(key="api_key", type="string", default="default")
     ctx.config.set("api_key", "kept-value")
-    storage = ExtensionStorage("test.disable", aether_root=tmp_path)
+    storage = ExtensionStorage("test.disable", aegis_root=tmp_path)
     storage.set("prefs", {"theme": "dark"})
     # Simulate disable -> we don't clear anything, just not removing
     # Verify still there after "disable" (no clear call)
@@ -342,11 +342,11 @@ def test_21_disable_not_delete(tmp_path):
     ctx2 = ExtensionContext(manifest=_make_manifest("test.disable"), capability_registry=cap_reg2, config_store=store2)
     ctx2.config.register(key="api_key", type="string", default="default")
     assert ctx2.config.get("api_key") == "kept-value"
-    storage2 = ExtensionStorage("test.disable", aether_root=tmp_path)
+    storage2 = ExtensionStorage("test.disable", aegis_root=tmp_path)
     assert storage2.get("prefs") == {"theme": "dark"}
 
 def test_22_path_safety(tmp_path):
-    storage = ExtensionStorage("test.pathsafe", aether_root=tmp_path)
+    storage = ExtensionStorage("test.pathsafe", aegis_root=tmp_path)
     # Attempt path traversal via key
     storage.set("normal", {"x": 1})
     # Keys with path traversal are sanitized to safe name, not escaping root

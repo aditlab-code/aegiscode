@@ -41,8 +41,8 @@ FIXTURE = DUMMY_ROOT / "task_hist_clear"
 
 
 def _write_task_log(root: Path, task_id: str, prompt: str, ts: str) -> None:
-    """Tulis log task dan response log di <root>/.aether/log/."""
-    log_dir = root / ".aether" / "log"
+    """Tulis log task dan response log di <root>/.aegis/log/."""
+    log_dir = root / ".aegis" / "log"
     resp_dir = log_dir / "response"
     log_dir.mkdir(parents=True, exist_ok=True)
     resp_dir.mkdir(parents=True, exist_ok=True)
@@ -102,8 +102,8 @@ def _run() -> int:
     print("=== Test 1: Single Task History Deletion ===")
     task_test_1 = "task_test_single_1"
     _write_task_log(root_a, task_test_1, "Prompt 1", "2026-01-01T00:00:00+00:00")
-    log_file = root_a / ".aether" / "log" / f"{task_test_1}.log"
-    resp_file = root_a / ".aether" / "log" / "response" / f"{task_test_1}.json"
+    log_file = root_a / ".aegis" / "log" / f"{task_test_1}.log"
+    resp_file = root_a / ".aegis" / "log" / "response" / f"{task_test_1}.json"
     assert log_file.is_file(), "Log file should exist before delete"
     assert resp_file.is_file(), "Response file should exist before delete"
 
@@ -159,9 +159,9 @@ def _run() -> int:
     # Also write a task log in project B to ensure isolation
     _write_task_log(root_b, "task_b_keep", "Keep in B", "2026-01-01T03:00:00+00:00")
 
-    log_a = root_a / ".aether" / "log" / f"{task_a}.log"
-    log_b = root_a / ".aether" / "log" / f"{task_b}.log"
-    log_b_keep = root_b / ".aether" / "log" / "task_b_keep.log"
+    log_a = root_a / ".aegis" / "log" / f"{task_a}.log"
+    log_b = root_a / ".aegis" / "log" / f"{task_b}.log"
+    log_b_keep = root_b / ".aegis" / "log" / "task_b_keep.log"
     assert log_a.is_file() and log_b.is_file() and log_b_keep.is_file()
 
     # Clear history of Project A

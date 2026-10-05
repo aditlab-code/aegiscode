@@ -13,7 +13,7 @@ Membuktikan bahwa:
 - Setelah request berhasil, counter retry untuk request berikutnya kembali ke 1
   (budget retry adalah per pemanggilan provider, bukan global).
 - Logging response API existing tetap mencatat SETIAP attempt ke
-  `.aether/log/response/<task_id>.json`.
+  `.aegis/log/response/<task_id>.json`.
 
 Semua test deterministik, tanpa network, dan tanpa delay nyata.
 
@@ -46,7 +46,7 @@ from agent_ai.config.settings import (  # noqa: E402
 from agent_ai.core.executor import ToolExecutor  # noqa: E402
 from agent_ai.core.models import AgentStatus  # noqa: E402
 from agent_ai.core.orchestrator import AgentOrchestrator  # noqa: E402
-from agent_ai.projects.aether_store import ResponseLog  # noqa: E402
+from agent_ai.projects.aegis_store import ResponseLog  # noqa: E402
 from agent_ai.providers.base import (  # noqa: E402
     GenerateOptions,
     GenerateResult,
@@ -155,7 +155,7 @@ def _make_orchestrator(
 def _retry_settings(failed_count: int, failed_sleep: float) -> Iterator[Path]:
     """Arahkan loader retry ke settings.json SEMENTARA (deterministik)."""
     previous = settings_mod.SETTINGS_PATH
-    directory = Path(tempfile.mkdtemp(prefix="aether-api-retry-"))
+    directory = Path(tempfile.mkdtemp(prefix="aegis-api-retry-"))
     path = directory / "settings.json"
     path.write_text(
         json.dumps(
@@ -328,10 +328,7 @@ def test_retry_counter_resets_for_next_request():
 # Logging response API existing tetap mencatat SETIAP attempt
 # --------------------------------------------------------------------------- #
 def _response_path(root: Path, task_id: str) -> Path:
-    p = root / ".aegis" / "log" / "response" / f"{task_id}.json"
-    if p.exists():
-        return p
-    return root / ".aether" / "log" / "response" / f"{task_id}.json"
+    return root / ".aegis" / "log" / "response" / f"{task_id}.json"
 
 
 def test_response_log_records_each_attempt(tmp_path):

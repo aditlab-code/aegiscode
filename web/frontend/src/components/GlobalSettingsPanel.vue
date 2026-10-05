@@ -1,9 +1,9 @@
 <script setup>
-// Global Settings AETHER (`data/settings.json`).
+// Global Settings Aegis (`data/settings.json`).
 //
-// Sumber konfigurasi global AETHER = `data/settings.json` (satu-satunya).
+// Sumber konfigurasi global Aegis = `data/settings.json` (satu-satunya).
 // Komponen ini HANYA memanggil HTTP ke Django Gateway (`/api/settings`), yang
-// meneruskan ke loader konfigurasi AETHER yang sudah ada
+// meneruskan ke loader konfigurasi Aegis yang sudah ada
 // (`agent_ai.config.settings`). TIDAK ada sumber/skema konfigurasi kedua di
 // frontend: nilai yang ditampilkan = nilai AKTUAL dari backend, dan setiap
 // simpan dikirim PARSIAL (hanya section terkait) sehingga key/setting lain di
@@ -142,10 +142,10 @@ onMounted(load);
 </script>
 
 <template>
-  <!-- Global AETHER Settings. Policy/permission TIDAK di sini: konfigurasi
+  <!-- Global Aegis Settings. Policy/permission TIDAK di sini: konfigurasi
        project (mode/scope permission) dikelola per project di
        Sidebar -> Projects -> Project Settings / Policy
-       (`<root>/.aether/permissions.json`). -->
+       (`<root>/.aegis/permissions.json`). -->
   <section class="panel">
     <div class="panel-body">
       <div class="gs-scope">

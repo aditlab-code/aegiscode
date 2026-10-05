@@ -1,8 +1,8 @@
-"""Verifikasi Environment Context project-local (`.aether/ENVIRONMENT.md`).
+"""Verifikasi Environment Context project-local (`.aegis/ENVIRONMENT.md`).
 
 Menguji (terisolasi, tanpa network):
-    1. Deteksi + pembuatan file `<root>/.aether/ENVIRONMENT.md` (struktur ada).
-    2. Path benar (di dalam `.aether/`, bukan workspace AETHER).
+    1. Deteksi + pembuatan file `<root>/.aegis/ENVIRONMENT.md` (struktur ada).
+    2. Path benar (di dalam `.aegis/`, bukan workspace AegisCode).
     3. Idempotent: file yang sudah ada di-LOAD, bukan ditimpa.
     4. Adaptif (bukan hardcode): isi berasal dari deteksi runtime & mengikuti
        tipe project (marker requirements.txt -> Python, package.json -> Node.js).
@@ -12,7 +12,7 @@ Menguji (terisolasi, tanpa network):
        dan TIDAK mengirim ulang Environment Context.
     7. Best-effort: root project tanpa project_root tidak melempar error.
 
-Semua fixture dibuat di `J:\\Agent_Ai\\dummy_test` dan dibersihkan setelah test.
+Semua fixture dibuat di `dummy_test` dan dibersihkan setelah test.
 
 Jalankan:
     python scripts/verify_environment_context.py
@@ -31,11 +31,11 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-#: Workspace testing terisolasi (BUKAN bagian source AETHER).
+#: Workspace testing terisolasi (BUKAN bagian source AegisCode).
 DUMMY_ROOT = PROJECT_ROOT / "dummy_test"
 
 import agent_ai.projects.environment as env_mod  # noqa: E402
-from agent_ai.projects.aether_store import AetherProjectStore  # noqa: E402
+from agent_ai.projects.aegis_store import AegisProjectStore  # noqa: E402
 from agent_ai.projects.environment import (  # noqa: E402
     build_or_load_environment,
     detect_environment,
@@ -79,18 +79,18 @@ def main() -> int:
     py_fixture = _make_fixture("env_py_", ["requirements.txt"])
     node_fixture = _make_fixture("env_node_", ["package.json"])
     try:
-        # 1) Path benar (di dalam `.aether/`).
-        expected_path = py_fixture / ".aether" / "ENVIRONMENT.md"
+        # 1) Path benar (di dalam `.aegis/`).
+        expected_path = py_fixture / ".aegis" / "ENVIRONMENT.md"
         assert environment_path(py_fixture) == expected_path
-        assert AetherProjectStore(py_fixture).environment_path() == expected_path
+        assert AegisProjectStore(py_fixture).environment_path() == expected_path
         print(f"path        : {expected_path}")
-        print("OK: path = <root>/.aether/ENVIRONMENT.md")
+        print("OK: path = <root>/.aegis/ENVIRONMENT.md")
 
         # 2) Pembuatan file + struktur terdeteksi.
         text = build_or_load_environment(py_fixture)
         assert expected_path.exists(), "ENVIRONMENT.md tidak dibuat"
         assert all(marker in text for marker in MARKERS), "struktur konteks tidak lengkap"
-        assert (py_fixture / ".aether").is_dir()
+        assert (py_fixture / ".aegis").is_dir()
         print("OK: ENVIRONMENT.md dibuat dengan struktur os/shell/python/virtualenv/tools/project")
 
         # 3) Adaptif: berasal dari deteksi runtime (bukan hardcode).
@@ -164,9 +164,9 @@ def main() -> int:
         ), "tanpa project_root tidak boleh ada Environment Context"
         print("OK: tanpa project_root -> tidak ada Environment Context (best-effort)")
 
-        # 9) Isolasi: fixture berada di dummy_test, bukan workspace AETHER.
+        # 9) Isolasi: fixture berada di dummy_test, bukan workspace AegisCode.
         assert str(expected_path).startswith(str(DUMMY_ROOT)), "fixture harus di dummy_test"
-        assert not (SRC_DIR / "agent_ai" / ".aether").exists(), "tidak boleh menulis .aether ke src"
+        assert not (SRC_DIR / "agent_ai" / ".aegis").exists(), "tidak boleh menulis .aegis ke src"
         print(f"OK: terisolasi di {DUMMY_ROOT}")
 
         print("\n[OK] Environment Context bekerja (project-local, adaptif, sekali per session).")

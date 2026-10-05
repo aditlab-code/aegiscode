@@ -1,7 +1,7 @@
 """Extension discovery contract (Task 01 minimal).
 
 Contract: Extensions are discoverable via entry-points OR via filesystem
-at <AETHER_ROOT>/Extension/<free-folder>/ with manifest.json + pyproject.toml.
+at <AEGIS_ROOT>/Extension/<free-folder>/ with manifest.json + pyproject.toml.
 
 Task 01 provides minimal load capability:
     - load_extension_from_dir (explicit contract test)
@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 from agent_ai.extensions.base import Extension
 from agent_ai.extensions.context import ExtensionContext
 from agent_ai.extensions.manifest import Manifest, load_manifest, parse_manifest
-from agent_ai.extensions.paths import get_aether_root, get_extensions_dir
+from agent_ai.extensions.paths import get_aegis_root, get_extensions_dir
 
 try:
     import importlib.metadata as importlib_metadata
@@ -62,7 +62,7 @@ def _load_py_module_from_dir(extension_dir: Path) -> Any:
     if not ext_file.is_file():
         raise ExtensionLoadError(f"extension.py not found in '{extension_dir}'")
     # Load as module with unique name
-    mod_name = f"_aether_ext_{extension_dir.name}_{id(extension_dir)}"
+    mod_name = f"_aegis_ext_{extension_dir.name}_{id(extension_dir)}"
     spec = importlib.util.spec_from_file_location(mod_name, str(ext_file))
     if spec is None or spec.loader is None:
         raise ExtensionLoadError(f"Cannot load extension.py from '{ext_file}'")
@@ -167,7 +167,7 @@ def load_extension_from_dir(extension_dir: str | Path) -> ExtensionEntry:
 
 def discover_extensions(
     *,
-    entry_point_group: str = "aether.extensions",
+    entry_point_group: str = "aegis.extensions",
 ) -> List[ExtensionEntry]:
     """Discover extensions via Python entry-points (contract for Task 01).
 
@@ -223,7 +223,7 @@ def discover_extensions(
 
 
 def discover_extensions_from_dir(extensions_root: str | Path) -> List[ExtensionEntry]:
-    """Discover extensions from filesystem <AETHER_ROOT>/Extension/ directory.
+    """Discover extensions from filesystem <AEGIS_ROOT>/Extension/ directory.
 
     Scans immediate subfolders for manifest.json.
     Skips invalid folders; collects valid ones.

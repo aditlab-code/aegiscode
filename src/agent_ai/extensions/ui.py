@@ -1,6 +1,6 @@
 """Extension UI System & Rendering Contract — Task 05.
 
-Generic UI contract for Extensions. AETHER Core does not know extension names.
+Generic UI contract for Extensions. Aegis Core does not know extension names.
 All rendering is determined by UI type / renderer id / schema / mime type,
 not by extension_id equality.
 

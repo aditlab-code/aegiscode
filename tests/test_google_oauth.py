@@ -44,12 +44,12 @@ from django.http import HttpRequest, JsonResponse
 
 from api.auth import (
     STATE_EXPIRY_SECONDS,
-    create_aether_session_token,
+    create_aegis_session_token,
     exchange_google_code,
     generate_signed_state,
     get_authenticated_user,
     require_auth,
-    verify_aether_session_token,
+    verify_aegis_session_token,
     verify_google_id_token,
     verify_signed_state,
 )
@@ -152,26 +152,26 @@ def test_verify_google_id_token():
         assert user_info["sub"] == "google-user-12345"
 
 
-def test_aether_session_token_roundtrip():
-    """Verify minting and verification of AETHER session token."""
+def test_aegis_session_token_roundtrip():
+    """Verify minting and verification of AegisCode session token."""
     user_info = {
         "sub": "sub-999",
         "email": "user@example.com",
         "name": "Test User",
         "picture": "https://avatar.url",
     }
-    token = create_aether_session_token(user_info, expiry_seconds=3600)
+    token = create_aegis_session_token(user_info, expiry_seconds=3600)
     assert isinstance(token, str)
 
-    decoded = verify_aether_session_token(token)
+    decoded = verify_aegis_session_token(token)
     assert decoded is not None
     assert decoded["email"] == "user@example.com"
     assert decoded["sub"] == "sub-999"
     assert decoded["name"] == "Test User"
 
     # Expired token test
-    expired_token = create_aether_session_token(user_info, expiry_seconds=-10)
-    assert verify_aether_session_token(expired_token) is None
+    expired_token = create_aegis_session_token(user_info, expiry_seconds=-10)
+    assert verify_aegis_session_token(expired_token) is None
 
 
 def test_auth_url_endpoint(client):
@@ -233,7 +233,7 @@ def test_auth_callback_endpoint_full_flow(client):
         assert data["user"]["name"] == "Adit Wicaksono"
 
         # Verify issued token
-        decoded = verify_aether_session_token(data["token"])
+        decoded = verify_aegis_session_token(data["token"])
         assert decoded["email"] == "adit@example.com"
 
 
@@ -255,12 +255,12 @@ def test_auth_me_endpoint(client):
     assert resp_unauth.status_code == 401
 
     # Authenticated with Bearer token
-    user_info = {"sub": "123", "email": "dev@aether.ai", "name": "Dev"}
-    token = create_aether_session_token(user_info)
+    user_info = {"sub": "123", "email": "dev@aegis.local", "name": "Dev"}
+    token = create_aegis_session_token(user_info)
     resp_auth = client.get("/api/auth/me", HTTP_AUTHORIZATION=f"Bearer {token}")
     assert resp_auth.status_code == 200
     assert resp_auth.json()["authenticated"] is True
-    assert resp_auth.json()["user"]["email"] == "dev@aether.ai"
+    assert resp_auth.json()["user"]["email"] == "dev@aegis.local"
 
 
 def test_require_auth_decorator():
@@ -276,7 +276,7 @@ def test_require_auth_decorator():
 
     # Test with valid token
     req_good = HttpRequest()
-    token = create_aether_session_token({"sub": "77", "email": "auth@user.com", "name": "Auth"})
+    token = create_aegis_session_token({"sub": "77", "email": "auth@user.com", "name": "Auth"})
     req_good.headers = {"Authorization": f"Bearer {token}"}
     res_good = protected_view(req_good)
     assert res_good.status_code == 200

@@ -1,17 +1,17 @@
-"""Verifikasi project-local `.aether` store (Task Log + AI Project Bible).
+"""Verifikasi project-local `.aegis` store (Task Log + AI Project Bible).
 
-Task 5: setiap project yang dikerjakan AETHER punya `<project>/.aether/`:
-    - `.aether/log/<task_id>.log`  -> log task (JSON Lines)
-    - `.aether/bible/*.md`         -> AI Project Bible (project-local)
+Task 5: setiap project yang dikerjakan AegisCode punya `<project>/.aegis/`:
+    - `.aegis/log/<task_id>.log`  -> log task (JSON Lines)
+    - `.aegis/bible/*.md`         -> AI Project Bible (project-local)
 
 Verifier deterministik (tanpa API/model cloud). Fixture dibuat di
-J:\\Agent_Ai\\dummy_test\\aether_store_fixture dan dibersihkan setelah test.
+dummy_test/aegis_store_fixture dan dibersihkan setelah test.
 
 Menguji:
-    1. project tanpa .aether -> otomatis dibuat (Bible + log).
+    1. project tanpa .aegis -> otomatis dibuat (Bible + log).
     2. execution tanpa task_id -> task_id dibuat dan log memakai id tsb.
     3. execution dengan task_id -> memakai ID tersebut.
-    4. log tersimpan di <project>/.aether/log/<task_id>.log.
+    4. log tersimpan di <project>/.aegis/log/<task_id>.log.
     5. Bible dibuat pertama kali (index + kategori).
     6. ProjectBrain.get_context() dapat membaca Bible.
     7. knowledge baru dapat memperbarui Bible (via learn).
@@ -22,7 +22,7 @@ Menguji:
    12. tidak ada storage intelligence kedua (Bible = source of truth).
 
 Jalankan:
-    python scripts/check_aether_store.py
+    python scripts/check_aegis_store.py
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ from agent_ai.projects import (  # noqa: E402
     ProjectIntelligence,
     TaskLog,
 )
-from agent_ai.projects.aegis_store import AegisProjectStore, AetherProjectStore  # noqa: E402
+from agent_ai.projects.aegis_store import AegisProjectStore  # noqa: E402
 from agent_ai.providers.base import BaseProvider, GenerateResult  # noqa: E402
 
 DUMMY_ROOT = PROJECT_ROOT / "dummy_test"

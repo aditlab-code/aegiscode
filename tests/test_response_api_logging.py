@@ -37,7 +37,7 @@ from agent_ai.config.settings import write_log_response_api  # noqa: E402
 from agent_ai.core.executor import ToolExecutor  # noqa: E402
 from agent_ai.core.models import AgentStatus  # noqa: E402
 from agent_ai.core.orchestrator import AgentOrchestrator  # noqa: E402
-from agent_ai.projects.aether_store import ResponseLog  # noqa: E402
+from agent_ai.projects.aegis_store import ResponseLog  # noqa: E402
 from agent_ai.providers.base import (  # noqa: E402
     BaseProvider,
     GenerateOptions,
@@ -133,10 +133,7 @@ def _registry_with_noop() -> ToolRegistry:
 
 
 def _response_path(root: Path, task_id: str) -> Path:
-    p = root / ".aegis" / "log" / "response" / f"{task_id}.json"
-    if p.exists():
-        return p
-    return root / ".aether" / "log" / "response" / f"{task_id}.json"
+    return root / ".aegis" / "log" / "response" / f"{task_id}.json"
 
 
 class _Prepared:
@@ -311,7 +308,6 @@ def test_disabled_writes_nothing(tmp_path):
     )
     result = orch.run("kerjakan task")
     assert result.status == AgentStatus.DONE
-    assert not (root / ".aether").exists()
     assert not (root / ".aegis").exists()
 
 

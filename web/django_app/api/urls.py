@@ -1,4 +1,4 @@
-"""URL routing untuk AETHER Gateway API (#50).
+"""URL routing untuk Aegis Gateway API (#50).
 
 Endpoint minimum:
     GET  /api/health
@@ -31,7 +31,7 @@ urlpatterns = [
         views.global_settings_update,
         name="global_settings_update",
     ),
-    # LLM Config / Settings (LLMConfigService AETHER existing).
+    # LLM Config / Settings (LLMConfigService Aegis existing).
     path("llm/config", views.llm_config, name="llm_config"),
     path("llm/credentials", views.llm_credentials, name="llm_credentials"),
     path(
@@ -155,7 +155,7 @@ urlpatterns = [
         views.task_queue_remove,
         name="task_queue_remove",
     ),
-    # Task History (reads .aether/log/ persistent store).
+    # Task History (reads .aegis/log/ persistent store).
     # PENTING: route literal "tasks/history" HARUS mendahului
     # "tasks/<str:task_id>" agar tidak di-shadow (task_id="history").
     path("tasks/history", views.task_history, name="task_history"),
@@ -167,7 +167,7 @@ urlpatterns = [
     path("tasks/<str:task_id>/activity", views.task_activity, name="task_activity"),
     # Report API (final Agent Report per task)
     path("tasks/<str:task_id>/report", views.task_report, name="task_report"),
-    # Consultant API (AETHER reasoning layer, read-only terhadap CODE PROJECT)
+    # Consultant API (Aegis reasoning layer, read-only terhadap CODE PROJECT)
     path("consultant/sessions", views.consultant_sessions, name="consultant_sessions"),
     path(
         "consultant/sessions/<str:session_id>",

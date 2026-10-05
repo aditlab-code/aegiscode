@@ -83,7 +83,7 @@ const TOOL_META = {
 };
 
 // Label event mentah (dipakai di layer detail) — mempertahankan istilah yang
-// sudah dipakai timeline AETHER.
+// sudah dipakai timeline Aegis.
 const RAW_LABEL = {
   tool_called: "TOOL",
   tool_completed: "RESULT",

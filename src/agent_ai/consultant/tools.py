@@ -226,7 +226,7 @@ class ConsultantBibleTool(BaseTool):
     """Simpan knowledge terverifikasi ke AI Project Bible (Project Knowledge).
 
     Ini SATU-SATUNYA jalur Consultant menulis: ke Project Bible project-local
-    (`<root>/.aether/bible/<kategori>.md`), bukan ke source code. Memakai
+    (`<root>/.aegis/bible/<kategori>.md`), bukan ke source code. Memakai
     IntelligenceLearner/BibleStore yang sudah ada (bukan store baru).
     """
 

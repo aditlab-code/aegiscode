@@ -1,12 +1,12 @@
 """Kebijakan tunggal (single source of truth) untuk batas pemindaian Project Map.
 
 Modul ini menentukan **directory dan file apa yang TIDAK boleh dipindai** ketika
-Atlas/RIG (dan fingerprint freshness AETHER) membangun Project Map.
+Atlas/RIG (dan fingerprint freshness Aegis) membangun Project Map.
 
 Modul ini sengaja berdiri sendiri (stdlib-only, TANPA import paket ``agent_ai``)
 agar dapat dimuat juga oleh engine vendored ``vendor/CODE_ATLAS`` dan
-``vendor/MAP_CODE_RIG`` lewat path file (lihat ``AETHER_SCAN_POLICY_PATH_ENV``).
-Dengan begitu hanya ada SATU daftar policy untuk AETHER, Atlas, dan RIG.
+``vendor/MAP_CODE_RIG`` lewat path file (lihat ``AEGIS_SCAN_POLICY_PATH_ENV``).
+Dengan begitu hanya ada SATU daftar policy untuk Aegis, Atlas, dan RIG.
 
 Prinsip:
     - Exclusion diputuskan **sebelum** rekursi (prune-then-descend), bukan
@@ -18,8 +18,8 @@ Prinsip:
       ``external``, ``third_party``) **tidak** di-blacklist: bisa saja berisi
       source code project sendiri.
 
-Catatan: ``dummy_test`` adalah workspace testing terisolasi milik AETHER
-(gitignored, bukan bagian source AETHER) sehingga tidak ikut dipetakan.
+Catatan: ``dummy_test`` adalah workspace testing terisolasi milik AegisCode
+(gitignored, bukan bagian source AegisCode) sehingga tidak ikut dipetakan.
 """
 
 from __future__ import annotations
@@ -36,8 +36,6 @@ __all__ = [
     "GENERATED_METADATA_DIR_SUFFIXES",
     "AEGIS_SCAN_POLICY_ENV",
     "AEGIS_SCAN_POLICY_PATH_ENV",
-    "AETHER_SCAN_POLICY_ENV",
-    "AETHER_SCAN_POLICY_PATH_ENV",
     "POLICY_VERSION",
     "is_excluded_dir",
     "is_excluded_file",
@@ -58,10 +56,6 @@ POLICY_VERSION = 1
 AEGIS_SCAN_POLICY_ENV = "AEGIS_SCAN_POLICY"
 #: Environment variable berisi path file policy ini (dibaca engine vendored).
 AEGIS_SCAN_POLICY_PATH_ENV = "AEGIS_SCAN_POLICY_PATH"
-
-#: Alias kompatibilitas
-AETHER_SCAN_POLICY_ENV = AEGIS_SCAN_POLICY_ENV
-AETHER_SCAN_POLICY_PATH_ENV = AEGIS_SCAN_POLICY_PATH_ENV
 
 #: Nama directory yang selalu di-exclude (dibandingkan case-insensitive).
 #:
@@ -150,10 +144,9 @@ EXCLUDED_DIR_NAMES = frozenset(
         ".vscode",
         ".vs",
         ".settings",
-        # --- Metadata AETHER / AegisCode ----------------------------------
-        ".aether",
+        # --- Metadata AegisCode -------------------------------------------
         ".aegis",
-        # --- Workspace testing terisolasi AETHER --------------------------
+        # --- Workspace testing terisolasi AegisCode -----------------------
         "dummy_test",
     }
 )
@@ -383,9 +376,9 @@ def to_payload() -> dict:
 
 
 def policy_from_env(environ: Optional[dict] = None) -> Tuple[Set[str], Set[str]]:
-    """Baca policy dari ``AETHER_SCAN_POLICY`` (JSON) -> (dirs, suffixes)."""
+    """Baca policy dari ``AEGIS_SCAN_POLICY`` (JSON) -> (dirs, suffixes)."""
     env = os.environ if environ is None else environ
-    payload = env.get(AETHER_SCAN_POLICY_ENV)
+    payload = env.get(AEGIS_SCAN_POLICY_ENV)
     if not payload:
         return set(), set()
     try:

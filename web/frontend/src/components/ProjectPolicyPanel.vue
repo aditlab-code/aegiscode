@@ -2,11 +2,11 @@
 // Project Permission Matrix MODAL (PROJECT-LOCAL, Sidebar -> Projects ->
 // gear "Permission Policy" -> modal).
 //
-// SATU sumber policy per project: `<root>/.aether/permissions.json` — disimpan
+// SATU sumber policy per project: `<root>/.aegis/permissions.json` — disimpan
 // sebagai Permission Matrix (aksi x inside/outside), dibuat dari Default
 // Project Permission Matrix saat project dibuat. Komponen ini HANYA memanggil
 // HTTP gateway; TIDAK ada policy engine/konfigurasi permission kedua di
-// frontend. Matrix di-enforce oleh PermissionManager AETHER existing saat
+// frontend. Matrix di-enforce oleh PermissionManager Aegis existing saat
 // Agent melakukan action.
 //
 // Perubahan policy di sini HANYA berlaku untuk project ini (isolasi project):
@@ -26,7 +26,7 @@ const busy = ref(false);
 const error = ref("");
 const notice = ref("");
 
-// Nilai AKTUAL project (dibaca dari `<root>/.aether/permissions.json`).
+// Nilai AKTUAL project (dibaca dari `<root>/.aegis/permissions.json`).
 const policy = ref({ matrix: {}, path: "", exists: false, project_id: "" });
 // Opsi dari backend (TIDAK di-hardcode di frontend).
 const actions = ref([]); // [{value, label, scopes:[{value,label}]}] dari backend
@@ -118,7 +118,7 @@ watch(() => projectId(), load, { immediate: true });
 </script>
 
 <template>
-  <!-- Modal AETHER (pola .modal-backdrop/.modal existing). Policy TIDAK lagi
+  <!-- Modal Aegis (pola .modal-backdrop/.modal existing). Policy TIDAK lagi
        ditampilkan sebagai panel inline di bawah tombol gear. -->
   <div v-if="projectId()" class="modal-backdrop" @click.self="close">
     <div class="modal pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-title">

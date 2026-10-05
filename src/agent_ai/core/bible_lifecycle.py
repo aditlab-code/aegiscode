@@ -39,8 +39,8 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 # Lokasi Bible project-local (sesuai BibleStore/ProjectIntelligence):
-#   <root project target>/.aether/bible/<kategori>.md
-_BIBLE_DIR = ".aether"
+#   <root project target>/.aegis/bible/<kategori>.md
+_BIBLE_DIR = ".aegis"
 _BIBLE_SUBDIR = "bible"
 
 # Atribut root yang mungkin dipakai objek brain/intelligence (best-effort).
@@ -92,7 +92,7 @@ def resolve_bible_root(brain: Any = None, root: Any = None) -> Optional[Path]:
 
 
 def bible_sources_dir(root: Any = None) -> Optional[Path]:
-    """Direktori sumber Bible (``<root>/.aether/bible``) atau ``None``."""
+    """Direktori sumber Bible (``<root>/.aegis/bible``) atau ``None``."""
     base = resolve_bible_root(root=root)
     if base is None:
         return None

@@ -1,6 +1,6 @@
 """
 Playwright Service — browser lifecycle, snapshot, element references and
-interaction for the AETHER Playwright Extension.
+interaction for the Aegis Playwright Extension.
 
 The service is the single owner of the Playwright resource hierarchy:
 
@@ -232,12 +232,12 @@ class RefRegistry:
 # therefore both scripts below are self-invoking function expressions.
 # ---------------------------------------------------------------------------
 #: Collects a compact, LLM-friendly element list and tags every element with a
-#: temporary ``data-aether-ref`` attribute (``e1``, ``e2``, ...). The marker
+#: temporary ``data-aegis-ref`` attribute (``e1``, ``e2``, ...). The marker
 #: comment is used by the test doubles to recognise the scan call.
 SNAPSHOT_SCAN_JS = r"""
 (() => {
-  /* AETHER_SNAPSHOT_SCAN */
-  const REF_ATTR = 'data-aether-ref';
+  /* AEGIS_SNAPSHOT_SCAN */
+  const REF_ATTR = 'data-aegis-ref';
   const MAX = __MAX__;
   const ROOT_SELECTOR = __SELECTOR__;
 
@@ -385,14 +385,14 @@ SNAPSHOT_SCAN_JS = r"""
       nodes.push(node);
     }
   }
-  return { marker: 'AETHER_SNAPSHOT_SCAN', nodes: nodes, count: nodes.length };
+  return { marker: 'AEGIS_SNAPSHOT_SCAN', nodes: nodes, count: nodes.length };
 })()
 """
 
 #: Scrolls the window to an absolute position (used for ``to='top'``/``'bottom'``).
 SCROLL_TO_JS = r"""
 (() => {
-  /* AETHER_SCROLL_TO */
+  /* AEGIS_SCROLL_TO */
   window.scrollTo({ left: __X__, top: __Y__, behavior: __BEHAVIOR__ });
   return true;
 })()
@@ -403,7 +403,7 @@ SCROLL_TO_JS = r"""
 #: The marker comment is used by the test doubles to recognise the call.
 DOM_INSPECT_JS = r"""
 (el) => {
-  /* AETHER_DOM_INSPECT */
+  /* AEGIS_DOM_INSPECT */
   const attrs = {};
   if (el.attributes) {
     for (let i = 0; i < el.attributes.length; i++) {
@@ -546,7 +546,7 @@ class _PlaywrightServiceCore:
             cfg.update(config)
         self.config: Dict[str, Any] = cfg
 
-        # Task 05 — persistence. ``storage`` is the real AETHER Extension
+        # Task 05 — persistence. ``storage`` is the real Aegis Extension
         # storage facade (``context.storage``); ``state_dir`` is a plain
         # filesystem fallback so the service stays usable/testable without a
         # full ExtensionContext. Neither is required until persistence is used.
@@ -1427,7 +1427,7 @@ class _SnapshotInteractionMixin:
                 f"(snapshot generation {registry.generation}). "
                 "Take a new snapshot and use one of its refs."
             )
-        return page.locator(f'[data-aether-ref="{ref}"]'), element
+        return page.locator(f'[data-aegis-ref="{ref}"]'), element
 
     def _build_locator(self, page: Any, spec: Any) -> Any:
         if spec is None:
@@ -2222,7 +2222,7 @@ class _SnapshotInteractionMixin:
         else:
             import tempfile
 
-            directory = Path(tempfile.gettempdir()) / "aether-playwright-artifacts"
+            directory = Path(tempfile.gettempdir()) / "aegis-playwright-artifacts"
         try:
             directory.mkdir(parents=True, exist_ok=True)
         except Exception:
@@ -3068,7 +3068,7 @@ def _atomic_json_write(path: Path, value: Any) -> None:
     import tempfile
 
     handle_fd, tmp_name = tempfile.mkstemp(
-        dir=str(path.parent), prefix=".aether_state_", suffix=".tmp"
+        dir=str(path.parent), prefix=".aegis_state_", suffix=".tmp"
     )
     try:
         with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
@@ -3085,7 +3085,7 @@ def _atomic_json_write(path: Path, value: Any) -> None:
 
 
 class _FacadeStateNamespace:
-    """Adapts an AETHER ``ExtensionStorage`` / ``ProjectScopedStorage`` facade.
+    """Adapts an Aegis ``ExtensionStorage`` / ``ProjectScopedStorage`` facade.
 
     Both expose the same minimal surface (``set`` / ``get`` / ``delete`` /
     ``exists`` / ``list_keys``); this thin wrapper keeps the store independent
@@ -3155,7 +3155,7 @@ class _FileStateNamespace:
 class BrowserStateStore:
     """Persist Playwright storage state, isolated by extension/session/project.
 
-    Backed either by an AETHER Extension storage facade (``context.storage`` —
+    Backed either by an Aegis Extension storage facade (``context.storage`` —
     the production path) or by a plain filesystem directory (``base_dir``) so
     the service stays usable and testable without a full ExtensionContext.
 
@@ -3163,7 +3163,7 @@ class BrowserStateStore:
 
     * **extension scope** (default) — one namespace per ``extension_id`` (the
       facade already isolates each extension);
-    * **project scope** — ``<project>/.aether/extensions/<ext>/…`` through
+    * **project scope** — ``<project>/.aegis/extensions/<ext>/…`` through
       ``storage.project(path)`` (facade) or ``<base>/projects/<name>`` (file).
 
     Only the JSON storage state itself is persisted. Nothing is ever returned to
@@ -3283,7 +3283,7 @@ class _PersistenceMixin:
 
     Uses Playwright's official ``BrowserContext.storage_state()`` /
     ``new_context(storage_state=…)`` mechanisms and stores the resulting JSON
-    through the AETHER Extension storage facade. It never returns cookie values
+    through the Aegis Extension storage facade. It never returns cookie values
     to the caller — only names, scopes and counts.
     """
 
@@ -3402,7 +3402,7 @@ class _PersistenceMixin:
 
         With ``session_id`` omitted a **new** session is created straight from
         the saved state (Playwright's official ``new_context(storage_state=…)``
-        path) — this is what survives an AETHER restart. With an existing
+        path) — this is what survives an Aegis restart. With an existing
         ``session_id`` the state is re-applied to that context: cookies via
         ``add_cookies`` and localStorage via an init script.
         """
@@ -3488,7 +3488,7 @@ class _DebugUIMixin:
     """Generic debug-panel view models (Task 05).
 
     Produces plain, JSON-serialisable view contracts (``renderer`` / ``type`` /
-    ``data`` — the AETHER UI Result contract) so the generic Extension UI
+    ``data`` — the Aegis UI Result contract) so the generic Extension UI
     runtime can render them with no Playwright-specific frontend code.
     """
 

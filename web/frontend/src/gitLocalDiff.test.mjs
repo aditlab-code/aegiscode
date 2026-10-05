@@ -78,10 +78,10 @@ test("4. api.js git client endpoint contract", () => {
   assert.equal(typeof getProjectGitCommits, "function");
 });
 
-test("5. changes panel filters out internal .aether and .git metadata paths", () => {
+test("5. changes panel filters out internal .aegis and .git metadata paths", () => {
   const rawList = [
-    { path: ".aether" },
-    { path: ".aether/state.json" },
+    { path: ".aegis" },
+    { path: ".aegis/state.json" },
     { path: ".git/HEAD" },
     { path: "src/main.py" },
     { path: "README.md" },
@@ -94,8 +94,8 @@ test("5. changes panel filters out internal .aether and .git metadata paths", ()
       !p.startsWith("../") &&
       !p.includes("/../") &&
       p !== ".." &&
-      p !== ".aether" &&
-      !p.startsWith(".aether/") &&
+      p !== ".aegis" &&
+      !p.startsWith(".aegis/") &&
       p !== ".git" &&
       !p.startsWith(".git/")
     );
@@ -122,8 +122,8 @@ test("5b. changes panel filters out external and path-traversal paths (../ and /
       !p.startsWith("../") &&
       !p.includes("/../") &&
       p !== ".." &&
-      p !== ".aether" &&
-      !p.startsWith(".aether/") &&
+      p !== ".aegis" &&
+      !p.startsWith(".aegis/") &&
       p !== ".git" &&
       !p.startsWith(".git/")
     );

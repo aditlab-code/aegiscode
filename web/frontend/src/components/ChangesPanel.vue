@@ -1,7 +1,7 @@
 <script setup>
-// Changes / Diff + Result. Data dari event SSE AETHER.
+// Changes / Diff + Result. Data dari event SSE Aegis.
 // TIDAK ada diff engine di frontend: hanya menampilkan perubahan yang
-// dilaporkan AETHER. Diff detail ditampilkan bila payload menyediakannya.
+// dilaporkan Aegis. Diff detail ditampilkan bila payload menyediakannya.
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import { getProjectGitStatus } from "../api.js";
 
@@ -110,8 +110,8 @@ async function loadGitChanges() {
             !p.startsWith("../") &&
             !p.includes("/../") &&
             p !== ".." &&
-            p !== ".aether" &&
-            !p.startsWith(".aether/") &&
+            p !== ".aegis" &&
+            !p.startsWith(".aegis/") &&
             p !== ".git" &&
             !p.startsWith(".git/")
           );
@@ -155,8 +155,8 @@ const displayChanges = computed(() => {
       !p.startsWith("../") &&
       !p.includes("/../") &&
       p !== ".." &&
-      p !== ".aether" &&
-      !p.startsWith(".aether/") &&
+      p !== ".aegis" &&
+      !p.startsWith(".aegis/") &&
       p !== ".git" &&
       !p.startsWith(".git/")
     );
@@ -167,7 +167,7 @@ function onRowClick(c) {
   emit("open-diff", c);
 }
 
-// Collapsible section (AETHER Workbench right column).
+// Collapsible section (Aegis Workbench right column).
 // Default: CHANGES tertutup. State hanya di frontend selama sesi aktif.
 const collapsed = ref(false);
 function toggleCollapse() {

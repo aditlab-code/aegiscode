@@ -19,7 +19,7 @@ from agent_ai.extensions.registry import ExtensionRegistry
 def create_installer(
     registry: Optional[ExtensionRegistry] = None,
     capability_registry: Optional[CapabilityRegistry] = None,
-    aether_root: Optional[Path] = None,
+    aegis_root: Optional[Path] = None,
     extensions_dir: Optional[Path] = None,
     tool_registry: Optional[Any] = None,
     config_store: Optional[Any] = None,
@@ -28,7 +28,7 @@ def create_installer(
     return ExtensionManager(
         registry=registry,
         capability_registry=capability_registry,
-        aether_root=aether_root,
+        aegis_root=aegis_root,
         extensions_dir=extensions_dir,
         tool_registry=tool_registry,
         config_store=config_store,

@@ -13,7 +13,7 @@ Alur yang dituju:
     LLM -> project_map_status() -> (stale?) -> refresh_project_map() -> query -> read_file()
 
 Prinsip (lihat juga `agent_ai.projects.project_map_query`):
-    - Map dibaca dari `.aether/map/atlas.json` / `.aether/map/rig.json` yang
+    - Map dibaca dari `.aegis/map/atlas.json` / `.aegis/map/rig.json` yang
       SUDAH ada lewat `ProjectMapService` (tidak regenerate saat query).
     - Query pada map `stale` TETAP membaca map lama dan melaporkan
       `map_status`; query != regenerate.
@@ -81,7 +81,7 @@ class AtlasQueryTool(_ProjectMapToolBase):
     name = "atlas_query"
     description = (
         "Mencari LOKASI kode yang relevan di project ini melalui peta navigasi "
-        "Code Atlas (.aether/map/atlas.json): symbol, class, function, method, "
+        "Code Atlas (.aegis/map/atlas.json): symbol, class, function, method, "
         "module, atau file/path (nama file + rentang baris), beserta relasi "
         "dasarnya (callers/callees/inherits) bila tersedia. PENTING: ini LOOKUP "
         "pada data map/index, BUKAN pencarian full-text isi source - isi file "
@@ -154,7 +154,7 @@ class RigQueryTool(_ProjectMapToolBase):
     description = (
         "Mencari entity kode (class/function/method/module/component) dan "
         "RELATIONSHIP-nya melalui Repository Intelligence Graph "
-        "(.aether/map/rig.json). Menjawab 'terhubung ke apa': callers, callees, "
+        "(.aegis/map/rig.json). Menjawab 'terhubung ke apa': callers, callees, "
         "imports, inherits, contains, depends_on, tests, external, related. Ini "
         "LOOKUP graph pada data map/index, BUKAN pencarian full-text isi source. "
         "Query harus berupa nama entity yang ter-index (mis. 'TaskExecutor' "
@@ -289,7 +289,7 @@ class RefreshProjectMapTool(_ProjectMapToolBase):
 
     name = "refresh_project_map"
     description = (
-        "Meregenerasi peta project (.aether/map/atlas.json dan/atau rig.json) "
+        "Meregenerasi peta project (.aegis/map/atlas.json dan/atau rig.json) "
         "dengan engine Atlas/RIG yang sudah ada. Panggil HANYA bila peta sudah "
         "stale / belum ada dan Anda memang membutuhkannya - bukan setiap task. "
         "Untuk target='both', Atlas dan RIG digenerate paralel. Penulisan "
@@ -375,7 +375,7 @@ def build_project_map_tools(
     Project Map mana yang ada.
 
     Args:
-        root: root project target (lokasi `.aether/map/`).
+        root: root project target (lokasi `.aegis/map/`).
         service: `ProjectMapService` opsional (mis. override engine dir).
         include_refresh: bila True, sertakan `refresh_project_map` (menulis
             map). Registry Consultant TIDAK boleh memakai True.
@@ -405,7 +405,7 @@ def build_project_map_registry(
     `include_refresh=True` untuk menambahkan `refresh_project_map`.
 
     Args:
-        root: root project target (lokasi `.aether/map/`).
+        root: root project target (lokasi `.aegis/map/`).
         service: `ProjectMapService` opsional (mis. untuk override engine dir).
         include_refresh: sertakan `refresh_project_map` (HANYA untuk Agent).
 

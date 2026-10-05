@@ -91,7 +91,7 @@ def write_log_response_api() -> bool:
     """Baca `write_log_response_api` dari `data/settings.json`.
 
     Global switch ON/OFF untuk logging response mentah API LLM per task ke
-    `<root project target>/.aether/log/response/<task_id>.json`. Default False
+    `<root project target>/.aegis/log/response/<task_id>.json`. Default False
     (backward compatible): bila file/field tidak ada, atau terjadi error baca,
     return False sehingga AETHER berjalan PERSIS seperti sekarang (tanpa
     menulis response API). Hanya nilai eksplisit `true` yang mengaktifkan.
@@ -490,7 +490,7 @@ def normalize_global_settings(updates: Dict[str, Any]) -> Dict[str, Any]:
         raise SettingsWriteError("Body update harus berupa object JSON.")
 
     # Pemisahan konfigurasi: policy/permission adalah milik Project Settings
-    # (`<root>/.aether/permissions.json`), BUKAN Global Settings AETHER. Tolak
+    # (`<root>/.aegis/permissions.json`), BUKAN Global Settings AETHER. Tolak
     # dengan pesan yang mengarahkan user ke tempat yang benar (bukan menerima
     # diam-diam lalu menyimpan konfigurasi project ke file global).
     migrated = set(updates) & _PROJECT_POLICY_KEYS

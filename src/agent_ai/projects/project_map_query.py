@@ -1,7 +1,7 @@
 """Query adapter untuk Project Map (CODE ATLAS + MAP_CODE_RIG).
 
 Tujuan modul ini: memberi LLM *subset kecil yang relevan* dari map yang sudah
-tersimpan (`.aether/map/atlas.json` / `.aether/map/rig.json`) - BUKAN seluruh
+tersimpan (`.aegis/map/atlas.json` / `.aegis/map/rig.json`) - BUKAN seluruh
 map. Modul ini:
 
     - HANYA membaca map yang sudah ada lewat `ProjectMapService` (tidak

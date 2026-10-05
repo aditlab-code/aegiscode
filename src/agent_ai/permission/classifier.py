@@ -52,7 +52,7 @@ _PROJECT_MAP_READ_TOOLS = frozenset({
 })
 
 #: Tool Project Map yang MENULIS file map di dalam project
-#: (`<root>/.aether/map/*.json`) lewat engine Atlas/RIG (lihat
+#: (`<root>/.aegis/map/*.json`) lewat engine Atlas/RIG (lihat
 #: tools/project_map.py + projects/project_map.py). Hanya Agent yang punya.
 _PROJECT_MAP_WRITE_TOOLS = frozenset({
     "refresh_project_map",

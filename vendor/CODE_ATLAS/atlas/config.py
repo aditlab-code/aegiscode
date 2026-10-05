@@ -18,10 +18,10 @@ from pathlib import Path
 # Default output file name used when none is provided.
 DEFAULT_OUTPUT_NAME = "atlas.json"
 
-# Environment variable berisi payload JSON policy (di-set oleh AETHER).
-_SHARED_POLICY_ENV = "AETHER_SCAN_POLICY"
-# Environment variable berisi path file policy bersama (di-set oleh AETHER).
-_SHARED_POLICY_PATH_ENV = "AETHER_SCAN_POLICY_PATH"
+# Environment variable berisi payload JSON policy (di-set oleh Aegis).
+_SHARED_POLICY_ENV = "AEGIS_SCAN_POLICY"
+# Environment variable berisi path file policy bersama (di-set oleh Aegis).
+_SHARED_POLICY_PATH_ENV = "AEGIS_SCAN_POLICY_PATH"
 
 # Directory yang selalu skipped (daftar bawaan; diperluas oleh policy bersama).
 _BASE_IGNORED_DIRS = {
@@ -42,7 +42,7 @@ _BASE_IGNORED_DIRS = {
     "build",
     "dist",
     ".eggs",
-    ".aether",
+    ".aegis",
 }
 
 # Extensions that are definitely binary / not source-relevant and

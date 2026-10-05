@@ -6,7 +6,7 @@ Features:
 - Anti-CSRF stateless JWT signed state tokens (300s expiration, no Django session required).
 - Server-to-server authorization code exchange with Google Token API.
 - Cryptographic verification of Google id_token via google-auth library.
-- Minting and verification of AETHER session JWT tokens (HS256).
+- Minting and verification of AegisCode session JWT tokens (HS256).
 - @require_auth decorator for route guarding.
 """
 
@@ -97,16 +97,12 @@ def verify_google_id_token(
     )
 
 
-def create_aether_session_token(
+def create_aegis_session_token(
     user_info: Dict[str, Any],
     expiry_seconds: Optional[int] = None,
 ) -> str:
     """Issue a signed AegisCode session JWT for the authenticated user."""
-    ttl = expiry_seconds or getattr(
-        settings,
-        "AEGIS_AUTH_TOKEN_EXPIRY",
-        getattr(settings, "AETHER_AUTH_TOKEN_EXPIRY", 604800),
-    )
+    ttl = expiry_seconds or getattr(settings, "AEGIS_AUTH_TOKEN_EXPIRY", 604800)
     now = int(time.time())
     payload = {
         "sub": str(user_info.get("sub", "")),
@@ -119,8 +115,8 @@ def create_aether_session_token(
     return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
 
 
-def verify_aether_session_token(token: str) -> Optional[Dict[str, Any]]:
-    """Decode and verify an AETHER session token. Returns payload or None."""
+def verify_aegis_session_token(token: str) -> Optional[Dict[str, Any]]:
+    """Decode and verify an AegisCode session token. Returns payload or None."""
     if not token:
         return None
     try:
@@ -135,7 +131,7 @@ def get_authenticated_user(request: HttpRequest) -> Optional[Dict[str, Any]]:
     if not auth_header or not auth_header.startswith("Bearer "):
         return None
     token = auth_header.split(" ", 1)[1].strip()
-    return verify_aether_session_token(token)
+    return verify_aegis_session_token(token)
 
 
 def require_auth(view_func: Callable) -> Callable:

@@ -1,13 +1,13 @@
 <script setup>
-// AETHER Code Editor (Monaco) — modal editor di dalam Workbench.
+// Aegis Code Editor (Monaco) — modal editor di dalam Workbench.
 //
 // Dibuka dari File Explorer (klik file / klik kanan -> "Open with Editor") dan
 // dari tombol Edit di panel CHANGES. Bukan route/halaman baru dan bukan
 // subsystem file manager baru:
 //   - daftar file & boundary workspace memakai Explorer/API yang sudah ada,
 //   - isi file dibaca/ditulis lewat API file backend existing
-//     (ReadFileTool/WriteFileTool AETHER; browser TIDAK menulis file),
-//   - modal memakai pola .modal-backdrop/.modal AETHER existing.
+//     (ReadFileTool/WriteFileTool Aegis; browser TIDAK menulis file),
+//   - modal memakai pola .modal-backdrop/.modal Aegis existing.
 //
 // Lifecycle Monaco: dibuat saat modal dibuka, di-dispose saat modal ditutup
 // (termasuk model + listener + ResizeObserver) supaya tidak ada instance atau
@@ -85,7 +85,7 @@ function modelUri(path, instanceId = "") {
     .map((part) => encodeURIComponent(part))
     .join("/");
   const prefix = instanceId ? `${encodeURIComponent(instanceId)}/` : "";
-  return monaco.Uri.parse(`inmemory://aether/${prefix}${clean}`);
+  return monaco.Uri.parse(`inmemory://aegis/${prefix}${clean}`);
 }
 
 function layout() {
@@ -130,7 +130,7 @@ async function mountEditor(text) {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
     automaticLayout: true,
-    theme: isLight ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME,
+    theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
     model,
   });
 
@@ -146,7 +146,7 @@ async function mountEditor(text) {
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     themeObserver = new MutationObserver(() => {
       const lightNow = document.documentElement.dataset.theme === "light";
-      monaco.editor.setTheme(lightNow ? mod.AETHER_LIGHT_THEME : mod.AETHER_THEME);
+      monaco.editor.setTheme(lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME);
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -172,7 +172,7 @@ async function mountEditor(text) {
           endLineNumber: err.line || 1,
           endColumn: (err.col || 1) + 15,
         }));
-        monaco.editor.setModelMarkers(model, "aether-syntax", monacoMarkers);
+        monaco.editor.setModelMarkers(model, "aegis-syntax", monacoMarkers);
       }
     }, 200);
   }

@@ -3,14 +3,14 @@
 Struktur yang dikelola (di ROOT project target):
 
     <root project target>/
-        .aether/
+        .aegis/
             map/
                 atlas.json    # output CODE ATLAS  (project navigation map)
                 rig.json      # output MAP_CODE_RIG (Repository Intelligence Graph)
 
 Inti modul:
     - Satu adapter terpusat (`ProjectMapService`) di layer `agent_ai.projects`
-      (mengikuti pola project-local `.aether/<subdir>/` seperti github_backup.py).
+      (mengikuti pola project-local `.aegis/<subdir>/` seperti github_backup.py).
     - Memakai engine Atlas/RIG yang SUDAH ADA di repo masing-masing
       (TIDAK menyalin / mengimplementasikan ulang engine).
     - Mengecek keberadaan map, memuat map ter-parse, menghitung freshness, dan
@@ -19,7 +19,7 @@ Inti modul:
 Termasuk (Task 4 - freshness + refresh terkontrol):
     - Freshness/stale detection DETERMINISTIK berbasis fingerprint source code
       (SHA-256 atas path + isi file `.py`). Metadata kecil per map disimpan di
-      `<project>/.aether/map/<type>.meta.json`; isi `atlas.json` / `rig.json`
+      `<project>/.aegis/map/<type>.meta.json`; isi `atlas.json` / `rig.json`
       TIDAK diubah.
     - Generation PARALEL Atlas + RIG (`generate_maps`) dengan penulisan atomik
       per map; kegagalan satu map tidak merusak map lain / map lama.
@@ -42,21 +42,21 @@ Cara AETHER mengakses Atlas/RIG:
 
     Lokasi engine dapat di-override (urutan prioritas):
         1. argumen konstruktor `atlas_dir` / `rig_dir`
-        2. environment variable `AETHER_CODE_ATLAS_DIR` / `AETHER_MAP_CODE_RIG_DIR`
-        3. default repo path (relatif root AETHER:
-           `<AETHER_ROOT>/vendor/CODE_ATLAS` + `<AETHER_ROOT>/vendor/MAP_CODE_RIG`;
+        2. environment variable `AEGIS_CODE_ATLAS_DIR` / `AEGIS_MAP_CODE_RIG_DIR`
+        3. default repo path (relatif root AegisCode:
+           `<AEGIS_ROOT>/vendor/CODE_ATLAS` + `<AEGIS_ROOT>/vendor/MAP_CODE_RIG`;
            lihat DEFAULT_ENGINE_DIRS)
 
-    Modul ini TIDAK meng-import engine ke proses AETHER (tidak memodifikasi
+    Modul ini TIDAK meng-import engine ke proses AegisCode (tidak memodifikasi
     `sys.path`), sehingga engine tetap terisolasi dan tidak bisa membuat
-    proses AETHER crash.
+    proses AegisCode crash.
 
 Prinsip:
     - Project-local: semua map ditulis di dalam root project target.
-    - Additive: hanya menambah subfolder `.aether/map/`; tidak mengubah
+    - Additive: hanya menambah subfolder `.aegis/map/`; tidak mengubah
       penulisan Bible/log/github yang sudah ada.
     - Idempotent: instansiasi service TIDAK membuat file/folder apa pun.
-      Folder `.aether/map/` hanya dibuat saat benar-benar menyimpan map.
+      Folder `.aegis/map/` hanya dibuat saat benar-benar menyimpan map.
     - Tanpa dependency baru.
 """
 
@@ -78,7 +78,6 @@ from agent_ai.projects import scan_policy
 
 #: Nama folder root metadata project.
 AEGIS_DIR_NAME = ".aegis"
-AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Subfolder hasil Project Map.
 MAP_DIR_NAME = "map"
 
@@ -109,7 +108,6 @@ ENV_ENGINE_DIRS: Dict[str, str] = {
 #: Root repository AegisCode. File ini berada di
 #: `src/agent_ai/projects/project_map.py`, sehingga `parents[3]` = root repo.
 _AEGIS_ROOT: Path = Path(__file__).resolve().parents[3]
-_AETHER_ROOT: Path = _AEGIS_ROOT
 
 #: Default lokasi repo engine (bila tidak di-override via env/konstruktor).
 #: Engine Atlas/RIG dibundel DI DALAM repository AegisCode (vendored):
@@ -147,7 +145,7 @@ FINGERPRINT_ALGORITHM = "sha256-code-v1"
 #: Versi metadata freshness.
 META_VERSION = 1
 
-#: Nama file metadata freshness per tipe map (di dalam `.aether/map/`).
+#: Nama file metadata freshness per tipe map (di dalam `.aegis/map/`).
 META_FILE_NAMES: Dict[str, str] = {
     MAP_TYPE_ATLAS: "atlas.meta.json",
     MAP_TYPE_RIG: "rig.meta.json",
@@ -264,12 +262,12 @@ class ProjectMapService:
         return Path(project_path) / AEGIS_DIR_NAME / MAP_DIR_NAME
 
     def get_map_path(self, project_path: ProjectPath, map_type: str) -> Path:
-        """Path file map: `<project>/.aether/map/<atlas|rig>.json`."""
+        """Path file map: `<project>/.aegis/map/<atlas|rig>.json`."""
         map_type = _normalize_map_type(map_type)
         return self.get_map_dir(project_path) / MAP_FILE_NAMES[map_type]
 
     def get_meta_path(self, project_path: ProjectPath, map_type: str) -> Path:
-        """Path metadata freshness: `<project>/.aether/map/<type>.meta.json`."""
+        """Path metadata freshness: `<project>/.aegis/map/<type>.meta.json`."""
         map_type = _normalize_map_type(map_type)
         return self.get_map_dir(project_path) / META_FILE_NAMES[map_type]
 
@@ -470,7 +468,7 @@ class ProjectMapService:
 
                 {
                   "project": "<project path>",
-                  "map_dir": "<.aether/map>",
+                  "map_dir": "<.aegis/map>",
                   "status": "available" | "missing" | "invalid",
                   "freshness": "fresh" | "stale" | "missing" | "invalid",
                   "maps": {
@@ -584,10 +582,10 @@ class ProjectMapService:
     # Generation (memakai engine yang sudah ada; sinkron, bukan background)
     # ------------------------------------------------------------------ #
     def generate_map(self, project_path: ProjectPath, map_type: str) -> Path:
-        """Generate satu map via engine Atlas/RIG dan simpan ke `.aether/map/`.
+        """Generate satu map via engine Atlas/RIG dan simpan ke `.aegis/map/`.
 
         Engine dijalankan sebagai CLI yang sudah ada (subprocess). Folder
-        `.aether/map/` dibuat di sini (bukan saat inisialisasi service).
+        `.aegis/map/` dibuat di sini (bukan saat inisialisasi service).
 
         Penulisan bersifat ATOMIK (temporary file di folder yang sama +
         `os.replace`): bila engine gagal / tidak menghasilkan output, map lama
@@ -654,8 +652,6 @@ class ProjectMapService:
             mod_path_str = str(scan_policy.module_path())
             engine_env[scan_policy.AEGIS_SCAN_POLICY_ENV] = payload_str
             engine_env[scan_policy.AEGIS_SCAN_POLICY_PATH_ENV] = mod_path_str
-            engine_env[scan_policy.AETHER_SCAN_POLICY_ENV] = payload_str
-            engine_env[scan_policy.AETHER_SCAN_POLICY_PATH_ENV] = mod_path_str
         except (TypeError, ValueError, OSError):
             pass
 
@@ -765,7 +761,7 @@ __all__ = [
     "MAP_TYPES",
     "MAP_FILE_NAMES",
     "META_FILE_NAMES",
-    "AETHER_DIR_NAME",
+    "AEGIS_DIR_NAME",
     "MAP_DIR_NAME",
     "SOURCE_EXTENSIONS",
     "FINGERPRINT_ALGORITHM",

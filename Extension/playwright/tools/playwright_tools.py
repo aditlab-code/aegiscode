@@ -3,8 +3,8 @@
 
 Every tool:
 
-* has a **namespaced** name (``aether.playwright.<action>``) so it is a valid
-  AETHER capability;
+* has a **namespaced** name (``aegis.playwright.<action>``) so it is a valid
+  Aegis capability;
 * exposes a JSON-schema-like ``input_schema``;
 * delegates straight to the service and returns plain dicts — **never** raw
   Playwright objects.
@@ -973,7 +973,7 @@ class BrowserDebugPanelTool(_PlaywrightTool):
         "Return the generic Playwright debug panel view model: sessions and "
         "pages tables plus the console/network views of the selected page. "
         "Optionally includes a DOM inspection and/or captures a screenshot or "
-        "stops an active trace as an artifact. The result follows the AETHER "
+        "stops an active trace as an artifact. The result follows the Aegis "
         "UI Result contract (renderer/type/data) so the generic UI can render "
         "it with no Playwright-specific frontend."
     )
@@ -1021,7 +1021,7 @@ class SessionSaveStateTool(_PlaywrightTool):
     name = NAMESPACE + "session_save_state"
     description = (
         "Save a session's browser storage state (cookies + localStorage) so it "
-        "survives an AETHER restart. Stored through the Extension storage API, "
+        "survives an Aegis restart. Stored through the Extension storage API, "
         "isolated per extension and (optionally) per project. Credentials are "
         "never returned — only counts."
     )

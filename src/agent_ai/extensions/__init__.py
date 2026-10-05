@@ -1,4 +1,4 @@
-"""AETHER Extension System — Foundation & Contract (Task 01-05).
+"""Aegis Extension System — Foundation & Contract (Task 01-05).
 
 UI system (Task 05) adds generic UI registry, declarative rendering, viewer
 and result contracts — all without hardcoding extension names.
@@ -18,7 +18,7 @@ from agent_ai.extensions.manifest import (
     validate_manifest,
     validate_manifest_data,
 )
-from agent_ai.extensions.paths import get_aether_root, get_extensions_dir, get_aether_data_dir, get_extensions_data_dir
+from agent_ai.extensions.paths import get_aegis_root, get_extensions_dir, get_aegis_data_dir, get_extensions_data_dir
 from agent_ai.extensions.discovery import (
     ExtensionEntry,
     ExtensionLoadError,
@@ -94,9 +94,9 @@ __all__ = [
     "global_capability_registry",
     "CURRENT_API_VERSION",
     "SUPPORTED_API_VERSIONS",
-    "get_aether_root",
+    "get_aegis_root",
     "get_extensions_dir",
-    "get_aether_data_dir",
+    "get_aegis_data_dir",
     "get_extensions_data_dir",
     "load_manifest",
     "parse_manifest",

@@ -213,7 +213,7 @@ def build_registry(
     Catatan Project Map: capability `atlas_query`, `rig_query`,
     `project_map_status`, dan `refresh_project_map` terdaftar di sini (Agent).
     Tool ini hanya bekerja bila `root` project diketahui (lokasi
-    `<root>/.aether/map/`). Registry Consultant dibangun terpisah
+    `<root>/.aegis/map/`). Registry Consultant dibangun terpisah
     (`agent_ai.consultant.tools.build_consultant_registry`) TANPA
     `refresh_project_map`, sehingga Consultant tetap read-only terhadap map.
 

@@ -78,7 +78,7 @@ def _extract_msg_content(msg: Any) -> str:
     return str(val) if val is not None else ""
 
 def _map_agy_tool_name(agy_name: str) -> str:
-    """Petakan nama tool internal Antigravity CLI (agy) ke nama tool standar AETHER."""
+    """Petakan nama tool internal Antigravity CLI (agy) ke nama tool standar Aegis."""
     name = (agy_name or "").lower().strip()
     if name in ("view_file", "read_file", "read_symbol", "view_symbol"):
         return "read_file"
@@ -383,7 +383,7 @@ class AntigravityProvider(BaseProvider):
 
 
             # Bila event_sink tersedia, gunakan stream-json agar intermediate tool
-            # calls dipancarkan real-time ke UI timeline AETHER saat agy berjalan.
+            # calls dipancarkan real-time ke UI timeline Aegis saat agy berjalan.
             use_streaming = event_sink is not None
             output_format = "stream-json" if use_streaming else "json"
             cmd = [cli, "-p", input_text, "--model", model, "--output-format", output_format]
@@ -455,14 +455,14 @@ class AntigravityProvider(BaseProvider):
 
                                 if step_type == "tool":
                                     agy_tool = step_update.get("tool_name") or ""
-                                    aether_tool = _map_agy_tool_name(agy_tool)
+                                    aegis_tool = _map_agy_tool_name(agy_tool)
                                     tool_info = step_update.get("tool_info") or {}
                                     params = tool_info.get("parameters") or {}
-                                    target = _extract_agy_target(aether_tool, params)
+                                    target = _extract_agy_target(aegis_tool, params)
 
                                     if state == "ACTIVE" and event_sink:
                                         event_sink("tool_called", {
-                                            "tool": aether_tool,
+                                            "tool": aegis_tool,
                                             "arguments": params,
                                             "target": target,
                                             "call_id": call_id,
@@ -470,13 +470,13 @@ class AntigravityProvider(BaseProvider):
                                     elif state == "DONE" and event_sink:
                                         output = tool_info.get("output", "")
                                         event_sink("tool_completed", {
-                                            "tool": aether_tool,
+                                            "tool": aegis_tool,
                                             "success": True,
                                             "target": target,
                                             "call_id": call_id,
                                         })
                                         event_sink("observation_received", {
-                                            "tool": aether_tool,
+                                            "tool": aegis_tool,
                                             "content": output,
                                             "success": True,
                                             "target": target,
@@ -566,13 +566,13 @@ class AntigravityProvider(BaseProvider):
                             call_id = f"agy_{step_idx}"
                             if step_type == "tool":
                                 agy_tool = step_update.get("tool_name") or ""
-                                aether_tool = _map_agy_tool_name(agy_tool)
+                                aegis_tool = _map_agy_tool_name(agy_tool)
                                 tool_info = step_update.get("tool_info") or {}
                                 params = tool_info.get("parameters") or {}
-                                target = _extract_agy_target(aether_tool, params)
+                                target = _extract_agy_target(aegis_tool, params)
                                 if state == "ACTIVE":
                                     event_sink("tool_called", {
-                                        "tool": aether_tool,
+                                        "tool": aegis_tool,
                                         "arguments": params,
                                         "target": target,
                                         "call_id": call_id,
@@ -580,13 +580,13 @@ class AntigravityProvider(BaseProvider):
                                 elif state == "DONE":
                                     output = tool_info.get("output", "")
                                     event_sink("tool_completed", {
-                                        "tool": aether_tool,
+                                        "tool": aegis_tool,
                                         "success": True,
                                         "target": target,
                                         "call_id": call_id,
                                     })
                                     event_sink("observation_received", {
-                                        "tool": aether_tool,
+                                        "tool": aegis_tool,
                                         "content": output,
                                         "success": True,
                                         "target": target,

@@ -1,4 +1,4 @@
-// AETHER Gateway API client (#52).
+// Aegis Gateway API client (#52).
 //
 // Frontend TIPIS: hanya memanggil HTTP/SSE Django Gateway (#50/#51).
 // TIDAK ada logic agent (runtime/loop/planning/tools/validation/recovery) di sini.
@@ -9,7 +9,7 @@ const BASE = "/api";
 async function request(path, options = {}) {
   let authToken = "";
   try {
-    authToken = localStorage.getItem("aether_auth_token") || "";
+    authToken = localStorage.getItem("aegis_auth_token") || "";
   } catch {
     // Ignore storage read error
   }
@@ -26,7 +26,7 @@ async function request(path, options = {}) {
   });
 
   if (resp.status === 401 && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("aether:auth-unauthorized"));
+    window.dispatchEvent(new CustomEvent("aegis:auth-unauthorized"));
   }
 
   const text = await resp.text();
@@ -51,14 +51,14 @@ export function getHealth() {
   return request("/health");
 }
 
-// Konfigurasi provider/model/mode dari AETHER (TIDAK hardcode di frontend).
+// Konfigurasi provider/model/mode dari Aegis (TIDAK hardcode di frontend).
 export function getConfig() {
   return request("/config");
 }
 
 // --- Global Settings (`data/settings.json` — SATU sumber konfigurasi global) ---
 // Halaman Settings HANYA membaca/menulis lewat backend; backend memakai loader
-// konfigurasi AETHER yang sudah ada (tidak ada sumber konfigurasi kedua).
+// konfigurasi Aegis yang sudah ada (tidak ada sumber konfigurasi kedua).
 // GET mengembalikan nilai AKTUAL; POST menggabungkan (merge) perubahan ke file
 // yang sama sehingga setting lain tidak hilang.
 export function getGlobalSettings() {
@@ -74,7 +74,7 @@ export function updateGlobalSettings(payload) {
 
 // --- LLM Config / Settings -------------------------------------------------
 // Halaman Settings HANYA memanggil endpoint konfigurasi LLM backend (yang
-// memakai LLMConfigService AETHER existing). Nilai secret TIDAK pernah
+// memakai LLMConfigService Aegis existing). Nilai secret TIDAK pernah
 // dikembalikan oleh backend (hanya versi masked).
 export function getLLMConfig() {
   return request("/llm/config");
@@ -151,20 +151,20 @@ export function getProjects() {
   return request("/projects");
 }
 
-// File Explorer: daftar file project aktif (read-only, via ListFilesTool AETHER).
+// File Explorer: daftar file project aktif (read-only, via ListFilesTool Aegis).
 export function listFiles(path = ".", recursive = false) {
   const q = new URLSearchParams({ path: path || "." });
   if (recursive) q.set("recursive", "true");
   return request(`/files?${q.toString()}`);
 }
 
-// Code Editor (Workbench): baca isi file project aktif (ReadFileTool AETHER).
+// Code Editor (Workbench): baca isi file project aktif (ReadFileTool Aegis).
 // Frontend TIDAK membaca filesystem browser; isi file selalu dari backend.
 export function readFileContent(path) {
   return request(`/files/content?path=${encodeURIComponent(path)}`);
 }
 
-// Code Editor (Workbench): simpan isi file project aktif (WriteFileTool AETHER).
+// Code Editor (Workbench): simpan isi file project aktif (WriteFileTool Aegis).
 // Penulisan dilakukan backend di dalam workspace boundary existing.
 export function writeFileContent(path, content) {
   return request("/files/content", {
@@ -200,8 +200,8 @@ export function deleteProject(projectId) {
 
 // --- Project Policy / Permission Matrix (PROJECT-LOCAL) --------------------
 // Policy permission SETIAP project disimpan project-local di
-// `<root>/.aether/permissions.json` (dibuat dari Default Project Permission
-// Matrix saat project dibuat). Di-enforce oleh PermissionManager AETHER
+// `<root>/.aegis/permissions.json` (dibuat dari Default Project Permission
+// Matrix saat project dibuat). Di-enforce oleh PermissionManager Aegis
 // existing saat Agent melakukan action — BUKAN sistem permission kedua.
 // Dikelola dari Sidebar -> Projects -> Project Settings / Policy.
 // Matrix: aksi x inside/outside workspace (allow | ask | deny).
@@ -232,7 +232,7 @@ export function closeActiveProject() {
 }
 
 // --- GitHub Backup (OPTIONAL per project) ----------------------------------
-// Konfigurasi disimpan project-local di `<root>/.aether/github/`. Token TIDAK
+// Konfigurasi disimpan project-local di `<root>/.aegis/github/`. Token TIDAK
 // pernah dikembalikan backend (hanya `credential_set`). Checkpoint/history/
 // recovery memakai Git history project (bukan DB checkpoint kedua).
 export function getGithubConfig(projectId) {
@@ -340,7 +340,7 @@ export function resolveApproval(requestId, allow) {
 }
 
 // Minta penghentian task (cooperative cancellation: Agent loop berhenti di
-// safe boundary lalu mencatat CANCELLED ke `.aether/log`).
+// safe boundary lalu mencatat CANCELLED ke `.aegis/log`).
 export function cancelTask(taskId) {
   return request(`/tasks/${encodeURIComponent(taskId)}/cancel`, { method: "POST" });
 }
@@ -352,7 +352,7 @@ export function listTasks(projectId = null) {
 }
 
 // --- Task Queue (TAMPILAN/kontrol UI antrian) ------------------------------
-// Satu queue GLOBAL AETHER; sumber data = TaskRecord in-memory yang sama
+// Satu queue GLOBAL AEGIS; sumber data = TaskRecord in-memory yang sama
 // dengan GET /api/tasks. Ini BUKAN subsystem kedua.
 
 // GET /api/tasks/queue -> antrian task aktif (pending/running/disabled).
@@ -398,8 +398,8 @@ export function clearTaskQueue(projectId = null) {
   });
 }
 
-// --- Task History / Activity / Report (membaca .aether/log/) ---------------
-// Persistent source of truth = `.aether/log/`. Endpoint di bawah HANYA
+// --- Task History / Activity / Report (membaca .aegis/log/) ---------------
+// Persistent source of truth = `.aegis/log/`. Endpoint di bawah HANYA
 // membaca log (read-only); tidak ada storage/subsystem kedua di frontend.
 
 // GET /api/tasks/history -> daftar task dari persistent log (newest first).
@@ -447,9 +447,9 @@ export function getTaskReport(taskId, projectId = null) {
   return request(`/tasks/${encodeURIComponent(taskId)}/report${qs}`);
 }
 
-// --- Consultant (AETHER reasoning layer) -----------------------------------
+// --- Consultant (Aegis reasoning layer) ------------------------------------
 // POST /api/consultant/consult -> satu giliran konsultasi. Backend menjalankan
-// reasoning/tool/boundary/bible memakai subsistem AETHER yang sudah ada.
+// reasoning/tool/boundary/bible memakai subsistem Aegis yang sudah ada.
 // `mode` ("quick" | "investigate", default "quick") menentukan tool yang benar-
 // benar tersedia bagi LLM. `images` (opsional) = daftar gambar multimodal
 // ({data: base64, mime_type, filename?}). Response memuat reply, tool_events,
@@ -593,7 +593,7 @@ export function openEventStream({ sessionId = null, taskId = null, onEvent = nul
   if (typeof onOpen === "function") source.addEventListener("open", onOpen);
   if (typeof onError === "function") source.addEventListener("error", onError);
 
-  // Event AETHER dikirim dengan `event: <event_type>`. Kita dengarkan tipe
+  // Event Aegis dikirim dengan `event: <event_type>`. Kita dengarkan tipe
   // yang dikenal (#51) tanpa mengasumsikan semuanya selalu ada.
   const KNOWN_EVENTS = [
     "task_created",

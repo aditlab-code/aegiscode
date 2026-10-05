@@ -1,12 +1,12 @@
 /**
- * editorSettingsService.js — Centralized Text Editor Preferences for AETHER Workbench.
+ * editorSettingsService.js — Centralized Text Editor Preferences for Aegis Workbench.
  *
  * Manages typography, layout, wrap, and minimap settings for Monaco Editor.
  * SSR-safe, client-persisted in localStorage with event broadcasting.
  */
 
-export const EDITOR_SETTINGS_KEY = "aether-editor-settings";
-export const EDITOR_SETTINGS_EVENT = "aether-editor-settings-change";
+export const EDITOR_SETTINGS_KEY = "aegis-editor-settings";
+export const EDITOR_SETTINGS_EVENT = "aegis-editor-settings-change";
 
 export const LOCAL_FONTS = Object.freeze([
   { label: "Default Coding Stack", value: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace" },

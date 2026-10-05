@@ -79,20 +79,20 @@ def _init_git_repo(repo_path: Path, manifest: dict, extension_py: str, pyproject
 def test_01_existing_extension_default_enabled(tmp_path):
     ext_dir = tmp_path / "exts"
     ext_dir.mkdir()
-    _make_extension_dir(ext_dir, "test-ext", {"id": "aether.test-existing", "name": "T", "version": "1.0", "description": "D", "api_version": "1"},
+    _make_extension_dir(ext_dir, "test-ext", {"id": "aegis.test-existing", "name": "T", "version": "1.0", "description": "D", "api_version": "1"},
                         'from agent_ai.extensions import Extension\nextension = Extension()\n')
     db = tmp_path / "lc.db"
     lc = ExtensionLifecycleStore(str(db))
     lc.clear_all()
     # No record -> default enabled true
-    assert lc.is_enabled("aether.test-existing") is True
+    assert lc.is_enabled("aegis.test-existing") is True
     # After loader startup, registry loaded, lifecycle still enabled
     reg = ExtensionRegistry()
     cap = CapabilityRegistry()
     loader = ExtensionLoader(registry=reg, extensions_dir=ext_dir, enable_entry_points=False, capability_registry=cap, lifecycle_store=lc)
     res = loader.load_all()
     assert res.count_loaded == 1
-    assert lc.is_enabled("aether.test-existing") is True
+    assert lc.is_enabled("aegis.test-existing") is True
 
 def test_02_disable_persistent(tmp_path):
     ext_dir = tmp_path / "exts"
@@ -164,7 +164,7 @@ def test_05_disable_not_delete_state(tmp_path):
                         'from agent_ai.extensions import Extension\nextension = Extension()\n')
     loader = ExtensionLoader(registry=reg, extensions_dir=ext_dir, enable_entry_points=False, capability_registry=cap, lifecycle_store=lc)
     loader.load_all()
-    storage = ExtensionStorage("test.state-keep", aether_root=tmp_path)
+    storage = ExtensionStorage("test.state-keep", aegis_root=tmp_path)
     storage.set("prefs", {"theme": "dark"})
     manager.disable("test.state-keep")
     assert storage.get("prefs") == {"theme": "dark"}
@@ -558,7 +558,7 @@ def test_23_staging_used(tmp_path):
     # Count staging dirs before install, ensure not leaking after (exactly same as before or only delta cleaned)
     import pathlib as _pl
     tmpdir = Path(tempfile.gettempdir())
-    before = {p.name for p in tmpdir.iterdir() if p.name.startswith("aether_ext_staging_")}
+    before = {p.name for p in tmpdir.iterdir() if p.name.startswith("aegis_ext_staging_")}
     ext_dir = tmp_path / "exts"
     ext_dir.mkdir()
     repo = tmp_path / "repo-staging-check"
@@ -567,7 +567,7 @@ def test_23_staging_used(tmp_path):
     db = tmp_path / "lc.db"
     manager, _, _, _, _ = _fresh_manager(ext_dir, db)
     manager.install(str(repo))
-    after = {p.name for p in tmpdir.iterdir() if p.name.startswith("aether_ext_staging_")}
+    after = {p.name for p in tmpdir.iterdir() if p.name.startswith("aegis_ext_staging_")}
     # Check no new leftover staging dir was left behind (any created during install was cleaned)
     new_left = after - before
     assert len(new_left) == 0, f"Staging not cleaned: {new_left}"
@@ -707,7 +707,7 @@ def test_30_config_state_not_deleted_on_uninstall(tmp_path):
     if not cap.exists("config", "test.keep-data.api_key"):
         ctx.config.register(key="api_key", type="string", default="def")
     ctx.config.set("api_key", "kept-secret")
-    storage = ExtensionStorage("test.keep-data", aether_root=tmp_path)
+    storage = ExtensionStorage("test.keep-data", aegis_root=tmp_path)
     storage.set("prefs", {"theme": "dark"})
     manager.uninstall("test.keep-data")
     # Config and storage should remain

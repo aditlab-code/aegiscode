@@ -1,4 +1,4 @@
-"""Extension base contract for AETHER Extension System.
+"""Extension base contract for Aegis Extension System.
 
 Provides minimal lifecycle contract: register/enable/disable with no-op defaults.
 Extension identity and manifest are available via context / properties.
@@ -13,7 +13,7 @@ from agent_ai.extensions.manifest import Manifest
 
 
 class Extension:
-    """Base class for AETHER Extensions.
+    """Base class for Aegis Extensions.
 
     Minimal contract for Task 01:
         - identity (via manifest.id)

@@ -4,7 +4,7 @@
 // selalu tersedia — task baru masuk Global Task Queue (pending/queued bila slot
 // eksekusi terpakai) — sedangkan Stop hanya tampil bila ADA task yang benar-
 // benar RUNNING. `disabled` (= isSubmitting) HANYA mencegah double-submit.
-// Model & mode dibaca dari konfigurasi AETHER (TIDAK hardcode).
+// Model & mode dibaca dari konfigurasi Aegis (TIDAK hardcode).
 // TIDAK ada execution engine di frontend: hanya memanggil API #50.
 import { computed, onMounted, ref, watch } from "vue";
 import PromptAutocompletePopover from "./ui/PromptAutocompletePopover.vue";
@@ -161,7 +161,7 @@ const providerNeedsModel = computed(() => {
 // Model difilter: HANYA model milik Provider Instance yang dipilih.
 // Model SELALU ditampilkan bila instance memilikinya — termasuk provider yang
 // model-nya OPSIONAL (mis. "custom" untuk routing "auto" atau 9Router), sehingga
-// user tetap bisa memilih. Bila dikosongkan, AETHER memakai model enabled
+// user tetap bisa memilih. Bila dikosongkan, Aegis memakai model enabled
 // pertama (atau server menentukan sendiri untuk provider routing).
 const modelOptions = computed(() => {
   const inst = providerOptions.value.find((p) => p.id === props.providerInstanceId);
@@ -288,7 +288,7 @@ function submit() {
         </select>
       </label>
 
-      <!-- Mode selector: routing profile AETHER (Fast/Balanced/Deep). -->
+      <!-- Mode selector: routing profile Aegis (Fast/Balanced/Deep). -->
       <label class="composer-select">
         <span class="cs-label">Mode</span>
         <select class="input-a" :disabled="disabled" :value="mode" @change="emit('update:mode', $event.target.value === 'minimal' ? 'fast' : $event.target.value)">

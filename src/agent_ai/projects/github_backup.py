@@ -1,28 +1,28 @@
-"""Project-local GitHub Backup metadata: `<root>/.aether/github/`.
+"""Project-local GitHub Backup metadata: `<root>/.aegis/github/`.
 
-Menyimpan metadata PRIVATE AETHER untuk fitur GitHub Backup per project:
+Menyimpan metadata PRIVATE AegisCode untuk fitur GitHub Backup per project:
 
     <root project target>/
-        .aether/
-            bible/            # AI Project Bible (dikelola aether_store.py)
-            log/              # Task log (dikelola aether_store.py)
+        .aegis/
+            bible/            # AI Project Bible (dikelola aegis_store.py)
+            log/              # Task log (dikelola aegis_store.py)
             github/           # GitHub Backup metadata (dikelola modul ini)
                 config.json   # NON-SECRET: enabled/repository/branch/exclude
                 credential.enc# token terenkripsi (opaque bytes, bukan plaintext)
 
 Prinsip:
     - Project-local: semua ditulis di dalam root project target, tidak di
-      workspace AETHER. Konfigurasi project A TIDAK boleh tercampur project B.
+      workspace AegisCode. Konfigurasi project A TIDAK boleh tercampur project B.
     - Token TIDAK pernah ditulis plaintext ke `config.json`. Nilai token hanya
       melewati modul ini sebagai bytes yang SUDAH terenkripsi (proteksi
       credential dilakukan di layer gateway, lihat api/github_backup.py).
-    - Additive: modul ini HANYA menambah subfolder `.aether/github/`; ia tidak
+    - Additive: modul ini HANYA menambah subfolder `.aegis/github/`; ia tidak
       mengubah penulisan Bible/log yang sudah ada.
     - Idempotent + atomic write: tidak ada file parsial.
     - Tidak ada dependency baru; tanpa DB/vektor/embeddings.
 
-Modul ini juga menyediakan `ensure_aether_ignored()`: memastikan `.gitignore`
-project SELALU memuat `.aether/` tanpa menimpa isi existing.
+Modul ini juga menyediakan `ensure_aegis_ignored()`: memastikan `.gitignore`
+project SELALU memuat `.aegis/` tanpa menimpa isi existing.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ from typing import Any, Dict, List, Optional, Union
 
 #: Nama folder root metadata project.
 AEGIS_DIR_NAME = ".aegis"
-AETHER_DIR_NAME = AEGIS_DIR_NAME
 #: Subfolder metadata GitHub Backup.
 GITHUB_DIR_NAME = "github"
 #: Nama file konfigurasi non-secret.
@@ -47,8 +46,7 @@ CREDENTIAL_FILE_NAME = "credential.enc"
 #: Rule mandatory yang WAJIB ada di `.gitignore` project.
 MANDATORY_IGNORE_RULE = ".aegis/"
 #: Baris-baris yang dianggap sudah mewakili `.aegis/` (agar tidak dobel tulis).
-_AEGIS_IGNORE_EQUIVALENTS = {".aegis/", ".aegis", "/.aegis/", "/.aegis", ".aether/", ".aether", "/.aether/", "/.aether"}
-_AETHER_IGNORE_EQUIVALENTS = _AEGIS_IGNORE_EQUIVALENTS
+_AEGIS_IGNORE_EQUIVALENTS = {".aegis/", ".aegis", "/.aegis/", "/.aegis"}
 
 
 def _normalize_exclude(exclude: Optional[Union[List[str], str]]) -> List[str]:
@@ -293,9 +291,4 @@ def aegis_is_ignored(root: Union[str, Path]) -> bool:
         if line.strip() in _AEGIS_IGNORE_EQUIVALENTS:
             return True
     return False
-
-
-#: Alias kompatibilitas
-ensure_aether_ignored = ensure_aegis_ignored
-aether_is_ignored = aegis_is_ignored
 

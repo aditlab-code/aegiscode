@@ -1,4 +1,4 @@
-"""Views HTTP untuk AETHER Gateway (#50).
+"""Views HTTP untuk Aegis Gateway (#50).
 
 Django views biasa (TANPA DRF). Views HANYA:
     - mem-parse & memvalidasi request HTTP,
@@ -40,11 +40,7 @@ def _parse_json_body(request: HttpRequest) -> Dict[str, Any]:
     """
     from api.services import ValidationError
 
-    max_bytes = getattr(
-        settings,
-        "AEGIS_GATEWAY_MAX_BODY_BYTES",
-        getattr(settings, "AETHER_GATEWAY_MAX_BODY_BYTES", 1_000_000),
-    )
+    max_bytes = getattr(settings, "AEGIS_GATEWAY_MAX_BODY_BYTES", 1_000_000)
     if len(request.body) > max_bytes:
         raise ValidationError(f"Body request melebihi batas {max_bytes} bytes.")
 
@@ -98,9 +94,9 @@ def health(request: HttpRequest, service: GatewayService) -> JsonResponse:
 @require_http_methods(["GET"])
 @_handle
 def config(request: HttpRequest, service: GatewayService) -> JsonResponse:
-    """GET /api/config -> provider/model/mode dari konfigurasi AETHER.
+    """GET /api/config -> provider/model/mode dari konfigurasi Aegis.
 
-    Frontend TIDAK meng-hardcode nama model/provider; semua dari AETHER.
+    Frontend TIDAK meng-hardcode nama model/provider; semua dari Aegis.
     """
     return _json_response(service.get_config())
 
@@ -108,7 +104,7 @@ def config(request: HttpRequest, service: GatewayService) -> JsonResponse:
 # ---------------------------------------------------------------------------
 # Global Settings (`data/settings.json` — SATU sumber konfigurasi global).
 #
-# View HANYA meneruskan ke facade AETHER (loader `agent_ai.config.settings`).
+# View HANYA meneruskan ke facade Aegis (loader `agent_ai.config.settings`).
 # Perubahan MERGE ke file yang sama; key/setting lain tidak hilang.
 # ---------------------------------------------------------------------------
 @require_http_methods(["GET"])
@@ -128,9 +124,9 @@ def global_settings_update(request: HttpRequest, service: GatewayService) -> Jso
 
 
 # ---------------------------------------------------------------------------
-# LLM Config (halaman Settings; LLMConfigService AETHER existing)
+# LLM Config (halaman Settings; LLMConfigService Aegis existing)
 #
-# Gateway HANYA memanggil facade konfigurasi LLM AETHER. Nilai secret (.env)
+# Gateway HANYA memanggil facade konfigurasi LLM Aegis. Nilai secret (.env)
 # TIDAK pernah dikembalikan ke klien: hanya versi masked.
 # ---------------------------------------------------------------------------
 @require_http_methods(["GET"])
@@ -264,7 +260,7 @@ def projects(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/projects -> daftar project launcher (SQLite store).
 
     POST /api/projects -> buat project baru (name + path), daftarkan ke
-    ProjectRegistry AETHER, simpan record, jadikan active project.
+    ProjectRegistry Aegis, simpan record, jadikan active project.
     """
     if request.method == "GET":
         return _json_response({"projects": service.list_launcher_projects()})
@@ -301,7 +297,7 @@ def project_pick_folder(request: HttpRequest, service: GatewayService) -> JsonRe
 
 
 # ---------------------------------------------------------------------------
-# Project Policy / Permission (PROJECT-LOCAL: `<root>/.aether/permissions.json`).
+# Project Policy / Permission (PROJECT-LOCAL: `<root>/.aegis/permissions.json`).
 #
 # Satu sumber policy per project. Mode/scope di-enforce oleh PermissionManager
 # EXISTING; TIDAK ada sistem permission kedua. Kelola dari Sidebar -> Projects
@@ -315,7 +311,7 @@ def project_policy(
 ) -> JsonResponse:
     """GET/POST /api/projects/<project_id>/policy -> Project Policy (per project).
 
-    GET  -> nilai policy AKTUAL project (`<root>/.aether/permissions.json`).
+    GET  -> nilai policy AKTUAL project (`<root>/.aegis/permissions.json`).
     POST -> simpan policy (body: {mode, scope}); hanya project ini terpengaruh.
     """
     if request.method == "GET":
@@ -502,7 +498,7 @@ def delete_entry(request: HttpRequest, service: GatewayService) -> JsonResponse:
 def files(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/files?path=... -> daftar file project aktif (read-only).
 
-    Memakai ListFilesTool AETHER (bukan abstraksi filesystem baru).
+    Memakai ListFilesTool Aegis (bukan abstraksi filesystem baru).
     """
     path = request.GET.get("path") or "."
     recursive = request.GET.get("recursive", "").lower() in ("1", "true", "yes")
@@ -515,13 +511,13 @@ def files(request: HttpRequest, service: GatewayService) -> JsonResponse:
 def file_content(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """Isi file project aktif untuk Code Editor (Workbench).
 
-    GET  /api/files/content?path=...  -> baca isi file (ReadFileTool AETHER).
-    POST /api/files/content           -> simpan isi file (WriteFileTool AETHER),
+    GET  /api/files/content?path=...  -> baca isi file (ReadFileTool Aegis).
+    POST /api/files/content           -> simpan isi file (WriteFileTool Aegis),
                                          body: {path, content}.
 
     Backend tetap satu-satunya yang menyentuh filesystem: frontend TIDAK
     menulis file dari browser. Path divalidasi terhadap active project root
-    oleh tool AETHER existing (workspace boundary sama dengan Explorer).
+    oleh tool Aegis existing (workspace boundary sama dengan Explorer).
     """
     if request.method == "GET":
         path = request.GET.get("path")
@@ -564,7 +560,7 @@ def tasks(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/tasks -> daftar task (history); POST /api/tasks -> buat task.
 
     GET hanya membaca task yang sudah ada (in-memory, tanpa database).
-    POST memvalidasi + menyiapkan task via AETHER (TaskPreparation).
+    POST memvalidasi + menyiapkan task via Aegis (TaskPreparation).
     """
     if request.method == "GET":
         project_id = request.GET.get("project_id") or None
@@ -645,7 +641,7 @@ def cancel_task(request: HttpRequest, service: GatewayService, task_id: str) -> 
     Menandai task CANCELLED dan MEMICU cooperative cancellation pada eksekusi
     yang sedang berjalan (Agent loop berhenti di safe boundary, bukan
     thread.kill). Bukan stop engine kedua: memakai token cancellation tunggal
-    yang dibagikan ke runtime/orchestrator AETHER yang sudah ada.
+    yang dibagikan ke runtime/orchestrator Aegis yang sudah ada.
     """
     return _json_response(service.cancel_task(task_id))
 
@@ -658,7 +654,7 @@ def cancel_task(request: HttpRequest, service: GatewayService, task_id: str) -> 
 def task_queue(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/tasks/queue -> daftar antrian task (pending/running/disabled).
 
-    Satu queue GLOBAL AETHER: sumber data tetap TaskRecord in-memory yang sama
+    Satu queue GLOBAL AEGIS: sumber data tetap TaskRecord in-memory yang sama
     dengan GET /api/tasks. Endpoint ini hanya memproyeksikan status antrian.
     """
     project_id = request.GET.get("project_id") or None
@@ -720,12 +716,12 @@ def task_queue_clear(request: HttpRequest, service: GatewayService) -> JsonRespo
 
 
 # ---------------------------------------------------------------------------
-# Task History API (reads .aether/log/ persistent store)
+# Task History API (reads .aegis/log/ persistent store)
 # ---------------------------------------------------------------------------
 @require_http_methods(["GET"])
 @_handle
 def task_history(request: HttpRequest, service: GatewayService) -> JsonResponse:
-    """GET /api/tasks/history -> daftar semua task dari .aether/log/.
+    """GET /api/tasks/history -> daftar semua task dari .aegis/log/.
 
     Query params (opsional):
         project_id: filter berdasarkan project (bila ada).
@@ -751,7 +747,7 @@ def task_history_clear(request: HttpRequest, service: GatewayService) -> JsonRes
 @require_http_methods(["GET", "DELETE"])
 @_handle
 def task_history_detail(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
-    """GET /api/tasks/history/<task_id> -> ringkasan task dari .aether/log/.
+    """GET /api/tasks/history/<task_id> -> ringkasan task dari .aegis/log/.
     DELETE /api/tasks/history/<task_id> -> hapus log dan history task.
     """
     project_id = request.GET.get("project_id") or None
@@ -795,7 +791,7 @@ def task_activity(request: HttpRequest, service: GatewayService, task_id: str) -
 @require_http_methods(["GET"])
 @_handle
 def task_report(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
-    """GET /api/tasks/<task_id>/report -> final Agent Report dari .aether/log/.
+    """GET /api/tasks/<task_id>/report -> final Agent Report dari .aegis/log/.
 
     Source utama: task_completed.data.result.
     Fallback: task_finished.data.result.
@@ -1042,7 +1038,7 @@ def extensions_result(request: HttpRequest, service: GatewayService) -> JsonResp
 
 
 # ---------------------------------------------------------------------------
-# Consultant API (AETHER reasoning layer — read-only terhadap CODE PROJECT)
+# Consultant API (Aegis reasoning layer — read-only terhadap CODE PROJECT)
 # ---------------------------------------------------------------------------
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1061,7 +1057,7 @@ def consultant_consult(request: HttpRequest, service: GatewayService) -> JsonRes
             {"data": "<base64>", "mime_type": "image/png", "filename": opsional}.
             Diteruskan ke Consultant untuk diproses modul vision existing.
 
-    Consultant memakai loop & tool AETHER yang sudah ada (read-only terhadap
+    Consultant memakai loop & tool Aegis yang sudah ada (read-only terhadap
     CODE PROJECT, read+update terhadap Project Bible). Response memuat reply,
     tool_events, dan task_proposal (bila Consultant menghasilkan Task Proposal).
     """
@@ -1188,13 +1184,13 @@ def consultant_session_detail(
 
 @require_http_methods(["GET"])
 def events(request: HttpRequest) -> StreamingHttpResponse:
-    """GET /api/events -> SSE stream event AETHER (server -> client).
+    """GET /api/events -> SSE stream event Aegis (server -> client).
 
     Query params (opsional):
         session_id: filter event berdasarkan session.
         task_id: filter event berdasarkan task.
 
-    Django HANYA transport: event berasal dari SessionStore AETHER. Tidak ada
+    Django HANYA transport: event berasal dari SessionStore Aegis. Tidak ada
     event model kedua / broker / database.
     """
     service = get_service()
@@ -1366,14 +1362,14 @@ def auth_dev_login(request: HttpRequest) -> JsonResponse:
             {"error": {"code": "FORBIDDEN", "message": "Dev login is only allowed when DJANGO_DEBUG=true."}},
             status=403,
         )
-    from api.auth import create_aether_session_token
+    from api.auth import create_aegis_session_token
 
     try:
         body = _parse_json_body(request)
     except Exception:
         body = {}
 
-    email = body.get("email") or "developer@aether.ai"
+    email = body.get("email") or "developer@aegis.local"
     name = body.get("name") or "Local Developer"
 
     user_info = {
@@ -1382,7 +1378,7 @@ def auth_dev_login(request: HttpRequest) -> JsonResponse:
         "name": name,
         "picture": "",
     }
-    token = create_aether_session_token(user_info)
+    token = create_aegis_session_token(user_info)
     return _json_response({"token": token, "user": user_info})
 
 
@@ -1390,9 +1386,9 @@ def auth_dev_login(request: HttpRequest) -> JsonResponse:
 @csrf_exempt
 @require_http_methods(["POST"])
 def google_auth_callback(request: HttpRequest) -> JsonResponse:
-    """Handle authorization code exchange and issue AETHER session token."""
+    """Handle authorization code exchange and issue AegisCode session token."""
     from api.auth import (
-        create_aether_session_token,
+        create_aegis_session_token,
         exchange_google_code,
         verify_google_id_token,
         verify_signed_state,
@@ -1448,8 +1444,8 @@ def google_auth_callback(request: HttpRequest) -> JsonResponse:
             status=400,
         )
 
-    # Issue AETHER session JWT
-    session_token = create_aether_session_token(user_info)
+    # Issue AegisCode session JWT
+    session_token = create_aegis_session_token(user_info)
     user_profile = {
         "sub": user_info.get("sub"),
         "email": user_info.get("email"),

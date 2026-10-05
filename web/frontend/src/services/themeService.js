@@ -1,7 +1,7 @@
 import { ref } from "vue";
 
-export const THEME_KEY = "aether-theme";
-export const WALLPAPER_KEY = "aether-wallpaper";
+export const THEME_KEY = "aegis-theme";
+export const WALLPAPER_KEY = "aegis-wallpaper";
 
 export const THEMES = Object.freeze({
   DARK: "dark",

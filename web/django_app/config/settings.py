@@ -1,7 +1,7 @@
-"""Django settings untuk AETHER Gateway (#50).
+"""Django settings untuk Aegis Gateway (#50).
 
 Konfigurasi minimal. Gateway tipis: TIDAK memakai database ORM, DRF, Celery,
-Redis, atau Channels. Django hanya HTTP layer menuju AETHER.
+Redis, atau Channels. Django hanya HTTP layer menuju Aegis.
 
 Hardening (#57): SECRET_KEY, DEBUG, ALLOWED_HOSTS, dan konfigurasi keamanan
 production dibaca dari environment. Default development tetap mudah dipakai,
@@ -22,12 +22,12 @@ from pathlib import Path
 DJANGO_APP_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = DJANGO_APP_DIR.parent.parent
 
-# Pastikan package AETHER (src/) dapat diimpor oleh gateway.
+# Pastikan package AegisCode (src/) dapat diimpor oleh gateway.
 SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# Muat .env (bila ada) agar konfigurasi deployment konsisten dengan AETHER core.
+# Muat .env (bila ada) agar konfigurasi deployment konsisten dengan Aegis core.
 # override=False: variabel environment yang sudah ada tidak tertimpa.
 try:
     from dotenv import load_dotenv
@@ -67,8 +67,7 @@ def _env_list(key: str, default: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # AEGIS_ENV: "production" | "development" (default development).
 # Production juga dapat ditandai lewat DJANGO_DEBUG=false.
-AEGIS_ENV = (_env("AEGIS_ENV") or _env("AETHER_ENV") or "development").lower()
-AETHER_ENV = AEGIS_ENV
+AEGIS_ENV = (_env("AEGIS_ENV") or "development").lower()
 IS_PRODUCTION = AEGIS_ENV in ("production", "prod")
 
 # ---------------------------------------------------------------------------
@@ -100,7 +99,7 @@ if not IS_PRODUCTION and "testserver" not in ALLOWED_HOSTS:
 if IS_PRODUCTION:
     if not SECRET_KEY or SECRET_KEY == _DEV_SECRET_KEY:
         raise RuntimeError(
-            "DJANGO_SECRET_KEY wajib diisi di production (AETHER_ENV=production)."
+            "DJANGO_SECRET_KEY wajib diisi di production (AEGIS_ENV=production)."
         )
     if DEBUG:
         raise RuntimeError(
@@ -190,8 +189,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if IS_PRODUCTION e
 # Gateway config (bukan logic agent; hanya batas HTTP).
 # ---------------------------------------------------------------------------
 # Batas ukuran body request (bytes) untuk mencegah payload tanpa batas.
-AEGIS_GATEWAY_MAX_BODY_BYTES = int(_env("AEGIS_GATEWAY_MAX_BODY_BYTES") or _env("AETHER_GATEWAY_MAX_BODY_BYTES") or "1000000")
-AETHER_GATEWAY_MAX_BODY_BYTES = AEGIS_GATEWAY_MAX_BODY_BYTES
+AEGIS_GATEWAY_MAX_BODY_BYTES = int(_env("AEGIS_GATEWAY_MAX_BODY_BYTES") or "1000000")
 
 # ---------------------------------------------------------------------------
 # Google OAuth & Identity Gateway (docs/Oauth-Google.md, Phase 0)
@@ -199,6 +197,5 @@ AETHER_GATEWAY_MAX_BODY_BYTES = AEGIS_GATEWAY_MAX_BODY_BYTES
 GOOGLE_OAUTH_CLIENT_ID = _env("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = _env("GOOGLE_OAUTH_CLIENT_SECRET")
 GOOGLE_OAUTH_REDIRECT_URI = _env("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback")
-AEGIS_AUTH_TOKEN_EXPIRY = int(_env("AEGIS_AUTH_TOKEN_EXPIRY") or _env("AETHER_AUTH_TOKEN_EXPIRY") or "604800")  # 7 days in seconds
-AETHER_AUTH_TOKEN_EXPIRY = AEGIS_AUTH_TOKEN_EXPIRY
+AEGIS_AUTH_TOKEN_EXPIRY = int(_env("AEGIS_AUTH_TOKEN_EXPIRY") or "604800")  # 7 days in seconds
 

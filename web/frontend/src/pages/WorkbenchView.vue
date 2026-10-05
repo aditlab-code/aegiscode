@@ -1153,14 +1153,14 @@ watch(
 function openSettings(tabName = "providers") {
   settingsSubTab.value = tabName;
   openTab(editorTabsState, {
-    path: "aether://settings",
+    path: "aegis://settings",
     name: "Settings",
   });
 }
 
 function openWelcomeTab() {
   openTab(editorTabsState, {
-    path: "aether://welcome",
+    path: "aegis://welcome",
     name: "Welcome",
   });
 }
@@ -1499,7 +1499,7 @@ defineExpose({
             >
               <span class="tab-icon" aria-hidden="true">
                 <svg
-                  v-if="tab.path === 'aether://settings'"
+                  v-if="tab.path === 'aegis://settings'"
                   width="13"
                   height="13"
                   viewBox="0 0 24 24"
@@ -1513,7 +1513,7 @@ defineExpose({
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
                 <svg
-                  v-else-if="tab.path === 'aether://welcome'"
+                  v-else-if="tab.path === 'aegis://welcome'"
                   width="13"
                   height="13"
                   viewBox="0 0 24 24"
@@ -1585,7 +1585,7 @@ defineExpose({
           </div>
 
           <!-- Actions toolbar: Compact Save and Split Buttons -->
-          <div v-if="pane1ActiveTabPath && !['aether://settings', 'aether://welcome'].includes(pane1ActiveTabPath)" class="wb-tab-actions">
+          <div v-if="pane1ActiveTabPath && !['aegis://settings', 'aegis://welcome'].includes(pane1ActiveTabPath)" class="wb-tab-actions">
             <button
               type="button"
               class="wb-tab-save-btn"
@@ -1622,12 +1622,12 @@ defineExpose({
 
         <!-- Breadcrumbs Navigation Bar (Single-window mode only) -->
         <div v-if="!splitActive && pane1ActiveTabPath" class="wb-breadcrumbs-bar">
-          <div v-if="pane1ActiveTabPath === 'aether://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
+          <div v-if="pane1ActiveTabPath === 'aegis://settings'" class="breadcrumbs-list" aria-label="Settings Breadcrumbs">
             <span class="crumb-item crumb-root">Preferences</span>
             <span class="crumb-separator" aria-hidden="true">›</span>
             <span class="crumb-item crumb-file current">Settings</span>
           </div>
-          <div v-else-if="pane1ActiveTabPath === 'aether://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
+          <div v-else-if="pane1ActiveTabPath === 'aegis://welcome'" class="breadcrumbs-list" aria-label="Welcome Breadcrumbs">
             <span class="crumb-item crumb-root">AEGIS</span>
             <span class="crumb-separator" aria-hidden="true">›</span>
             <span class="crumb-item crumb-file current">Welcome</span>
@@ -1649,7 +1649,7 @@ defineExpose({
         <!-- Central Editor Surface / Settings Tab / Welcome / Empty State Canvas -->
         <div class="wb-editor-canvas">
           <!-- 1. Settings tab -->
-          <div v-if="!splitActive && pane1ActiveTabPath === 'aether://settings'" class="wb-settings-tab">
+          <div v-if="!splitActive && pane1ActiveTabPath === 'aegis://settings'" class="wb-settings-tab">
             <SettingsOverlay
               embedded
               :open="true"
@@ -1661,7 +1661,7 @@ defineExpose({
               :model-id="modelId"
               :mode="config?.mode"
               v-model:active-tab="settingsSubTab"
-              @close="handleCloseTab('aether://settings', 'pane1')"
+              @close="handleCloseTab('aegis://settings', 'pane1')"
               @refresh-config="emit('refresh-config')"
               @update:provider-instance-id="emit('update:provider-instance-id', $event)"
               @update:model-id="emit('update:model-id', $event)"
@@ -1768,7 +1768,7 @@ defineExpose({
                 <!-- Primary Pane Actions Toolbar -->
                 <div class="wb-tab-actions">
                   <button
-                    v-if="pane1ActiveTabPath && !['aether://settings', 'aether://welcome'].includes(pane1ActiveTabPath)"
+                    v-if="pane1ActiveTabPath && !['aegis://settings', 'aegis://welcome'].includes(pane1ActiveTabPath)"
                     type="button"
                     class="wb-tab-save-btn"
                     :class="{ dirty: isPane1TabDirty }"

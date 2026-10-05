@@ -287,12 +287,12 @@ class SubprocessGitClient(GitClient):
                     continue
                 file_path = raw_path
 
-            # Saring direktori internal AETHER (.aether), Git (.git), dan path traversal/kosong
+            # Saring direktori internal Aegis (.aegis), Git (.git), dan path traversal/kosong
             clean_fp = file_path.strip().rstrip("/")
             if (
                 not clean_fp
-                or clean_fp == ".aether"
-                or clean_fp.startswith(".aether/")
+                or clean_fp == ".aegis"
+                or clean_fp.startswith(".aegis/")
                 or clean_fp == ".git"
                 or clean_fp.startswith(".git/")
                 or clean_fp.startswith("..")
@@ -349,8 +349,8 @@ class SubprocessGitClient(GitClient):
             clean_fp = file_path.strip().rstrip("/")
             if (
                 not clean_fp
-                or clean_fp == ".aether"
-                or clean_fp.startswith(".aether/")
+                or clean_fp == ".aegis"
+                or clean_fp.startswith(".aegis/")
                 or clean_fp == ".git"
                 or clean_fp.startswith(".git/")
                 or clean_fp.startswith("..")
@@ -451,8 +451,8 @@ class SubprocessGitClient(GitClient):
         if file_path:
             clean_fp = file_path.strip().rstrip("/")
             if (
-                clean_fp == ".aether"
-                or clean_fp.startswith(".aether/")
+                clean_fp == ".aegis"
+                or clean_fp.startswith(".aegis/")
                 or clean_fp == ".git"
                 or clean_fp.startswith(".git/")
                 or clean_fp.startswith("..")
@@ -493,8 +493,8 @@ class SubprocessGitClient(GitClient):
                 pass
 
         try:
-            # Clean untracked files & dirs, preserve .aether
-            self._run(["clean", "-fd", "-e", ".aether"], path)
+            # Clean untracked files & dirs, preserve .aegis
+            self._run(["clean", "-fd", "-e", ".aegis"], path)
         except GitError:
             pass
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""Django management utility untuk AETHER Gateway (#50).
+"""Django management utility untuk Aegis Gateway (#50).
 
-Gateway HTTP tipis menuju AETHER. Django HANYA bertugas sebagai HTTP layer:
-    HTTP request -> API validation -> AETHER service/facade -> response
+Gateway HTTP tipis menuju Aegis. Django HANYA bertugas sebagai HTTP layer:
+    HTTP request -> API validation -> Aegis service/facade -> response
 
 Tidak ada logic Agent/Runtime/Planning/Tool di sini.
 """

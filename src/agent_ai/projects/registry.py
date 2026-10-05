@@ -3,7 +3,7 @@
 Mendaftarkan banyak project di workspace Agent-Ai. Metadata project
 (`project.json`) disimpan DI BAWAH workspace Agent-Ai (mis.
 J:\\Agent_Ai\\projects\\<id>\\). Knowledge project (AI Project Bible) disimpan
-project-local di `<root project target>/.aether/bible/`.
+project-local di `<root project target>/.aegis/bible/`.
     from agent_ai.projects import ProjectRegistry
 
     reg = ProjectRegistry()  # default: <workspace>/projects
@@ -88,12 +88,12 @@ class ProjectRegistry:
         self._write_json(self._project_json(config.id), config.to_dict())
 
         # Buat AI Project Bible project-local di root project TARGET
-        # (`<root>/.aether/bible/` + index). Knowledge TIDAK ditulis ke
+        # (`<root>/.aegis/bible/` + index). Knowledge TIDAK ditulis ke
         # workspace AETHER (single source of truth: project-local).
         ProjectIntelligence(project_dir, root=config.root).create()
 
         # Inisialisasi Default Project Policy untuk project BARU:
-        # `<root>/.aether/permissions.json` dibuat dari baseline default yang
+        # `<root>/.aegis/permissions.json` dibuat dari baseline default yang
         # berlaku. File bersifat PROJECT-LOCAL (hanya di root project ini) dan
         # TIDAK menimpa policy yang sudah ada (idempotent). Setelah dibuat,
         # policy menjadi milik project tersebut sehingga perubahan lewat UI

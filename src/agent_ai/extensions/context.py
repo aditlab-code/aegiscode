@@ -1,6 +1,6 @@
-"""ExtensionContext facade for AETHER Extension System.
+"""ExtensionContext facade for Aegis Extension System.
 
-Context is the API boundary between Extension and AETHER Core.
+Context is the API boundary between Extension and Aegis Core.
 It exposes capability placeholders that future tasks will populate
 without requiring redesign of base Extension API.
 """
@@ -35,7 +35,7 @@ class _Placeholder:
 
 
 class ExtensionContext:
-    """Facade / API boundary between Extension and AETHER Core.
+    """Facade / API boundary between Extension and Aegis Core.
 
     Task 03 provides real capability facades for all 10 types.
     Task 04 adds config + storage (real implementations, no placeholders).
@@ -47,7 +47,6 @@ class ExtensionContext:
         extension_root: Optional[Path] = None,
         manifest: Optional[Any] = None,
         aegis_root: Optional[Path] = None,
-        aether_root: Optional[Path] = None,
         extensions_dir: Optional[Path] = None,
         capability_registry: Optional[Any] = None,
         tool_registry: Optional[Any] = None,
@@ -58,14 +57,12 @@ class ExtensionContext:
         self.manifest = manifest
         self.extension_id: str = getattr(manifest, "id", "") if manifest is not None else ""
 
-        root_cand = aegis_root if aegis_root is not None else aether_root
-        if root_cand is not None:
-            self.aegis_root = Path(root_cand)
+        if aegis_root is not None:
+            self.aegis_root = Path(aegis_root)
         else:
             from agent_ai.extensions.paths import get_aegis_root
 
             self.aegis_root = get_aegis_root()
-        self.aether_root = self.aegis_root
 
         if extensions_dir is not None:
             self.extensions_dir = Path(extensions_dir)
@@ -136,7 +133,7 @@ class ExtensionContext:
                 extension_root=self.extension_root,
                 source=src,
                 config_store=_cs,
-                aether_root=self.aether_root,
+                aegis_root=self.aegis_root,
             )
             self.services = ServicesFacade(
                 extension_id=self.extension_id,
@@ -177,7 +174,7 @@ class ExtensionContext:
             # Real storage (isolated per extension_id) — facade over filesystem data/extensions/
             self.storage: Any = ExtensionStorage(
                 extension_id=self.extension_id,
-                aether_root=self.aether_root,
+                aegis_root=self.aegis_root,
                 project_root=self._project_root,
             )
         else:

@@ -1,8 +1,8 @@
 // Time utilities untuk Task Card Workbench (frontend-only).
 //
-// Sumber waktu = timestamp lifecycle AETHER yang SUDAH ADA:
+// Sumber waktu = timestamp lifecycle Aegis yang SUDAH ADA:
 //   - SSE live (#51): `timestamp` epoch detik
-//   - history log (.aether/log via Activity API): `timestamp` ISO string
+//   - history log (.aegis/log via Activity API): `timestamp` ISO string
 // TIDAK ada polling/timer backend baru. Ticker di sini HANYA me-refresh
 // TAMPILAN durasi live; durasi sebenarnya selalu dihitung dari timestamp.
 

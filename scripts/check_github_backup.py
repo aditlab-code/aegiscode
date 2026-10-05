@@ -7,13 +7,13 @@ dan dibersihkan setelah test.
 Menguji:
     1.  Project tanpa konfigurasi GitHub tetap usable (status not configured).
     2.  Configure GitHub -> config.json (non-secret) + credential.enc (encrypted).
-    3.  Token TIDAK tersimpan plaintext (config/credential/semua file .aether).
+    3.  Token TIDAK tersimpan plaintext (config/credential/semua file .aegis).
     4.  Credential DPAPI dapat didekripsi lagi (roundtrip) di mesin/user ini.
-    5.  `.aether/` selalu masuk `.gitignore` (dibuat/ditambah, tidak overwrite).
-    6.  Rule mandatory `.aether/` tidak bisa dihapus lewat exclude.
+    5.  `.aegis/` selalu masuk `.gitignore` (dibuat/ditambah, tidak overwrite).
+    6.  Rule mandatory `.aegis/` tidak bisa dihapus lewat exclude.
     7.  Exclude optional bekerja (file ter-exclude tidak ikut backup).
     8.  Create checkpoint -> commit + push (git push ke remote bare).
-    9.  `.aether/` TIDAK ikut commit (lokal maupun remote).
+    9.  `.aegis/` TIDAK ikut commit (lokal maupun remote).
     10. Commit history tampil (list checkpoints).
     11. Test Connection sukses + gagal tanpa crash.
     12. Recovery (restore) dari checkpoint bekerja; dirty tree butuh force.
@@ -104,13 +104,13 @@ def teardown_fixture() -> None:
         _rmtree(path)
 
 
-def _all_text_in_aether(root: Path) -> str:
-    """Gabungkan semua teks file di `.aether/` (untuk cek kebocoran token)."""
+def _all_text_in_aegis(root: Path) -> str:
+    """Gabungkan semua teks file di `.aegis/` (untuk cek kebocoran token)."""
     chunks = []
-    aether = root / ".aether"
-    if not aether.exists():
+    aegis = root / ".aegis"
+    if not aegis.exists():
         return ""
-    for path in aether.rglob("*"):
+    for path in aegis.rglob("*"):
         if not path.is_file():
             continue
         try:
@@ -187,21 +187,21 @@ def _run() -> int:
     assert status["credential_set"] is True, status
     assert status["repository"] == remote_a_url, status
     assert status["branch"] == "main", status
-    aether_github = FIXTURE_A / ".aether" / "github"
-    assert (aether_github / "config.json").is_file()
-    assert (aether_github / "credential.enc").is_file()
+    aegis_github = FIXTURE_A / ".aegis" / "github"
+    assert (aegis_github / "config.json").is_file()
+    assert (aegis_github / "credential.enc").is_file()
     print("[2] configure GitHub -> config.json + credential.enc dibuat OK")
 
-    # 3) Token TIDAK plaintext di mana pun di .aether.
-    config_raw = (aether_github / "config.json").read_text(encoding="utf-8")
+    # 3) Token TIDAK plaintext di mana pun di .aegis.
+    config_raw = (aegis_github / "config.json").read_text(encoding="utf-8")
     assert TOKEN_A not in config_raw, "token bocor di config.json"
     config_data = json.loads(config_raw)
     assert "token" not in config_data, config_data
     assert set(config_data) == {"enabled", "repository", "branch", "exclude"}, config_data
-    enc_bytes = (aether_github / "credential.enc").read_bytes()
+    enc_bytes = (aegis_github / "credential.enc").read_bytes()
     assert TOKEN_A.encode("utf-8") not in enc_bytes, "token bocor plaintext di credential.enc"
-    leaked = _all_text_in_aether(FIXTURE_A)
-    assert TOKEN_A not in leaked, "token bocor pada salah satu file .aether"
+    leaked = _all_text_in_aegis(FIXTURE_A)
+    assert TOKEN_A not in leaked, "token bocor pada salah satu file .aegis"
     print("[3] token tersimpan TERENKRIPSI (tidak plaintext) OK")
 
     # 4) Credential DPAPI roundtrip.
@@ -210,10 +210,10 @@ def _run() -> int:
     assert decrypted == TOKEN_A, "hasil dekripsi tidak sama dengan token asli"
     print("[4] credential DPAPI dapat didekripsi lagi (roundtrip) OK")
 
-    # 5) `.aether/` selalu masuk .gitignore.
+    # 5) `.aegis/` selalu masuk .gitignore.
     gitignore_text = (FIXTURE_A / ".gitignore").read_text(encoding="utf-8")
-    assert ".aether/" in gitignore_text, gitignore_text
-    print("[5] .gitignore memuat .aether/ OK")
+    assert ".aegis/" in gitignore_text, gitignore_text
+    print("[5] .gitignore memuat .aegis/ OK")
 
     # 6) Exclude tidak dapat menghapus rule mandatory.
     service.save_github_backup_config(
@@ -221,12 +221,12 @@ def _run() -> int:
         {
             "repository": remote_a_url,
             "branch": "main",
-            "exclude": ["data/", "*.db", ".gitignore", ".aether/"],
+            "exclude": ["data/", "*.db", ".gitignore", ".aegis/"],
         },
     )
     gitignore_text = (FIXTURE_A / ".gitignore").read_text(encoding="utf-8")
-    assert ".aether/" in gitignore_text, "rule mandatory .aether/ hilang!"
-    print("[6] rule mandatory .aether/ tidak bisa dihapus lewat exclude OK")
+    assert ".aegis/" in gitignore_text, "rule mandatory .aegis/ hilang!"
+    print("[6] rule mandatory .aegis/ tidak bisa dihapus lewat exclude OK")
 
     # 7) Exclude optional bekerja (file ter-exclude tidak ikut backup).
     (FIXTURE_A / "cache.db").write_text("data\n", encoding="utf-8")
@@ -248,15 +248,15 @@ def _run() -> int:
     assert checkpoint["short_hash"], checkpoint
     print("[8] create checkpoint -> commit + push OK")
 
-    # 9) `.aether/` & file ter-exclude TIDAK ikut commit (lokal + remote).
+    # 9) `.aegis/` & file ter-exclude TIDAK ikut commit (lokal + remote).
     tracked = _git(["ls-files"], cwd=FIXTURE_A).replace("\\", "/")
-    assert ".aether/" not in tracked, tracked
+    assert ".aegis/" not in tracked, tracked
     assert "cache.db" not in tracked, tracked
     assert "data/dump.bin" not in tracked, tracked
     remote_tree = _git(["ls-tree", "-r", "--name-only", "HEAD"], git_dir=REMOTE_A)
-    assert ".aether/" not in remote_tree, remote_tree
+    assert ".aegis/" not in remote_tree, remote_tree
     assert "app.py" in remote_tree, remote_tree
-    print("[9] .aether/ + file ter-exclude tidak ikut commit (lokal & remote) OK")
+    print("[9] .aegis/ + file ter-exclude tidak ikut commit (lokal & remote) OK")
 
     # 10) Commit history (checkpoints) tampil dari Git.
     data = service.list_github_checkpoints(pid_a)
@@ -298,11 +298,11 @@ def _run() -> int:
     status_b = service.github_backup_status(pid_b)
     assert status_a["repository"] != status_b["repository"], (status_a, status_b)
     token_b_decrypted = backup.protector.unprotect(
-        (FIXTURE_B / ".aether" / "github" / "credential.enc").read_bytes()
+        (FIXTURE_B / ".aegis" / "github" / "credential.enc").read_bytes()
     )
     assert token_b_decrypted == TOKEN_B, "credential project B salah"
-    assert TOKEN_B not in _all_text_in_aether(FIXTURE_A), "credential B bocor ke project A"
-    assert TOKEN_A not in _all_text_in_aether(FIXTURE_B), "credential A bocor ke project B"
+    assert TOKEN_B not in _all_text_in_aegis(FIXTURE_A), "credential B bocor ke project A"
+    assert TOKEN_A not in _all_text_in_aegis(FIXTURE_B), "credential A bocor ke project B"
     print("[13] project A & B punya konfigurasi GitHub terpisah OK")
 
     # 14) Restart (instance baru) tidak merusak konfigurasi.
@@ -310,7 +310,7 @@ def _run() -> int:
     fresh_status = fresh.get_config(FIXTURE_A)
     assert fresh_status["configured"] is True, fresh_status
     assert fresh.protector.unprotect(
-        (FIXTURE_A / ".aether" / "github" / "credential.enc").read_bytes()
+        (FIXTURE_A / ".aegis" / "github" / "credential.enc").read_bytes()
     ) == TOKEN_A
     print("[14] restart (instance baru) membaca konfigurasi + credential OK")
 

@@ -46,7 +46,6 @@ _IGNORED_DIRS = {
     "build",
     ".mypy_cache",
     ".pytest_cache",
-    ".aether",
     ".aegis",
 }
 

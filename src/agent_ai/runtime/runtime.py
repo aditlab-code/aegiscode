@@ -143,17 +143,17 @@ class AgentRuntime:
         self.use_continuous_loop = use_continuous_loop
 
         # Project-local storage (Task 5): root project target. Bila diisi,
-        # runtime menulis `.aether/log/<task_id>.log` dan memakai AI Project
-        # Bible project-local (`.aether/bible`) lewat ProjectBrain.
+        # runtime menulis `.aegis/log/<task_id>.log` dan memakai AI Project
+        # Bible project-local (`.aegis/bible`) lewat ProjectBrain.
         self.project_root = project_root
         self.project_brain_enabled = project_brain
         self._task_log: Optional[Any] = None
-        # Log response API LLM project-local (`.aether/log/response/<task_id>.json`).
+        # Log response API LLM project-local (`.aegis/log/response/<task_id>.json`).
         # Dibuat per task HANYA bila `data/settings.json` -> `write_log_response_api`
         # aktif. Default None = tidak ada logging (perilaku sekarang).
         self._response_log: Optional[Any] = None
         self._brain: Optional[Any] = None
-        # Environment Context project-local (`<project_root>/.aether/ENVIRONMENT.md`).
+        # Environment Context project-local (`<project_root>/.aegis/ENVIRONMENT.md`).
         # Dibuat/dimuat SEKALI per session (instance runtime); hasilnya di-cache
         # di `_environment_text` dan hanya disuntikkan pada task pertama.
         self._environment_text: Optional[str] = None
@@ -1030,7 +1030,7 @@ class AgentRuntime:
         """Environment Context project-local, dimuat SEKALI per session.
 
         Session = satu instance AgentRuntime. Pada task PERTAMA session, file
-        `<project_root>/.aether/ENVIRONMENT.md` dibuat bila belum ada (atau
+        `<project_root>/.aegis/ENVIRONMENT.md` dibuat bila belum ada (atau
         dimuat bila sudah ada) dan dikembalikan untuk dijadikan system message.
         Task berikutnya pada session yang sama TIDAK membaca/menyusun ulang
         (mengembalikan None). Instance runtime baru = session baru -> deteksi

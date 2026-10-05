@@ -1,6 +1,6 @@
 <script setup>
 /**
- * WelcomeView.vue - Modern AETHER Welcome & Getting Started Studio Canvas.
+ * WelcomeView.vue - Modern Aegis Welcome & Getting Started Studio Canvas.
  * Follows the "Your IDE. Your Own." philosophy: pure web-native, zero bloatware,
  * local-first, engineered to work seamlessly side-by-side with browser AI panels.
  * Strictly uses native inline Vue SVG icons (zero emoticons).

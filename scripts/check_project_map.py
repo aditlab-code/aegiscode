@@ -1,10 +1,10 @@
 """Verifikasi Project Map foundation (integrasi CODE ATLAS + MAP_CODE_RIG).
 
 Membuat fixture project kecil di `dummy_test/project_map_fixture`
-(workspace testing terisolasi, BUKAN bagian source AETHER), lalu memverifikasi
+(workspace testing terisolasi, BUKAN bagian source AegisCode), lalu memverifikasi
 kontrak `ProjectMapService`:
 
-    1.  Path map directory benar (`<project>/.aether/map`).
+    1.  Path map directory benar (`<project>/.aegis/map`).
     2.  Path `atlas.json` benar.
     3.  Path `rig.json` benar.
     4.  Inisialisasi service TIDAK membuat folder/file (tanpa efek samping).
@@ -17,7 +17,7 @@ kontrak `ProjectMapService`:
     11. (best-effort) Integrasi engine: jalankan Atlas/RIG yang sudah ada.
 
 Bagian (11) bersifat informatif: engine yang tidak tersedia akan di-SKIP, dan
-engine yang gagal dicatat sebagai WARN (defect di repo engine, bukan AETHER).
+engine yang gagal dicatat sebagai WARN (defect di repo engine, bukan AegisCode).
 
 Jalankan:
     python scripts/check_project_map.py
@@ -58,10 +58,11 @@ _FILES = {
 
 
 def setup_fixture() -> None:
-    for rel, content in _FILES.items():
-        path = FIXTURE / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+    shutil.rmtree(FIXTURE, ignore_errors=True)
+    for rel_path, content in _FILES.items():
+        target = FIXTURE / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
 
 
 def teardown_fixture() -> None:
@@ -106,12 +107,12 @@ def main() -> int:
 
 
 def _run() -> int:
-    map_dir = FIXTURE / ".aether" / "map"
+    map_dir = FIXTURE / ".aegis" / "map"
 
     # (4) Inisialisasi TIDAK boleh membuat folder/file apa pun.
     svc = ProjectMapService()
-    assert not (FIXTURE / ".aether").exists(), (
-        "inisialisasi service tidak boleh membuat .aether/"
+    assert not (FIXTURE / ".aegis").exists(), (
+        "inisialisasi service tidak boleh membuat .aegis/"
     )
     print("inisialisasi tanpa efek samping : OK")
 
@@ -207,8 +208,8 @@ def _run() -> int:
     explicit = ProjectMapService(atlas_dir=r"X:\explicit_atlas")
     assert str(explicit.get_engine_dir("atlas")) == r"X:\explicit_atlas"
 
-    prev = os.environ.get("AETHER_CODE_ATLAS_DIR")
-    os.environ["AETHER_CODE_ATLAS_DIR"] = r"X:\env_atlas"
+    prev = os.environ.get("AEGIS_CODE_ATLAS_DIR")
+    os.environ["AEGIS_CODE_ATLAS_DIR"] = r"X:\env_atlas"
     try:
         from_env = ProjectMapService()
         assert str(from_env.get_engine_dir("atlas")) == r"X:\env_atlas", (
@@ -219,9 +220,9 @@ def _run() -> int:
         assert str(both.get_engine_dir("atlas")) == r"X:\ctor_atlas"
     finally:
         if prev is None:
-            os.environ.pop("AETHER_CODE_ATLAS_DIR", None)
+            os.environ.pop("AEGIS_CODE_ATLAS_DIR", None)
         else:
-            os.environ["AETHER_CODE_ATLAS_DIR"] = prev
+            os.environ["AEGIS_CODE_ATLAS_DIR"] = prev
     # Setelah env dihapus, kembali ke default.
     assert svc.get_engine_dir("atlas") == default_atlas
     print("resolusi engine (default/env/konstruktor) : OK")
@@ -236,7 +237,7 @@ def _run() -> int:
     if results["rig"] == "fail":
         print(
             "[WARN] engine 'rig' gagal dijalankan (defect repo engine, "
-            "bukan kode AETHER); kontrak fondasi tetap terverifikasi."
+            "bukan kode AegisCode); kontrak fondasi tetap terverifikasi."
         )
 
     print()

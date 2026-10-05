@@ -1,6 +1,6 @@
 <script setup>
 // File Explorer (#52 rework). Menampilkan file project aktif (read-only).
-// Data dari ListFilesTool AETHER via gateway (#50). TIDAK ada abstraksi
+// Data dari ListFilesTool Aegis via gateway (#50). TIDAK ada abstraksi
 // filesystem baru di frontend. Root = active project root (bukan ".").
 import { computed, ref, watch } from "vue";
 import { listFiles, getProjectGitStatus } from "../api.js";
@@ -36,7 +36,7 @@ const expanded = ref({});
 const selected = ref("");
 // Git Status Map: relativePath -> status code ('M', 'U', 'D', 'A', etc.)
 const gitStatusMap = ref({});
-// Collapsible section (AETHER Workbench right column).
+// Collapsible section (Aegis Workbench right column).
 // Default: EXPLORER TERBUKA. State hanya di frontend selama sesi aktif.
 const collapsed = ref(false);
 function toggleCollapse() {
@@ -66,7 +66,7 @@ const contextMenu = ref(null);
 const contextOpen = ref(false);
 
 // Nama folder internal AegisCode yang disembunyikan dari UI Explorer.
-const HIDDEN_NAMES = new Set([".aegis", ".aether"]);
+const HIDDEN_NAMES = new Set([".aegis"]);
 
 function visibleEntries(list) {
   return (list || []).filter((e) => !HIDDEN_NAMES.has(e.name));

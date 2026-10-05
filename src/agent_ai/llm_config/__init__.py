@@ -1,7 +1,7 @@
-"""Sistem konfigurasi LLM AETHER (core).
+"""Sistem konfigurasi LLM Aegis (core).
 
-Paket ini mengelola PERSISTENSI konfigurasi LLM di database GLOBAL AETHER
-(`data/aether.db`) dan referensi credential di `.env`.
+Paket ini mengelola PERSISTENSI konfigurasi LLM di database GLOBAL Aegis
+(`data/aegis.db`) dan referensi credential di `.env`.
 
 Model data & relasi:
     API Key (.env)  ->  Provider Instance  ->  Model

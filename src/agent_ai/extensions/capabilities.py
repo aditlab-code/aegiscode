@@ -1,7 +1,7 @@
-"""Capability Registration System for AETHER Extension (Task 03).
+"""Capability Registration System for Aegis Extension (Task 03).
 
 Generic contract for Extension to register capabilities via ExtensionContext
-without AETHER Core knowing extension types.
+without Aegis Core knowing extension types.
 """
 
 from __future__ import annotations
@@ -279,7 +279,7 @@ class _BaseFacade:
 # ------------------------------------------------------------------ #
 
 class ToolsFacade(_BaseFacade):
-    def __init__(self, extension_id: str, capability_registry: CapabilityRegistry, extension_root: Optional[Path] = None, source: Optional[str] = None, tool_registry: Optional[Any] = None, aether_root: Optional[Path] = None):
+    def __init__(self, extension_id: str, capability_registry: CapabilityRegistry, extension_root: Optional[Path] = None, source: Optional[str] = None, tool_registry: Optional[Any] = None, aegis_root: Optional[Path] = None):
         super().__init__(extension_id, capability_registry, "tool", extension_root, source)
         self._tool_registry = tool_registry
 
@@ -454,7 +454,7 @@ class ConfigFacade(_BaseFacade):
         extension_root: Optional[Path] = None,
         source: Optional[str] = None,
         config_store: Optional[Any] = None,
-        aether_root: Optional[Path] = None,
+        aegis_root: Optional[Path] = None,
         **_: Any,
     ):
         super().__init__(extension_id, capability_registry, "config", extension_root, source)
@@ -467,7 +467,7 @@ class ConfigFacade(_BaseFacade):
                 self._config_store = get_config_store()
             except Exception:
                 self._config_store = None
-        self._aether_root = aether_root
+        self._aegis_root = aegis_root
 
     def _norm_key(self, key: str) -> tuple[str, str]:
         """Normalize key -> (short_key, full_id)."""

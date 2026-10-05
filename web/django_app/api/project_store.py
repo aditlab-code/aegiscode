@@ -1,13 +1,13 @@
 """SQLite store untuk Project Launcher & Active Project (layer gateway).
 
-Persistence MINIMAL di layer web/gateway (bukan AETHER Core). Menyimpan:
+Persistence MINIMAL di layer web/gateway (bukan Aegis Core). Menyimpan:
     - daftar project yang pernah ditambahkan (untuk Project Launcher),
     - state active project (single-user local app; bukan login/session user).
 
 PENTING:
     - TIDAK ada database server / dependency tambahan (hanya sqlite3 stdlib).
     - TIDAK menghapus filesystem project. Delete hanya menghapus record.
-    - TIDAK menduplikasi ProjectRegistry AETHER: registry tetap sumber
+    - TIDAK menduplikasi ProjectRegistry Aegis: registry tetap sumber
       kebenaran struktur project (project.json + intelligence). Store ini
       hanya menyimpan metadata launcher + active project state.
 """
@@ -79,9 +79,9 @@ class ProjectStore:
     # Projects
     # ------------------------------------------------------------------ #
     def add_project_with_id(self, project_id: str, name: str, path: str) -> Dict[str, Any]:
-        """Simpan metadata launcher dengan id eksplisit (id dari registry AETHER).
+        """Simpan metadata launcher dengan id eksplisit (id dari registry Aegis).
 
-        Id diselaraskan dengan ProjectRegistry AETHER agar satu identitas
+        Id diselaraskan dengan ProjectRegistry Aegis agar satu identitas
         project (tidak ada registry kedua). Tidak menyentuh filesystem.
         """
         now = _now_iso()
