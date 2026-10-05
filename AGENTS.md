@@ -114,7 +114,7 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 | **Bahasa output** | Bahasa Indonesia baku — wajib untuk semua respons, komentar, commit, dokumentasi |
 | **Bahasa Jawa** | DILARANG KERAS dalam output apa pun |
 | **Emoji/Emotikon** | DILARANG dalam respons, komentar kode, commit, maupun dokumentasi |
-| **Kuota operan antar-subagent** | Maks. 250 token/operan, format 4-kotak: `[Diagnosis]` `[Keputusan & YAGNI]` `[Kontrak/Diff]` `[Stop-Gate]` |
+| **Kuota operan antar-subagent** | Maks. 250 token/operan, format 4-kotak: `[Diagnosis]` `[Keputusan & YAGNI]` `[Kontrak/Diff]` `[Stop-Gate]` — wajib menyebutkan dokumen rujukan `docs/` spesifik pada kotak `[Kontrak/Diff]` saat menyangkut perubahan arsitektur, API, UI, atau kriteria pengujian |
 | **Chain-of-thought mentah** | DILARANG dicetak ke output; wajib dipadatkan |
 
 ---
@@ -125,3 +125,27 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 2. **Jangan sembunyikan galat**: Selalu baca seluruh log build/test saat gagal.
 3. **Wajib test sebelum selesai**: Jalankan `node --test` atau `npm test`.
 4. **Laporan ringkas**: Sertakan tautan markdown ke file yang dimodifikasi; tanpa emoji.
+
+---
+
+## 8. Panduan Rujukan Knowledge Base (`docs/`)
+
+Untuk menjaga kepatuhan batas kuota konteks LLM (< 4.000 token), pembacaan dokumentasi internal pada folder `docs/` diatur dengan prinsip **Just-in-Time (JIT) dan Terarah**:
+- **Larangan Pemuatan Massal**: Dilarang keras membaca seluruh direktori `docs/` sekaligus ke dalam konteks. Agen hanya diizinkan membaca berkas spesifik yang relevan langsung dengan modul yang sedang dianalisis atau dikerjakan.
+- **Rujukan Operan Wajib**: Saat mengoper tugas antar-agen, `kresna-architect` atau agen pengirim wajib mencantumkan berkas kontrak `docs/` yang menjadi acuan teknis pada kotak `[Kontrak/Diff]`.
+
+### Matriks Pemetaan Topik Tugas & Tanggung Jawab Konsultasi:
+
+| Topik / Domain Tugas | Berkas Rujukan Wajib di `docs/` | Agen Utama yang Berkonsultasi |
+| :--- | :--- | :--- |
+| **Visi Produk & Batasan Ruang Lingkup** | `docs/PRD.md` | `semar-orchestrator`, `kresna-architect` |
+| **Arsitektur Sistem & Sub-sistem Python** | `docs/architecture.md` | `kresna-architect`, `arjuna-coder` |
+| **Kontrak API, Auth JWT, Git Facade, PTY** | `docs/api.md` | `kresna-architect`, `arjuna-coder` |
+| **Tata Letak UI, Monaco Diff, Komponen Vue** | `docs/ui-design.md` | `arjuna-coder` |
+| **Standar Rekayasa, YAGNI, RTK, Tree-Kill** | `docs/ruleset.md` | `widura-auditor`, `werkudara-tester`, `arjuna-coder` |
+| **Provider AI (Google Antigravity & LLM)** | `docs/core-features/antigravity_provider.md` | `kresna-architect`, `arjuna-coder` |
+| **Fitur IDE Workbench & Eksekusi Background** | `docs/core-features/workbench_features.md` | `kresna-architect`, `arjuna-coder` |
+| **Runtime Penalaran (CoT) & Replanning** | `docs/core-features/cot_reasoning_runtime.md` | `semar-orchestrator`, `kresna-architect` |
+| **Peta Jalan Masa Depan & RAG Semantik** | `docs/future-roadmap/future_roadmap.md` | `semar-orchestrator`, `kresna-architect` |
+| **Riwayat Implementasi Selesai** | `docs/history/completed-features.md` | `hanoman-scout`, `widura-auditor` |
+| **Indeks Navigasi Lengkap Dokumentasi** | `docs/README.md` | Seluruh Agen |

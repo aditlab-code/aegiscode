@@ -89,3 +89,21 @@ Repositori menerapkan strategi penemuan status dua arah:
 2. **Bahasa Output**: Bahasa Indonesia baku wajib digunakan untuk semua respons kepada pengguna, komentar kode, pesan commit Git, dan dokumen resmi.
 3. **Larangan Bahasa Daerah**: Dilarang keras menggunakan kosakata bahasa Jawa dalam teks output.
 4. **Larangan Emoji**: Dilarang menyertakan simbol emoji atau emotikon pada seluruh pesan output, komentar kode, commit Git, maupun dokumentasi teknis.
+
+---
+
+## 8. Panduan Rujukan Knowledge Base (`docs/`)
+
+1. **Prinsip Just-in-Time (JIT)**: Agen dan pengembang wajib merujuk dokumen secara terarah sesuai domain modul yang sedang dikerjakan. Dilarang memuat seluruh direktori `docs/` sekaligus untuk menjaga kuota token (< 4.000 token).
+2. **Kewajiban Sitasi Kontrak**: Pada setiap pertukaran operan antar-agen (format 4-kotak), rujukan dokumen spesifik wajib dituliskan pada kotak `[Kontrak/Diff]`.
+3. **Peta Konsultasi**:
+   - Visi & Batasan Produk: `docs/PRD.md`
+   - Arsitektur Sistem: `docs/architecture.md`
+   - Kontrak API: `docs/api.md`
+   - Antarmuka & Tata Letak UI: `docs/ui-design.md`
+   - Standar Rekayasa & Ruleset: `docs/ruleset.md`
+   - Fitur Inti & Provider: `docs/core-features/`
+   - Rencana Masa Depan: `docs/future-roadmap/`
+   - Riwayat Implementasi Selesai: `docs/history/`
+   - Indeks Navigasi: `docs/README.md`
+
