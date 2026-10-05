@@ -143,6 +143,7 @@ Untuk menjaga kepatuhan batas kuota konteks LLM (< 4.000 token), pembacaan dokum
 | **Kontrak API, Auth JWT, Git Facade, PTY** | `docs/api.md` | `kresna-architect`, `arjuna-coder` |
 | **Tata Letak UI, Monaco Diff, Komponen Vue** | `docs/ui-design.md` | `arjuna-coder` |
 | **Standar Rekayasa, YAGNI, RTK, Tree-Kill** | `docs/ruleset.md` | `widura-auditor`, `werkudara-tester`, `arjuna-coder` |
+| **Regulasi Git Multi-Remote & Alur Branch** | `docs/Gitmaster.md` | `semar-orchestrator`, `widura-auditor` |
 | **Provider AI (Google Antigravity & LLM)** | `docs/core-features/antigravity_provider.md` | `kresna-architect`, `arjuna-coder` |
 | **Fitur IDE Workbench & Eksekusi Background** | `docs/core-features/workbench_features.md` | `kresna-architect`, `arjuna-coder` |
 | **Runtime Penalaran (CoT) & Replanning** | `docs/core-features/cot_reasoning_runtime.md` | `semar-orchestrator`, `kresna-architect` |

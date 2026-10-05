@@ -102,6 +102,7 @@ Repositori menerapkan strategi penemuan status dua arah:
    - Kontrak API: `docs/api.md`
    - Antarmuka & Tata Letak UI: `docs/ui-design.md`
    - Standar Rekayasa & Ruleset: `docs/ruleset.md`
+   - Regulasi Git Multi-Remote: `docs/Gitmaster.md`
    - Fitur Inti & Provider: `docs/core-features/`
    - Rencana Masa Depan: `docs/future-roadmap/`
    - Riwayat Implementasi Selesai: `docs/history/`

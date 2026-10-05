@@ -15,6 +15,7 @@ Dokumen di bawah ini merupakan fondasi spesifikasi teknis repositori:
 | **[docs/api.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/api.md)** | Spesifikasi lengkap Django API Gateway: Stateless Signed JWT OAuth, Git Local Facade, Task Runtime, Queue Control, dan Terminal PTY Bridge. |
 | **[docs/ui-design.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ui-design.md)** | Spesifikasi tata letak workbench AegisCode Studio: Monaco Editor, Monaco Diff Editor, Changes Panel, Drawer Persisten, dan Sistem Desain. |
 | **[docs/ruleset.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ruleset.md)** | Standar rekayasa perangkat lunak: prinsip YAGNI, protokol RTK, pengujian dual-stack, zero-zombie process lifecycle, dan aturan branch Git. |
+| **[docs/Gitmaster.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/Gitmaster.md)** | Panduan arsitektur Git multi-remote, isolasi kerahasiaan branch privat (master & release), dan alur rilis komunitas (main). |
 
 ---
 
