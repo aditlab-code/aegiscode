@@ -183,6 +183,7 @@ def build_registry(
     change_sink: "Callable[[dict], None] | None" = None,
     cancel_token: "Any | None" = None,
     read_cache: "Any" = _AUTO_READ_CACHE,
+    policy_escalator: "Any | None" = None,
 ) -> ToolRegistry:
     """Bangun ToolRegistry dengan semua tool bawaan.
 
@@ -206,6 +207,7 @@ def build_registry(
             dedup read_file ter-scope per task/session (build_registry dipanggil
             per task). Kirim `None` eksplisit untuk MEMATIKAN dedup (dipakai
             untuk registry global; agar tidak ada cache lintas task).
+        policy_escalator: callback opsional untuk eskalasi policy (Agent).
 
     Returns:
         ToolRegistry baru berisi seluruh tool bawaan.
@@ -280,7 +282,9 @@ def build_registry(
     if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
         from agent_ai.tools.semantic import build_semantic_tools
 
-        for tool in build_semantic_tools(root=resolved, include_refresh=True, read_only=False):
+        for tool in build_semantic_tools(
+            root=resolved, include_refresh=True, read_only=False, include_hybrid=True
+        ):
             reg.register(tool)
 
     # Skill System (Agent): SATU mekanisme Skill yang sama — catalog + progressive
@@ -293,6 +297,11 @@ def build_registry(
 
     for tool in build_skill_tools(root=resolved, include_lifecycle=True):
         reg.register(tool)
+    # Execution Policy Escalation Tool (Agent):
+    from agent_ai.tools.policy import RequestPolicyEscalationTool
+
+    reg.register(RequestPolicyEscalationTool(escalator=policy_escalator))
+
     # Review capability (Agent): read-only, LLM-driven. Tool ini OPTIONAL
     # dan hanya dimuat bila eksplisit diaktifkan (untuk menghindari overhead
     # token definisi tool yang memengaruhi budget compaction existing test).

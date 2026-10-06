@@ -426,7 +426,9 @@ def build_consultant_registry(
     if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
         from agent_ai.tools.semantic import build_semantic_tools as _build_semantic_tools
 
-        for tool in _build_semantic_tools(root=resolved, include_refresh=False, read_only=True):
+        for tool in _build_semantic_tools(
+            root=resolved, include_refresh=False, read_only=True, include_hybrid=True
+        ):
             registry.register(tool)
 
 

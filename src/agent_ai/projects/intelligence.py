@@ -55,16 +55,30 @@ class ProjectIntelligence:
             AI Project Bible project-local di `<root>/.aegis/bible/`.
     """
 
-    def __init__(self, project_dir: Path, root: Optional[Union[str, Path]] = None) -> None:
+    def __init__(
+        self,
+        project_dir: Path,
+        root: Optional[Union[str, Path]] = None,
+        use_brain: bool = False,
+    ) -> None:
         self.project_dir = Path(project_dir)
         self.intelligence_dir = self.project_dir / "intelligence"
         self.root = Path(root) if root is not None else None
-        self._bible = BibleStore(self.root) if self.root is not None else None
+        self._bible = BibleStore(self.root, use_brain=use_brain) if self.root is not None else None
 
     @classmethod
-    def for_project(cls, root: Union[str, Path], project_dir: Optional[Path] = None) -> "ProjectIntelligence":
+    def for_project(
+        cls,
+        root: Union[str, Path],
+        project_dir: Optional[Path] = None,
+        use_brain: bool = False,
+    ) -> "ProjectIntelligence":
         """Bangun instance Bible-backed untuk sebuah root project target."""
-        return cls(Path(project_dir) if project_dir is not None else Path(root), root=root)
+        return cls(
+            Path(project_dir) if project_dir is not None else Path(root),
+            root=root,
+            use_brain=use_brain,
+        )
 
     @property
     def categories(self) -> tuple:

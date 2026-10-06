@@ -19,8 +19,14 @@ import {
 import { renderMarkdown } from "../markdown.js";
 import QueuePanel from "./QueuePanel.vue";
 import PromptAutocompletePopover from "./ui/PromptAutocompletePopover.vue";
+import AppThinkingBlock from "./ui/AppThinkingBlock.vue";
 import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
-
+import {
+  stripTaskProposal,
+  assistantText,
+  extractFirstCodeBlock,
+  extractTaskProposalText,
+} from "../services/consultantProposalService.js";
 const props = defineProps({
   embedded: { type: Boolean, default: true },
   providers: { type: Array, default: () => [] },
@@ -223,6 +229,37 @@ async function removeSession(id, e) {
     error.value = err.message || "Failed to delete session.";
   }
 }
+const renamingSessionId = ref(null);
+const renameInput = ref("");
+
+const activeSessionTitle = computed(() => {
+  const current = sessions.value.find((s) => s.session_id === sessionId.value);
+  return current?.title || "New Chat";
+});
+
+function promptRenameCurrentSession() {
+  const current = activeSessionTitle.value;
+  const newTitle = prompt("Rename conversation:", current);
+  if (!newTitle || newTitle.trim() === "" || newTitle.trim() === current) return;
+  saveSessionRename(sessionId.value, newTitle.trim());
+}
+
+function startSessionRename(s) {
+  renamingSessionId.value = s.session_id;
+  renameInput.value = s.title || "New Chat";
+}
+
+async function saveSessionRename(id, explicitTitle = null) {
+  const newTitle = (explicitTitle !== null ? explicitTitle : renameInput.value).trim();
+  renamingSessionId.value = null;
+  if (!newTitle || !id) return;
+  try {
+    await renameConsultantSession(id, newTitle, props.projectId || null);
+    await loadSessions();
+  } catch (err) {
+    error.value = err.message || "Failed to rename session.";
+  }
+}
 
 function formatSessionTime(timestamp) {
   if (!timestamp) return "";
@@ -376,17 +413,6 @@ function scrollToBottom() {
 // keduanya dirender, teks Task muncul DUA KALI (di bubble balasan + di card
 // Task Proposal). Sesuai permintaan: hanya card yang menampilkan Task, jadi
 // blok berpagar `task` dibersihkan dari teks bubble assistant.
-const TASK_FENCE_RE = /```[ \t]*task(?:-proposal)?[ \t]*\r?\n[\s\S]*?```/gi;
-
-function stripTaskProposal(text) {
-  if (!text) return "";
-  return String(text).replace(TASK_FENCE_RE, "").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-// Teks bubble assistant tanpa blok Task Proposal (dihitung sekali per pesan).
-function assistantText(msg) {
-  return stripTaskProposal(msg.text);
-}
 
 // --- Copy pesan -------------------------------------------------------------
 // Salin isi bubble ke clipboard. Untuk assistant: salin teks yang SAMA dengan
@@ -418,11 +444,6 @@ async function copyMessage(msg, index) {
   }, 1400);
 }
 
-function extractFirstCodeBlock(text) {
-  if (!text) return "";
-  const match = String(text).match(/```(?:[a-zA-Z0-9_+-]+)?\r?\n([\s\S]*?)\r?\n```/);
-  return match ? match[1] : "";
-}
 
 function applyCodeToEditor(msg) {
   const code = extractFirstCodeBlock(assistantText(msg));
@@ -595,6 +616,7 @@ async function send() {
       tools: summarizeTools(data.tool_events),
       taskProposal: data.task_proposal || null,
       failed: data.status === "failed",
+      reasoning: data.reasoning || null,
     });
     // Refresh session list so newly created sessions appear in the tab.
     if (activeSideTab.value === "sessions") {
@@ -890,8 +912,19 @@ onMounted(() => {
             </div>
           </div>
           <!-- eslint-disable-next-line vue/no-v-html -->
+          <!-- Thinking Block (Reasoning Process) -->
+          <div v-if="msg.reasoning" class="consultant-thinking-wrapper" style="margin-bottom: 8px;">
+            <AppThinkingBlock
+              title="Thinking Process"
+              :collapsed="true"
+            >
+              <div class="thinking-content-markdown" v-html="renderMarkdown(msg.reasoning)"></div>
+            </AppThinkingBlock>
+          </div>
+
+          <!-- eslint-disable-next-line vue/no-v-html -->
           <div
-            v-else-if="assistantText(msg)"
+            v-if="msg.role === 'assistant' && assistantText(msg)"
             class="consultant-md md"
             :class="{ failed: msg.failed }"
           >
@@ -1079,6 +1112,16 @@ onMounted(() => {
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
+            </button>
+            <!-- Rename conversation button -->
+            <button
+              type="button"
+              class="chat-icon-btn chat-rename-btn"
+              :title="`Rename conversation: ${activeSessionTitle}`"
+              aria-label="Rename conversation"
+              @click="promptRenameCurrentSession"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
             </button>
 
             <!-- Settings icon -->
@@ -1278,14 +1321,35 @@ onMounted(() => {
                 @click="switchSession(s.session_id)"
               >
                 <div class="cs-item-main">
-                  <div class="cs-item-title" :title="s.title || 'New Chat'">
-                    {{ s.title || "New Chat" }}
-                  </div>
-                  <div class="cs-item-meta">
-                    <span class="cs-item-time">{{ formatSessionTime(s.updated_at) }}</span>
-                    <span v-if="s.turn_count" class="cs-item-turns">{{ s.turn_count }} turns</span>
-                  </div>
+                  <template v-if="renamingSessionId === s.session_id">
+                    <input
+                      v-model="renameInput"
+                      class="cs-rename-input"
+                      type="text"
+                      @keydown.enter.stop="saveSessionRename(s.session_id)"
+                      @keydown.esc.stop="renamingSessionId = null"
+                      @blur="saveSessionRename(s.session_id)"
+                      @click.stop
+                    />
+                  </template>
+                  <template v-else>
+                    <div class="cs-item-title" :title="s.title || 'New Chat'">
+                      {{ s.title || "New Chat" }}
+                    </div>
+                    <div class="cs-item-meta">
+                      <span class="cs-item-time">{{ formatSessionTime(s.updated_at) }}</span>
+                      <span v-if="s.turn_count" class="cs-item-turns">{{ s.turn_count }} turns</span>
+                    </div>
+                  </template>
                 </div>
+                <button
+                  type="button"
+                  class="cs-item-edit"
+                  title="Rename session"
+                  @click.stop="startSessionRename(s)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                </button>
                 <button
                   type="button"
                   class="cs-item-del"

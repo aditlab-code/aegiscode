@@ -337,7 +337,7 @@
 }
 
 .term-prompt {
-  color: var(--accent-muted, #45c985);
+  color: var(--accent-muted);
   font-family: var(--mono, monospace);
   font-size: 12.5px;
   font-weight: 700;
@@ -353,7 +353,7 @@
   color: var(--text, #e8e6ef);
   font-family: var(--mono, monospace);
   font-size: 12.5px;
-  caret-color: var(--accent-muted, #45c985);
+  caret-color: var(--accent-muted);
   min-width: 0;
 }
 
@@ -382,7 +382,7 @@
 }
 
 .term-send-btn:not(:disabled):hover {
-  color: var(--accent-muted, #45c985);
+  color: var(--accent-muted);
 }
 
 .term-send-btn:disabled {
@@ -409,7 +409,7 @@
 
 /* User input echo — prompt-green */
 .log-line.inp .msg {
-  color: var(--accent-muted, #45c985);
+  color: var(--accent-muted);
 }
 
 .act-body {
@@ -656,8 +656,8 @@
   gap: 8px;
   padding: 8px 10px;
   border-radius: 6px;
-  background: var(--bg-panel, #141318);
-  border: 1px solid var(--border-soft, #262332);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -750,8 +750,8 @@
 .side-hist-item {
   padding: 8px 10px;
   border-radius: 6px;
-  background: var(--bg-panel, #141318);
-  border: 1px solid var(--border-soft, #262332);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -796,7 +796,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--border-soft, #262332);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .side-sess-title {
@@ -837,8 +837,8 @@
   justify-content: space-between;
   padding: 7px 10px;
   border-radius: 6px;
-  background: var(--bg-panel, #141318);
-  border: 1px solid var(--border-soft, #262332);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -849,8 +849,8 @@
 }
 
 .side-sess-item.active {
-  background: var(--bg-card, #262332);
-  border-color: var(--accent, #2d7d4e);
+  background: var(--bg-card);
+  border-color: var(--accent);
 }
 
 .side-sess-main {

@@ -149,6 +149,19 @@ const branchTooltip = computed(() => {
 
     <!-- Right Section: Model, Provider, Version -->
     <div class="footer-right">
+      <!-- Editor Position & Language Metadata -->
+      <span v-if="cursor" class="status-item cursor-item" title="Line and Column">
+        Ln {{ cursor.ln || 1 }}, Col {{ cursor.col || 1 }}
+      </span>
+      <span class="status-item spaces-item" title="Indentation">
+        Spaces: {{ spaces }}
+      </span>
+      <span class="status-item encoding-item" title="File Encoding">
+        {{ encoding }}
+      </span>
+      <span v-if="language" class="status-item lang-item" title="File Language">
+        {{ language }}
+      </span>
       <!-- Model Label -->
       <span v-if="modelLabel" class="status-item model-item" title="Active AI Model">
         {{ modelLabel }}

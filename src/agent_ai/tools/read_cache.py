@@ -44,6 +44,10 @@ RangeKey = Tuple[Optional[int], Optional[int]]
 #: Signature file: (mtime_ns, size_bytes).
 FileSignature = Tuple[int, int]
 
+#: Batas maksimal berkas unik yang boleh dibaca penuh per mode eksekusi (Aegis Execution Policy).
+FAST_MODE_MAX_FULL_READS = 3
+BALANCED_MODE_MAX_FULL_READS = 8
+
 
 class ToolReadCache:
     """Catatan retrieval per task: read range + search, untuk dedup.
@@ -54,6 +58,8 @@ class ToolReadCache:
         - _sig     : path -> (mtime_ns, size, total_lines)
         - _searches: set (query, path, context_lines)
         - _locks   : path -> threading.Lock (in-flight dedup)
+        - _full_reads: set path unik yang dibaca penuh (guardrail kuota mode)
+        - _policy_mode: mode eksekusi aktif ('fast', 'balanced', 'deep', atau None)
     """
 
     def __init__(self) -> None:
@@ -63,6 +69,8 @@ class ToolReadCache:
         self._sig: Dict[str, Tuple[int, int, int]] = {}
         self._searches: Set[Tuple[str, str, int]] = set()
         self._locks: Dict[str, threading.Lock] = {}
+        self._policy_mode: Optional[str] = None
+        self._full_reads: Set[str] = set()
 
     # ------------------------------------------------------------------ #
     # Digest
@@ -328,9 +336,88 @@ class ToolReadCache:
             self._sig.clear()
             self._searches.clear()
 
+    # ------------------------------------------------------------------ #
+    # Execution Policy Guardrail (Fast / Balanced / Deep file quota)
+    # ------------------------------------------------------------------ #
+    def set_policy_mode(self, mode: Optional[str]) -> None:
+        """Set atau perbarui mode eksekusi aktif untuk sesi task ini."""
+        with self._lock:
+            self._policy_mode = str(mode).strip().lower() if mode else None
+
+    def get_policy_mode(self) -> Optional[str]:
+        """Ambil mode eksekusi aktif saat ini."""
+        with self._lock:
+            return self._policy_mode
+
+    def can_read_full(self, rel_path: str) -> Tuple[bool, Optional[str]]:
+        """Periksa apakah pembacaan penuh berkas baru diizinkan oleh policy.
+
+        Returns:
+            (allowed, message): True bila diizinkan; False + pesan instruksi
+            bila melebihi ambang kuota mode.
+        """
+        with self._lock:
+            mode = self._policy_mode
+            if not mode or mode in ("deep", "unlimited"):
+                return True, None
+
+            # Berkas yang sudah pernah dibaca penuh selalu diizinkan dibaca ulang
+            if rel_path in self._full_reads:
+                return True, None
+
+            current_count = len(self._full_reads)
+            if mode == "fast" and current_count >= FAST_MODE_MAX_FULL_READS:
+                paths_str = ", ".join(f"'{p}'" for p in sorted(self._full_reads))
+                msg = (
+                    f"FAST_MODE_FILE_LIMIT_EXCEEDED: Mode Fast telah mencapai batas pembacaan berkas penuh "
+                    f"(maksimal {FAST_MODE_MAX_FULL_READS} berkas unik: {paths_str}). "
+                    f"Dilarang membaca berkas baru '{rel_path}' secara utuh.\n"
+                    "Solusi hemat token:\n"
+                    f"1. Gunakan 'search_code' untuk mencari teks/simbol spesifik pada '{rel_path}'.\n"
+                    f"2. Gunakan 'read_file(path=\"{rel_path}\", symbol=\"nama_simbol\")' atau tentukan rentang 'start_line'/'end_line'.\n"
+                    "3. Jika tugas ini memerlukan pemahaman arsitektur multi-berkas lebih luas, panggil tool 'request_policy_escalation' dengan target_mode='balanced'."
+                )
+                return False, msg
+
+            if mode == "balanced" and current_count >= BALANCED_MODE_MAX_FULL_READS:
+                paths_str = ", ".join(f"'{p}'" for p in sorted(self._full_reads))
+                msg = (
+                    f"BALANCED_MODE_FILE_LIMIT_EXCEEDED: Mode Balanced telah mencapai batas wajar pembacaan berkas penuh "
+                    f"(maksimal {BALANCED_MODE_MAX_FULL_READS} berkas unik: {paths_str}). "
+                    f"Dilarang membaca berkas baru '{rel_path}' secara utuh.\n"
+                    "Solusi efisien:\n"
+                    f"1. Gunakan 'search_code' atau 'read_file(symbol=...)' untuk mengambil bagian yang relevan saja.\n"
+                    "2. Jika perubahan berskala arsitektur besar, panggil tool 'request_policy_escalation' dengan target_mode='deep'."
+                )
+                return False, msg
+
+            return True, None
+
+    def record_full_read(self, rel_path: str) -> None:
+        """Catat bahwa berkas rel_path telah dibaca secara utuh."""
+        with self._lock:
+            self._full_reads.add(rel_path)
+
+    def full_read_count(self) -> int:
+        """Jumlah berkas unik yang telah dibaca secara utuh."""
+        with self._lock:
+            return len(self._full_reads)
+
+    def full_read_paths(self) -> List[str]:
+        """Daftar berkas unik yang telah dibaca secara utuh."""
+        with self._lock:
+            return sorted(self._full_reads)
+
     def __len__(self) -> int:  # pragma: no cover - introspection
         with self._lock:
             return sum(len(v) for v in self._ranges.values())
 
 
-__all__ = ["ToolReadCache", "RangeKey", "FileSignature"]
+__all__ = [
+    "ToolReadCache",
+    "RangeKey",
+    "FileSignature",
+    "FAST_MODE_MAX_FULL_READS",
+    "BALANCED_MODE_MAX_FULL_READS",
+]
+

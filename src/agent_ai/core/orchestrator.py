@@ -55,7 +55,7 @@ from agent_ai.core.history import ConversationHistory
 from agent_ai.core.loop import AgentLoop, MaxIterationsExceeded
 from agent_ai.core.models import AgentObservation, AgentStatus
 from agent_ai.core.observability import EventSink, emit as emit_event
-from agent_ai.core.response import ActionType, LLMResponse
+from agent_ai.core.response import ActionType, LLMResponse, extract_reasoning_and_content
 from agent_ai.core.types import ToolCall, ToolResultPayload
 from agent_ai.providers.base import (
     BaseProvider,
@@ -161,7 +161,7 @@ class OrchestratorResult:
     # True bila kegagalan berasal dari provider (bukan tool/command).
     # Dipakai oleh Provider Fallback (#45) untuk memutuskan perpindahan provider.
     provider_error: bool = False
-
+    reasoning: Optional[str] = None
     @property
     def success(self) -> bool:
         return self.status == AgentStatus.DONE
@@ -409,6 +409,10 @@ class AgentOrchestrator:
         environment = self._environment_context_message()
         if environment is not None:
             messages.append(environment)
+        # Execution Policy directive (Fast/Balanced/Deep guardrail):
+        policy_directive = self._policy_directive_message()
+        if policy_directive is not None:
+            messages.append(policy_directive)
         messages.append(Message(role="user", content=task, parts=user_parts))
         messages.extend(history)
         return messages
@@ -654,6 +658,28 @@ class AgentOrchestrator:
             return None
         return Message(role="system", content=text)
 
+    def _policy_directive_message(self) -> Optional[Message]:
+        """Arahan operasional Execution Policy (Fast, Balanced, Deep) sebagai system message.
+
+        Membimbing LLM agar berperilaku efisien sesuai mode yang sedang aktif:
+        - Fast: Batas maks 3 berkas, prioritaskan search_code, eskalasi jika perlu.
+        - Balanced: Eksplorasi moderat terarah (maks 8 berkas).
+        - Deep: Eksplorasi menyeluruh tanpa batasan berkas.
+        """
+        mode = self.effective_mode
+        if not mode:
+            return None
+        try:
+            from agent_ai.runtime.policy import directive_prompt_for_mode
+
+            text = directive_prompt_for_mode(mode)
+            if not text:
+                return None
+            return Message(role="system", content=text)
+        except Exception:  # noqa: BLE001 - direktif policy tidak boleh menggagalkan loop
+            return None
+
+
     # ------------------------------------------------------------------ #
     # Runtime context compaction (hemat token tanpa kehilangan memori)
     # ------------------------------------------------------------------ #
@@ -787,6 +813,8 @@ class AgentOrchestrator:
             return history.to_provider_format(), {}
 
         overhead = self._tool_definitions_tokens(tools)
+        if budget > 0 and overhead >= budget:
+            overhead = min(overhead, max(0, budget // 2))
         before = history.estimate_tokens()
         original = history.messages
         # `comp_stats` = KOMPOSISI keputusan anggaran (observability):
@@ -1704,16 +1732,25 @@ class AgentOrchestrator:
         penanganan loop yang sudah ada.
         """
         call_options = options
-        if self.event_sink is not None:
-            if call_options is None:
-                call_options = GenerateOptions(extra={"event_sink": self.event_sink})
-            elif "event_sink" not in (call_options.extra or {}):
-                call_options = GenerateOptions(
-                    temperature=call_options.temperature,
-                    max_tokens=call_options.max_tokens,
-                    model=call_options.model,
-                    extra={**(call_options.extra or {}), "event_sink": self.event_sink},
-                )
+        extra = dict(call_options.extra or {}) if (call_options and call_options.extra) else {}
+        extra_updated = False
+        if self.event_sink is not None and "event_sink" not in extra:
+            extra["event_sink"] = self.event_sink
+            extra_updated = True
+        if self.execution_policy is not None and "execution_policy" not in extra:
+            extra["execution_policy"] = self.execution_policy
+            extra["mode"] = self.execution_policy.get("effective_mode") or "balanced"
+            extra_updated = True
+        if getattr(self.executor, "workspace_root", None) and "workspace_root" not in extra:
+            extra["workspace_root"] = self.executor.workspace_root
+            extra_updated = True
+        if extra_updated or (call_options is None and extra):
+            call_options = GenerateOptions(
+                temperature=call_options.temperature if call_options else None,
+                max_tokens=call_options.max_tokens if call_options else None,
+                model=call_options.model if call_options else None,
+                extra=extra,
+            )
 
         if getattr(self, "response_log", None) is None:
             gen_result = self.provider.generate(
@@ -2012,32 +2049,33 @@ class AgentOrchestrator:
                 self._provider_response_payload(response),
             )
 
-            # Commentary natural dari LLM (bukan log tool). Hanya diemit bila
-            # response punya teks bermakna (bukan kosong / bukan code/tool
-            # payload). Tidak mengarang commentary dari nama tool.
-            commentary = self._extract_commentary(response)
-            if commentary:
-                emit_event(
-                    self.event_sink,
-                    "agent_commentary",
-                    {"text": commentary, "iteration": loop.iteration},
-                )
-
-            # 2) Sinyal penyelesaian dari model adalah source of truth.
-            #    FINAL (tanpa tool call) -> selesai. Bila action FINAL datang
-            #    bersama tool call, `completion` tidak None tetapi response
-            #    bukan is_final; tool call dieksekusi dulu lalu loop berhenti.
-            #    Response yang TERPOTONG (finish_reason=length) TIDAK dianggap
-            #    final: tool-call tak lengkap sudah DIBUANG oleh provider (tidak
-            #    ada file parsial), dan agent diberi kesempatan melanjutkan.
             truncated = bool(getattr(response, "truncated", False))
             if truncated:
                 truncation_recoveries += 1
             else:
                 truncation_recoveries = 0
             completion = self._completion_signal(response)
-            if response.is_final and not truncated:
-                loop.finish(result=completion)
+            is_final_turn = bool(response.is_final and not truncated)
+
+            # Commentary natural dari LLM (bukan log tool). Hanya diemit bila
+            # response punya teks bermakna (bukan kosong / bukan code/tool
+            # payload). Tidak mengarang commentary dari nama tool.
+            # Hindari duplikasi bila teks commentary identik dengan final completion.
+            commentary = self._extract_commentary(response)
+            if commentary:
+                clean_commentary, _ = extract_reasoning_and_content(commentary)
+                clean_comp, _ = extract_reasoning_and_content(completion or "")
+                if not (is_final_turn and clean_commentary.strip() == clean_comp.strip()):
+                    emit_event(
+                        self.event_sink,
+                        "agent_commentary",
+                        {"text": clean_commentary, "iteration": loop.iteration},
+                    )
+
+            if is_final_turn:
+                clean_completion, reasoning_text = extract_reasoning_and_content(completion or "")
+                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                loop.finish(result=clean_completion)
                 break
             if truncated:
                 emit_event(
@@ -2202,6 +2240,7 @@ class AgentOrchestrator:
             steps=loop.to_dict()["steps"],
             learning=learning,
             provider_error=provider_error,
+            reasoning=getattr(self, "_last_reasoning", None),
         )
 
     # ------------------------------------------------------------------ #
@@ -2266,6 +2305,9 @@ class AgentOrchestrator:
         brain_context = self._bible_context_message_for_task(task)
         if brain_context is not None:
             history.append_system_message(brain_context.content)
+        policy_directive = self._policy_directive_message()
+        if policy_directive is not None:
+            history.append_system_message(policy_directive.content)
         history.append_user_message(task, parts=user_parts)
 
         tools = self._tool_definitions()
@@ -2363,18 +2405,23 @@ class AgentOrchestrator:
                 loop.cancel(self._cancel_reason())
                 break
 
-            # Commentary natural dari LLM (bila ada); bukan reasoning buatan.
-            commentary = self._extract_commentary(response)
-            if commentary:
-                emit_event(
-                    self.event_sink,
-                    "agent_commentary",
-                    {"text": commentary, "iteration": loop.iteration},
-                )
-
             truncated = bool(getattr(response, "truncated", False))
             if not truncated:
                 truncation_recoveries = 0
+
+            is_final_turn = bool(not response.has_tool_calls and not truncated)
+
+            # Commentary natural dari LLM (bila ada); bukan reasoning buatan.
+            commentary = self._extract_commentary(response)
+            if commentary:
+                clean_commentary, _ = extract_reasoning_and_content(commentary)
+                clean_comp, _ = extract_reasoning_and_content(response.text or "")
+                if not (is_final_turn and clean_commentary.strip() == clean_comp.strip()):
+                    emit_event(
+                        self.event_sink,
+                        "agent_commentary",
+                        {"text": clean_commentary, "iteration": loop.iteration},
+                    )
 
             # LLM TIDAK memanggil tool -> jawaban final (source of truth LLM).
             # Ini SATU-SATUNYA jalur completion continuous loop. TIDAK ada
@@ -2404,8 +2451,10 @@ class AgentOrchestrator:
                     # menghasilkan jawaban final (bukan FAILED karena cap).
                     history.append_user_message(self._truncation_message().content)
                     continue
-                history.append_assistant_message(content=response.text or "")
-                loop.finish(result=response.text or "")
+                clean_res, reasoning_text = extract_reasoning_and_content(response.text or "")
+                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                history.append_assistant_message(content=clean_res)
+                loop.finish(result=clean_res)
                 break
 
             # LLM memanggil tool: simpan assistant(tool_calls) penuh lebih dulu,
@@ -2604,6 +2653,7 @@ class AgentOrchestrator:
             steps=loop.to_dict()["steps"],
             learning=learning,
             provider_error=provider_error,
+            reasoning=getattr(self, "_last_reasoning", None),
         )
 
     def _record_tool_result(

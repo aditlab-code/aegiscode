@@ -6,6 +6,7 @@
  */
 
 import { ref } from "vue";
+import { terminateServer as apiTerminateServer, getHealth } from "../api.js";
 
 export const isTerminating = ref(false);
 export const serverTerminated = ref(false);
@@ -20,20 +21,7 @@ export const isServerOnline = ref(false);
 export async function terminateServer(force = false) {
   isTerminating.value = true;
   try {
-    const res = await fetch("/api/server/terminate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ force }),
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.error?.message || `HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
+    const data = await apiTerminateServer();
     serverTerminated.value = true;
     return { success: true, data };
   } catch (err) {
@@ -50,8 +38,8 @@ export async function terminateServer(force = false) {
  */
 export async function checkServerHealth() {
   try {
-    const res = await fetch("/api/health");
-    const ok = Boolean(res && res.ok);
+    const res = await getHealth();
+    const ok = Boolean(res && res.status === "ok");
     isServerOnline.value = ok;
     return ok;
   } catch {

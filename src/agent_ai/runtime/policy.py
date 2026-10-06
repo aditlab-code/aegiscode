@@ -58,6 +58,11 @@ DEFAULT_MODE = MODE_BALANCED
 #: Urutan escalation yang disarankan: fast -> balanced -> deep.
 ESCALATION_ORDER: Tuple[str, ...] = (MODE_FAST, MODE_BALANCED, MODE_DEEP)
 
+#: Batas maksimal berkas unik yang boleh dibaca penuh per mode eksekusi
+FAST_MODE_MAX_FULL_READS = 3
+BALANCED_MODE_MAX_FULL_READS = 8
+
+
 #: Alias nilai mode LAMA/asing -> mode policy kanonik.
 #:
 #: ``minimal`` adalah nilai retrieval profile TaskComposer AETHER yang sudah
@@ -386,6 +391,46 @@ def policy_activity_text(
     return format_policy_block(state)
 
 
+def directive_prompt_for_mode(mode: Any) -> str:
+    """Prompt arahan direktif kerja per mode (Fast, Balanced, Deep).
+
+    Disisipkan sebagai system message agar LLM mematuhi batas efisiensi kerja:
+    - Fast: Kerja bedah, hemat token, batas maks 3 berkas penuh, prioritaskan search_code/symbol.
+    - Balanced: Eksplorasi moderat terarah (hingga 8 berkas penuh).
+    - Deep: Eksplorasi mendalam tanpa batas berkas.
+    """
+    norm = normalize_mode(mode, DEFAULT_MODE)
+    if norm == MODE_FAST:
+        return (
+            "[EXECUTION POLICY: FAST MODE ACTIVE]\n"
+            "You are operating under FAST execution policy:\n"
+            "- Goal: Rapid, surgical resolution with minimal latency and minimal token consumption.\n"
+            "- File Reading Guardrail: Strictly maximum 3 full file reads per task. Use 'search_code' or 'read_file(symbol=...)' / line ranges instead of reading entire files.\n"
+            "- Minimal Planning: Do not construct verbose multi-step planning lists. Directly apply surgical changes.\n"
+            "- Targeted Verification: Validate syntax and verify only the modified files.\n"
+            "- Escalation: If you discover this task genuinely requires exploring >3 files or architecture-wide refactoring, invoke the 'request_policy_escalation' tool with target_mode='balanced'."
+        )
+    if norm == MODE_DEEP:
+        return (
+            "[EXECUTION POLICY: DEEP MODE ACTIVE]\n"
+            "You are operating under DEEP execution policy:\n"
+            "- Goal: Thorough investigation, high-assurance architecture validation, and complete regression safety.\n"
+            "- File Reading: Unrestricted exploration allowed. Proactively utilize 'semantic_search', 'hybrid_search', and 'atlas_query' / Project Map.\n"
+            "- Planning: Formulate detailed multi-phase plans.\n"
+            "- Full Verification: Run broad regression test suites and inspect cross-module impact."
+        )
+    # Default Balanced
+    return (
+        "[EXECUTION POLICY: BALANCED MODE ACTIVE]\n"
+        "You are operating under BALANCED execution policy (Standard):\n"
+        "- Goal: Optimal balance between execution velocity, code correctness, and token efficiency.\n"
+        "- File Reading Guardrail: Moderate exploration up to 8 full file reads. Use 'search_code' to pinpoint code locations before reading.\n"
+        "- Standard Verification: Run tests and checkers targeted to modified and related modules.\n"
+        "- Escalation: If you encounter widespread ripple effects requiring exhaustive repository-wide search, invoke 'request_policy_escalation' with target_mode='deep'."
+    )
+
+
+
 class ExecutionPolicyResolver:
     """Resolver requested_mode -> effective_mode + mekanisme escalation.
 
@@ -477,12 +522,14 @@ class ExecutionPolicyResolver:
 
 
 __all__ = [
+    "BALANCED_MODE_MAX_FULL_READS",
     "DEFAULT_MODE",
     "ESCALATION_ORDER",
     "ExecutionMode",
     "ExecutionPolicy",
     "ExecutionPolicyResolver",
     "ExecutionPolicyState",
+    "FAST_MODE_MAX_FULL_READS",
     "MODE_ALIASES",
     "MODE_BALANCED",
     "MODE_DEEP",
@@ -492,6 +539,7 @@ __all__ = [
     "PolicyError",
     "PolicyEscalationError",
     "available_modes",
+    "directive_prompt_for_mode",
     "format_escalation_block",
     "format_policy_block",
     "get_policy",

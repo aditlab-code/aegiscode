@@ -1,7 +1,6 @@
 """Resolusi lokasi penyimpanan database vektor dan cache model.
 
-Mendukung backward compatibility dua arah: .aegis/ (primer) dengan fallback
-transparan ke .aether/.
+Murni menggunakan .aegis/vectors.db pada workspace.
 """
 
 from __future__ import annotations
@@ -19,27 +18,12 @@ PathLike = Union[str, os.PathLike[str]]
 
 VECTORS_DB_NAME = "vectors.db"
 AEGIS_DIR = ".aegis"
-AETHER_DIR = ".aether"
 
 
 def resolve_vectors_db(root: PathLike) -> Path:
-    """Tentukan jalur berkas vectors.db pada target workspace.
-
-    Aturan:
-        1. Bila <root>/.aegis/vectors.db sudah ada, gunakan .aegis/vectors.db.
-        2. Bila <root>/.aegis/vectors.db belum ada tetapi <root>/.aether/vectors.db ada,
-           gunakan .aether/vectors.db (fallback transparan).
-        3. Bila belum ada di kedua lokasi, gunakan .aegis/vectors.db sebagai target baru.
-    """
+    """Tentukan jalur berkas vectors.db pada target workspace (<root>/.aegis/vectors.db)."""
     root_path = Path(root).resolve()
-    aegis_db = root_path / AEGIS_DIR / VECTORS_DB_NAME
-    aether_db = root_path / AETHER_DIR / VECTORS_DB_NAME
-
-    if aegis_db.exists():
-        return aegis_db
-    if aether_db.exists():
-        return aether_db
-    return aegis_db
+    return root_path / AEGIS_DIR / VECTORS_DB_NAME
 
 
 def resolve_model_cache() -> Path:
@@ -54,11 +38,10 @@ def resolve_model_cache() -> Path:
     return _REPO_ROOT / "data" / "models"
 
 
-
 __all__ = [
     "resolve_vectors_db",
     "resolve_model_cache",
     "VECTORS_DB_NAME",
     "AEGIS_DIR",
-    "AETHER_DIR",
 ]
+

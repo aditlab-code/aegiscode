@@ -3,7 +3,7 @@
 // TIDAK ada diff engine di frontend: hanya menampilkan perubahan yang
 // dilaporkan Aegis. Diff detail ditampilkan bila payload menyediakannya.
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
-import { getProjectGitStatus } from "../api.js";
+import { getProjectGitStatus, getProjectGitDiff } from "../api.js";
 
 const props = defineProps({
   changes: { type: Array, default: () => [] },
@@ -15,6 +15,8 @@ const props = defineProps({
 const emit = defineEmits(["open-file", "open-diff", "discard-change"]);
 
 const localGitChanges = ref([]);
+const isRepository = ref(true);
+const gitignoreRules = ref([]);
 
 const confirmDiscardAll = ref(false);
 const discardAllBusy = ref(false);
@@ -117,14 +119,43 @@ function isInternalOrIgnored(path) {
   return false;
 }
 
+function matchesGitignore(path, rules) {
+  if (!rules || !rules.length || !path) return false;
+  const p = String(path).trim().replace(/\\/g, "/").replace(/^\.\//, "");
+  for (const raw of rules) {
+    let r = String(raw).trim();
+    if (!r || r.startsWith("#")) continue;
+    if (r.endsWith("/")) {
+      const dirName = r.slice(0, -1);
+      if (p === dirName || p.startsWith(`${dirName}/`) || p.includes(`/${dirName}/`)) {
+        return true;
+      }
+      continue;
+    }
+    if (r.startsWith("*.")) {
+      const ext = r.slice(1);
+      if (p.endsWith(ext)) return true;
+      continue;
+    }
+    if (p === r || p.endsWith(`/${r}`) || p.startsWith(`${r}/`) || p.includes(`/${r}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function loadGitChanges() {
   const pId = props.project?.id || props.project?.project_id;
   if (!pId) {
     localGitChanges.value = [];
+    isRepository.value = true;
+    gitignoreRules.value = [];
     return;
   }
   try {
     const res = await getProjectGitStatus(pId);
+    isRepository.value = res?.is_repository !== false;
+    gitignoreRules.value = Array.isArray(res?.gitignore_rules) ? res.gitignore_rules : [];
     if (res?.is_repository && Array.isArray(res.files)) {
       localGitChanges.value = res.files
         .filter((f) => !isInternalOrIgnored(f?.path))
@@ -144,6 +175,7 @@ async function loadGitChanges() {
     }
   } catch (e) {
     localGitChanges.value = [];
+    gitignoreRules.value = [];
   }
 }
 
@@ -160,7 +192,11 @@ const displayChanges = computed(() => {
     props.changes && props.changes.length > 0
       ? props.changes
       : localGitChanges.value;
-  return (raw || []).filter((c) => !isInternalOrIgnored(c?.path || c?.detail));
+  return (raw || []).filter(
+    (c) =>
+      !isInternalOrIgnored(c?.path || c?.detail) &&
+      !matchesGitignore(c?.path || c?.detail, gitignoreRules.value)
+  );
 });
 
 function onRowClick(c) {
@@ -177,10 +213,32 @@ function toggleCollapse() {
 // Accordion: hanya SATU baris terbuka pada satu waktu (index terpilih).
 // -1 = semua tertutup (diff TIDAK dirender secara default).
 const expandedIndex = ref(-1);
-function toggleRow(i) {
-  expandedIndex.value = expandedIndex.value === i ? -1 : i;
-}
+const loadingDiff = ref({});
 
+async function toggleRow(i, c) {
+  if (expandedIndex.value === i) {
+    expandedIndex.value = -1;
+    return;
+  }
+  expandedIndex.value = i;
+  if (c && !c.diff && props.project) {
+    const projectId = props.project.id || props.project.project_id;
+    const filePath = c.path || c.detail;
+    if (projectId && filePath) {
+      loadingDiff.value[i] = true;
+      try {
+        const res = await getProjectGitDiff(projectId, filePath);
+        if (res && typeof res.diff === "string") {
+          c.diff = res.diff;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch git diff for", filePath, err);
+      } finally {
+        loadingDiff.value[i] = false;
+      }
+    }
+  }
+}
 // Klasifikasi kind perubahan (created/added/new, deleted/removed, modified/...).
 function kindOf(c) {
   return (c.kind || "change").toLowerCase();
@@ -265,7 +323,7 @@ defineExpose({ loadGitChanges });
           Cancel
         </button>
       </div>
-      <div v-else-if="displayChanges.length > 0" class="drawer-sec-actions">
+      <div v-else-if="isRepository && displayChanges.length > 0" class="drawer-sec-actions">
         <button
           type="button"
           class="sc-discard-all-btn"
@@ -280,14 +338,15 @@ defineExpose({ loadGitChanges });
 
     <!-- Body = SATU scroll owner: header tetap, kartu perubahan + diff mengalir di area ini -->
     <div v-show="!collapsed" class="sc-changes-body changes-body">
-      <div v-if="!displayChanges.length" class="sc-empty-hint">No changes yet.</div>
+      <div v-if="!isRepository" class="sc-empty-hint">Not a Git repository.</div>
+      <div v-else-if="!displayChanges.length" class="sc-empty-hint">No changes yet.</div>
 
       <template v-else>
         <div class="changes-list">
           <template v-for="(c, i) in displayChanges" :key="i">
             <!-- Kartu satu baris: caret + status + nama file (ellipsis) + +/- -->
             <div class="file-row" :class="{ open: expandedIndex === i }" @click="onRowClick(c)">
-              <span class="file-caret" aria-hidden="true" title="Toggle inline preview" @click.stop="toggleRow(i)">{{ expandedIndex === i ? "▾" : "▸" }}</span>
+              <span class="file-caret" aria-hidden="true" title="Toggle inline preview" @click.stop="toggleRow(i, c)">{{ expandedIndex === i ? "▾" : "▸" }}</span>
               <span class="file-status" :class="tagClass(c)" :title="tagLabel(c)">{{ tagCode(c) }}</span>
               <span class="file-name" :title="rowTitle(c)">{{ c.path || c.detail || "(unknown)" }}</span>
               <span class="file-stat">
@@ -341,8 +400,9 @@ defineExpose({ loadGitChanges });
 
             <!-- Diff muncul saat caret diklik (accordion) -->
             <div v-if="expandedIndex === i" class="file-diff">
-              <div v-if="c.diff" class="file-diff-body"><pre>{{ c.diff }}</pre></div>
-              <div v-else class="file-diff-note">Diff detail is not available from AEGIS. Click row to open Monaco Diff.</div>
+              <div v-if="loadingDiff[i]" class="file-diff-note">Loading diff…</div>
+              <div v-else-if="c.diff" class="file-diff-body"><pre>{{ c.diff }}</pre></div>
+              <div v-else class="file-diff-note">Diff detail is not available. Click row to open Monaco Diff.</div>
             </div>
           </template>
         </div>

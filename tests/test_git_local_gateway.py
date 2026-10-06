@@ -252,8 +252,12 @@ def test_git_status_scoped_to_subfolder(temp_git_repo):
     root_change = temp_git_repo / "root_change.py"
     root_change.write_text("# root change\n", encoding="utf-8")
 
-    # Initialize facade scoped to subapp
-    facade = GitRepositoryFacade(root=subapp)
+    # 1. By default with strict_root=True, subfolder without .git is not a repo
+    facade_strict = GitRepositoryFacade(root=subapp)
+    assert facade_strict.is_repository() is False
+
+    # 2. When strict_root=False (monorepo scoped subfolder mode), scopes to subapp
+    facade = GitRepositoryFacade(root=subapp, strict_root=False)
     assert facade.is_repository() is True
 
     st = facade.status()
@@ -326,3 +330,95 @@ def test_git_status_and_diff_filters_internal_mechanisms(temp_git_repo):
     summary_paths = [s.path for s in summaries]
     assert not any(".aegis" in p for p in summary_paths)
     assert not any(".aether" in p for p in summary_paths)
+
+
+def test_git_init_for_non_git_workspace(tmp_path):
+    plain_dir = tmp_path / "plain_project"
+    plain_dir.mkdir()
+
+    facade = GitRepositoryFacade(root=plain_dir)
+    assert facade.is_repository() is False
+
+    res = facade.init()
+    assert res["ok"] is True
+    assert (plain_dir / ".git").exists()
+    assert facade.is_repository() is True
+
+
+def test_django_http_git_init_endpoint(tmp_path):
+    project_dir = tmp_path / "init_project"
+    project_dir.mkdir()
+
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {"id": "test-init-1", "path": str(project_dir)}
+
+    service = GatewayService(
+        project_store=mock_store,
+        project_registry=MagicMock(),
+        task_preparation=MagicMock(),
+        session_store=MagicMock(),
+    )
+
+    orig_get_service = views.get_service
+    views.get_service = lambda: service
+
+    try:
+        client = Client()
+
+        # Status before init -> is_repository is False
+        res_before = client.get("/api/projects/test-init-1/git/status")
+        assert res_before.status_code == 200
+        assert res_before.json()["is_repository"] is False
+
+        # POST /api/projects/test-init-1/git/init
+        res_init = client.post("/api/projects/test-init-1/git/init")
+        assert res_init.status_code == 200
+        data_init = res_init.json()
+        assert data_init["ok"] is True
+        assert data_init["is_repository"] is True
+
+        # Status after init -> is_repository is True
+        res_after = client.get("/api/projects/test-init-1/git/status")
+        assert res_after.status_code == 200
+        assert res_after.json()["is_repository"] is True
+
+        # POST /api/projects/test-init-1/git/deinit
+        res_deinit = client.post("/api/projects/test-init-1/git/deinit")
+        assert res_deinit.status_code == 200
+        data_deinit = res_deinit.json()
+        assert data_deinit["ok"] is True
+        assert data_deinit["is_repository"] is False
+
+        # Status after deinit -> is_repository is False
+        res_after_deinit = client.get("/api/projects/test-init-1/git/status")
+        assert res_after_deinit.status_code == 200
+        assert res_after_deinit.json()["is_repository"] is False
+    finally:
+        views.get_service = orig_get_service
+
+
+def test_gitignore_patterns_and_sync(tmp_path):
+    project_dir = tmp_path / "gi_project"
+    project_dir.mkdir()
+
+    gi_file = project_dir / ".gitignore"
+    gi_file.write_text("# Comments\n*.log\nnode_modules/\nsecrets.env\n", encoding="utf-8")
+
+    facade = GitRepositoryFacade(root=project_dir)
+    patterns = facade.gitignore_patterns()
+    assert patterns == ["*.log", "node_modules/", "secrets.env"]
+
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {"id": "proj-gi", "path": str(project_dir)}
+
+    service = GatewayService(
+        project_store=mock_store,
+        project_registry=MagicMock(),
+        task_preparation=MagicMock(),
+        session_store=MagicMock(),
+    )
+
+    st = service.git_status("proj-gi")
+    assert st["gitignore_rules"] == ["*.log", "node_modules/", "secrets.env"]
+
+

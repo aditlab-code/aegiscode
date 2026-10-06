@@ -450,30 +450,34 @@ class OpenAICompatibleProvider(BaseProvider):
                 f"Response dari provider '{self.name}' bukan JSON yang valid."
             ) from exc
 
-        text = self._extract_text(data)
+        text, reasoning = self._extract_text_and_reasoning(data)
         return GenerateResult(
             text=text,
             model=payload.get("model", self.config.model),
             provider=self.name,
             raw=data if isinstance(data, dict) else {},
+            reasoning=reasoning,
         )
 
-    @staticmethod
-    def _extract_text(data: Any) -> str:
-        """Ambil teks dari response format OpenAI-compatible.
-
-        Raises:
-            ProviderResponseError: bila struktur response tidak sesuai.
-        """
+    @classmethod
+    def _extract_text_and_reasoning(cls, data: Any) -> tuple[str, Optional[str]]:
+        """Ambil teks dan reasoning dari response format OpenAI-compatible."""
         try:
             choices = data["choices"]
             message = choices[0]["message"]
             content = message.get("content", "")
+            reasoning = message.get("reasoning_content") or message.get("reasoning") or None
         except (KeyError, IndexError, TypeError) as exc:
             raise ProviderResponseError(
                 "Struktur response provider tidak sesuai format OpenAI-compatible."
             ) from exc
-        return content or ""
+        return content or "", reasoning
+
+    @staticmethod
+    def _extract_text(data: Any) -> str:
+        """Ambil teks dari response format OpenAI-compatible."""
+        text, _ = OpenAICompatibleProvider._extract_text_and_reasoning(data)
+        return text
 
     def is_available(self) -> bool:
         """Provider dianggap tersedia bila API key dan base URL sudah diisi.
@@ -578,6 +582,7 @@ class OpenAICompatibleProvider(BaseProvider):
             else:
                 finish_reason = FinishReason.UNKNOWN
 
+        reasoning = result.reasoning or message.get("reasoning_content") or message.get("reasoning") or None
         return LLMResponse(
             text=text,
             actions=actions,
@@ -589,5 +594,6 @@ class OpenAICompatibleProvider(BaseProvider):
             # dibuang karena terpotong (length + ada argumen tak lengkap).
             truncated=length_truncated and dropped > 0,
             incomplete_tool_calls=dropped,
+            reasoning=reasoning,
         )
 

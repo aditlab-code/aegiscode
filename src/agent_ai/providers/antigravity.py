@@ -18,6 +18,7 @@ Referensi: https://antigravity.google/docs/models/
 
 from __future__ import annotations
 import json
+import logging
 import os
 import re
 import shutil
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 _orig_subprocess_run = subprocess.run
+logger = logging.getLogger(__name__)
 import requests
 
 from agent_ai.config.settings import AntigravityConfig, settings
@@ -105,9 +107,54 @@ def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
         return str(params.get("CommandLine") or params.get("command") or "")
     if tool_name == "list_files":
         return str(params.get("DirectoryPath") or params.get("path") or params.get("dir") or "")
-    if tool_name == "search_code":
+    if tool_name in (
+        "search_code",
+        "hybrid_search",
+        "semantic_search",
+        "atlas_query",
+        "rig_query",
+    ):
         return str(params.get("Query") or params.get("query") or params.get("pattern") or "")
     return str(params.get("path") or params.get("command") or params.get("target") or "")
+
+
+def _format_antigravity_policy_directive(mode: str) -> str:
+    """Format prompt direktif guardrail ketat untuk Antigravity CLI."""
+    mode_clean = (mode or "balanced").lower().strip()
+
+    rules = [
+        "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
+        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
+        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
+        "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
+        "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
+    ]
+
+    if mode_clean == "fast":
+        rules.extend([
+            "5. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
+            "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
+            "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
+            "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
+        ])
+    elif mode_clean == "balanced":
+        rules.extend([
+            "5. EXECUTION MODE: BALANCED:",
+            "   - Read only files directly related to the user's task (max 6-8 files).",
+            "   - Avoid redundant reads of the same file. Once read, proceed with implementation immediately.",
+            "   - Apply edits as soon as sufficient context is gathered.",
+        ])
+    else:  # deep
+        rules.extend([
+            "5. EXECUTION MODE: DEEP:",
+            "   - Thorough analysis and verification are permitted across the workspace.",
+            "   - Do not re-read the same file repeatedly without edits.",
+            "   - Log files (.aegis/log/) remain strictly prohibited.",
+            "   - Stay strictly within workspace boundaries.",
+        ])
+
+    return "\n".join(rules)
+
 
 def _extract_tool_call_dict(tc: Any) -> Dict[str, Any]:
     """Ekstrak nama, arguments, dan id dari dict atau objek ToolCall."""
@@ -292,10 +339,14 @@ class AntigravityProvider(BaseProvider):
         self,
         messages: Any,
         tools: Optional[List[ToolDefinition]] = None,
+        policy_directive: Optional[str] = None,
     ) -> str:
         """Format daftar pesan Message/dict menjadi teks dialog terstruktur."""
         formatted_turns: List[str] = []
         tools_injected = False
+
+        if policy_directive:
+            formatted_turns.append(f"[SYSTEM]:\n{policy_directive}")
 
         for msg in messages:
             role = _extract_msg_role(msg).lower()
@@ -357,13 +408,22 @@ class AntigravityProvider(BaseProvider):
 
         cli = self._resolve_cli_path()
         if cli:
+            policy_mode = (
+                (options.extra.get("execution_policy", {}).get("effective_mode") if options and options.extra else None)
+                or (options.extra.get("mode") if options and options.extra else None)
+                or "balanced"
+            )
+            policy_directive = _format_antigravity_policy_directive(policy_mode)
+
             if messages:
-                input_text = self._format_messages_to_prompt(messages, tools=tool_defs if tool_defs else None)
+                input_text = self._format_messages_to_prompt(
+                    messages, tools=tool_defs if tool_defs else None, policy_directive=policy_directive
+                )
             elif prompt:
                 if tool_defs:
-                    input_text = f"[SYSTEM]:\n{_format_tools_prompt(tool_defs)}\n\n[USER]:\n{prompt}"
+                    input_text = f"[SYSTEM]:\n{policy_directive}\n\n{_format_tools_prompt(tool_defs)}\n\n[USER]:\n{prompt}"
                 else:
-                    input_text = prompt
+                    input_text = f"[SYSTEM]:\n{policy_directive}\n\n[USER]:\n{prompt}"
             else:
                 input_text = ""
 
@@ -381,12 +441,13 @@ class AntigravityProvider(BaseProvider):
             if cwd and os.path.exists(str(cwd)):
                 target_cwd = str(Path(cwd).resolve())
 
-
             # Bila event_sink tersedia, gunakan stream-json agar intermediate tool
             # calls dipancarkan real-time ke UI timeline Aegis saat agy berjalan.
             use_streaming = event_sink is not None
             output_format = "stream-json" if use_streaming else "json"
             cmd = [cli, "-p", input_text, "--model", model, "--output-format", output_format]
+            if options and options.max_tokens is not None:
+                cmd.extend(["--max-tokens", str(options.max_tokens)])
             if target_cwd:
                 cmd.extend(["--add-dir", target_cwd])
             env = os.environ.copy()
@@ -418,10 +479,12 @@ class AntigravityProvider(BaseProvider):
                     ) from exc
 
                 accumulated_text: List[str] = []
+                accumulated_thoughts: List[str] = []
                 final_response = ""
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
-
+                files_read_set: set[str] = set()
+                file_read_counts: Dict[str, int] = {}
                 try:
                     while True:
                         if time.time() - start_time > timeout:
@@ -460,15 +523,108 @@ class AntigravityProvider(BaseProvider):
                                     params = tool_info.get("parameters") or {}
                                     target = _extract_agy_target(aegis_tool, params)
 
-                                    if state == "ACTIVE" and event_sink:
-                                        event_sink("tool_called", {
-                                            "tool": aegis_tool,
-                                            "arguments": params,
-                                            "target": target,
-                                            "call_id": call_id,
-                                        })
+                                    if state == "ACTIVE":
+                                        # Active Streaming Circuit Breaker:
+                                        # 1. Blokir pelanggaran batas workspace (directory traversal keluar dari root)
+                                        # 2. Blokir pembacaan berkas log internal (.aegis/log/ dsb)
+                                        # 3. Batasi pembacaan berkas unik di mode fast (maks 3 berkas)
+                                        norm_target = target.replace("\\", "/").lower()
+
+                                        is_traversal_breach = False
+                                        if aegis_tool == "run_command":
+                                            cmd_tokens = norm_target.split()
+                                            if any(tok == ".." or tok.startswith("../") or "/../" in tok for tok in cmd_tokens):
+                                                is_traversal_breach = True
+                                        elif aegis_tool in ("read_file", "edit_file", "write_file", "delete_file"):
+                                            if norm_target.startswith("../") or "/../" in norm_target:
+                                                is_traversal_breach = True
+                                            elif target_cwd and norm_target.startswith("/"):
+                                                norm_cwd = target_cwd.replace("\\", "/").lower()
+                                                if not norm_target.startswith(norm_cwd):
+                                                    is_traversal_breach = True
+
+                                        if aegis_tool in ("edit_file", "write_file", "replace_file_content", "delete_file", "move_file"):
+                                            if norm_target in file_read_counts:
+                                                file_read_counts[norm_target] = 0
+
+                                        if is_traversal_breach:
+                                            proc.kill()
+                                            raise ProviderAPIError(
+                                                f"Pelanggaran Batasan Workspace: Operasi '{target}' mengakses direktori di luar root proyek. "
+                                                "Eksekusi dibatasi ketat di dalam root proyek aktif.",
+                                                status_code=403,
+                                                endpoint="agy CLI",
+                                                response_body=f"Circuit breaker: workspace boundary violation '{target}'",
+                                            )
+
+                                        if aegis_tool == "read_file":
+                                            is_log_target = (
+                                                "/.aegis/log/" in norm_target
+                                                or norm_target.startswith(".aegis/log/")
+                                                or "/.aether/log/" in norm_target
+                                                or norm_target.startswith(".aether/log/")
+                                                or (norm_target.endswith(".log") and (".aegis" in norm_target or ".aether" in norm_target))
+                                            )
+                                            if is_log_target:
+                                                proc.kill()
+                                                raise ProviderAPIError(
+                                                    f"Pelanggaran Guardrail Keamanan: Antigravity CLI dihentikan karena mencoba membaca berkas log '{target}'. "
+                                                    "Membaca berkas log dilarang untuk mencegah token overflow.",
+                                                    status_code=400,
+                                                    endpoint="agy CLI",
+                                                    response_body=f"Circuit breaker: forbidden log file read '{target}'",
+                                                )
+                                            if target:
+                                                files_read_set.add(target)
+                                                read_count = file_read_counts.get(norm_target, 0) + 1
+                                                file_read_counts[norm_target] = read_count
+                                                if read_count > 2:
+                                                    warning_msg = (
+                                                        f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
+                                                        "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
+                                                    )
+                                                    logger.warning(
+                                                        "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
+                                                        target,
+                                                        read_count,
+                                                    )
+                                                    if event_sink:
+                                                        event_sink("warning", {
+                                                            "message": warning_msg,
+                                                            "target": target,
+                                                            "read_count": read_count,
+                                                        })
+                                                        event_sink("agent_reasoning_delta", {
+                                                            "delta": f"\n{warning_msg}\n",
+                                                        })
+                                            if policy_mode == "fast" and len(files_read_set) > 3:
+                                                proc.kill()
+                                                raise ProviderAPIError(
+                                                    f"Pelanggaran Guardrail Efisiensi Mode Fast: Antigravity CLI telah membaca {len(files_read_set)} berkas "
+                                                    f"(batas mode Fast adalah 3 berkas unik). Eksekusi dihentikan. "
+                                                    "Gunakan mode Balanced jika memerlukan analisis lintas berkas yang lebih luas.",
+                                                    status_code=429,
+                                                    endpoint="agy CLI",
+                                                    response_body=f"Circuit breaker: fast mode read limit exceeded ({len(files_read_set)} > 3)",
+                                                )
+
+                                        if event_sink:
+                                            event_sink("tool_called", {
+                                                "tool": aegis_tool,
+                                                "arguments": params,
+                                                "target": target,
+                                                "call_id": call_id,
+                                            })
                                     elif state == "DONE" and event_sink:
                                         output = tool_info.get("output", "")
+                                        norm_t = target.replace("\\", "/").lower()
+                                        if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
+                                            re_read_warning = (
+                                                f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
+                                                "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
+                                            )
+                                            if isinstance(output, str):
+                                                output = output + re_read_warning
                                         event_sink("tool_completed", {
                                             "tool": aegis_tool,
                                             "success": True,
@@ -481,6 +637,12 @@ class AntigravityProvider(BaseProvider):
                                             "success": True,
                                             "target": target,
                                         })
+                                elif step_type in ("thought", "reasoning"):
+                                    thought_delta = step_update.get("thought_delta") or step_update.get("text_delta")
+                                    if thought_delta:
+                                        accumulated_thoughts.append(thought_delta)
+                                        if event_sink:
+                                            event_sink("agent_reasoning_delta", {"delta": thought_delta})
                                 elif step_type == "agent_response":
                                     text_delta = step_update.get("text_delta")
                                     if text_delta:
@@ -495,8 +657,9 @@ class AntigravityProvider(BaseProvider):
                 stderr_text = proc.stderr.read().strip() if proc.stderr else ""
                 proc.wait()
 
-                if proc.returncode != 0 and not accumulated_text and not final_response:
-                    err_msg = stderr_text or f"Exit code {proc.returncode}"
+                ret_code = getattr(proc, "returncode", 0)
+                if ret_code != 0 and not accumulated_text and not final_response:
+                    err_msg = stderr_text or f"Exit code {ret_code}"
                     raise ProviderAPIError(
                         f"Antigravity CLI mengembalikan error: {err_msg}",
                         status_code=proc.returncode,
@@ -513,6 +676,7 @@ class AntigravityProvider(BaseProvider):
                     model=model,
                     provider=self.name,
                     raw=raw_data,
+                    reasoning="\n".join(accumulated_thoughts).strip() or None,
                 )
 
             # Jalur B: Standar subprocess.run (untuk mock unit test atau non-streaming)
@@ -544,11 +708,13 @@ class AntigravityProvider(BaseProvider):
                 )
 
             stdout = proc.stdout.strip()
+            accumulated_thoughts: List[str] = []
             # Bila stdout berisi baris-baris stream-json dan event_sink aktif
             if stdout.startswith("{") and "\n{" in stdout and event_sink:
                 accumulated_text = []
                 final_response = ""
                 raw_data = {}
+                file_read_counts: Dict[str, int] = {}
                 for line in stdout.splitlines():
                     line_str = line.strip()
                     if not line_str:
@@ -571,6 +737,31 @@ class AntigravityProvider(BaseProvider):
                                 params = tool_info.get("parameters") or {}
                                 target = _extract_agy_target(aegis_tool, params)
                                 if state == "ACTIVE":
+                                    norm_target = target.replace("\\", "/").lower()
+                                    if aegis_tool in ("edit_file", "write_file", "replace_file_content", "delete_file", "move_file"):
+                                        if norm_target in file_read_counts:
+                                            file_read_counts[norm_target] = 0
+                                    elif aegis_tool == "read_file" and target:
+                                        read_count = file_read_counts.get(norm_target, 0) + 1
+                                        file_read_counts[norm_target] = read_count
+                                        if read_count > 2:
+                                            warning_msg = (
+                                                f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
+                                                "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
+                                            )
+                                            logger.warning(
+                                                "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
+                                                target,
+                                                read_count,
+                                            )
+                                            event_sink("warning", {
+                                                "message": warning_msg,
+                                                "target": target,
+                                                "read_count": read_count,
+                                            })
+                                            event_sink("agent_reasoning_delta", {
+                                                "delta": f"\n{warning_msg}\n",
+                                            })
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
                                         "arguments": params,
@@ -579,6 +770,14 @@ class AntigravityProvider(BaseProvider):
                                     })
                                 elif state == "DONE":
                                     output = tool_info.get("output", "")
+                                    norm_t = target.replace("\\", "/").lower()
+                                    if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
+                                        re_read_warning = (
+                                            f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
+                                            "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
+                                        )
+                                        if isinstance(output, str):
+                                            output = output + re_read_warning
                                     event_sink("tool_completed", {
                                         "tool": aegis_tool,
                                         "success": True,
@@ -591,6 +790,12 @@ class AntigravityProvider(BaseProvider):
                                         "success": True,
                                         "target": target,
                                     })
+                            elif step_type in ("thought", "reasoning"):
+                                thought_delta = step_update.get("thought_delta") or step_update.get("text_delta")
+                                if thought_delta:
+                                    accumulated_thoughts.append(thought_delta)
+                                    if event_sink:
+                                        event_sink("agent_reasoning_delta", {"delta": thought_delta})
                             elif step_type == "agent_response":
                                 text_delta = step_update.get("text_delta")
                                 if text_delta:
@@ -613,6 +818,7 @@ class AntigravityProvider(BaseProvider):
                 model=model,
                 provider=self.name,
                 raw=data,
+                reasoning="\n".join(accumulated_thoughts).strip() or None,
             )
 
         # Fallback ke HTTP endpoint bila API key tersedia
@@ -698,14 +904,18 @@ class AntigravityProvider(BaseProvider):
             data = resp.json()
             choices = data.get("choices") or []
             first_text = ""
+            reasoning_text = None
             if choices and isinstance(choices[0], dict):
-                first_text = choices[0].get("message", {}).get("content", "") or ""
+                msg = choices[0].get("message", {})
+                first_text = msg.get("content", "") or ""
+                reasoning_text = msg.get("reasoning_content") or msg.get("reasoning") or None
 
             return GenerateResult(
                 text=first_text,
                 model=model,
                 provider=self.name,
-                raw=data,
+                raw=data if isinstance(data, dict) else {},
+                reasoning=reasoning_text,
             )
 
         raise ProviderNotConfiguredError(
@@ -772,6 +982,7 @@ class AntigravityProvider(BaseProvider):
                     raw=raw,
                     provider=self.name,
                     model=result.model,
+                    reasoning=result.reasoning or first_msg.get("reasoning_content") or first_msg.get("reasoning") or None,
                 )
 
         # Branch B: Text-Embedded Tool Calls (CLI bridge & embedded responses)
@@ -892,4 +1103,5 @@ class AntigravityProvider(BaseProvider):
             raw=raw,
             provider=self.name,
             model=result.model,
+            reasoning=result.reasoning or first_msg.get("reasoning_content") or first_msg.get("reasoning") or None,
         )

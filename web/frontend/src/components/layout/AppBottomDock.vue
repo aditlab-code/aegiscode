@@ -329,11 +329,8 @@ function handleClose() {
       <!-- 1. Terminal View -->
       <div v-if="activeTab === 'terminal'" class="dock-panel terminal-dock-panel">
         <TerminalView
-          :lines="terminalLines"
-          :running="terminalRunning"
+          :key="projectId || '__default__'"
           :project-id="projectId"
-          @run-command="emit('run-command', $event)"
-          @abort-command="emit('abort-command')"
         />
       </div>
 

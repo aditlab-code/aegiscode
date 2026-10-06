@@ -30,7 +30,8 @@
 // .cmsg-actions/.copy-btn yang sama dengan Consultant Chat.
 import { computed, nextTick, ref, watch } from "vue";
 import { renderMarkdown } from "../markdown.js";
-
+import AppThinkingBlock from "./ui/AppThinkingBlock.vue";
+import { buildAgentActivityCopy } from "../activityCopy.js";
 const props = defineProps({
   events: { type: Array, default: () => [] },
   status: { type: String, default: "idle" },
@@ -80,7 +81,12 @@ const TOOL_META = {
   write_file: { icon: "edit", verb: "Editing files" },
   edit_file: { icon: "edit", verb: "Editing files" },
   run_command: { icon: "play", verb: "Running command" },
+  hybrid_search: { icon: "search", verb: "Hybrid search" },
+  semantic_search: { icon: "search", verb: "Semantic search" },
+  atlas_query: { icon: "target", verb: "Querying Code Atlas" },
+  rig_query: { icon: "target", verb: "Querying RIG graph" },
 };
+
 
 // Ikon SVG terpadu (gaya Lucide, stroke currentColor) pengganti emotikon.
 const ICON_PATHS = {
@@ -175,9 +181,16 @@ function measure(tool, content) {
   if (tool === "search_code" && typeof obj.count === "number") {
     return { matches: obj.count };
   }
+  if ((tool === "hybrid_search" || tool === "semantic_search") && typeof obj.total_results === "number") {
+    return { matches: obj.total_results };
+  }
+  if (tool === "atlas_query" && typeof obj.returned === "number") {
+    return { matches: obj.returned };
+  }
   if (typeof obj.total_lines === "number") return { lines: obj.total_lines };
   return null;
 }
+
 
 function isRepeatContent(content) {
   const obj = asObject(content);
@@ -312,7 +325,12 @@ function countLabel(group) {
     if (dirs) parts.push(`${dirs} director${dirs === 1 ? "y" : "ies"}`);
     return parts.join(", ");
   }
-  if (group.tool === "search_code") {
+  if (
+    group.tool === "search_code" ||
+    group.tool === "hybrid_search" ||
+    group.tool === "semantic_search" ||
+    group.tool === "atlas_query"
+  ) {
     const total = group.measures.reduce((acc, m) => acc + (m.matches || 0), 0);
     return total ? `${total} match${total === 1 ? "" : "es"}` : "";
   }
@@ -327,7 +345,15 @@ function countLabel(group) {
 // Scope ringkas (direktori bersama, file tunggal, query, atau command).
 function scopeLabel(tool, targets) {
   if (!targets.length) return "";
-  if (tool === "search_code" || tool === "run_command") return targets[0];
+  if (
+    tool === "search_code" ||
+    tool === "run_command" ||
+    tool === "hybrid_search" ||
+    tool === "semantic_search" ||
+    tool === "atlas_query" ||
+    tool === "rig_query"
+  ) return targets[0];
+
   if (targets.length === 1) return targets[0];
   const dirs = uniqueList(
     targets.map((target) => {
@@ -380,94 +406,121 @@ function describeTool(group, status) {
   };
 }
 
-// Aktivitas non-tool -> baris status/notice ringkas.
+// Dispatcher terstruktur untuk event non-tool
+const EVENT_DESCRIBERS = {
+  agent_commentary: (d, base, index) => {
+    const text = String(d.text || "").trim();
+    if (!text) return null;
+    return {
+      ...base,
+      key: `agent-${index}`,
+      kind: "reasoning",
+      icon: "brain",
+      title: "Reasoning",
+      detailText: text,
+    };
+  },
+  task_started: (d, base, index) => ({
+    ...base,
+    key: `status-${index}`,
+    kind: "status",
+    icon: "play",
+    title: "Task started",
+  }),
+  task_completed: (d, base, index) => {
+    const report = typeof d.result === "string" ? d.result : "";
+    return {
+      ...base,
+      key: `status-${index}`,
+      kind: "status",
+      icon: "check",
+      title: "Task completed",
+      reportText: report,
+      reportHtml: report ? renderMarkdown(report) : "",
+    };
+  },
+  task_failed: (d, base, index) => ({
+    ...base,
+    key: `status-${index}`,
+    kind: "status",
+    icon: "x",
+    title: "Task failed",
+  }),
+  task_cancelled: (d, base, index) => ({
+    ...base,
+    key: `status-${index}`,
+    kind: "status",
+    icon: "warn",
+    title: "Task cancelled",
+  }),
+  validation_started: (d, base, index) => ({
+    ...base,
+    key: `notice-${index}`,
+    kind: "notice",
+    icon: "check",
+    title: "Validating",
+  }),
+  validation_completed: (d, base, index) => ({
+    ...base,
+    key: `notice-${index}`,
+    kind: "notice",
+    icon: d.success === false ? "x" : "check",
+    title: d.success === false ? "Validation failed" : "Validation completed",
+  }),
+  recovery_started: (d, base, index) => ({
+    ...base,
+    key: `notice-${index}`,
+    kind: "notice",
+    icon: "warn",
+    title: "Recovery started",
+  }),
+  recovery_completed: (d, base, index) => ({
+    ...base,
+    key: `notice-${index}`,
+    kind: "notice",
+    icon: "check",
+    title: "Recovery completed",
+  }),
+  policy_applied: (d, base, index) => {
+    const req = d.requested_mode ? (d.requested_mode.charAt(0).toUpperCase() + d.requested_mode.slice(1)) : "Balanced";
+    const eff = d.effective_mode ? (d.effective_mode.charAt(0).toUpperCase() + d.effective_mode.slice(1)) : "Balanced";
+    const act = d.activity || "";
+    const isEscalated = Boolean(d.escalated);
+    return {
+      ...base,
+      key: `policy-${index}`,
+      kind: "notice",
+      icon: isEscalated ? "zap" : "target",
+      title: isEscalated ? `Policy: ${req} → ${eff}` : `Policy: ${eff}`,
+      scope: isEscalated ? `Escalated to ${eff}` : `Mode: ${eff}`,
+      detailText: act || (isEscalated
+        ? `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`
+        : `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}`),
+    };
+  },
+  policy_escalated: (d, base, index) => {
+    const from = d.from_mode ? (d.from_mode.charAt(0).toUpperCase() + d.from_mode.slice(1)) : "Fast";
+    const to = d.to_mode ? (d.to_mode.charAt(0).toUpperCase() + d.to_mode.slice(1)) : "Deep";
+    const act = d.activity || "";
+    return {
+      ...base,
+      key: `policy-esc-${index}`,
+      kind: "notice",
+      icon: "zap",
+      title: `Policy escalated: ${from} → ${to}`,
+      scope: `Escalated: ${from} → ${to}`,
+      detailText: act || `[POLICY]\nEscalated:\n${from} → ${to}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`,
+    };
+  },
+};
+
+// Aktivitas non-tool -> baris status/notice ringkas via dispatcher
 function describeEvent(e, index) {
   const d = e.data || {};
   const base = { at: index, ts: e.ts, events: [] };
-  switch (e.type) {
-    case "agent_commentary": {
-      const text = String(d.text || "").trim();
-      if (!text) return null;
-      return {
-        ...base,
-        key: `agent-${index}`,
-        kind: "reasoning",
-        icon: "brain",
-        title: "Reasoning",
-        detailText: text,
-      };
-    }
-    case "task_started":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "play", title: "Task started" };
-    case "task_completed": {
-      // Agent Report final = data.result (isi UTUH dari log/SSE, bukan preview
-      // terpotong). Dirender penuh sebagai Markdown; teks aslinya disimpan
-      // terpisah untuk tombol Copy.
-      const report = typeof d.result === "string" ? d.result : "";
-      return {
-        ...base,
-        key: `status-${index}`,
-        kind: "status",
-        icon: "check",
-        title: "Task completed",
-        reportText: report,
-        reportHtml: report ? renderMarkdown(report) : "",
-      };
-    }
-    case "task_failed":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "x", title: "Task failed" };
-    case "task_cancelled":
-      return { ...base, key: `status-${index}`, kind: "status", icon: "warn", title: "Task cancelled" };
-    case "validation_started":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "check", title: "Validating" };
-    case "validation_completed":
-      return {
-        ...base,
-        key: `notice-${index}`,
-        kind: "notice",
-        icon: d.success === false ? "x" : "check",
-        title: d.success === false ? "Validation failed" : "Validation completed",
-      };
-    case "recovery_started":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "warn", title: "Recovery started" };
-    case "recovery_completed":
-      return { ...base, key: `notice-${index}`, kind: "notice", icon: "check", title: "Recovery completed" };
-    case "policy_applied": {
-      const req = d.requested_mode ? (d.requested_mode.charAt(0).toUpperCase() + d.requested_mode.slice(1)) : "Balanced";
-      const eff = d.effective_mode ? (d.effective_mode.charAt(0).toUpperCase() + d.effective_mode.slice(1)) : "Balanced";
-      const act = d.activity || "";
-      const isEscalated = Boolean(d.escalated);
-      return {
-        ...base,
-        key: `policy-${index}`,
-        kind: "notice",
-        icon: isEscalated ? "zap" : "target",
-        title: isEscalated ? `Policy: ${req} → ${eff}` : `Policy: ${eff}`,
-        scope: isEscalated ? `Escalated to ${eff}` : `Mode: ${eff}`,
-        detailText: act || (isEscalated
-          ? `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`
-          : `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}`),
-      };
-    }
-    case "policy_escalated": {
-      const from = d.from_mode ? (d.from_mode.charAt(0).toUpperCase() + d.from_mode.slice(1)) : "Fast";
-      const to = d.to_mode ? (d.to_mode.charAt(0).toUpperCase() + d.to_mode.slice(1)) : "Deep";
-      const act = d.activity || "";
-      return {
-        ...base,
-        key: `policy-esc-${index}`,
-        kind: "notice",
-        icon: "zap",
-        title: `Policy escalated: ${from} → ${to}`,
-        scope: `Escalated: ${from} → ${to}`,
-        detailText: act || `[POLICY]\nEscalated:\n${from} → ${to}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`,
-      };
-    }
-    default:
-      return null;
-  }
+  const handler = EVENT_DESCRIBERS[e.type];
+  return handler ? handler(d, base, index) : null;
 }
-
 // Timeline chronological: lifecycle milestones (done → active → events → pending)
 // + merged tool groups + non-tool events, sorted by virtual position.
 const timeline = computed(() => {
@@ -646,6 +699,26 @@ function rawTextClass(ev) {
 const copiedReportKey = ref(null);
 let copiedTimer = null;
 
+// --- Copy Timeline / Activity snapshot ---
+const copiedTimeline = ref(false);
+let copiedTimelineTimer = null;
+
+async function copyTimeline() {
+  const text = buildAgentActivityCopy({
+    events: props.events,
+    agentStatus: props.status,
+  });
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    copiedTimeline.value = true;
+    if (copiedTimelineTimer) clearTimeout(copiedTimelineTimer);
+    copiedTimelineTimer = setTimeout(() => {
+      copiedTimeline.value = false;
+      copiedTimelineTimer = null;
+    }, 1500);
+  } catch (_) {}
+}
 async function copyReport(item) {
   const text = item && typeof item.reportText === "string" ? item.reportText : "";
   if (!text) return;
@@ -697,7 +770,24 @@ watch(
           <span v-else-if="item.state === 'active'" class="vtl-ms-badge active">running</span>
         </div>
 
-        <!-- ── Activity row (tool / status / notice / reasoning) ── -->
+        <!-- ── Reasoning row with AppThinkingBlock ── -->
+        <template v-else-if="item.kind === 'reasoning'">
+          <div class="vtl-row reasoning ok">
+            <div class="vtl-node-col">
+              <div class="vtl-dot"></div>
+            </div>
+            <div class="vtl-content" style="padding: 0; width: 100%;">
+              <AppThinkingBlock
+                :title="item.title"
+                :collapsed="false"
+              >
+                <div class="act-detail-text" style="padding: 8px;">{{ item.detailText }}</div>
+              </AppThinkingBlock>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── Activity row (tool / status / notice) ── -->
         <template v-else>
           <div :class="['vtl-row', item.kind, item.state]">
             <div class="vtl-node-col">

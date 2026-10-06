@@ -1,16 +1,11 @@
 <script setup>
 // TerminalView — 100% pure native terminal (via @xterm/xterm & PTY socket bridge).
 // Keyboard input streams directly to PTY with zero input forms or send buttons.
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
-  lines:     { type: Array,   default: () => [] },
-  running:   { type: Boolean, default: false },
-  readOnly:  { type: Boolean, default: false },
-  projectId: { type: String,  default: "" },
+  projectId: { type: String, default: "" },
 });
-
-const emit = defineEmits(["run-command", "abort-command"]);
 
 const isBrowser = typeof window !== "undefined";
 const terminalContainer = ref(null);
@@ -84,7 +79,12 @@ function initPtySocket() {
 
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const projectSegment = props.projectId ? `${encodeURIComponent(props.projectId)}/` : "";
-  const wsUrl = `${proto}//${window.location.host}/ws/terminal/${projectSegment}`;
+  let tokenParam = "";
+  try {
+    const token = localStorage.getItem("aegis_auth_token") || "";
+    if (token) tokenParam = `?token=${encodeURIComponent(token)}`;
+  } catch (_) {}
+  const wsUrl = `${proto}//${window.location.host}/ws/terminal/${projectSegment}${tokenParam}`;
 
   try {
     const SocketCtor = window["Web" + "Socket"];
@@ -116,6 +116,22 @@ function initPtySocket() {
     socket = null;
   }
 }
+
+watch(
+  () => props.projectId,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      if (socket) {
+        socket.close();
+        socket = null;
+      }
+      if (term) {
+        term.reset();
+      }
+      initPtySocket();
+    }
+  }
+);
 
 function syncDimensions() {
   if (fitAddon && term && socket && socket.readyState === 1) {
@@ -245,14 +261,6 @@ onBeforeUnmount(() => {
     <!-- 100% Native xterm container -->
     <div ref="xtermElement" class="xterm-viewport"></div>
 
-    <!-- SSR Fallback / Test Contract container (renders structured lines in SSR/testing) -->
-    <div v-if="!isBrowser" class="term-ssr-fallback" style="display: none">
-      <div v-for="(line, i) in lines" :key="i" class="log-line">
-        <span v-if="line.tool">{{ line.tool }}</span>
-        <span v-if="line.text">{{ line.text }}</span>
-        <span v-if="line.target">{{ line.target }}</span>
-      </div>
-    </div>
   </div>
 </template>
 

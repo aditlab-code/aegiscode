@@ -612,3 +612,46 @@ test("7. dual-theme CSS tokens: --bg-drawer dan --bg-sidebar terdefinisi di kedu
   assert.ok(lightVars.includes("--bg-drawer"), "light theme mendefinisikan --bg-drawer");
   assert.ok(lightVars.includes("--bg-sidebar"), "light theme mendefinisikan --bg-sidebar");
 });
+
+// -----------------------------------------------------------------------------
+// Test 8: Harmonisasi Background Right Drawer & Left Sidebar (AGENTS.md §9.1 & §9.2)
+// Verifikasi konsistensi wallpaper transparency, absence of hardcoded #101018,
+// dan keselarasan child views right drawer.
+// -----------------------------------------------------------------------------
+test("8. harmonisasi background right drawer & left sidebar di wallpaper, drawer, dan light theme", () => {
+  const frontendRoot = fileURLToPath(new URL("..", import.meta.url));
+  const wallpaperCss = readFileSync(
+    resolve(frontendRoot, "src/styles/themes/wallpaper.css"),
+    "utf-8"
+  );
+  const drawerCss = readFileSync(
+    resolve(frontendRoot, "src/styles/layout/drawer.css"),
+    "utf-8"
+  );
+  const lightThemeCss = readFileSync(
+    resolve(frontendRoot, "src/styles/themes/theme-light.css"),
+    "utf-8"
+  );
+
+  // 1. Wallpaper mode mencakup seluruh elemen right drawer untuk konsistensi transparansi
+  assert.ok(wallpaperCss.includes(".right-drawer-body"), "wallpaper.css mencakup .right-drawer-body");
+  assert.ok(wallpaperCss.includes(".rd-activity-view"), "wallpaper.css mencakup .rd-activity-view");
+  assert.ok(wallpaperCss.includes(".rd-scroll-area"), "wallpaper.css mencakup .rd-scroll-area");
+  assert.ok(wallpaperCss.includes(".rd-consultant-view"), "wallpaper.css mencakup .rd-consultant-view");
+  assert.ok(wallpaperCss.includes(".task-hstrip"), "wallpaper.css mencakup .task-hstrip");
+
+  // 2. Larangan fallback hardcoded hex #101018 di drawer.css
+  assert.ok(!drawerCss.includes("#101018"), "drawer.css tidak boleh memuat hardcoded #101018");
+
+  // 3. Right drawer header selaras dengan token var(--bg-drawer)
+  assert.ok(
+    drawerCss.includes(".right-drawer-header") &&
+    drawerCss.includes("background: var(--bg-drawer)"),
+    "right-drawer-header menggunakan var(--bg-drawer)"
+  );
+
+  // 4. Light theme mencakup activity dan scroll area di var(--bg-drawer)
+  assert.ok(lightThemeCss.includes(".rd-activity-view"), "theme-light.css mencakup .rd-activity-view");
+  assert.ok(lightThemeCss.includes(".rd-scroll-area"), "theme-light.css mencakup .rd-scroll-area");
+  assert.ok(lightThemeCss.includes(".task-hstrip"), "theme-light.css mencakup .task-hstrip");
+});

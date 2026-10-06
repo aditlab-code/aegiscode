@@ -178,11 +178,128 @@ class RefreshSemanticIndexTool(_SemanticToolBase):
             }
 
 
+class HybridSearchTool(_SemanticToolBase):
+    """Pencarian kode hibrida menggabungkan Code Atlas (leksikal) dan sqlite-vec (vektor) via RRF (Phase 3)."""
+
+    name = "hybrid_search"
+    description = (
+        "Melakukan pencarian kode hibrida (hybrid retrieval) yang memadukan pencarian "
+        "leksikal eksak (Code Atlas) dan kemiripan semantik (VectorDB) menggunakan "
+        "algoritma Reciprocal Rank Fusion (RRF). Sangat presisi untuk menemukan definisi simbol, "
+        "fungsi, kelas, maupun konsep kode yang relevan secara bersamaan."
+    )
+    input_schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Nama simbol, class, function, method, atau konsep logika kode yang dicari.",
+            },
+            "k": {
+                "type": "integer",
+                "description": "Jumlah hasil paling relevan yang dikembalikan (1-30, default 10).",
+                "default": 10,
+            },
+            "kind": {
+                "type": "string",
+                "description": "Filter tipe simbol opsional: any | symbol | class | function | method | module | file (default: any).",
+            },
+            "path_prefix": {
+                "type": "string",
+                "description": "Filter awalan path berkas opsional untuk membatasi ruang pencarian.",
+            },
+            "lexical_weight": {
+                "type": "number",
+                "description": "Bobot prioritas pencarian leksikal Code Atlas (default: 1.0).",
+                "default": 1.0,
+            },
+            "semantic_weight": {
+                "type": "number",
+                "description": "Bobot prioritas pencarian semantik vektor (default: 1.0).",
+                "default": 1.0,
+            },
+        },
+        "required": ["query"],
+    }
+
+    def __init__(
+        self,
+        root: Optional[Any] = None,
+        service: Optional[Any] = None,
+        coordinator: Optional[Any] = None,
+        read_only: bool = False,
+    ) -> None:
+        super().__init__(root=root, service=service, read_only=read_only)
+        self._coordinator = coordinator
+
+    def _get_coordinator(self) -> Any:
+        if self._coordinator is not None:
+            return self._coordinator
+        from agent_ai.repointel.semantic.hybrid import HybridRetrievalCoordinator
+
+        self._coordinator = HybridRetrievalCoordinator(
+            root=self.root,
+            semantic_service=self._get_service(),
+            read_only=self.read_only,
+        )
+        return self._coordinator
+
+    def execute(self, **arguments: Any) -> Dict[str, Any]:
+        query = str(arguments.get("query") or "").strip()
+        if not query:
+            raise ToolValidationError("Argumen 'query' wajib diisi dan tidak boleh kosong.")
+
+        k_val = arguments.get("k", 10)
+        try:
+            k = max(1, min(int(k_val), 30))
+        except (ValueError, TypeError):
+            k = 10
+
+        kind = arguments.get("kind")
+        if kind is not None:
+            kind = str(kind).strip().lower()
+            if kind in ("", "any", "all", "*"):
+                kind = None
+
+        path_prefix = arguments.get("path_prefix")
+        if path_prefix:
+            path_prefix = str(path_prefix).strip()
+
+        try:
+            lexical_weight = float(arguments.get("lexical_weight", 1.0))
+        except (ValueError, TypeError):
+            lexical_weight = 1.0
+
+        try:
+            semantic_weight = float(arguments.get("semantic_weight", 1.0))
+        except (ValueError, TypeError):
+            semantic_weight = 1.0
+
+        self._require_root()
+        coordinator = self._get_coordinator()
+        try:
+            return coordinator.search(
+                query=query,
+                k=k,
+                kind=kind,
+                path_prefix=path_prefix,
+                lexical_weight=lexical_weight,
+                semantic_weight=semantic_weight,
+            )
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "results": [],
+            }
+
+
 def build_semantic_tools(
     root: Optional[Any] = None,
     service: Optional[SemanticIndexService] = None,
     include_refresh: bool = False,
     read_only: bool = False,
+    include_hybrid: bool = False,
 ) -> List[BaseTool]:
     """Bangun daftar capability pencarian semantik (satu sumber konstruksi tool).
 
@@ -192,13 +309,27 @@ def build_semantic_tools(
     tools: List[BaseTool] = [
         SemanticSearchTool(root=root, service=service, read_only=read_only),
     ]
+    if include_hybrid:
+        tools.append(HybridSearchTool(root=root, service=service, read_only=read_only))
     if include_refresh and not read_only:
         tools.append(RefreshSemanticIndexTool(root=root, service=service, read_only=False))
     return tools
 
 
+def build_hybrid_tools(
+    root: Optional[Any] = None,
+    service: Optional[Any] = None,
+    read_only: bool = False,
+) -> List[BaseTool]:
+    """Bangun capability pencarian kode hybrid."""
+    return [HybridSearchTool(root=root, service=service, read_only=read_only)]
+
+
 __all__ = [
     "SemanticSearchTool",
     "RefreshSemanticIndexTool",
+    "HybridSearchTool",
     "build_semantic_tools",
+    "build_hybrid_tools",
 ]
+

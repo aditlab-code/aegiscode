@@ -1,9 +1,11 @@
-# Dependency runtime AETHER.
+# Dependency runtime AegisCode.
 # Sumber kebenaran dependency juga ada di pyproject.toml ([project].dependencies).
 # File ini disediakan untuk instalasi cepat: pip install -r requirements.txt
 
 # Interface layer (Django Gateway, web/django_app)
 Django>=4.2,<5.1
+channels>=4.0.0
+daphne>=4.0.0
 PyJWT>=2.8.0
 google-auth>=2.20.0
 

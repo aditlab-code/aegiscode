@@ -30,8 +30,6 @@
   --accent-dim: #1e4080;
   --accent-soft: rgba(41, 89, 170, 0.16);
   --accent-muted:#2959aa;
-  --dioptase-green: #2959aa;
-  --dioptase-bright:#3d59a1;
 
   /* Accent 2: Tokyo Night Violet / Magenta */
   --accent-2:     #7c3aed; /* Violet / Magenta */
@@ -64,6 +62,7 @@
 }
 
 /* Badges & Slider Tracks */
+[data-theme="light"] .app-badge,
 [data-theme="light"] .aether-badge,
 [data-theme="light"] .seg-badge,
 [data-theme="light"] .badge-n,
@@ -283,10 +282,13 @@
 }
 
 [data-theme="light"] .rd-tab-btn.active {
-  background: var(--bg-drawer);
+  background: var(--bg-elev);
   color: var(--text);
 }
 
+[data-theme="light"] .right-drawer-body,
+[data-theme="light"] .rd-activity-view,
+[data-theme="light"] .rd-scroll-area,
 [data-theme="light"] .rd-consultant-view,
 [data-theme="light"] .consultant-wrapper.consultant-embedded,
 [data-theme="light"] .consultant-content-pane.consultant-embedded-pane,
@@ -294,6 +296,11 @@
 [data-theme="light"] .consultant-embedded-pane .consultant-chat,
 [data-theme="light"] .consultant-embedded-pane .consultant-messages {
   background: var(--bg-drawer);
+}
+
+[data-theme="light"] .task-hstrip {
+  background: transparent;
+  border-bottom-color: var(--border-soft);
 }
 
 [data-theme="light"] .rd-close-btn {

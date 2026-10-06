@@ -18,6 +18,7 @@ import {
 import { validateCodeSyntax } from "../services/diagnosticService.js";
 import {
   getOrCreateModel,
+  getEntry,
   releaseModel,
   markSaved,
   isShared,
@@ -102,33 +103,51 @@ function detachModelSubscriptions() {
   }
 }
 
+let loadSeq = 0;
+const acquiredPaths = new Set();
+
+function releasePath(path) {
+  if (path && acquiredPaths.has(path)) {
+    acquiredPaths.delete(path);
+  }
+}
+
 async function switchToFile(targetPath, previousPath = "") {
   if (!targetPath) return;
+  const thisLoadId = ++loadSeq;
   loading.value = true;
   loadError.value = "";
   saveError.value = "";
 
   try {
     const mod = await loadMonacoModule();
-    if (disposed || !container.value) return;
+    if (disposed || !container.value || thisLoadId !== loadSeq) return;
     monaco = mod.getMonaco();
 
     detachModelSubscriptions();
-    const oldP = previousPath || currentPath.value;
-    if (oldP && oldP !== targetPath) {
-      releaseModel(oldP);
+
+    let entry = getEntry(targetPath);
+    if (!acquiredPaths.has(targetPath)) {
+      if (!entry) {
+        const data = await readFileContent(targetPath);
+        if (disposed || !container.value || thisLoadId !== loadSeq) return;
+        const text = typeof data?.content === "string" ? data.content : "";
+        const lang = languageForFile(props.name || targetPath);
+        entry = getOrCreateModel(monaco, targetPath, text, lang);
+      } else {
+        entry = getOrCreateModel(monaco, targetPath);
+      }
+      acquiredPaths.add(targetPath);
     }
 
-    const data = await readFileContent(targetPath);
-    const text = typeof data?.content === "string" ? data.content : "";
-    const lang = languageForFile(props.name || targetPath);
+    if (disposed || !container.value || thisLoadId !== loadSeq) return;
+    if (!entry) return;
 
-    const entry = getOrCreateModel(monaco, targetPath, text, lang);
     model = entry.model;
     savedVersionId = entry.savedVersionId;
     currentPath.value = targetPath;
 
-    if (editor) {
+    if (editor && model) {
       editor.setModel(model);
     }
 
@@ -261,18 +280,23 @@ watch(
 // --- Save --------------------------------------------------------------------
 async function save() {
   if (!editor || saving.value || !props.path) return false;
-  const value = editor.getValue();
+  const targetPath = props.path;
+  const targetModel = model;
+  if (!targetModel) return false;
+
+  const value = targetModel.getValue ? targetModel.getValue() : editor.getValue();
   saving.value = true;
   saveError.value = "";
   try {
-    await writeFileContent(props.path, value);
-    if (editor.getValue() === value && model) {
-      savedVersionId = model.getAlternativeVersionId();
-      markSaved(props.path, savedVersionId);
+    await writeFileContent(targetPath, value);
+    if (targetModel) {
+      const newVersionId = targetModel.getAlternativeVersionId ? targetModel.getAlternativeVersionId() : 1;
+      savedVersionId = newVersionId;
+      markSaved(targetPath, newVersionId);
       dirty.value = false;
-      emit("dirty-change", { path: props.path, dirty: false });
+      emit("dirty-change", { path: targetPath, dirty: false });
     }
-    emit("saved", { path: props.path });
+    emit("saved", { path: targetPath });
     return true;
   } catch (e) {
     saveError.value = e.message || "Gagal menyimpan file.";
@@ -346,10 +370,11 @@ onMounted(() => {
 onBeforeUnmount(() => {
   disposed = true;
   detachModelSubscriptions();
-  if (currentPath.value) {
-    releaseModel(currentPath.value);
-    currentPath.value = "";
-  }
+  acquiredPaths.forEach((p) => {
+    releaseModel(p);
+  });
+  acquiredPaths.clear();
+  currentPath.value = "";
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -394,6 +419,7 @@ defineExpose({
   revealPosition,
   reload: () => switchToFile(props.path),
   switchToFile,
+  releasePath,
 });
 </script>
 

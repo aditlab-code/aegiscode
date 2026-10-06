@@ -72,12 +72,21 @@ class ProjectBrain:
         root: Any,
         provider: Optional[BaseProvider] = None,
         options: Optional[GenerateOptions] = None,
+        use_brain: Optional[bool] = None,
     ) -> "ProjectBrain":
         """Bangun Brain yang membaca/menulis Bible project-local di `root`.
 
-        Knowledge disimpan di `<root>/.aegis/bible/` (AI Project Bible).
+        Knowledge disimpan di `<root>/.brain/` (Antigravity mode) atau
+        `<root>/.aegis/bible/` (Aegis default).
         """
-        return cls(ProjectIntelligence.for_project(root), provider=provider, options=options)
+        is_antigravity = False
+        if provider is not None:
+            p_name = getattr(provider, "name", "")
+            if p_name == "antigravity":
+                is_antigravity = True
+        active_use_brain = use_brain if use_brain is not None else is_antigravity
+        intel = ProjectIntelligence.for_project(root, use_brain=active_use_brain)
+        return cls(intel, provider=provider, options=options)
     # ------------------------------------------------------------------ #
     # Read
     # ------------------------------------------------------------------ #

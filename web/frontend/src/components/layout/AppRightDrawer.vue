@@ -130,6 +130,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  mode: {
+    type: String,
+    default: "balanced",
+  },
 });
 
 const emit = defineEmits([
@@ -146,6 +150,7 @@ const emit = defineEmits([
   "apply-to-editor",
   "update:provider-instance-id",
   "update:model-id",
+  "update:mode",
   "update:active-session-id",
 ]);
 
@@ -160,6 +165,27 @@ const modelOptions = computed(() => {
   const inst = providerOptions.value.find((p) => p.id === props.providerInstanceId);
   return inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
 });
+
+watch(
+  () => [props.providers, props.providerInstanceId],
+  () => {
+    const en = (props.providers || []).filter((p) => p.enabled !== false);
+    if (!en.length) return;
+    if (!props.providerInstanceId || !en.some((p) => p.id === props.providerInstanceId)) {
+      const first = en.find((p) => (p.models || []).some((m) => m.enabled !== false)) || en[0];
+      emit("update:provider-instance-id", first.id);
+      const ms = (first.models || []).filter((m) => m.enabled !== false);
+      if (ms.length > 0) emit("update:model-id", ms[0].id);
+    } else {
+      const inst = en.find((p) => p.id === props.providerInstanceId);
+      const ms = inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
+      if (ms.length > 0 && (!props.modelId || !ms.some((m) => m.id === props.modelId))) {
+        emit("update:model-id", ms[0].id);
+      }
+    }
+  },
+  { immediate: true }
+);
 
 function handleProviderChange(e) {
   const nextId = String(e.target.value || "");
@@ -554,33 +580,49 @@ const statusIconPath = computed(() => {
             ></textarea>
           </div>
           <div class="chat-card-actions">
-            <button
-              v-if="isRunning"
-              type="button"
-              class="chat-stop-btn"
-              title="Stop running task"
-              :disabled="stopInProgress"
-              @click="emit('request-stop')"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <rect x="6" y="6" width="12" height="12" rx="2" />
-              </svg>
-              <span>Stop</span>
-            </button>
-            <button
-              type="button"
-              class="chat-send-btn"
-              :disabled="isRunning || !promptText.trim()"
-              title="Send prompt to AegisCode (Enter)"
-              aria-label="Send Task"
-              @click="handleSubmit"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-              <span>Send</span>
-            </button>
+            <div class="chat-card-actions-left">
+              <select
+                :value="mode"
+                class="agent-mode-select consultant-mode-select"
+                title="Execution Policy Mode: Fast, Balanced, or Deep"
+                aria-label="Execution Policy Mode"
+                :disabled="isRunning"
+                @change="emit('update:mode', $event.target.value)"
+              >
+                <option value="fast">Fast</option>
+                <option value="balanced">Balanced</option>
+                <option value="deep">Deep</option>
+              </select>
+            </div>
+            <div class="chat-card-actions-right">
+              <button
+                v-if="isRunning"
+                type="button"
+                class="chat-stop-btn"
+                title="Stop running task"
+                :disabled="stopInProgress"
+                @click="emit('request-stop')"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+                <span>Stop</span>
+              </button>
+              <button
+                type="button"
+                class="chat-send-btn"
+                :disabled="isRunning || !promptText.trim()"
+                title="Send prompt to AegisCode (Enter)"
+                aria-label="Send Task"
+                @click="handleSubmit"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+                <span>Send</span>
+              </button>
+            </div>
           </div>
           <div v-if="error" class="wb-error">{{ error }}</div>
         </div>
@@ -614,7 +656,7 @@ const statusIconPath = computed(() => {
   gap: 7px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-card);
+  background: transparent;
   min-height: 36px;
   cursor: default;
   overflow: hidden;
@@ -852,9 +894,18 @@ const statusIconPath = computed(() => {
 .chat-card-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 6px;
   padding: 4px 10px 8px;
+}
+.chat-card-actions-left,
+.chat-card-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-card-actions-right {
+  margin-left: auto;
 }
 .chat-stop-btn {
   display: inline-flex;

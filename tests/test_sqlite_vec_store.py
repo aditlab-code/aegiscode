@@ -146,26 +146,18 @@ def test_bruteforce_vector_store_crud():
         assert store.count() == 0
 
 
-def test_resolve_vectors_db_fallback():
+def test_resolve_vectors_db_pure_aegis():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td).resolve()
 
-        # 1. Kasus awal: keduanya belum ada -> .aegis/vectors.db
+        # Pure Aegis: selalu mengarah ke .aegis/vectors.db tanpa fallback .aether
         resolved = resolve_vectors_db(root)
         assert resolved == root / ".aegis" / "vectors.db"
 
-
-        # 2. Hanya .aether/vectors.db yang ada -> fallback ke .aether
+        # Bahkan jika ada .aether lama, tetap murni .aegis/vectors.db
         aether_dir = root / ".aether"
         aether_dir.mkdir()
         (aether_dir / "vectors.db").write_text("dummy")
-        resolved = resolve_vectors_db(root)
-        assert resolved == root / ".aether" / "vectors.db"
-
-        # 3. .aegis/vectors.db dibuat -> .aegis menjadi prioritas primer
-        aegis_dir = root / ".aegis"
-        aegis_dir.mkdir()
-        (aegis_dir / "vectors.db").write_text("dummy_primary")
         resolved = resolve_vectors_db(root)
         assert resolved == root / ".aegis" / "vectors.db"
 

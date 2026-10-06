@@ -106,6 +106,16 @@ urlpatterns = [
         views.project_git_discard,
         name="project_git_discard",
     ),
+    path(
+        "projects/<str:project_id>/git/init",
+        views.project_git_init,
+        name="project_git_init",
+    ),
+    path(
+        "projects/<str:project_id>/git/deinit",
+        views.project_git_deinit,
+        name="project_git_deinit",
+    ),
     # Project Policy / Permission (PROJECT-LOCAL). Mendahului
     # "projects/<str:project_id>" agar sub-path literal tidak di-shadow.
     path(
@@ -120,6 +130,7 @@ urlpatterns = [
     path("delete-entry", views.delete_entry, name="delete_entry"),
     path("files", views.files, name="files"),
     path("files/content", views.file_content, name="file_content"),
+    path("files/rename", views.rename_entry, name="rename_entry"),
     path("tasks", views.tasks, name="tasks"),
     # Approval (ASK) — keputusan user untuk action yang ditahan policy.
     # Literal route \"tasks/approvals\" HARUS mendahului \"tasks/<str:task_id>\"

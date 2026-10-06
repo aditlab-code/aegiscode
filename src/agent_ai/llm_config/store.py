@@ -52,12 +52,16 @@ _SCHEMA_STATEMENTS = (
     """,
     """
     CREATE TABLE IF NOT EXISTS llm_models (
-        id          TEXT PRIMARY KEY,
-        provider_id TEXT NOT NULL,
-        model_name  TEXT NOT NULL,
-        enabled     INTEGER NOT NULL DEFAULT 1,
-        created_at  TEXT NOT NULL,
-        updated_at  TEXT NOT NULL,
+        id                TEXT PRIMARY KEY,
+        provider_id       TEXT NOT NULL,
+        model_name        TEXT NOT NULL,
+        enabled           INTEGER NOT NULL DEFAULT 1,
+        context_window    INTEGER NOT NULL DEFAULT 128000,
+        supports_thinking INTEGER NOT NULL DEFAULT 0,
+        reasoning_budget  INTEGER,
+        timeout           INTEGER NOT NULL DEFAULT 60,
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL,
         FOREIGN KEY (provider_id)
             REFERENCES llm_provider_instances (id) ON DELETE CASCADE,
         UNIQUE (provider_id, model_name)
@@ -105,11 +109,25 @@ class LLMConfigStore:
         finally:
             conn.close()
 
+    def _migrate_schema(self, conn: sqlite3.Connection) -> None:
+        """Migrasi skema database llm_models bila kolom baru belum ada."""
+        cursor = conn.execute("PRAGMA table_info(llm_models)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "context_window" not in columns:
+            conn.execute("ALTER TABLE llm_models ADD COLUMN context_window INTEGER NOT NULL DEFAULT 128000")
+        if "supports_thinking" not in columns:
+            conn.execute("ALTER TABLE llm_models ADD COLUMN supports_thinking INTEGER NOT NULL DEFAULT 0")
+        if "reasoning_budget" not in columns:
+            conn.execute("ALTER TABLE llm_models ADD COLUMN reasoning_budget INTEGER")
+        if "timeout" not in columns:
+            conn.execute("ALTER TABLE llm_models ADD COLUMN timeout INTEGER NOT NULL DEFAULT 60")
+
     def _init_schema(self) -> None:
-        """Buat tabel/index bila belum ada (idempotent)."""
+        """Buat tabel/index bila belum ada (idempotent) dan jalankan migrasi."""
         with self._lock, self._connection() as conn:
             for statement in _SCHEMA_STATEMENTS:
                 conn.execute(statement)
+            self._migrate_schema(conn)
 
     # ------------------------------------------------------------------ #
     # Provider instance
@@ -215,25 +233,37 @@ class LLMConfigStore:
         provider_id: str,
         model_name: str,
         enabled: bool = True,
+        context_window: int = 128000,
+        supports_thinking: bool = False,
+        reasoning_budget: Optional[int] = None,
+        timeout: int = 60,
     ) -> ModelConfig:
         """Simpan model baru untuk sebuah provider instance."""
         model = ModelConfig(
             provider_id=provider_id,
             model_name=model_name,
             enabled=enabled,
+            context_window=context_window,
+            supports_thinking=supports_thinking,
+            reasoning_budget=reasoning_budget,
+            timeout=timeout,
         )
         with self._lock, self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO llm_models
-                    (id, provider_id, model_name, enabled, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (id, provider_id, model_name, enabled, context_window, supports_thinking, reasoning_budget, timeout, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     model.id,
                     model.provider_id,
                     model.model_name,
                     1 if model.enabled else 0,
+                    model.context_window,
+                    1 if model.supports_thinking else 0,
+                    model.reasoning_budget,
+                    model.timeout,
                     model.created_at,
                     model.updated_at,
                 ),
@@ -285,7 +315,7 @@ class LLMConfigStore:
         fields["updated_at"] = _now_iso()
         assignments = ", ".join(f"{key} = ?" for key in fields)
         values = [
-            int(value) if (key == "enabled" and isinstance(value, bool)) else value
+            int(value) if isinstance(value, bool) else value
             for key, value in fields.items()
         ]
         with self._lock, self._connection() as conn:

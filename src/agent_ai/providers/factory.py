@@ -140,7 +140,16 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
     model = _clean(config.get("model"))
     timeout = config.get("timeout")
     context_window = config.get("context_window")
+    supports_thinking = bool(config.get("supports_thinking", False))
+    reasoning_budget = config.get("reasoning_budget")
+    if reasoning_budget is not None:
+        try:
+            reasoning_budget = int(reasoning_budget)
+        except (ValueError, TypeError):
+            reasoning_budget = None
     instance_name = _clean(config.get("instance_name")) or provider_type
+
+    provider: Optional[BaseProvider] = None
 
     if provider_type == "ollama":
         from agent_ai.config.settings import OllamaConfig
@@ -164,13 +173,13 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
         }
         if timeout:
             kwargs["timeout"] = int(timeout)
-        return OllamaProvider(config=OllamaConfig(**kwargs))
+        provider = OllamaProvider(config=OllamaConfig(**kwargs))
 
     # Provider GENERIK: endpoint OpenAI-compatible apa pun (Gerry/Bariska/9Router/
     # server lokal). Base URL & model bebas; API key opsional. Nilai api_key dan
     # model SELALU di-set eksplisit (walau kosong) agar TIDAK ada fallback diam-
     # diam ke default/env provider lain.
-    if provider_type == "custom":
+    elif provider_type == "custom":
         if not api_url:
             raise ProviderNotConfiguredError(
                 f"Provider instance '{instance_name}' (custom) belum memiliki "
@@ -194,9 +203,8 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
         # Bila instance tidak punya model eksplisit, provider generik boleh
         # menemukan model ID valid lewat `GET {base_url}/models`.
         provider.supports_model_discovery = _supports_model_discovery(provider_type)
-        return provider
 
-    if provider_type in _OPENAI_COMPATIBLE_TYPES:
+    elif provider_type in _OPENAI_COMPATIBLE_TYPES:
         if _requires_api_key(provider_type) and not api_key:
             raise ProviderNotConfiguredError(
                 f"Provider instance '{instance_name}' ({provider_type}) belum "
@@ -229,9 +237,8 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
         provider.send_model_field = _needs_model_field(provider_type)
         # Discovery model hanya untuk provider yang mendukungnya (katalog).
         provider.supports_model_discovery = _supports_model_discovery(provider_type)
-        return provider
 
-    if provider_type == "antigravity":
+    elif provider_type == "antigravity":
         from agent_ai.config.settings import AntigravityConfig
         from agent_ai.providers.antigravity import AntigravityProvider
 
@@ -246,7 +253,17 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
             ag_kwargs["timeout"] = int(timeout)
         if context_window:
             ag_kwargs["context_window"] = int(context_window)
-        return AntigravityProvider(config=AntigravityConfig(**ag_kwargs))
+        provider = AntigravityProvider(config=AntigravityConfig(**ag_kwargs))
+
+    if provider is not None:
+        provider.supports_thinking = supports_thinking
+        provider.reasoning_budget = reasoning_budget
+        if context_window:
+            try:
+                provider.context_window = int(context_window)
+            except (ValueError, TypeError):
+                pass
+        return provider
 
     raise ProviderNotConfiguredError(
         f"Provider type '{provider_type or '(kosong)'}' tidak dikenal. "

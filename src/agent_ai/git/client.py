@@ -40,8 +40,15 @@ class GitClient(ABC):
     """Interface operasi Git read-only."""
 
     @abstractmethod
-    def is_repository(self, path: Path) -> bool:
-        """True bila `path` berada di dalam repository Git."""
+    def is_repository(self, path: Path, strict_root: bool = True) -> bool:
+        """True bila `path` berada di dalam repository Git.
+        Bila strict_root=True, wajib memiliki root repository tepat di path.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def init(self, path: Path) -> bool:
+        """Inisialisasi repository Git baru di `path`."""
         raise NotImplementedError
 
     @abstractmethod
@@ -168,12 +175,25 @@ class SubprocessGitClient(GitClient):
     # ------------------------------------------------------------------ #
     # Interface
     # ------------------------------------------------------------------ #
-    def is_repository(self, path: Path) -> bool:
+    def is_repository(self, path: Path, strict_root: bool = True) -> bool:
+        p = Path(path).resolve()
+        if strict_root:
+            dot_git = p / ".git"
+            if not dot_git.exists():
+                return False
+            root = self.repo_root(p)
+            return root is not None and root == p
+
         try:
-            out = self._run(["rev-parse", "--is-inside-work-tree"], path)
+            out = self._run(["rev-parse", "--is-inside-work-tree"], p)
         except GitError:
             return False
         return out.strip() == "true"
+
+    def init(self, path: Path) -> bool:
+        p = Path(path).resolve()
+        self._run(["init"], p)
+        return True
 
     def repo_root(self, path: Path) -> Optional[Path]:
         try:

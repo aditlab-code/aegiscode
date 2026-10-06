@@ -41,8 +41,8 @@ FIXTURE = DUMMY_ROOT / "sidebar_iso"
 
 
 def _write_task_log(root: Path, task_id: str, prompt: str, ts: str) -> None:
-    """Tulis minimal task log JSONL di <root>/.aether/log/<task_id>.log."""
-    log_dir = root / ".aether" / "log"
+    """Tulis minimal task log JSONL di <root>/.aegis/log/<task_id>.log."""
+    log_dir = root / ".aegis" / "log"
     log_dir.mkdir(parents=True, exist_ok=True)
     events = [
         {"timestamp": ts, "event": "task_requested", "data": {"prompt": prompt}},

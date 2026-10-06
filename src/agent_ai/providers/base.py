@@ -396,7 +396,7 @@ class GenerateResult:
     model: str = ""
     provider: str = ""
     raw: Dict[str, Any] = field(default_factory=dict)
-
+    reasoning: Optional[str] = None
 
 class BaseProvider(ABC):
     """Abstract base class untuk semua provider AI.
@@ -413,6 +413,11 @@ class BaseProvider(ABC):
     #: True bila provider membutuhkan model untuk beroperasi.
     #: Provider seperti 9Router yang menentukan model sendiri dapat set ini ke False.
     requires_model: bool = True
+
+    #: Kapabilitas LLM (PR-07 / AEG-16)
+    context_window: int = 128000
+    supports_thinking: bool = False
+    reasoning_budget: Optional[int] = None
 
     @abstractmethod
     def generate(

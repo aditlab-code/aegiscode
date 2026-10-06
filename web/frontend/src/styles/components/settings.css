@@ -399,10 +399,12 @@
   text-align: right;
 }
 
+.app-table thead th.th-actions:not([style*="width"]),
 .aether-table thead th.th-actions:not([style*="width"]) {
   width: 96px;
 }
 
+.app-table tbody td.td-actions,
 .aether-table tbody td.td-actions {
   text-align: right;
   white-space: nowrap;
@@ -416,11 +418,13 @@
   justify-content: flex-end;
 }
 
+.app-table,
 .aether-table {
   width: 100%;
   border-collapse: collapse;
 }
 
+.app-table thead th,
 .aether-table thead th {
   text-align: left;
   font-size: 10.5px;
@@ -433,24 +437,29 @@
   background: rgba(255, 255, 255, 0.012);
 }
 
+.app-table tbody td,
 .aether-table tbody td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border-soft);
   vertical-align: middle;
 }
 
+.app-table tbody tr:last-child td,
 .aether-table tbody tr:last-child td {
   border-bottom: none;
 }
 
+.app-table tbody tr,
 .aether-table tbody tr {
   transition: background 0.12s ease;
 }
 
+.app-table tbody tr:hover,
 .aether-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.018);
 }
 
+.app-table tbody tr.clickable,
 .aether-table tbody tr.clickable {
   cursor: pointer;
 }

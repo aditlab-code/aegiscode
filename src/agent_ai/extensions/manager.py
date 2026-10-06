@@ -197,6 +197,9 @@ class ExtensionManager:
         self.project_root = Path(project_root) if project_root is not None and str(project_root).strip() else None
         self._event_sink = event_sink
 
+    @property
+    def capabilities(self) -> CapabilityRegistry:
+        return self.capability_registry
     def _resolve_extensions_dir(self) -> Path:
         return self._extensions_dir
 
