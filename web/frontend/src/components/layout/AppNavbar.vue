@@ -1,8 +1,4 @@
 <script setup>
-import { computed } from "vue";
-import {
-  getProjectDisplayName,
-} from "../../services/projectService.js";
 
 const props = defineProps({
   project: {
@@ -34,6 +30,18 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  sidebarVisible: {
+    type: Boolean,
+    default: true,
+  },
+  bottomDockVisible: {
+    type: Boolean,
+    default: false,
+  },
+  isDark: {
+    type: Boolean,
+    default: true,
+  },
   user: {
     type: Object,
     default: null,
@@ -44,65 +52,76 @@ const emit = defineEmits([
   "open-explorer",
   "open-command-palette",
   "toggle-assistant",
+  "toggle-sidebar",
+  "toggle-terminal",
+  "toggle-theme",
   "logout",
 ]);
 
-const projectName = computed(() => (props.project ? getProjectDisplayName(props.project) : "AegisCode Studio"));
 </script>
 
 <template>
   <header class="app-navbar" aria-label="Top Navigation">
-    <!-- Left: Brand -->
-    <div class="nav-left">
-      <div class="nav-brand">
-        <span class="brand-badge" aria-label="AegisCode Studio (AE)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m4.5 8.5-3 3.5 3 3.5" />
-            <path d="m19.5 8.5 3 3.5-3 3.5" />
-            <path d="M12 3c.4 3.8 2.2 5.6 6 6-3.8.4-5.6 2.2-6 6-.4-3.8-2.2-5.6-6-6 3.8-.4 5.6-2.2 6-6Z" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-          </svg>
-        </span>
-        <span v-if="tier !== 'mobile'" class="brand-text">AegisCode</span>
-      </div>
+    <!-- macOS / UI Kit Traffic lights -->
+    <div class="nav-traffic-lights" aria-hidden="true">
+      <span class="traffic-light light-close" title="Close"></span>
+      <span class="traffic-light light-minimize" title="Minimize"></span>
+      <span class="traffic-light light-maximize" title="Maximize"></span>
     </div>
 
-    <!-- Center: Command Palette Quick Open Trigger -->
+    <!-- Left: Aegis Brand -->
+    <div class="nav-left">
+      <button
+        type="button"
+        class="nav-project-btn"
+        title="Open explorer"
+        @click="emit('open-explorer')"
+      >
+        <div class="brand-badge-icon" aria-hidden="true">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <span class="brand-title">AEGIS</span>
+      </button>
+    </div>
+
+    <!-- Center: Command Search ⌘K -->
     <div class="nav-center">
       <button
         type="button"
         class="nav-cmd-btn"
-        title="Command Palette (Cmd+K / Ctrl+K)"
+        title="Search files, commands, and more (Cmd+K / Ctrl+K)"
         aria-label="Open Command Palette"
         @click="emit('open-command-palette')"
       >
-        <div class="nav-cmd-left">
-          <svg
-            class="cmd-ico"
-            width="13"
-            height="13"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <span v-if="tier !== 'mobile'" class="cmd-text">Quick Open</span>
-        </div>
-        <kbd v-if="tier === 'desktop'" class="cmd-shortcut">⌘K</kbd>
+        <svg
+          class="cmd-ico"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <span class="cmd-text">Search files, commands, and more</span>
+        <kbd class="cmd-shortcut">⌘ K</kbd>
       </button>
     </div>
 
-    <!-- Right: Status Chips & Actions -->
+    <!-- Right: Status, Profile, Theme & Panel Toggles -->
     <div class="nav-right">
-      <!-- Changes Count Chip (Desktop and Compact only when > 0; hidden on Mobile) -->
+      <!-- Changes Count Chip -->
       <div
-        v-if="tier !== 'mobile' && changesCount > 0"
+        v-if="changesCount > 0"
         class="chip changes-chip"
         title="Pending changes count"
       >
@@ -110,8 +129,7 @@ const projectName = computed(() => (props.project ? getProjectDisplayName(props.
         <span class="chip-val mono">{{ changesCount }}</span>
       </div>
 
-
-      <!-- Background AI Running Indicator (Pulsing badge when drawer closed) -->
+      <!-- Background AI Running Indicator -->
       <button
         v-if="isRunning && !assistantVisible"
         type="button"
@@ -124,7 +142,7 @@ const projectName = computed(() => (props.project ? getProjectDisplayName(props.
         <span class="pill-label">AI Working…</span>
       </button>
 
-      <!-- User Profile / Antigravity Identity Chip -->
+      <!-- User Profile Chip -->
       <div
         v-if="user"
         class="nav-user-chip"
@@ -140,7 +158,7 @@ const projectName = computed(() => (props.project ? getProjectDisplayName(props.
         <div v-else class="user-avatar-fallback">
           {{ (user.name || user.email || "U").charAt(0).toUpperCase() }}
         </div>
-        <span v-if="tier !== 'mobile'" class="user-name-text">
+        <span v-if="tier === 'desktop'" class="user-name-text">
           {{ user.name || user.email }}
         </span>
         <button
@@ -150,7 +168,7 @@ const projectName = computed(() => (props.project ? getProjectDisplayName(props.
           aria-label="Sign out"
           @click="emit('logout')"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
             <polyline points="16 17 21 12 16 7"></polyline>
             <line x1="21" y1="12" x2="9" y2="12"></line>
@@ -158,27 +176,74 @@ const projectName = computed(() => (props.project ? getProjectDisplayName(props.
         </button>
       </div>
 
-      <!-- Assistant Toggle Button -->
+      <!-- Theme Toggle Button -->
       <button
         type="button"
-        class="nav-assistant-btn"
-        :class="{ 'is-running': isRunning, 'drawer-closed': !assistantVisible }"
-        :title="isRunning && !assistantVisible ? 'AI Assistant (Running in background)' : 'Toggle AI Assistant (Cmd+J)'"
-        aria-label="Toggle Assistant"
+        class="icon-action-btn"
+        :title="isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'"
+        aria-label="Toggle theme"
+        @click="emit('toggle-theme')"
+      >
+        <svg v-if="isDark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg v-else width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+
+      <span class="nav-v-sep" aria-hidden="true"></span>
+
+      <!-- Panel Left Toggle (Sidebar) -->
+      <button
+        type="button"
+        class="icon-action-btn"
+        :class="{ 'is-active': sidebarVisible }"
+        title="Toggle Explorer Sidebar (Cmd+B)"
+        aria-label="Toggle explorer"
+        @click="emit('toggle-sidebar')"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+      </button>
+
+      <!-- Panel Bottom Toggle (Terminal Dock) -->
+      <button
+        type="button"
+        class="icon-action-btn"
+        :class="{ 'is-active': bottomDockVisible }"
+        title="Toggle Terminal Dock (Ctrl+`)"
+        aria-label="Toggle terminal"
+        @click="emit('toggle-terminal')"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="3" y1="15" x2="21" y2="15"></line>
+        </svg>
+      </button>
+
+      <!-- Panel Right Toggle (Assistant Drawer) -->
+      <button
+        type="button"
+        class="icon-action-btn"
+        :class="{ 'is-active': assistantVisible, 'is-running': isRunning }"
+        title="Toggle Aegis Assistant (Cmd+J)"
+        aria-label="Toggle assistant"
         @click="emit('toggle-assistant')"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="15" y1="3" x2="15" y2="21"></line>
         </svg>
       </button>
     </div>

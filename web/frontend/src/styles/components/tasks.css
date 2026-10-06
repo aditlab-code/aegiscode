@@ -3,10 +3,11 @@
 
 /* Task Card */
 .task-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-panel);
-  padding: 16px 18px;
+  border: 1px solid var(--edge, var(--border));
+  border-radius: 8px;
+  background: var(--panel, var(--bg-panel));
+  padding: 14px 16px;
+  box-shadow: none;
 }
 
 .task-top {

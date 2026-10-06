@@ -404,23 +404,6 @@ class ConsultantService:
                 session._on_change = persist_cb
                 self._sessions[(pid, sid)] = session
 
-    def _load_sessions_from_store(self) -> None:
-        """Muat sesi dari persistent store ke cache in-memory (saat init)."""
-        try:
-            metas = self._store.list_sessions()
-        except Exception:  # noqa: BLE001 - store tidak boleh menggagalkan startup
-            return
-        for meta in metas:
-            sid = meta.get("session_id")
-            pid = meta.get("project_id") or ""
-            if not sid:
-                continue
-            if (pid, sid) in self._sessions:
-                continue
-            data = self._store.get_session(sid, project_id=pid if pid else None)
-            if data:
-                self._sessions[(pid, sid)] = ConsultantSession.from_dict(data)
-
     def create_session(
         self, project_id: Optional[str] = None, title: Optional[str] = None
     ) -> Dict[str, Any]:

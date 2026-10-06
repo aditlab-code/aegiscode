@@ -25,6 +25,7 @@ from agent_ai.providers.base import (
     ToolChoice,
     ToolDefinition,
     build_provider_api_error,
+    filter_provider_extra,
     from_provider_safe_tool_name,
     to_provider_safe_tool_name,
 )
@@ -270,7 +271,7 @@ class OpenAICompatibleProvider(BaseProvider):
             if tool_choice is not None:
                 payload["tool_choice"] = self._to_openai_tool_choice(tool_choice)
 
-        payload.update(opts.extra or {})
+        payload.update(filter_provider_extra(opts.extra))
         return payload
 
     # ------------------------------------------------------------------ #

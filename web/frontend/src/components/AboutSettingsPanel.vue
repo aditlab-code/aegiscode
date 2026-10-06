@@ -86,7 +86,7 @@ async function copyLicense() {
                   <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2v2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2v1a4 4 0 0 0 8 0v-1h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2v-2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/>
                 </svg>
               </div>
-              <div class="card-head">Hybrid 5-Stage CoT Protocol</div>
+              <div class="about-card-title">Hybrid 5-Stage CoT Protocol</div>
               <div class="card-text">
                 Enforces systematic reasoning: Intent Assessment &rarr; Architectural Analysis (YAGNI Check) &rarr; Step Action Planning &rarr; Execution Reflection Loop &rarr; Independent Verification.
               </div>
@@ -100,7 +100,7 @@ async function copyLicense() {
                   <line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
               </div>
-              <div class="card-head">Hybrid Asymmetric Split-Brain</div>
+              <div class="about-card-title">Hybrid Asymmetric Split-Brain</div>
               <div class="card-text">
                 Decouples cloud LLM reasoning with a strict context budget (&lt; 4,000 tokens) from deterministic local execution (AST parsing, PTY terminal, and FileWriteLock).
               </div>
@@ -112,7 +112,7 @@ async function copyLicense() {
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                 </svg>
               </div>
-              <div class="card-head">Dual-Stack Verification</div>
+              <div class="about-card-title">Dual-Stack Verification</div>
               <div class="card-text">
                 Guarantees zero regressions across both Python backend (Pytest / Django REST API) and modern frontend (Vite / Vue 3 / Monaco Editor / Vitest).
               </div>
@@ -125,7 +125,7 @@ async function copyLicense() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </div>
-              <div class="card-head">Strict Security &amp; Policy</div>
+              <div class="about-card-title">Strict Security &amp; Policy</div>
               <div class="card-text">
                 Read-before-write invariant, workspace sandbox boundaries, environment variable secret masking, and real-time state synchronization via RTK Protocol.
               </div>
@@ -352,28 +352,44 @@ Aegis Agent (Hands) — Local Worker:
 }
 
 .about-card {
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
+  padding: 14px 16px !important;
+  border-radius: 8px !important;
+  background: var(--inset, rgba(0, 0, 0, 0.25)) !important;
+  border: 1px solid var(--line, #1e1e2c) !important;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+[data-theme="light"] .about-card {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: var(--line, rgba(73, 64, 97, 0.1)) !important;
+}
+
+.about-card:hover {
+  border-color: var(--accent, #a78bfa) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 .card-icon {
-  font-size: 18px;
+  color: var(--accent, #a78bfa);
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
 }
 
-.card-head {
-  font-size: 12.5px;
+.about-card-title {
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  line-height: 1.3;
 }
 
 .card-text {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-faint);
   line-height: 1.45;
 }
@@ -393,13 +409,18 @@ Aegis Agent (Hands) — Local Worker:
 
 .arch-box {
   padding: 12px 14px;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 11.5px;
   color: var(--text-dim);
   white-space: pre-wrap;
   line-height: 1.5;
+}
+
+[data-theme="light"] .arch-box {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .arch-subsystems-grid {
@@ -410,12 +431,17 @@ Aegis Agent (Hands) — Local Worker:
 
 .arch-subsystem-card {
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+[data-theme="light"] .arch-subsystem-card {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .subsys-name {
@@ -474,10 +500,15 @@ Aegis Agent (Hands) — Local Worker:
 
 .license-card {
   padding: 14px 16px;
-  background: var(--bg-deep);
-  border: 1px solid var(--border-soft);
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line);
   border-radius: 8px;
   margin-bottom: 16px;
+}
+
+[data-theme="light"] .license-card {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .license-text {
@@ -509,12 +540,17 @@ Aegis Agent (Hands) — Local Worker:
 
 .credit-item {
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line);
   border-radius: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+[data-theme="light"] .credit-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .credit-name {

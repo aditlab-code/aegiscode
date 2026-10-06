@@ -67,33 +67,11 @@
 }
 
 .settings-close-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  color: var(--text-muted);
 }
 
 .settings-close-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-hover);
-}
-
-.shortcut-badge {
-  display: inline-block;
-  padding: 1px 5px;
-  font-size: 10px;
-  font-family: monospace;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-dim);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
 }
 
 .settings-overlay-layout {
@@ -269,9 +247,10 @@
 }
 
 .settings-panel {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  background: var(--panel, var(--bg-card));
+  border: 1px solid var(--edge, var(--border));
+  border-radius: 8px;
+  box-shadow: none;
 }
 
 /* Compact overrides for sub-panels within settings-content */
@@ -281,19 +260,24 @@
   border-radius: 8px !important;
 }
 
+/* Unified Settings Panel Header */
 .settings-content .panel-head {
-  margin-bottom: 10px !important;
-  padding-bottom: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 44px !important;
+  padding: 10px 16px !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid var(--line, var(--border-soft)) !important;
 }
 
-.settings-content .panel-head .title {
+.settings-content .panel-head .title,
+.settings-content .panel-title {
   font-size: 13.5px !important;
-  font-weight: 600 !important;
-}
-
-.settings-content .panel-head .desc {
-  font-size: 11px !important;
-  margin-top: 2px !important;
+  font-weight: 650 !important;
+  color: var(--text) !important;
+  line-height: 1.2 !important;
 }
 
 .settings-content .gs-row {
@@ -582,10 +566,6 @@
   padding: 1px 6px;
 }
 
-.settings-overlay-header.header-embedded .settings-close-btn {
-  padding: 4px 10px;
-  font-size: 11.5px;
-}
 
 html:not([data-wallpaper="disabled"]) .settings-overlay-header.header-embedded {
   background: transparent !important;

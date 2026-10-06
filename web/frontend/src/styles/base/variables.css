@@ -1,77 +1,98 @@
 /* AegisCode Design System — Core Variables & Tokens
-   Baseline dark theme variables (Tokyo Night Storm). */
+   Baseline dark theme variables (Orbit / Violet Slate). */
 
 :root {
-  /* Canvas & Panel Colors (Tokyo Night Storm) */
-  --bg:         #24283b;   /* Storm base canvas */
-  --bg-panel:   #1f2335;   /* Sidebars, drawers, widget containers */
-  --bg-surface: #1f2335;   /* Layout surfaces */
-  --bg-header:  #1a1b26;   /* Classic dark top navbar, tab bars, activity bar */
-  --bg-elev:    #292e42;   /* Elevated dialogs, active tab, popovers */
-  --bg-hover:   #2f354f;   /* List & button hover state */
-  --bg-deep:    #16161e;   /* Form inputs, deep embedded containers */
-  --bg-sidebar: #13141f;   /* Deeper contrast for left tool sidebar */
-  --bg-drawer:  #13141f;   /* Deeper contrast for right AI assistant drawer */
-  --bg-card:    #1f2335;   /* Card background */
-  --bg-secondary: #1a1b26; /* Secondary surface for top navbar and footer */
+  /* UI Kit Core Palette Tokens (Dark Mode) */
+  --surface:        rgba(24, 25, 34, 0.57); /* #18192291 */
+  --chrome:         rgba(228, 220, 255, 0.043); /* #e4dcff0b */
+  --panel:          #292a36;
+  --sidebar:        rgba(213, 202, 255, 0.024); /* #d5caff06 */
+  --rail:           rgba(226, 217, 255, 0.035); /* #e2d9ff09 */
+  --editor:         rgba(23, 24, 32, 0.18); /* #1718202e */
+  --assistant:      rgba(217, 210, 255, 0.035); /* #d9d2ff09 */
+  --terminal:       rgba(23, 24, 32, 0.22); /* #17182038 */
+  --tabs:           rgba(228, 220, 255, 0.024); /* #e4dcff06 */
+  --text:           #dedee9;
+  --secondary:      #bcbcca;
+  --muted:          #a29eaf;
+  --edge:           rgba(255, 255, 255, 0.19); /* #ffffff30 */
+  --line:           rgba(255, 255, 255, 0.07); /* #ffffff12 */
+  --hover:          rgba(255, 255, 255, 0.06); /* #ffffff10 */
+  --inset:          rgba(23, 24, 32, 0.4); /* #17182066 */
+  --input:          rgba(230, 221, 255, 0.047); /* #e6ddff0c */
+  --bubble:         rgba(226, 216, 255, 0.05); /* #e2d8ff0d */
+  --accent:         #b5a1ed;
+  --accent-dim:     #9d7cd8;
+  --accent-soft:    rgba(181, 161, 237, 0.16);
+  --accent-muted:   #b5a1ed;
+  --selection:      rgba(181, 161, 237, 0.16);
+  --line-highlight: rgba(255, 255, 255, 0.012);
+  --line-number:    #8c849a;
+  --syntax-green:   #a2c9a3;
+  --syntax-purple:  #c1a4df;
+  --syntax-blue:    #91b8d7;
 
-  /* Borders — Tokyo Night Cool Slate */
-  --border:        #292e42;  /* Component outline */
-  --border-soft:   #1f2335;  /* Inner row dividers */
-  --border-subtle: #16161e;  /* Subtle boundary */
-  --border-hover:  #3b4261;  /* Interactive border hover */
+  /* AegisCode System Mappings & Dual-Theme Compatibility */
+  --bg:             #181922;
+  --bg-panel:       var(--panel);
+  --bg-surface:     #1f202c;
+  --bg-header:      #21222e;
+  --bg-elev:        #292a36;
+  --bg-hover:       rgba(255, 255, 255, 0.06);
+  --bg-deep:        #15161f;
+  --bg-sidebar:     #171822;
+  --bg-drawer:      #171822;
+  --bg-card:        var(--panel);
+  --bg-secondary:   #1d1e28;
+
+  /* Borders */
+  --border:         var(--line);
+  --border-soft:    rgba(255, 255, 255, 0.06);
+  --border-subtle:  rgba(255, 255, 255, 0.03);
+  --border-hover:   rgba(181, 161, 237, 0.35);
 
   /* Typography */
-  --text:       #c0caf5;   /* Primary crisp text */
-  --text-dim:   #9aa5ce;   /* Secondary / muted labels */
-  --text-faint: #565f89;   /* Inactive / timestamps / comments */
+  --text-dim:       #bcbcca;
+  --text-faint:     #a29eaf;
 
-  /* Accent 1: Tokyo Night Electric Blue */
-  --accent:          #7aa2f7;   /* Electric Blue */
-  --accent-dim:      #3d59a1;   /* Deeper Blue */
-  --accent-soft:     rgba(122, 162, 247, 0.16);
-  --accent-muted:    #7aa2f7;
-
-  /* Accent 2: Neon Magenta / Violet */
-  --accent-2:        #bb9af7;   /* Neon Magenta */
-  --accent-2-dim:    #9d7cd8;   /* Deeper Violet */
-  --accent-2-soft:   rgba(187, 154, 247, 0.16);
-  --accent-2-bright: #bb9af7;
+  /* Accent 2 */
+  --accent-2:        #c1a4df;
+  --accent-2-dim:    #9d7cd8;
+  --accent-2-soft:   rgba(193, 164, 223, 0.16);
+  --accent-2-bright: #d9c2f5;
 
   /* Status Colors */
-  --ok:   #9ece6a;  /* Tokyo Night Green */
-  --warn: #e0af68;  /* Tokyo Night Amber/Yellow */
-  --err:  #f7768e;  /* Tokyo Night Red/Pink */
+  --ok:   #a2c9a3;
+  --warn: #e0af68;
+  --err:  #f7768e;
 
   /* Activity timeline tokens */
-  --act-ts:    #c0caf5;
-  --act-agent: #bb9af7;   /* Neon Magenta agent identifier */
-  --act-obs:   #7aa2f7;   /* Electric Blue observation / tool output */
+  --act-ts:    #dedee9;
+  --act-agent: #c1a4df;
+  --act-obs:   #91b8d7;
 
   /* Alert tokens */
-  --alert-ok-text:   #9ece6a;
-  --alert-ok-bg:     rgba(158, 206, 106, 0.14);
-  --alert-ok-border: rgba(158, 206, 106, 0.45);
+  --alert-ok-text:   #a2c9a3;
+  --alert-ok-bg:     rgba(162, 201, 163, 0.14);
+  --alert-ok-border: rgba(162, 201, 163, 0.45);
   --alert-err-text:  #f7768e;
   --alert-err-bg:    rgba(247, 118, 142, 0.14);
   --alert-err-border:rgba(247, 118, 142, 0.45);
 
   /* Status dot flat colors */
-  --dot-ok:   #9ece6a;
+  --dot-ok:   #a2c9a3;
   --dot-warn: #e0af68;
   --dot-err:  #f7768e;
 
-  --shadow-pop: 0 4px 18px -4px rgba(13, 15, 23, 0.7);
+  --shadow-pop: 0 28px 90px -20px rgba(0, 0, 0, 0.35);
 
   /* Layout Dimensions & Radius */
-  --sidebar-w:   260px;
-  --right-col-w: 380px;
+  --sidebar-w:   240px;
+  --right-col-w: 320px;
   --radius:      10px;
   --radius-sm:   6px;
 
   /* Typography Font Families */
   --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-
-

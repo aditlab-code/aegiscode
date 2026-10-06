@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import AppCard from "../ui/AppCard.vue";
 import AgentActivity from "../AgentActivity.vue";
 import ConsultantChat from "../ConsultantChat.vue";
@@ -323,12 +323,32 @@ const statusIconPath = computed(() => {
   if (s === "cancelled") return '<circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/>';
   return '<circle cx="12" cy="12" r="9"/>';
 });
+
+function focusPrompt() {
+  nextTick(() => {
+    if (promptTextarea.value) {
+      promptTextarea.value.focus();
+    }
+  });
+}
+
+defineExpose({
+  focusPrompt,
+});
 </script>
 
 <template>
   <aside class="app-right-drawer" aria-label="AI Assistant Panel">
-    <!-- Header with Dual-Tab Switcher & Close Button -->
+    <!-- Header with Aegis Assistant Branding, Dual-Tab Switcher & Close Button -->
     <div class="right-drawer-header">
+      <div class="rd-header-title-box">
+        <svg class="rd-sparkle-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"></path>
+        </svg>
+        <span class="rd-main-title">Aegis Assistant</span>
+        <span class="rd-badge-pill">ACTIVE</span>
+      </div>
+
       <div class="right-drawer-tabs" role="tablist">
         <button
           type="button"
@@ -340,20 +360,6 @@ const statusIconPath = computed(() => {
           title="Agent: autonomous task execution"
           @click="setTab(activeTab === 'activity' ? 'activity' : 'agents')"
         >
-          <svg
-            class="rd-tab-ico"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
           <span class="rd-tab-title">Agent</span>
         </button>
         <button
@@ -366,10 +372,21 @@ const statusIconPath = computed(() => {
           title="Ask: Quick or Deep project consultation"
           @click="setTab(activeTab === 'consultant' ? 'consultant' : 'ask')"
         >
+          <span class="rd-tab-title">Ask</span>
+        </button>
+      </div>
+
+      <div class="rd-header-actions">
+        <button
+          type="button"
+          class="rd-close-btn"
+          title="Collapse Assistant (Cmd+J)"
+          aria-label="Close Assistant Panel"
+          @click="emit('close')"
+        >
           <svg
-            class="rd-tab-ico"
-            width="14"
-            height="14"
+            width="13"
+            height="13"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -378,34 +395,11 @@ const statusIconPath = computed(() => {
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
-          <span class="rd-tab-title">Ask</span>
         </button>
       </div>
-
-      <button
-        type="button"
-        class="rd-close-btn"
-        title="Collapse Assistant"
-        aria-label="Close Assistant Panel"
-        @click="emit('close')"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
     </div>
 
     <!-- Body Area -->

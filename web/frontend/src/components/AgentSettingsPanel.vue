@@ -15,6 +15,7 @@
 // logic agent apa pun di sini.
 import { computed, onMounted, ref } from "vue";
 import AppButton from "./ui/AppButton.vue";
+import AppCard from "./ui/AppCard.vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 
 const loading = ref(false);
@@ -110,19 +111,13 @@ onMounted(load);
 </script>
 
 <template>
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Agent</div>
-        <div class="desc">
-          System Prompt / Agent Instructions yang dipakai AEGIS Agent saat
-          membuat system message.
-        </div>
+  <AppCard variant="panel" class="settings-panel as-panel">
+    <template #header>
+      <div class="panel-head">
+        <div class="title">Agent Instructions</div>
       </div>
-      <AppButton variant="ghost" size="sm" :disabled="loading || busy" @click="load">
-        Refresh
-      </AppButton>
-    </div>
+    </template>
+
     <div class="panel-body">
       <div v-if="error" class="as-alert err">{{ error }}</div>
       <div v-if="notice" class="as-alert ok">{{ notice }}</div>
@@ -191,48 +186,47 @@ onMounted(load);
         </div>
 
         <div class="as-actions">
-          <AppButton variant="ghost" :disabled="busy" @click="restoreDefault">
+          <AppButton variant="ghost" size="sm" :disabled="busy" @click="restoreDefault">
             Restore default
           </AppButton>
-          <AppButton variant="ghost" :disabled="busy || !dirty" @click="reset">
+          <AppButton variant="ghost" size="sm" :disabled="busy || !dirty" @click="reset">
             Reset
           </AppButton>
-          <AppButton variant="primary" :disabled="!canSave" @click="save">
+          <AppButton variant="primary" size="sm" :disabled="!canSave" @click="save">
             Save
           </AppButton>
         </div>
         <div v-if="isDefaultValue" class="as-hint">
           Editor sedang memuat System Prompt bawaan AEGIS.
         </div>
+
+        <!-- Sub-section: Nilai aktual pada data/settings.json -->
+        <div class="as-sub-divider"></div>
+
+        <div class="as-sub-section">
+          <div class="as-sub-header">
+            <div class="as-sub-title">Actual Values</div>
+            <div class="as-sub-desc">
+              Nilai yang benar-benar dipakai AEGIS Agent dari <span class="mono">data/settings.json</span>.
+            </div>
+          </div>
+          <div class="as-actual-grid">
+            <div class="kv">
+              <span class="k mono">agent.system_prompt</span>
+              <span class="v mono">
+                {{ actual.system_prompt.length }} karakter ·
+                {{ isCustom ? "custom" : "default (bawaan)" }}
+              </span>
+            </div>
+            <div class="kv">
+              <span class="k mono">agent.default_mode</span>
+              <span class="v mono">{{ actual.default_mode }}</span>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
-  </section>
-
-  <!-- Nilai aktual pada `data/settings.json` (read-only, sumber kebenaran). -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Actual value</div>
-        <div class="desc">
-          Nilai yang benar-benar dipakai AEGIS Agent dari
-          <span class="mono">data/settings.json</span>.
-        </div>
-      </div>
-    </div>
-    <div class="panel-body">
-      <div class="kv">
-        <span class="k mono">agent.system_prompt</span>
-        <span class="v mono">
-          {{ actual.system_prompt.length }} karakter ·
-          {{ isCustom ? "custom" : "default (bawaan)" }}
-        </span>
-      </div>
-      <div class="kv">
-        <span class="k mono">agent.default_mode</span>
-        <span class="v mono">{{ actual.default_mode }}</span>
-      </div>
-    </div>
-  </section>
+  </AppCard>
 </template>
 
 <style scoped>
@@ -252,6 +246,34 @@ onMounted(load);
   color: var(--alert-ok-text);
   background: var(--alert-ok-bg);
   border-color: var(--alert-ok-border);
+}
+
+.as-sub-divider {
+  height: 1px;
+  background: var(--line, var(--border-soft));
+  margin: 16px 0;
+}
+.as-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.as-sub-header {
+  margin-bottom: 2px;
+}
+.as-sub-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+.as-sub-desc {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.as-actual-grid {
+  display: grid;
+  gap: 8px;
 }
 
 .as-scope {

@@ -57,7 +57,7 @@ html:not([data-wallpaper="disabled"]) .app-activity-bar {
 }
 
 html:not([data-wallpaper="disabled"]) .app-footer {
-  background: var(--glass-header-bg) !important;
+  background: var(--bg-secondary) !important;
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
   border-top: 1px solid var(--glass-border) !important;
@@ -68,7 +68,7 @@ html:not([data-wallpaper="disabled"]) .workbench-view {
 }
 
 html:not([data-wallpaper="disabled"]) .wb-left-column {
-  background: var(--glass-panel-bg) !important;
+  background: var(--bg-secondary) !important;
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
   border-right: 1px solid var(--glass-border) !important;
@@ -231,40 +231,42 @@ html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card,
   box-shadow: 0 16px 40px rgba(69, 43, 34, 0.10) !important;
 }
 
-/* Inner Action Buttons & Recent Items inside Frosted Welcome Cards */
+/* Inner Action Buttons & Recent Items inside Welcome Cards */
 html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
 html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
-  border-radius: var(--radius-sm, 8px);
-  background: rgba(255, 255, 255, 0.07) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--inset, rgba(0, 0, 0, 0.25)) !important;
+  border: 1px solid var(--line, #1e1e2c) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
 html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
-  background: rgba(255, 255, 255, 0.14) !important;
-  border-color: var(--accent, #10f09a) !important;
-  box-shadow: 0 6px 20px rgba(16, 240, 154, 0.25) !important;
+  background: var(--hover, rgba(255, 255, 255, 0.05)) !important;
+  border-color: var(--accent, #a78bfa) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .action-btn,
 html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-item,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
-  background: rgba(255, 255, 255, 0.45) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 4px 16px rgba(69, 43, 34, 0.06) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid var(--line, rgba(73, 64, 97, 0.1)) !important;
+  box-shadow: none !important;
 }
 
 html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .action-btn:hover:not(:disabled),
 html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-item:hover,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
-  background: rgba(255, 255, 255, 0.72) !important;
-  border-color: var(--accent, #10f09a) !important;
-  box-shadow: 0 6px 20px rgba(16, 240, 154, 0.20) !important;
+  background: var(--hover, rgba(101, 85, 120, 0.04)) !important;
+  border-color: var(--accent, #8261bb) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 html:not([data-wallpaper="disabled"]) .welcome-shortcuts {
@@ -326,17 +328,15 @@ html:not([data-wallpaper="disabled"])[data-theme="light"] .settings-search-box {
   border-color: var(--glass-border) !important;
 }
 
-html:not([data-wallpaper="disabled"]) .settings-content {
-  background: transparent !important;
-}
-
+/* Settings Content & Panels: Unified Solid Profile */
 html:not([data-wallpaper="disabled"]) .settings-panel,
-html:not([data-wallpaper="disabled"]) .settings-content .panel {
-  background: var(--glass-panel-bg) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
-  border: 1px solid var(--glass-border) !important;
-  box-shadow: var(--glass-rim) !important;
+html:not([data-wallpaper="disabled"]) .settings-content .panel,
+html:not([data-wallpaper="disabled"]) .settings-content .card {
+  background: var(--panel, var(--bg-card)) !important;
+  border: 1px solid var(--edge, var(--border)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
 }
 
 html:not([data-wallpaper="disabled"]) .aether-table thead th {

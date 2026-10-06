@@ -19,6 +19,7 @@ from agent_ai.providers.base import (
     Message,
     ToolChoice,
     ToolDefinition,
+    filter_provider_extra,
 )
 from agent_ai.providers.openai_compatible import OpenAICompatibleProvider
 
@@ -73,5 +74,5 @@ class NineRouterProvider(OpenAICompatibleProvider):
             if tool_choice is not None:
                 payload["tool_choice"] = self._to_openai_tool_choice(tool_choice)
 
-        payload.update(opts.extra or {})
+        payload.update(filter_provider_extra(opts.extra))
         return payload

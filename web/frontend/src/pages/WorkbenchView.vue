@@ -340,6 +340,20 @@ function handleRunConsultantTask(taskPayload) {
   emit("run-consultant-task", taskPayload);
 }
 
+const rightDrawerRef = ref(null);
+
+function handleOpenAgentComposer() {
+  assistantTab.value = "agents";
+  if (!assistantVisible.value) {
+    toggleAssistant(true);
+  }
+  nextTick(() => {
+    rightDrawerRef.value?.focusPrompt?.();
+    const ta = document.querySelector(".chat-prompt-textarea");
+    if (ta) ta.focus();
+  });
+}
+
 const consultantBusy = ref(false);
 const bgToast = ref(null);
 let bgToastTimer = null;
@@ -1252,6 +1266,8 @@ defineExpose({
   openSettings,
   openWelcomeTab,
   clearAllTabs,
+  handleOpenAgentComposer,
+  openComposer: handleOpenAgentComposer,
 });
 </script>
 
@@ -2034,30 +2050,160 @@ defineExpose({
           />
 
           <!-- 5. Active Workspace Empty Canvas (Zero tabs open, project active) -->
-          <div v-else-if="activeProject" class="wb-welcome">
-            <div class="welcome-card">
-              <div class="welcome-logo">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="m4.5 8.5-3 3.5 3 3.5" />
-                  <path d="m19.5 8.5 3 3.5-3 3.5" />
-                  <path d="M12 3c.4 3.8 2.2 5.6 6 6-3.8.4-5.6 2.2-6 6-.4-3.8-2.2-5.6-6-6 3.8-.4 5.6-2.2 6-6Z" />
-                  <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                </svg>
-              </div>
-              <h2 class="welcome-title">Welcome to AEGIS</h2>
-              <div class="welcome-project">{{ activeProject?.path || activeProject?.root || '' }}</div>
-              <div class="welcome-shortcuts">
-                <div class="shortcut-row">
-                  <span class="sc-label">Quick Open</span>
-                  <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>P</kbd></span>
+          <div v-else-if="activeProject" class="wb-welcome welcome-view-root">
+            <div class="welcome-container">
+              <div class="welcome-grid">
+                <!-- Left Column: Hero & Start Actions -->
+                <div class="welcome-col welcome-col-main">
+                  <header class="welcome-card hero-card" aria-label="AegisCode Studio Overview">
+                    <div class="welcome-hero">
+                      <div class="hero-brand-row">
+                        <div class="brand-logo-wrap" aria-hidden="true">
+                          <svg
+                            class="brand-logo-svg"
+                            width="36"
+                            height="36"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          >
+                            <path d="m4.5 8.5-3 3.5 3 3.5" />
+                            <path d="m19.5 8.5 3 3.5-3 3.5" />
+                            <path d="M12 3c.4 3.8 2.2 5.6 6 6-3.8.4-5.6 2.2-6 6-.4-3.8-2.2-5.6-6-6 3.8-.4 5.6-2.2 6-6Z" />
+                            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                          </svg>
+                        </div>
+                        <div class="brand-text-block">
+                          <h1 class="brand-title welcome-title">AegisCode Studio</h1>
+                          <span class="version-tag">v0.2.01</span>
+                        </div>
+                      </div>
+                      <p class="brand-tagline welcome-project">
+                        {{ activeProject?.path || activeProject?.root || "No Project Selected" }}
+                      </p>
+                    </div>
+                  </header>
+
+                  <!-- Start Actions Card -->
+                  <section class="welcome-card start-card" aria-labelledby="start-heading">
+                    <h2 id="start-heading" class="card-heading">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                      <span>Start</span>
+                    </h2>
+                    <div class="action-buttons-list">
+                      <button
+                        type="button"
+                        class="action-btn"
+                        @click="handleOpenAgentComposer"
+                      >
+                        <svg
+                          class="action-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                        </svg>
+                        <div class="action-btn-text">
+                          <span class="btn-label">New Agent Task…</span>
+                          <span class="btn-sub">Compose and run an autonomous AI agent task</span>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="action-btn"
+                        @click="toggleBottomDock()"
+                      >
+                        <svg
+                          class="action-icon"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.8"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <polyline points="4 17 10 11 4 5" />
+                          <line x1="12" y1="19" x2="20" y2="19" />
+                        </svg>
+                        <div class="action-btn-text">
+                          <span class="btn-label">Open Terminal…</span>
+                          <span class="btn-sub">Toggle bottom shell terminal dock</span>
+                        </div>
+                      </button>
+                    </div>
+                  </section>
                 </div>
-                <div class="shortcut-row">
-                  <span class="sc-label">Command Palette</span>
-                  <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>K</kbd></span>
-                </div>
-                <div class="shortcut-row">
-                  <span class="sc-label">Toggle Terminal Dock</span>
-                  <span class="sc-kbd-group"><kbd>Ctrl</kbd> + <kbd>`</kbd></span>
+
+                <!-- Right Column: Key Bindings -->
+                <div class="welcome-col welcome-col-side">
+                  <section class="welcome-card shortcuts-card" aria-labelledby="shortcuts-heading">
+                    <h2 id="shortcuts-heading" class="card-heading">
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h12" />
+                      </svg>
+                      <span>Key Bindings</span>
+                    </h2>
+
+                    <div class="shortcuts-grid">
+                      <div class="shortcut-row">
+                        <span class="sc-label">Quick Open File</span>
+                        <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>P</kbd></span>
+                      </div>
+                      <div class="shortcut-row">
+                        <span class="sc-label">Command Palette</span>
+                        <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>K</kbd></span>
+                      </div>
+                      <div class="shortcut-row">
+                        <span class="sc-label">Toggle Sidebar</span>
+                        <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>B</kbd></span>
+                      </div>
+                      <div class="shortcut-row">
+                        <span class="sc-label">Toggle AI Assistant</span>
+                        <span class="sc-kbd-group"><kbd>Cmd</kbd> + <kbd>J</kbd></span>
+                      </div>
+                      <div class="shortcut-row">
+                        <span class="sc-label">Toggle Terminal Dock</span>
+                        <span class="sc-kbd-group"><kbd>Ctrl</kbd> + <kbd>`</kbd></span>
+                      </div>
+                    </div>
+                  </section>
                 </div>
               </div>
             </div>
@@ -2071,7 +2217,7 @@ defineExpose({
               :active-project="null"
               @open-folder="emit('open-folder')"
               @clone-git="handleOpenCloneGitModal"
-              @new-task="emit('open-composer')"
+              @new-task="emit('open-folder')"
               @open-project="emit('select-project', $event)"
               @delete-project="emit('delete-project', $event)"
               @open-settings="openSettings('providers')"
@@ -2127,6 +2273,7 @@ defineExpose({
         :style="tier !== 'mobile' ? { width: `${assistantWidth}px` } : {}"
       >
         <AppRightDrawer
+          ref="rightDrawerRef"
           v-model:active-tab="assistantTab"
           :task="task"
           :task-history="taskHistory"
@@ -2158,7 +2305,7 @@ defineExpose({
           :model-id="effectiveModelId"
           :mode="props.mode || props.config?.mode || 'balanced'"
           @close="toggleAssistant(false)"
-          @open-composer="emit('open-composer')"
+          @open-composer="handleOpenAgentComposer"
           @request-stop="emit('request-stop')"
           @submit-task="emit('submit-task', $event)"
           @open-settings="emit('open-settings', $event)"

@@ -21,6 +21,7 @@ from agent_ai.providers.base import (
     ToolChoice,
     ToolDefinition,
     build_provider_api_error,
+    filter_provider_extra,
 )
 from agent_ai.providers.retry import (
     InfrastructureRetryPolicy,
@@ -139,7 +140,7 @@ class OllamaProvider(BaseProvider):
             gen_options["temperature"] = opts.temperature
         if opts.max_tokens is not None:
             gen_options["num_predict"] = opts.max_tokens
-        gen_options.update(opts.extra or {})
+        gen_options.update(filter_provider_extra(opts.extra))
         if gen_options:
             payload["options"] = gen_options
 

@@ -15,6 +15,8 @@ import {
   uninstallExtension,
 } from "../api.js";
 import ExtensionUI from "./ExtensionUI.vue";
+import AppButton from "./ui/AppButton.vue";
+import AppCard from "./ui/AppCard.vue";
 
 const emit = defineEmits(["error"]);
 
@@ -337,18 +339,18 @@ defineExpose({ refresh });
 
 <template>
   <div class="ext-mgmt">
-    <div class="ext-mgmt-head">
-      <div class="ext-mgmt-title">
-        <div class="title">Extensions</div>
-        <div class="desc">
-          Manage AEGIS extensions. Install from Git URL, enable/disable, update, or remove.
-          <span v-if="failedCount" class="ext-badge-failed">{{ failedCount }} failed</span>
+    <AppCard variant="panel" class="settings-panel">
+      <template #header>
+        <div class="panel-head">
+          <div class="title">Extensions</div>
+          <AppButton variant="primary" size="sm" :disabled="installBusy" @click="openInstall">
+            Install Extension
+          </AppButton>
         </div>
-      </div>
-      <button class="btn-aether btn-primary-a" :disabled="installBusy" @click="openInstall">Install Extension</button>
-    </div>
+      </template>
 
-    <div class="ext-toolbar">
+      <div class="panel-body">
+        <div class="ext-toolbar">
       <div class="ext-filters" role="tablist" aria-label="Extension filter">
         <button class="seg-tab" :class="{ active: filter === 'all' }" @click="filter = 'all'">All <span class="seg-badge">{{ extensions.length }}</span></button>
         <button class="seg-tab" :class="{ active: filter === 'enabled' }" @click="filter = 'enabled'">Enabled</button>
@@ -419,6 +421,8 @@ defineExpose({ refresh });
         </div>
       </div>
     </div>
+  </div>
+</AppCard>
 
     <!-- Detail Drawer / Modal -->
     <div v-if="detailId" class="modal-backdrop" @click.self="closeDetail">
@@ -578,9 +582,21 @@ defineExpose({ refresh });
 .ext-notice { background: var(--alert-ok-bg); border:1px solid var(--alert-ok-border); color: var(--alert-ok-text); }
 .ext-error-line { display:flex; gap:8px; align-items:center; margin-top:6px; }
 .ext-error-text { color: var(--err); font-size:12px; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.ext-list { display:grid; gap:10px; }
-.ext-card { border:1px solid var(--border); border-radius:12px; background: var(--bg-panel); padding:12px 14px; display:grid; gap:10px; }
-.ext-card.failed { border-color: rgba(248,113,113,0.3); }
+.ext-card {
+  border: 1px solid var(--line, var(--border-soft));
+  border-radius: 6px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+  box-shadow: none !important;
+  transform: none !important;
+  transition: border-color 0.15s ease;
+}
+.ext-card:hover {
+  border-color: var(--edge, var(--border));
+}
+.ext-card.failed { border-color: rgba(248,113,113,0.4); }
 .ext-card-head { display:flex; gap:12px; cursor:pointer; }
 .ext-card-main { flex:1; min-width:0; }
 .ext-card-title { font-weight:600; font-size:14px; }

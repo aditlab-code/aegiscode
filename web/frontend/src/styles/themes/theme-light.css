@@ -1,64 +1,87 @@
-/* AegisCode Tokyo Night Light Theme Tokens & Component Overrides ([data-theme="light"]) */
+/* AegisCode UI Kit Light Theme Tokens & Component Overrides ([data-theme="light"]) */
 
 [data-theme="light"] {
-  /* AegisCode Tokyo Night Light */
-  --bg:        #e6e7ed;   /* Light base canvas */
-  --bg-panel:  #d6d8df;   /* Light panel surface */
-  --bg-surface:#d6d8df;   /* Layout components surface */
-  --bg-header: #cdced1;   /* Top navbar, tab bars, activity bar */
-  --bg-elev:   #f5f6f9;   /* Active tab, elevated card surface */
-  --bg-card:   #d6d8df;   /* Card surface */
-  --bg-hover:  #d0d2db;   /* Hover state */
-  --bg-deep:   #d0d2db;   /* Form inputs background */
-  --bg-secondary: #cdced1; /* Secondary surface */
-  --bg-sidebar: #cdced1;   /* Deeper contrast for left tool sidebar in light mode */
-  --bg-drawer:  #cdced1;   /* Deeper contrast for right AI assistant drawer in light mode */
+  /* UI Kit Core Palette Tokens (Light Mode) */
+  --surface:        rgba(247, 244, 252, 0.44); /* #f7f4fc70 */
+  --chrome:         rgba(255, 255, 255, 0.16); /* #ffffff28 */
+  --panel:          #f5f3fa;
+  --sidebar:        rgba(255, 255, 255, 0.08); /* #ffffff15 */
+  --rail:           rgba(255, 255, 255, 0.15); /* #ffffff25 */
+  --editor:         rgba(255, 255, 255, 0.13); /* #ffffff20 */
+  --assistant:      rgba(255, 255, 255, 0.13); /* #ffffff22 */
+  --terminal:       rgba(238, 231, 245, 0.13); /* #eee7f522 */
+  --tabs:           rgba(255, 255, 255, 0.09); /* #ffffff18 */
+  --text:           #333044;
+  --secondary:      #555168;
+  --muted:          #736b82;
+  --edge:           rgba(255, 255, 255, 0.7);  /* #ffffffb3 */
+  --line:           rgba(73, 64, 97, 0.1);     /* #4940611a */
+  --hover:          rgba(101, 85, 120, 0.04);  /* #6555780b */
+  --inset:          rgba(220, 215, 232, 0.3);  /* #dcd7e84d */
+  --input:          rgba(255, 255, 255, 0.25); /* #ffffff40 */
+  --bubble:         rgba(255, 255, 255, 0.21); /* #ffffff35 */
+  --accent:         #8261bb;
+  --accent-dim:     #6d4fa3;
+  --accent-soft:    rgba(130, 97, 187, 0.13);
+  --accent-muted:   #8261bb;
+  --selection:      rgba(130, 97, 187, 0.13);
+  --line-highlight: rgba(130, 97, 187, 0.02);
+  --line-number:    #95899f;
+  --syntax-green:   #628c5a;
+  --syntax-purple:  #9a60ad;
+  --syntax-blue:    #4e7f9b;
 
-  /* Borders — Tokyo Night Cool Silver */
-  --border:      #c1c2c7;  /* Component outline */
-  --border-soft: #d0d2db;  /* Inner row dividers */
-  --border-subtle:#d6d8df; /* Subtle border */
-  --border-hover: #a9abb3;  /* Border hover */
+  /* AegisCode System Mappings & Dual-Theme Compatibility */
+  --bg:             #eae5f4;
+  --bg-panel:       var(--panel);
+  --bg-surface:     #edeaf5;
+  --bg-header:      #e8e4f1;
+  --bg-elev:        #ffffff;
+  --bg-card:        var(--panel);
+  --bg-hover:       rgba(101, 85, 120, 0.06);
+  --bg-deep:        var(--inset);
+  --bg-secondary:   #e4dfea;
+  --bg-sidebar:     #eeeaf5;
+  --bg-drawer:      #eeeaf5;
+
+  /* Borders */
+  --border:         var(--line);
+  --border-soft:    rgba(73, 64, 97, 0.08);
+  --border-subtle:  rgba(73, 64, 97, 0.05);
+  --border-hover:   rgba(130, 97, 187, 0.35);
 
   /* Typography */
-  --text:       #343b59;   /* Deep slate typography */
-  --text-dim:   #565a6e;   /* Secondary typography */
-  --text-faint: #707280;   /* Muted metadata / inactive text */
+  --text-dim:       #555168;
+  --text-faint:     #736b82;
 
-  /* Accent 1: Tokyo Night Light Blue */
-  --accent:     #2959aa;   /* Electric Blue */
-  --accent-dim: #1e4080;
-  --accent-soft: rgba(41, 89, 170, 0.16);
-  --accent-muted:#2959aa;
+  /* Accent 2 */
+  --accent-2:        #9a60ad;
+  --accent-2-dim:    #7c488e;
+  --accent-2-soft:   rgba(154, 96, 173, 0.14);
+  --accent-2-bright: #b87ad0;
 
-  /* Accent 2: Tokyo Night Violet / Magenta */
-  --accent-2:     #7c3aed; /* Violet / Magenta */
-  --accent-2-dim: #6d28d9;
-  --accent-2-soft:rgba(124, 58, 237, 0.16);
-  --accent-2-bright:#8b5cf6;
+  /* Status Colors */
+  --ok:   #628c5a;
+  --warn: #8f5e15;
+  --err:  #8c4351;
 
-  /* Status */
-  --ok:   #485e30;  /* Tokyo Night Light Green */
-  --warn: #8f5e15;  /* Tokyo Night Light Amber */
-  --err:  #8c4351;  /* Tokyo Night Light Red */
-
-  --act-ts:    #343b59;
-  --act-agent: #7c3aed;   /* Magenta agent identifier */
-  --act-obs:   #2959aa;   /* Blue observation */
+  --act-ts:    #333044;
+  --act-agent: #9a60ad;
+  --act-obs:   #4e7f9b;
 
   /* Alert tokens */
-  --alert-ok-text:   #485e30;
-  --alert-ok-bg:     rgba(72, 94, 48, 0.12);
-  --alert-ok-border: rgba(72, 94, 48, 0.40);
+  --alert-ok-text:   #628c5a;
+  --alert-ok-bg:     rgba(98, 140, 90, 0.12);
+  --alert-ok-border: rgba(98, 140, 90, 0.40);
   --alert-err-text:  #8c4351;
   --alert-err-bg:    rgba(140, 67, 81, 0.10);
   --alert-err-border:rgba(140, 67, 81, 0.40);
 
-  --dot-ok:   #485e30;
+  --dot-ok:   #628c5a;
   --dot-warn: #8f5e15;
   --dot-err:  #8c4351;
 
-  --shadow-pop: 0 4px 18px -4px rgba(52, 59, 89, 0.14);
+  --shadow-pop: 0 4px 18px -4px rgba(73, 64, 97, 0.14);
 }
 
 /* Badges & Slider Tracks */
@@ -170,7 +193,7 @@
 
 /* Left Sidebar */
 [data-theme="light"] .app-left-sidebar {
-  background: var(--bg-sidebar);
+  background: var(--bg-secondary);
   border-right: none;
 }
 
@@ -203,10 +226,16 @@
   background: var(--bg);
 }
 
-[data-theme="light"] .wb-left-column,
+[data-theme="light"] .wb-left-column {
+  background: var(--bg-secondary);
+  border-right-color: var(--edge);
+  box-shadow: 4px 0 14px rgba(69, 43, 34, 0.08);
+}
+
 [data-theme="light"] .wb-right-column {
   background: var(--bg-panel);
-  border-color: var(--border-soft);
+  border-left-color: var(--edge);
+  box-shadow: -4px 0 14px rgba(69, 43, 34, 0.08);
 }
 
 [data-theme="light"] .wb-center-column {
@@ -256,9 +285,15 @@
   background: transparent;
 }
 
-[data-theme="light"] .app-splitter:hover,
-[data-theme="light"] .app-splitter.is-dragging {
-  background: var(--accent);
+[data-theme="light"] .app-splitter::after {
+  background: var(--edge);
+}
+
+[data-theme="light"] .app-splitter:hover::after,
+[data-theme="light"] .app-splitter.is-dragging::after,
+[data-theme="light"] .splitter-dragging::after {
+  background: var(--accent) !important;
+  box-shadow: 0 0 4px rgba(130, 97, 187, 0.35);
 }
 
 /* Right Drawer */
@@ -282,8 +317,8 @@
 }
 
 [data-theme="light"] .rd-tab-btn.active {
-  background: var(--bg-elev);
-  color: var(--text);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 [data-theme="light"] .right-drawer-body,
@@ -469,6 +504,16 @@
 [data-theme="light"] .modal-backdrop,
 [data-theme="light"] .cmd-palette-backdrop {
   background: rgba(14, 13, 20, 0.45);
+}
+
+[data-theme="light"] .modal {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .modal-actions {
+  background: rgba(0, 0, 0, 0.02);
 }
 
 [data-theme="light"] .cmd-palette-modal {

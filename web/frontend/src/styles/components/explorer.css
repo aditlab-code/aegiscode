@@ -123,12 +123,12 @@
 }
 
 .ex-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--hover);
   color: var(--text);
 }
 
 .ex-row.selected {
-  background: rgba(45, 125, 78, 0.16);
+  background: var(--selection);
   color: var(--text);
   box-shadow: inset 2px 0 0 var(--accent);
 }

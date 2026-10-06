@@ -589,6 +589,7 @@ export function validateCodeSyntax(code = "", language = "", filePath = "") {
   const stack = [];
   const pairs = { ")": "(", "}": "{", "]": "[" };
   let inBlockComment = false;
+  let multilineQuote = null;
 
   for (let i = 0; i < lines.length; i++) {
     const lineNum = i + 1;
@@ -623,10 +624,21 @@ export function validateCodeSyntax(code = "", language = "", filePath = "") {
       }
     }
 
-    // Bracket scanner (ignoring string literals)
+    // Bracket scanner (ignoring string literals & multiline strings)
     let inQuote = null;
     let escaped = false;
-    for (let c = 0; c < rawLine.length; c++) {
+    let c = 0;
+
+    if (multilineQuote) {
+      const closeIdx = rawLine.indexOf(multilineQuote);
+      if (closeIdx === -1) {
+        continue;
+      }
+      c = closeIdx + multilineQuote.length;
+      multilineQuote = null;
+    }
+
+    for (; c < rawLine.length; c++) {
       const char = rawLine[c];
       if (escaped) {
         escaped = false;
@@ -640,7 +652,44 @@ export function validateCodeSyntax(code = "", language = "", filePath = "") {
         if (char === inQuote) inQuote = null;
         continue;
       }
-      if (char === '"' || char === "'" || char === "`") {
+
+      // Deteksi Python triple quotes multiline
+      if (language === "python" || filePath.endsWith(".py")) {
+        if (rawLine.startsWith('"""', c)) {
+          const closing = rawLine.indexOf('"""', c + 3);
+          if (closing !== -1) {
+            c = closing + 2;
+          } else {
+            multilineQuote = '"""';
+            break;
+          }
+          continue;
+        }
+        if (rawLine.startsWith("'''", c)) {
+          const closing = rawLine.indexOf("'''", c + 3);
+          if (closing !== -1) {
+            c = closing + 2;
+          } else {
+            multilineQuote = "'''";
+            break;
+          }
+          continue;
+        }
+      }
+
+      // Deteksi JS/TS template literal multiline
+      if (char === "`") {
+        const closing = rawLine.indexOf("`", c + 1);
+        if (closing !== -1) {
+          c = closing;
+        } else {
+          multilineQuote = "`";
+          break;
+        }
+        continue;
+      }
+
+      if (char === '"' || char === "'") {
         inQuote = char;
         continue;
       }

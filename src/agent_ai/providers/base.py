@@ -81,6 +81,40 @@ def from_provider_safe_tool_name(name: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Metadata runtime internal (bukan parameter HTTP wire API provider)
+# ---------------------------------------------------------------------------
+INTERNAL_RUNTIME_KEYS: frozenset = frozenset({
+    "event_sink",
+    "execution_policy",
+    "mode",
+    "workspace_root",
+    "runtime_context",
+})
+
+
+def filter_provider_extra(extra: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Saring opsi tambahan agar parameter internal runtime tidak masuk ke HTTP payload.
+
+    Args:
+        extra: Dict opsi tambahan (mis. dari GenerateOptions.extra).
+
+    Returns:
+        Dict baru yang hanya memuat parameter yang aman dikirim ke provider wire.
+    """
+    if not extra:
+        return {}
+    filtered = {}
+    for key, value in extra.items():
+        if key in INTERNAL_RUNTIME_KEYS:
+            continue
+        # Jangan kirim objek yang jelas tidak serializable ke JSON (mis. callable)
+        if callable(value):
+            continue
+        filtered[key] = value
+    return filtered
+
+
+# ---------------------------------------------------------------------------
 # Exception hierarchy untuk provider
 # ---------------------------------------------------------------------------
 # Status HTTP yang bersifat INFRASTRUKTUR (sementara) sehingga layak di-retry di

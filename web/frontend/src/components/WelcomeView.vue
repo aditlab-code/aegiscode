@@ -553,38 +553,39 @@ function handleOpenProject(p) {
   align-items: center;
   gap: 14px;
   padding: 12px 16px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line, #1e1e2c);
   color: var(--text, #cccccc);
   text-align: left;
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 [data-theme="light"] .action-btn {
-  background: rgba(255, 255, 255, 0.45);
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 16px rgba(69, 43, 34, 0.06);
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
 }
 
 .action-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: var(--accent, #10f09a);
-  color: var(--text-bright, #ffffff);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 240, 154, 0.25);
+  background: var(--hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--accent, #a78bfa);
+  color: var(--text, #ffffff);
+  transform: none;
+  box-shadow: none;
 }
 
 [data-theme="light"] .action-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: var(--accent, #10f09a);
-  box-shadow: 0 6px 20px rgba(16, 240, 154, 0.20);
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent, #8261bb);
+  box-shadow: none;
+  transform: none;
 }
 
 .action-icon {
@@ -665,32 +666,38 @@ function handleOpenProject(p) {
   display: flex;
   align-items: center;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.06));
-  transition: all 0.15s ease;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--line, #1e1e2c);
+  transition: background 0.15s ease, border-color 0.15s ease;
   width: 100%;
   box-sizing: border-box;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 [data-theme="light"] .recent-item {
   background: rgba(0, 0, 0, 0.02);
-  border-color: rgba(0, 0, 0, 0.06);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
 }
 
 .recent-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--accent, #a78bfa);
+  box-shadow: none;
+  transform: none;
 }
 
 [data-theme="light"] .recent-item:hover {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: var(--accent, #10f09a);
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent, #8261bb);
+  box-shadow: none;
+  transform: none;
 }
 
 .recent-item.active {
-  border-color: var(--accent, #10f09a);
+  border-color: var(--accent, #a78bfa);
 }
 
 .recent-open-btn {
@@ -757,22 +764,22 @@ function handleOpenProject(p) {
   color: var(--danger, #e06c75);
 }
 
-/* Cards - Frosted Glass */
+/* Cards - Unified UI Kit Style (Static, No Glow) */
 .welcome-card {
-  background: rgba(14, 13, 20, 0.45);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
+  background: var(--panel, #14141e);
+  border: 1px solid var(--edge, #262635);
+  border-radius: 8px;
   padding: 20px;
   margin-bottom: 24px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 [data-theme="light"] .welcome-card {
-  background: rgba(253, 249, 243, 0.55);
-  border: 1px solid rgba(69, 43, 34, 0.14);
-  box-shadow: 0 16px 40px rgba(69, 43, 34, 0.10);
+  background: var(--panel, #f5f3fa);
+  border: 1px solid var(--edge, rgba(255, 255, 255, 0.7));
+  box-shadow: none;
 }
 
 /* Cards - Left aligned */

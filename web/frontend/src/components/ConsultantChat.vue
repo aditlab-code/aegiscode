@@ -21,6 +21,7 @@ import QueuePanel from "./QueuePanel.vue";
 import PromptAutocompletePopover from "./ui/PromptAutocompletePopover.vue";
 import AppThinkingBlock from "./ui/AppThinkingBlock.vue";
 import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
+import { useAttachmentPipeline } from "../composables/useAttachmentPipeline.js";
 import {
   stripTaskProposal,
   assistantText,
@@ -162,12 +163,14 @@ async function switchSession(id) {
   }
 }
 
+let resumeSessionSeq = 0;
 async function resumeSessionFromId(id) {
   // Called when props.activeSessionId changes; load turns without UI blocking.
   if (!id) return;
+  const thisSeq = ++resumeSessionSeq;
   try {
     const sess = await getConsultantSession(id, props.projectId || null);
-    if (!sess) return;
+    if (!sess || thisSeq !== resumeSessionSeq) return;
     const turns = sess.turns || [];
     messages.value = turns.map((t) => {
       if (t.role === "user") {
@@ -208,7 +211,7 @@ async function createNewSession() {
         taskProposal: null,
       },
     ];
-    attachments.value = [];
+    clearAttachments();
     await loadSessions();
     scrollToBottom();
   } catch (e) {
@@ -271,10 +274,24 @@ function formatSessionTime(timestamp) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// Gambar terlampir (belum dikirim): [{ name, mimeType, dataUrl, base64 }].
-// Dimaksimalkan 8 gambar agar konsisten dengan batas backend.
-const MAX_ATTACHMENTS = 8;
-const attachments = ref([]);
+// Gambar terlampir (belum dikirim) dikelola via useAttachmentPipeline.
+const {
+  attachments,
+  attachError,
+  clearAttachments,
+  removeAttachment,
+  restoreAttachments,
+  triggerAttach: doTriggerAttach,
+  onFilesPicked,
+} = useAttachmentPipeline({ scopeLabel: "pesan" });
+
+watch(attachError, (err) => {
+  if (err) error.value = err;
+});
+
+function triggerAttach() {
+  doTriggerAttach(fileInput.value, sending.value);
+}
 
 // Tinggi maksimum composer (px). Di atas nilai ini textarea scroll internal
 // agar footer tidak memanjang tanpa batas.
@@ -485,50 +502,7 @@ function summarizeTools(events) {
   }));
 }
 
-// --- Attach image (multimodal) ---------------------------------------------
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-function triggerAttach() {
-  if (sending.value) return;
-  const el = fileInput.value;
-  if (el) el.click();
-}
-
-function onFilesPicked(e) {
-  const files = Array.from(e.target.files || []);
-  e.target.value = "";
-  for (const file of files) {
-    if (attachments.value.length >= MAX_ATTACHMENTS) {
-      error.value = `Maksimum ${MAX_ATTACHMENTS} gambar per pesan.`;
-      break;
-    }
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      error.value = `Format tidak didukung: ${file.type || "unknown"} (pakai JPEG/PNG/WebP).`;
-      continue;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || "");
-      const comma = dataUrl.indexOf(",");
-      const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : "";
-      if (!base64) return;
-      attachments.value.push({
-        name: file.name || "image",
-        mimeType: file.type,
-        dataUrl,
-        base64,
-      });
-    };
-    reader.onerror = () => {
-      error.value = `Gagal membaca gambar: ${file.name}`;
-    };
-    reader.readAsDataURL(file);
-  }
-}
-
-function removeAttachment(index) {
-  attachments.value.splice(index, 1);
-}
 
 const {
   popoverVisible,
@@ -579,6 +553,8 @@ function onSelectSuggestion(item) {
 async function send() {
   const text = input.value.trim();
   const pending = attachments.value.slice();
+  const savedDraftText = input.value;
+  const savedDraftAttachments = pending;
   if ((!text && !pending.length) || sending.value) return;
   error.value = "";
   messages.value.push({
@@ -588,7 +564,7 @@ async function send() {
   });
   pushHistory(text);
   input.value = "";
-  attachments.value = [];
+  clearAttachments();
   resetComposer();
   sending.value = true;
   emit("consultant-event", { type: "sending_started", prompt: text });
@@ -625,6 +601,13 @@ async function send() {
     emit("consultant-event", { type: "sending_completed", prompt: text, error: null, data });
   } catch (e) {
     error.value = e.message || "Consultant request failed.";
+    // Pulihkan draft jika submit gagal agar input tidak hilang
+    if (!input.value && savedDraftText) {
+      input.value = savedDraftText;
+    }
+    if (!attachments.value.length && savedDraftAttachments.length) {
+      restoreAttachments(savedDraftAttachments);
+    }
     messages.value.push({
       role: "assistant",
       text: `Consultant error: ${error.value}`,

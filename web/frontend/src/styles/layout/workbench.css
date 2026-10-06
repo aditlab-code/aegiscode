@@ -1,12 +1,33 @@
-/* AETHER IDE Shell & Workbench 3-Column Layout */
+/* AegisCode IDE Shell & Edge-to-Edge Web Page Layout */
 
 .ide-root {
   display: flex;
   flex-direction: column;
   width: 100vw;
   height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
-  background: var(--bg, #0e0d14);
+  background: var(--surface);
+  font-family: var(--sans);
+  color: var(--text);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Full Web Window Container (Edge-to-Edge) */
+.ide-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .ide-main-row {
@@ -60,8 +81,9 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
-  background: var(--bg-sidebar, #13141f);
-  border-right: 1px solid var(--border, #292e42);
+  background: var(--bg-secondary, var(--chrome));
+  border-right: 1px solid var(--edge);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.35);
   z-index: 10;
 }
 
@@ -73,7 +95,8 @@
   overflow: hidden;
   position: relative;
   background: var(--bg-drawer, #13141f);
-  border-left: 1px solid var(--border, #292e42);
+  border-left: 1px solid var(--edge);
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
   z-index: 10;
 }
 
@@ -104,52 +127,33 @@
 /* Welcome Canvas Empty State */
 .wb-welcome {
   flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 30px;
-  background: radial-gradient(circle at 50% 40%, rgba(45, 125, 78, 0.05) 0%, transparent 70%), var(--bg, #0e0d14);
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--surface, #14141e);
+  padding: 40px 32px;
+}
+
+[data-theme="light"] .wb-welcome {
+  background: var(--surface, #f7f4fc);
 }
 
 .welcome-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  max-width: 440px;
-  width: 100%;
-}
-
-.welcome-logo {
-  color: var(--accent-muted, #5ebd87);
-  margin-bottom: 14px;
-}
-
-.welcome-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text, #f5f3fa);
-  margin: 0 0 6px 0;
-  letter-spacing: -0.3px;
-}
-
-.welcome-project {
-  font-size: 12.5px;
-  color: var(--text-faint, #9592a8);
-  margin: 0 0 26px 0;
-  font-family: var(--font-mono, monospace);
-  word-break: break-all;
-}
-
-.welcome-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  background: var(--bg-card, #1c1a23);
-  border: 1px solid var(--border-soft, #383447);
+  background: var(--panel, #14141e);
+  border: 1px solid var(--edge, #262635);
   border-radius: 8px;
-  padding: 14px 18px;
+  padding: 20px;
+  margin-bottom: 24px;
+  box-shadow: none;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+[data-theme="light"] .welcome-card {
+  background: var(--panel, #f5f3fa);
+  border: 1px solid var(--edge, rgba(255, 255, 255, 0.7));
+  box-shadow: none;
 }
 
 .shortcut-item {

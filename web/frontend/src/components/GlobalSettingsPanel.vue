@@ -15,6 +15,7 @@ import { computed, onMounted, reactive, ref } from "vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 import { terminateServer, isTerminating, serverTerminated } from "../services/serverService.js";
 import AppButton from "./ui/AppButton.vue";
+import AppCard from "./ui/AppCard.vue";
 
 const loading = ref(false);
 const busy = ref(false);
@@ -143,12 +144,18 @@ onMounted(load);
 </script>
 
 <template>
-  <!-- Global Aegis Settings. Policy/permission TIDAK di sini: konfigurasi
-       project (mode/scope permission) dikelola per project di
-       Sidebar -> Projects -> Project Settings / Policy
-       (`<root>/.aegis/permissions.json`). -->
-  <section class="panel">
+  <AppCard variant="panel" class="settings-panel gs-panel">
+    <template #header>
+      <div class="panel-head">
+        <div class="title">Global Settings</div>
+      </div>
+    </template>
+
     <div class="panel-body">
+      <div v-if="error" class="gs-alert err">{{ error }}</div>
+      <div v-if="notice" class="gs-alert ok">{{ notice }}</div>
+
+      <!-- Scope Badge -->
       <div class="gs-scope">
         <span class="gs-scope-badge">Global AegisCode Settings</span>
         <span class="gs-scope-note">
@@ -160,244 +167,209 @@ onMounted(load);
           <span class="mono">Sidebar -&gt; Projects -&gt; Project Settings / Policy</span>.
         </span>
       </div>
-    </div>
-  </section>
 
-  <!-- Server -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Server</div>
-        <div class="desc">Port lokal yang dipakai AegisCode saat dijalankan.</div>
-      </div>
-      <AppButton variant="ghost" :disabled="loading || busy" @click="load">
-        Refresh
-      </AppButton>
-    </div>
-    <div class="panel-body">
-      <div v-if="error" class="gs-alert err">{{ error }}</div>
-      <div v-if="notice" class="gs-alert ok">{{ notice }}</div>
+      <div class="gs-sub-divider"></div>
 
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Port</div>
-          <div class="gs-help">
-            Port HTTP gateway AegisCode (1–65535). Perubahan berlaku saat AegisCode
-            dijalankan ulang.
+      <!-- Section: Server -->
+      <div class="gs-sub-section">
+        <div class="gs-sub-header">
+          <div class="gs-sub-title">Server</div>
+          <div class="gs-sub-desc">Port lokal yang dipakai AegisCode saat dijalankan.</div>
+        </div>
+
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Port</div>
+            <div class="gs-help">
+              Port HTTP gateway AegisCode (1–65535). Perubahan berlaku saat AegisCode dijalankan ulang.
+            </div>
+          </div>
+          <div class="gs-control">
+            <input
+              v-model.number="form.port"
+              class="gs-input"
+              type="number"
+              min="1"
+              max="65535"
+              step="1"
+              inputmode="numeric"
+            />
           </div>
         </div>
-        <div class="gs-control">
-          <input
-            v-model.number="form.port"
-            class="gs-input"
-            type="number"
-            min="1"
-            max="65535"
-            step="1"
-            inputmode="numeric"
-          />
-        </div>
-      </div>
 
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Terminasi Server</div>
-          <div class="gs-help">
-            Hentikan server AegisCode beserta seluruh sub-proses anak (PTY slave, background tasks) secara deterministik (Zero-Zombie). Port akan segera dilepaskan.
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Terminasi Server</div>
+            <div class="gs-help">
+              Hentikan server AegisCode beserta seluruh sub-proses anak (PTY slave, background tasks) secara deterministik (Zero-Zombie). Port akan segera dilepaskan.
+            </div>
+          </div>
+          <div class="gs-control">
+            <AppButton
+              variant="danger"
+              size="sm"
+              :disabled="isTerminating || serverTerminated"
+              @click="confirmTerminateServer"
+            >
+              {{ isTerminating ? "Menghentikan..." : (serverTerminated ? "Server Berhenti" : "Hentikan Server") }}
+            </AppButton>
           </div>
         </div>
-        <div class="gs-control">
-          <AppButton
-            variant="danger"
-            :disabled="isTerminating || serverTerminated"
-            @click="confirmTerminateServer"
-          >
-            {{ isTerminating ? "Menghentikan..." : (serverTerminated ? "Server Berhenti" : "Hentikan Server") }}
-          </AppButton>
-        </div>
-      </div>
 
-      <!-- Konfirmasi Penghentian Server -->
-      <div v-if="showTerminateConfirm" class="gs-confirm-box">
-        <div class="gs-confirm-title">Konfirmasi Penghentian Server</div>
-        <div class="gs-confirm-desc">
-          Apakah Anda yakin ingin menghentikan server AegisCode? Seluruh koneksi dan sesi terminal PTY aktif akan ditutup secara aman.
-        </div>
-        <div class="gs-confirm-actions">
-          <AppButton variant="ghost" @click="cancelTerminateServer">Batal</AppButton>
-          <AppButton variant="danger" @click="executeTerminateServer">Ya, Hentikan Server</AppButton>
-        </div>
-      </div>
-
-      <div class="gs-actions">
-        <AppButton variant="ghost" :disabled="busy" @click="reset">
-          Reset
-        </AppButton>
-        <AppButton variant="primary" :disabled="busy" @click="saveServer">
-          Save
-        </AppButton>
-      </div>
-    </div>
-  </section>
-
-  <!-- Conversation context -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Conversation</div>
-        <div class="desc">Perilaku konteks percakapan sebelum dikirim ke model.</div>
-      </div>
-    </div>
-    <div class="panel-body">
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Conversation compression</div>
-          <div class="gs-help">
-            Aktifkan peringkasan/pemadatan riwayat percakapan saat konteks
-            mendekati batas — hemat token, tetapi detail lama bisa diringkas.
+        <!-- Konfirmasi Penghentian Server -->
+        <div v-if="showTerminateConfirm" class="gs-confirm-box">
+          <div class="gs-confirm-title">Konfirmasi Penghentian Server</div>
+          <div class="gs-confirm-desc">
+            Apakah Anda yakin ingin menghentikan server AegisCode? Seluruh koneksi dan sesi terminal PTY aktif akan ditutup secara aman.
+          </div>
+          <div class="gs-confirm-actions">
+            <AppButton variant="ghost" size="sm" @click="cancelTerminateServer">Batal</AppButton>
+            <AppButton variant="danger" size="sm" @click="executeTerminateServer">Ya, Hentikan Server</AppButton>
           </div>
         </div>
-        <div class="gs-control">
-          <label class="slider-toggle gs-switch">
-            <input v-model="form.compression_enabled" type="checkbox" />
-            <span class="slider-track gs-track"><span class="slider-thumb gs-thumb"></span></span>
-            <span class="slider-state gs-state">{{ form.compression_enabled ? "Enabled" : "Disabled" }}</span>
-          </label>
+
+        <div class="gs-actions">
+          <AppButton variant="ghost" size="sm" :disabled="busy" @click="reset">Reset</AppButton>
+          <AppButton variant="primary" size="sm" :disabled="busy" @click="saveServer">Save</AppButton>
         </div>
       </div>
 
-      <div class="gs-actions">
-        <AppButton variant="ghost" :disabled="busy" @click="reset">
-          Reset
-        </AppButton>
-        <AppButton variant="primary" :disabled="busy" @click="saveConversation">
-          Save
-        </AppButton>
-      </div>
-    </div>
-  </section>
+      <div class="gs-sub-divider"></div>
 
-  <!-- Logging -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Logging</div>
-        <div class="desc">Pencatatan response mentah API provider per task.</div>
-      </div>
-    </div>
-    <div class="panel-body">
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Log API responses</div>
-          <div class="gs-help">
-            Simpan setiap response provider ke
-            <span class="mono">.aegis/log/response/&lt;task_id&gt;.json</span>
-            pada project target. Berguna untuk diagnosis, tetapi menambah berkas di
-            disk.
+      <!-- Section: Conversation Context -->
+      <div class="gs-sub-section">
+        <div class="gs-sub-header">
+          <div class="gs-sub-title">Conversation</div>
+          <div class="gs-sub-desc">Perilaku konteks percakapan sebelum dikirim ke model.</div>
+        </div>
+
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Conversation compression</div>
+            <div class="gs-help">
+              Aktifkan peringkasan/pemadatan riwayat percakapan saat konteks mendekati batas — hemat token, tetapi detail lama bisa diringkas.
+            </div>
+          </div>
+          <div class="gs-control">
+            <label class="slider-toggle gs-switch">
+              <input v-model="form.compression_enabled" type="checkbox" />
+              <span class="slider-track gs-track"><span class="slider-thumb gs-thumb"></span></span>
+              <span class="slider-state gs-state">{{ form.compression_enabled ? "Enabled" : "Disabled" }}</span>
+            </label>
           </div>
         </div>
-        <div class="gs-control">
-          <label class="slider-toggle gs-switch">
-            <input v-model="form.write_log_response_api" type="checkbox" />
-            <span class="slider-track gs-track"><span class="slider-thumb gs-thumb"></span></span>
-            <span class="slider-state gs-state">{{ form.write_log_response_api ? "Enabled" : "Disabled" }}</span>
-          </label>
+
+        <div class="gs-actions">
+          <AppButton variant="ghost" size="sm" :disabled="busy" @click="reset">Reset</AppButton>
+          <AppButton variant="primary" size="sm" :disabled="busy" @click="saveConversation">Save</AppButton>
         </div>
       </div>
 
-      <div class="gs-actions">
-        <AppButton variant="ghost" :disabled="busy" @click="reset">
-          Reset
-        </AppButton>
-        <AppButton variant="primary" :disabled="busy" @click="saveLogging">
-          Save
-        </AppButton>
-      </div>
-    </div>
-  </section>
+      <div class="gs-sub-divider"></div>
 
-  <!-- API Retry -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">API Retry</div>
-        <div class="desc">
-          Perilaku pengulangan request saat panggilan API provider gagal.
+      <!-- Section: Logging -->
+      <div class="gs-sub-section">
+        <div class="gs-sub-header">
+          <div class="gs-sub-title">Logging</div>
+          <div class="gs-sub-desc">Pencatatan response mentah API provider per task.</div>
         </div>
-      </div>
-    </div>
-    <div class="panel-body">
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Retry attempts</div>
-          <div class="gs-help">
-            Jumlah pengulangan SETELAH request gagal (0 = tanpa retry). Total
-            percobaan = 1 percobaan awal + nilai ini.
+
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Log API responses</div>
+            <div class="gs-help">
+              Simpan setiap response provider ke <span class="mono">.aegis/log/response/&lt;task_id&gt;.json</span> pada project target. Berguna untuk diagnosis, tetapi menambah berkas di disk.
+            </div>
+          </div>
+          <div class="gs-control">
+            <label class="slider-toggle gs-switch">
+              <input v-model="form.write_log_response_api" type="checkbox" />
+              <span class="slider-track gs-track"><span class="slider-thumb gs-thumb"></span></span>
+              <span class="slider-state gs-state">{{ form.write_log_response_api ? "Enabled" : "Disabled" }}</span>
+            </label>
           </div>
         </div>
-        <div class="gs-control">
-          <input
-            v-model.number="form.failed_count"
-            class="gs-input"
-            type="number"
-            min="0"
-            max="1000"
-            step="1"
-            inputmode="numeric"
-          />
+
+        <div class="gs-actions">
+          <AppButton variant="ghost" size="sm" :disabled="busy" @click="reset">Reset</AppButton>
+          <AppButton variant="primary" size="sm" :disabled="busy" @click="saveLogging">Save</AppButton>
         </div>
       </div>
 
-      <div class="gs-row">
-        <div class="gs-label">
-          <div class="gs-name">Retry delay (seconds)</div>
-          <div class="gs-help">
-            Jeda tunggu sebelum setiap pengulangan. 0 = langsung mengulang tanpa
-            jeda.
+      <div class="gs-sub-divider"></div>
+
+      <!-- Section: API Retry -->
+      <div class="gs-sub-section">
+        <div class="gs-sub-header">
+          <div class="gs-sub-title">API Retry</div>
+          <div class="gs-sub-desc">Perilaku pengulangan request saat panggilan API provider gagal.</div>
+        </div>
+
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Retry attempts</div>
+            <div class="gs-help">
+              Jumlah pengulangan SETELAH request gagal (0 = tanpa retry). Total percobaan = 1 percobaan awal + nilai ini.
+            </div>
+          </div>
+          <div class="gs-control">
+            <input
+              v-model.number="form.failed_count"
+              class="gs-input"
+              type="number"
+              min="0"
+              max="1000"
+              step="1"
+              inputmode="numeric"
+            />
           </div>
         </div>
-        <div class="gs-control">
-          <input
-            v-model.number="form.failed_sleep"
-            class="gs-input"
-            type="number"
-            min="0"
-            max="3600"
-            step="0.1"
-            inputmode="decimal"
-          />
+
+        <div class="gs-row">
+          <div class="gs-label">
+            <div class="gs-name">Retry delay (seconds)</div>
+            <div class="gs-help">
+              Jeda tunggu sebelum setiap pengulangan. 0 = langsung mengulang tanpa jeda.
+            </div>
+          </div>
+          <div class="gs-control">
+            <input
+              v-model.number="form.failed_sleep"
+              class="gs-input"
+              type="number"
+              min="0"
+              max="3600"
+              step="0.1"
+              inputmode="decimal"
+            />
+          </div>
+        </div>
+
+        <div class="gs-actions">
+          <AppButton variant="ghost" size="sm" :disabled="busy" @click="reset">Reset</AppButton>
+          <AppButton variant="primary" size="sm" :disabled="busy" @click="saveRetry">Save</AppButton>
         </div>
       </div>
 
-      <div class="gs-actions">
-        <AppButton variant="ghost" :disabled="busy" @click="reset">
-          Reset
-        </AppButton>
-        <AppButton variant="primary" :disabled="busy" @click="saveRetry">
-          Save
-        </AppButton>
-      </div>
-    </div>
-  </section>
+      <div class="gs-sub-divider"></div>
 
-  <!-- Nilai aktual pada `data/settings.json` (read-only, sumber kebenaran). -->
-  <section class="panel">
-    <div class="panel-head">
-      <div>
-        <div class="title">Actual values</div>
-        <div class="desc">
-          Nilai yang benar-benar dibaca AegisCode dari
-          <span class="mono">data/settings.json</span>.
+      <!-- Section: Actual values -->
+      <div class="gs-sub-section">
+        <div class="gs-sub-header">
+          <div class="gs-sub-title">Actual values</div>
+          <div class="gs-sub-desc">
+            Nilai yang benar-benar dibaca AegisCode dari <span class="mono">data/settings.json</span>.
+          </div>
+        </div>
+        <div class="gs-actual-grid">
+          <div v-for="line in actualLines" :key="line.label" class="kv">
+            <span class="k mono">{{ line.label }}</span>
+            <span class="v mono">{{ line.value }}</span>
+          </div>
         </div>
       </div>
     </div>
-    <div class="panel-body">
-      <div v-for="line in actualLines" :key="line.label" class="kv">
-        <span class="k mono">{{ line.label }}</span>
-        <span class="v mono">{{ line.value }}</span>
-      </div>
-    </div>
-  </section>
+  </AppCard>
 </template>
 
 <style scoped>
@@ -451,6 +423,34 @@ onMounted(load);
   color: var(--alert-ok-text);
   background: var(--alert-ok-bg);
   border-color: var(--alert-ok-border);
+}
+
+.gs-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gs-sub-header {
+  margin-bottom: 2px;
+}
+.gs-sub-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+.gs-sub-desc {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.gs-sub-divider {
+  height: 1px;
+  background: var(--line, var(--border-soft));
+  margin: 14px 0;
+}
+.gs-actual-grid {
+  display: grid;
+  gap: 8px;
 }
 
 .gs-row {
