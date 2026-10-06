@@ -42,9 +42,11 @@ def _default_extension_tool_resolver(action: str) -> bool:
     normal; aman, tidak pernah memaksa ALLOW).
     """
     try:
-        from agent_ai.tools.registry import is_extension_tool
+        import importlib
 
-        return bool(is_extension_tool(action))
+        registry = importlib.import_module("agent_ai.tools.registry")
+        is_ext = getattr(registry, "is_extension_tool", None)
+        return bool(is_ext(action)) if callable(is_ext) else False
     except Exception:  # noqa: BLE001 - resolver tidak boleh membuat evaluasi crash
         return False
 

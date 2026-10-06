@@ -52,6 +52,10 @@ import { mapMonacoMarkersToDiagnostics, classifyDiagnostic } from "../services/d
 import { useWorkbenchLayout } from "../composables/useWorkbenchLayout.js";
 import { useWorkbenchTabs } from "../composables/useWorkbenchTabs.js";
 import { useWorkbenchLiveEvents } from "../composables/useWorkbenchLiveEvents.js";
+import {
+  loadWorkspaceContext,
+  saveWorkspaceContext,
+} from "../services/workspaceContextService.js";
 
 const props = defineProps({
   config: {
@@ -210,6 +214,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  runningTaskId: {
+    type: String,
+    default: "",
+  },
   terminalLines: {
     type: Array,
     default: () => [],
@@ -301,6 +309,7 @@ const emit = defineEmits([
   "update:model-id",
   "update:mode",
   "refresh-config",
+  "refresh-history",
   "open-history-task",
   "open-consultant-session",
   "open-folder",
@@ -456,7 +465,7 @@ const effectiveConsultantProps = computed(() => {
     modelId: base.modelId || effectiveModelId.value,
     projectId: base.projectId || props.activeProject?.id || "",
     running: typeof base.running === "boolean" ? base.running : props.isRunning,
-    runningTaskId: base.runningTaskId || props.task?.id || "",
+    runningTaskId: props.runningTaskId || base.runningTaskId || props.task?.id || "",
     providerLabel: effectiveTaskProvider.value,
     modelLabel: effectiveTaskModel.value,
     activeTabPath: currentTab ? currentTab.path : "",
@@ -1071,12 +1080,86 @@ function clearAllTabs() {
   activeCodeEditorRef.value?.layout?.();
 }
 
+function restoreProjectContext(projectId) {
+  if (!projectId) return;
+  const ctx = loadWorkspaceContext(projectId);
+  if (Array.isArray(ctx?.editor?.tabs) && ctx.editor.tabs.length > 0) {
+    ctx.editor.tabs.forEach((t) => {
+      if (t.isDiff) {
+        openDiffTab(pane1TabsState, t.filePath || t.path);
+      } else {
+        openTab(pane1TabsState, t);
+      }
+    });
+    if (ctx.editor.activeTab) {
+      pane1TabsState.activeTab.value = ctx.editor.activeTab;
+    }
+  }
+  if (ctx?.layout) {
+    if (typeof ctx.layout.bottomDockOpen === "boolean") {
+      bottomDockOpen.value = ctx.layout.bottomDockOpen;
+    }
+    if (ctx.layout.dockActiveTab) {
+      dockActiveTab.value = ctx.layout.dockActiveTab;
+    }
+    if (typeof ctx.layout.dockHeight === "number") {
+      dockHeight.value = ctx.layout.dockHeight;
+    }
+    if (ctx.layout.assistantTab) {
+      assistantTab.value = ctx.layout.assistantTab;
+    }
+  }
+}
+
 watch(
   () => props.activeProject?.id,
   (newId, oldId) => {
     if (newId !== oldId) {
       clearAllTabs();
+      if (newId) {
+        restoreProjectContext(newId);
+      }
     }
+  },
+  { immediate: true }
+);
+
+watch(
+  [() => pane1TabsState.tabs.value, () => pane1TabsState.activeTab.value],
+  () => {
+    const pId = props.activeProject?.id;
+    if (!pId) return;
+    const serializedTabs = (pane1TabsState.tabs.value || [])
+      .filter((t) => t.path && !t.path.startsWith("aegis://welcome"))
+      .map((t) => ({
+        path: t.path,
+        filePath: t.filePath,
+        name: t.name,
+        isDiff: Boolean(t.isDiff),
+      }));
+    saveWorkspaceContext(pId, {
+      editor: {
+        tabs: serializedTabs,
+        activeTab: pane1TabsState.activeTab.value || "activity",
+      },
+    });
+  },
+  { deep: true }
+);
+
+watch(
+  [() => bottomDockOpen.value, () => dockActiveTab.value, () => dockHeight.value, () => assistantTab.value],
+  () => {
+    const pId = props.activeProject?.id;
+    if (!pId) return;
+    saveWorkspaceContext(pId, {
+      layout: {
+        bottomDockOpen: Boolean(bottomDockOpen.value),
+        dockActiveTab: dockActiveTab.value || "terminal",
+        dockHeight: Number(dockHeight.value) || 220,
+        assistantTab: assistantTab.value || "agents",
+      },
+    });
   }
 );
 
@@ -1313,6 +1396,7 @@ defineExpose({
           @stop-task="emit('stop-task', $event)"
           @view-task="emit('view-task', $event)"
           @open-history-task="emit('open-history-task', $event)"
+          @refresh-history="emit('refresh-history')"
           @open-consultant-session="handleOpenConsultantSession"
           @open-folder="emit('open-folder')"
           @select-tab="(path, pane) => handleSelectTab(path, pane)"

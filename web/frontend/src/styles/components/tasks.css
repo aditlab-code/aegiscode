@@ -640,6 +640,36 @@
   color: var(--text-faint, #8a849d);
 }
 
+.q-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  margin: 6px 8px;
+  border-radius: 6px;
+  background: var(--diff-del-bg, rgba(239, 68, 68, 0.12));
+  border: 1px solid var(--diff-del-border, rgba(239, 68, 68, 0.3));
+  color: var(--diff-del-text, #f87171);
+  font-size: 11px;
+}
+
+.q-retry-btn {
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: inherit;
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s ease;
+}
+
+.q-retry-btn:hover {
+  opacity: 1;
+}
+
 /* Queue List in Left Sidebar */
 .task-subpane .q-list {
   display: flex;

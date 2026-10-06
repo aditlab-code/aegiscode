@@ -58,10 +58,12 @@ class ProjectBrain:
         intelligence: ProjectIntelligence,
         provider: Optional[BaseProvider] = None,
         options: Optional[GenerateOptions] = None,
+        external_brain: Optional[Any] = None,
     ) -> None:
         self.intelligence = intelligence
         self._context = ProjectIntelligenceContext(intelligence)
         self._learner = IntelligenceLearner(intelligence, provider=provider, options=options)
+        self._external_brain = external_brain
 
     # ------------------------------------------------------------------ #
     # Factory (Bible project-local)
@@ -73,11 +75,13 @@ class ProjectBrain:
         provider: Optional[BaseProvider] = None,
         options: Optional[GenerateOptions] = None,
         use_brain: Optional[bool] = None,
+        enable_external_brain: Optional[bool] = None,
     ) -> "ProjectBrain":
         """Bangun Brain yang membaca/menulis Bible project-local di `root`.
 
         Knowledge disimpan di `<root>/.brain/` (Antigravity mode) atau
-        `<root>/.aegis/bible/` (Aegis default).
+        `<root>/.aegis/bible/` (Aegis default). Bila diaktifkan, memori global
+        Antigravity di root pengguna juga dapat diakses secara read-only.
         """
         is_antigravity = False
         if provider is not None:
@@ -86,7 +90,17 @@ class ProjectBrain:
                 is_antigravity = True
         active_use_brain = use_brain if use_brain is not None else is_antigravity
         intel = ProjectIntelligence.for_project(root, use_brain=active_use_brain)
-        return cls(intel, provider=provider, options=options)
+
+        ext_resolver = None
+        should_use_ext = enable_external_brain if enable_external_brain is not None else is_antigravity
+        if should_use_ext:
+            from agent_ai.projects.external_brain import ExternalBrainResolver
+            resolver = ExternalBrainResolver()
+            if resolver.is_available():
+                ext_resolver = resolver
+
+        return cls(intel, provider=provider, options=options, external_brain=ext_resolver)
+
     # ------------------------------------------------------------------ #
     # Read
     # ------------------------------------------------------------------ #
@@ -105,6 +119,10 @@ class ProjectBrain:
             BrainContext (text + jumlah entry per kategori).
         """
         text = self._context.to_context_text(categories=categories, include_empty=include_empty)
+        if self._external_brain is not None:
+            ext_summary = self._external_brain.get_summary_context()
+            if ext_summary:
+                text = f"{text}\n\n{ext_summary}" if text else ext_summary
         summary = self._context.summary(categories=categories)
         return BrainContext(text=text, categories=summary)
 

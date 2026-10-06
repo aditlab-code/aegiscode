@@ -662,6 +662,10 @@ class TaskLogReader:
             events.append(event)
         return events
 
+    def read_events(self) -> List[Dict[str, Any]]:
+        """Alias untuk load_events() demi kompatibilitas pemanggil."""
+        return self.load_events()
+
     def get_task_info(self) -> Optional[Dict[str, Any]]:
         """Ambil ringkasan task dari log (task_id, first/last timestamp, status, prompt).
 
@@ -681,12 +685,15 @@ class TaskLogReader:
         prompt = ""
         result = None
         error = None
+        has_active_work = False
 
         for ev in events:
             evt = ev.get("event", "")
             data = ev.get("data", {}) or {}
             if evt == "task_requested":
                 prompt = data.get("prompt", "")
+            elif evt in ("task_started", "tool_called", "observation_received", "phase_changed", "provider_request", "agent_commentary"):
+                has_active_work = True
             elif evt == "task_completed":
                 status = "completed"
                 result = data.get("result")
@@ -703,6 +710,9 @@ class TaskLogReader:
                         result = data.get("result")
                     if data.get("error") is not None and error is None:
                         error = data.get("error")
+
+        if status == "incomplete" and has_active_work:
+            status = "running"
 
         return {
             "task_id": self.task_id,

@@ -98,6 +98,7 @@ const emit = defineEmits([
   "stop-task",
   "view-task",
   "open-history-task",
+  "refresh-history",
   "open-consultant-session",
   "select-tab",
   "close-tab",
@@ -151,6 +152,8 @@ watch(
   ([tab]) => {
     if (tab === "sessions") {
       loadConsultantSessions();
+    } else if (tab === "history") {
+      emit("refresh-history");
     }
   },
   { immediate: true }
@@ -349,7 +352,7 @@ function statusTagClass(st) {
             :class="{ active: taskSubTab === 'history' }"
             role="tab"
             :aria-selected="taskSubTab === 'history'"
-            @click="taskSubTab = 'history'"
+            @click="taskSubTab = 'history'; emit('refresh-history');"
           >
             History
             <span v-if="taskHistory.length" class="subtab-count">{{ taskHistory.length }}</span>
@@ -383,7 +386,7 @@ function statusTagClass(st) {
           <div v-if="taskSubTab === 'history'" class="task-subpane sidebar-history-pane">
             <div v-if="!taskHistory.length" class="side-task-empty">
               <span>No recorded task history</span>
-              <small>Completed tasks will appear here</small>
+              <small>Active and completed tasks will appear here</small>
             </div>
             <div v-else class="side-hist-list">
               <div
@@ -392,8 +395,8 @@ function statusTagClass(st) {
                 class="side-hist-item"
                 role="button"
                 tabindex="0"
-                @click="emit('open-history-task', t.task_id)"
-                @keydown.enter="emit('open-history-task', t.task_id)"
+                @click="emit('open-history-task', t)"
+                @keydown.enter="emit('open-history-task', t)"
               >
                 <div class="side-hist-top">
                   <span class="status-tag" :class="statusTagClass(t.status)">{{ t.status }}</span>

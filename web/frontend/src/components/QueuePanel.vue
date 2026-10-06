@@ -116,8 +116,7 @@ async function load() {
     error.value = "";
   } catch (e) {
     if (currentGen !== loadGeneration) return;
-    // Endpoint queue mungkin belum tersedia; UI tetap aman.
-    error.value = "";
+    error.value = e?.message || "Failed to load task queue.";
   } finally {
     if (currentGen === loadGeneration) {
       loading.value = false;
@@ -309,7 +308,11 @@ watch(
     </div>
 
     <div v-show="hideHeader || !collapsed" class="q-body">
-      <div v-if="!tasks.length" class="side-task-empty q-empty">
+      <div v-if="error" class="q-error-banner" role="alert">
+        <span>{{ error }}</span>
+        <button type="button" class="q-retry-btn" @click="load">Retry</button>
+      </div>
+      <div v-if="!tasks.length && !error" class="side-task-empty q-empty">
         <span>No tasks in queue</span>
         <small>Submitted tasks waiting for execution will appear here</small>
       </div>

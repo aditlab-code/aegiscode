@@ -118,6 +118,15 @@ def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
     return str(params.get("path") or params.get("command") or params.get("target") or "")
 
 
+def _tool_call_signature(tool_name: str, params: Dict[str, Any]) -> str:
+    """Buat signature kanonikal dari tool call untuk mendeteksi perulangan identik."""
+    try:
+        norm_params = json.dumps(params, sort_keys=True, default=str)
+    except Exception:
+        norm_params = str(params)
+    return f"{tool_name}:{norm_params}"
+
+
 def _format_antigravity_policy_directive(mode: str) -> str:
     """Format prompt direktif guardrail ketat untuk Antigravity CLI."""
     mode_clean = (mode or "balanced").lower().strip()
@@ -128,6 +137,10 @@ def _format_antigravity_policy_directive(mode: str) -> str:
         "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
         "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
         "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
+        "5. NO REPETITIVE SEARCH QUERIES: Do NOT repeat identical search queries or list directory calls. If a search yields 0 results, do not repeat with minor variations; adjust your strategy or proceed with implementation.",
+        "6. NO BLIND SHELL DISCOVERY: Do NOT run raw shell commands like 'find', 'dir', or indiscriminate 'ls' to scan the directory tree. Prioritize the provided Workspace Intel target files or targeted search tools.",
+        "7. VERIFY MANIFEST BEFORE TESTING: Do NOT blindly run 'npm test', 'pytest', or build commands without first reading and verifying the project manifest (e.g. package.json, pyproject.toml) to confirm that the script or test framework actually exists.",
+        "8. NO UNREQUESTED GIT DUMPS: Do NOT run 'git show', 'git log', or commit diff dumps unless the user explicitly requested git history analysis.",
     ]
 
     if mode_clean == "fast":
@@ -154,6 +167,301 @@ def _format_antigravity_policy_directive(mode: str) -> str:
         ])
 
     return "\n".join(rules)
+
+
+_IGNORE_DIRS = {
+    ".git",
+    "node_modules",
+    "dist",
+    "build",
+    ".aegis",
+    ".aether",
+    ".brain",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".turbo",
+    ".next",
+    ".nuxt",
+    ".output",
+    "target",
+    "vendor",
+    ".cache",
+    ".pytest_cache",
+    ".coverage",
+}
+
+_CODE_EXTS = {
+    ".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte",
+    ".py", ".go", ".rs", ".php", ".rb", ".java",
+    ".c", ".cpp", ".h", ".hpp", ".cs", ".html",
+    ".css", ".scss", ".json", ".yaml", ".yml", ".toml", ".sql"
+}
+
+_COMMON_STOP_WORDS = {
+    "buat", "bikin", "tambah", "ubah", "ganti", "file", "berkas", "code", "kode",
+    "project", "aplikasi", "yang", "dan", "atau", "pada", "untuk", "dengan", "saya",
+    "kamu", "bisa", "tolong", "make", "create", "update", "modify", "please", "help",
+    "from", "with", "into", "that", "this", "test", "testing", "cek", "check", "fix",
+    "error", "bug", "perbaiki", "fitur", "feature", "run", "jalankan",
+}
+
+
+def _detect_manifest_intel(cwd_path: Path) -> List[str]:
+    """Deteksi file manifest (package.json, pyproject.toml, Cargo.toml, go.mod) secara dinamis."""
+    intel: List[str] = []
+
+    # 1. Node.js / JavaScript / TypeScript
+    pkg_json_path = cwd_path / "package.json"
+    if pkg_json_path.is_file():
+        try:
+            with open(pkg_json_path, "r", encoding="utf-8") as f:
+                pkg_data = json.load(f)
+            scripts = pkg_data.get("scripts", {})
+            script_names = list(scripts.keys())
+            if "test" in script_names:
+                intel.append(
+                    f"package.json detected. Defined scripts: {script_names} (script 'test' is available: 'npm test')"
+                )
+            else:
+                intel.append(
+                    f"package.json detected. Defined scripts: {script_names} (CRITICAL: NO 'test' script found in package.json; do NOT run npm test)"
+                )
+        except Exception:
+            intel.append("package.json detected (unparseable)")
+
+    # 2. Python
+    pyproject_path = cwd_path / "pyproject.toml"
+    setup_py = cwd_path / "setup.py"
+    req_txt = cwd_path / "requirements.txt"
+    if pyproject_path.is_file():
+        intel.append("pyproject.toml detected (Python project).")
+    elif setup_py.is_file():
+        intel.append("setup.py detected (Python project).")
+    elif req_txt.is_file():
+        intel.append("requirements.txt detected (Python project).")
+
+    # 3. Rust
+    if (cwd_path / "Cargo.toml").is_file():
+        intel.append("Cargo.toml detected (Rust project; use cargo commands).")
+
+    # 4. Go
+    if (cwd_path / "go.mod").is_file():
+        intel.append("go.mod detected (Go module project).")
+
+    # 5. PHP
+    if (cwd_path / "composer.json").is_file():
+        intel.append("composer.json detected (PHP Composer project).")
+
+    return intel
+
+
+def _extract_query_keywords(query: str) -> List[str]:
+    """Ekstrak token kata kunci relevan dari kueri pengguna."""
+    if not query:
+        return []
+    tokens = re.findall(r"[A-Za-z0-9_]{3,}", query.lower())
+    keywords = [t for t in tokens if t not in _COMMON_STOP_WORDS]
+    seen = set()
+    result = []
+    for k in keywords:
+        if k not in seen:
+            seen.add(k)
+            result.append(k)
+    return result
+
+
+def _resolve_semantic_search_candidates(cwd_path: Path, query: str, limit: int) -> List[Dict[str, Any]]:
+    """Gunakan SemanticIndexService lokal jika database vektor tersedia."""
+    if not query.strip():
+        return []
+    try:
+        from agent_ai.repointel.semantic.availability import is_available
+        avail, _ = is_available()
+        if not avail:
+            return []
+        from agent_ai.repointel.semantic.paths import resolve_vectors_db
+        db_path = resolve_vectors_db(cwd_path)
+        if not db_path.is_file():
+            return []
+        from agent_ai.repointel.semantic.service import SemanticIndexService
+        with SemanticIndexService(root=cwd_path, read_only=True) as service:
+            results = service.search(query=query, k=limit)
+            candidates = []
+            for r in results:
+                rel_path = r.get("path")
+                if rel_path:
+                    candidates.append({
+                        "path": str(rel_path).replace("\\", "/"),
+                        "symbol": r.get("symbol"),
+                        "kind": r.get("kind"),
+                        "start_line": r.get("start_line"),
+                        "end_line": r.get("end_line"),
+                    })
+            return candidates
+    except Exception:
+        return []
+
+
+def _extract_file_symbols(file_path: Path, max_lines: int = 60) -> List[str]:
+    """Ekstrak simbol penting secara instan dari awal berkas tanpa overhead eksternal."""
+    ext = file_path.suffix.lower()
+    symbols: List[str] = []
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            for idx, line in enumerate(f):
+                if idx >= max_lines:
+                    break
+                line_str = line.strip()
+                if ext in (".ts", ".tsx", ".js", ".jsx"):
+                    m = re.search(r"export\s+(?:default\s+)?(?:function|const|class|type|interface)\s+([A-Za-z0-9_]+)", line_str)
+                    if m:
+                        symbols.append(m.group(1))
+                elif ext == ".py":
+                    m = re.search(r"^(?:def|class)\s+([A-Za-z0-9_]+)", line_str)
+                    if m:
+                        symbols.append(m.group(1))
+                elif ext in (".go", ".rs"):
+                    m = re.search(r"^(?:func|fn|struct|type)\s+([A-Za-z0-9_]+)", line_str)
+                    if m:
+                        symbols.append(m.group(1))
+    except Exception:
+        pass
+    return symbols[:3]
+
+
+def _fallback_dynamic_code_scan(cwd_path: Path, query: str, limit: int) -> List[Dict[str, Any]]:
+    """Pindai seluruh struktur repositori secara dinamis untuk menemukan berkas kode paling relevan."""
+    keywords = _extract_query_keywords(query)
+    all_candidates: List[tuple[int, Path]] = []
+    scanned_count = 0
+    max_scan = 2000
+
+    try:
+        for root, dirs, files in os.walk(cwd_path):
+            dirs[:] = [d for d in dirs if d not in _IGNORE_DIRS and not d.startswith(".")]
+            for file in files:
+                scanned_count += 1
+                if scanned_count > max_scan:
+                    break
+                p = Path(root) / file
+                ext = p.suffix.lower()
+                if ext not in _CODE_EXTS:
+                    continue
+                try:
+                    rel_p = p.relative_to(cwd_path).as_posix()
+                except ValueError:
+                    rel_p = p.as_posix()
+
+                rel_lower = rel_p.lower()
+                file_stem_lower = p.stem.lower()
+
+                score = 0
+                for kw in keywords:
+                    if kw == file_stem_lower:
+                        score += 30
+                    elif kw in file_stem_lower:
+                        score += 20
+                    elif kw in rel_lower:
+                        score += 10
+
+                if keywords and score > 0:
+                    try:
+                        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                            content_sample = "".join([f.readline() for _ in range(50)]).lower()
+                            for kw in keywords:
+                                if kw in content_sample:
+                                    score += 8
+                    except Exception:
+                        pass
+                elif not keywords:
+                    # Bila tidak ada kata kunci spesifik, prioritaskan berkas kode terdekat dari root workspace
+                    try:
+                        depth = len(p.relative_to(cwd_path).parts)
+                    except ValueError:
+                        depth = 1
+                    score = max(1, 15 - depth)
+
+                if score > 0:
+                    all_candidates.append((score, p))
+            if scanned_count > max_scan:
+                break
+    except Exception:
+        pass
+
+    all_candidates.sort(key=lambda x: x[0], reverse=True)
+    top_files = all_candidates[:limit]
+
+    results: List[Dict[str, Any]] = []
+    for _, p in top_files:
+        try:
+            rel = p.relative_to(cwd_path).as_posix()
+        except ValueError:
+            rel = p.as_posix()
+        syms = _extract_file_symbols(p)
+        results.append({
+            "path": rel,
+            "symbols": syms,
+        })
+    return results
+
+
+def _resolve_dynamic_code_context(cwd_path: Optional[str], query: str, mode: str) -> str:
+    """Susun Workspace Intel dinamis dari manifest dan pencarian semantik / fallback AST."""
+    if not cwd_path or not os.path.isdir(cwd_path):
+        return ""
+
+    mode_clean = (mode or "balanced").lower().strip()
+    if mode_clean == "fast":
+        limit = 3
+    elif mode_clean == "deep":
+        limit = 8
+    else:  # balanced
+        limit = 5
+
+    root = Path(cwd_path).resolve()
+    manifest_info = _detect_manifest_intel(root)
+
+    semantic_candidates = _resolve_semantic_search_candidates(root, query, limit)
+    targets: List[str] = []
+
+    if semantic_candidates:
+        for idx, c in enumerate(semantic_candidates, 1):
+            sym = f" (symbol: {c['symbol']})" if c.get("symbol") else ""
+            targets.append(f"{idx}. {c['path']}{sym}")
+    else:
+        ast_candidates = _fallback_dynamic_code_scan(root, query, limit)
+        for idx, c in enumerate(ast_candidates, 1):
+            sym_str = f" (exported: {', '.join(c['symbols'])})" if c.get("symbols") else ""
+            targets.append(f"{idx}. {c['path']}{sym_str}")
+
+    intel_lines: List[str] = [
+        "============================================================",
+        "WORKSPACE INTEL (DYNAMIC CODE DISCOVERY - PRE-COMPUTED)",
+        "============================================================",
+    ]
+
+    if manifest_info:
+        intel_lines.append("Project Manifest & Scripts:")
+        for m in manifest_info:
+            intel_lines.append(f"- {m}")
+        intel_lines.append("")
+
+    if targets:
+        intel_lines.append(f"Pre-Discovered Relevant Target Code ({mode_clean.upper()} Mode - Top {len(targets)}):")
+        intel_lines.extend(targets)
+        intel_lines.extend([
+            "",
+            "ACTION DIRECTIVE: Focus your read_file / edit_file actions directly on the target files above.",
+            "Do NOT run blind exploratory shell commands ('find .', 'ls -R', or blind tests) to locate files.",
+        ])
+    else:
+        intel_lines.extend([
+            "Workspace Note: No specific code files matched pre-retrieval. Use targeted search_code or read_file.",
+        ])
+
+    intel_lines.append("============================================================")
+    return "\n".join(intel_lines)
 
 
 def _extract_tool_call_dict(tc: Any) -> Dict[str, Any]:
@@ -408,12 +716,35 @@ class AntigravityProvider(BaseProvider):
 
         cli = self._resolve_cli_path()
         if cli:
+            cwd = (
+                (options.extra.get("workspace_root") if options and options.extra else None)
+                or getattr(self.config, "workspace_root", None)
+                or None
+            )
+            target_cwd: Optional[str] = None
+            if cwd and os.path.exists(str(cwd)):
+                target_cwd = str(Path(cwd).resolve())
+
             policy_mode = (
                 (options.extra.get("execution_policy", {}).get("effective_mode") if options and options.extra else None)
                 or (options.extra.get("mode") if options and options.extra else None)
                 or "balanced"
             )
             policy_directive = _format_antigravity_policy_directive(policy_mode)
+
+            query = ""
+            if prompt:
+                query = prompt
+            elif messages:
+                for msg in reversed(messages):
+                    if _extract_msg_role(msg).lower() == "user":
+                        query = _extract_msg_content(msg)
+                        break
+
+            if target_cwd:
+                workspace_intel = _resolve_dynamic_code_context(target_cwd, query, policy_mode)
+                if workspace_intel:
+                    policy_directive = f"{policy_directive}\n\n{workspace_intel}"
 
             if messages:
                 input_text = self._format_messages_to_prompt(
@@ -432,20 +763,12 @@ class AntigravityProvider(BaseProvider):
                 if options and options.extra and callable(options.extra.get("event_sink"))
                 else None
             )
-            cwd = (
-                (options.extra.get("workspace_root") if options and options.extra else None)
-                or getattr(self.config, "workspace_root", None)
-                or None
-            )
-            target_cwd: Optional[str] = None
-            if cwd and os.path.exists(str(cwd)):
-                target_cwd = str(Path(cwd).resolve())
 
             # Bila event_sink tersedia, gunakan stream-json agar intermediate tool
             # calls dipancarkan real-time ke UI timeline Aegis saat agy berjalan.
             use_streaming = event_sink is not None
             output_format = "stream-json" if use_streaming else "json"
-            cmd = [cli, "-p", input_text, "--model", model, "--output-format", output_format]
+            cmd = [cli, "-p", input_text, "--model", model, "--output-format", output_format, "--dangerously-skip-permissions"]
             if options and options.max_tokens is not None:
                 cmd.extend(["--max-tokens", str(options.max_tokens)])
             if target_cwd:
@@ -460,6 +783,27 @@ class AntigravityProvider(BaseProvider):
                 env["GOOGLE_CLOUD_LOCATION"] = self.config.location
 
             timeout = self.config.timeout or 120
+
+            cancel_check = (
+                options.extra.get("cancel_check")
+                if options and options.extra and callable(options.extra.get("cancel_check"))
+                else None
+            )
+            cancel_token = (
+                options.extra.get("cancel_token")
+                if options and options.extra
+                else None
+            )
+
+            def is_cancelled() -> bool:
+                if cancel_check is not None and cancel_check():
+                    return True
+                if cancel_token is not None and getattr(cancel_token, "is_cancelled", None) and cancel_token.is_cancelled():
+                    return True
+                return False
+
+            if is_cancelled():
+                raise ProviderUnavailableError("Antigravity execution dibatalkan oleh pengguna (user stop).")
 
             # Jalur A: Live streaming via subprocess.Popen (real Antigravity CLI execution)
             if use_streaming and subprocess.run is _orig_subprocess_run:
@@ -485,8 +829,15 @@ class AntigravityProvider(BaseProvider):
                 start_time = time.time()
                 files_read_set: set[str] = set()
                 file_read_counts: Dict[str, int] = {}
+                tool_call_counts: Dict[str, int] = {}
+                zero_result_streak = 0
                 try:
                     while True:
+                        if is_cancelled():
+                            proc.kill()
+                            raise ProviderUnavailableError(
+                                "Antigravity execution dibatalkan oleh pengguna (user stop)."
+                            )
                         if time.time() - start_time > timeout:
                             proc.kill()
                             raise ProviderUnavailableError(
@@ -496,6 +847,11 @@ class AntigravityProvider(BaseProvider):
                         if not line:
                             if proc.poll() is not None:
                                 break
+                            if is_cancelled():
+                                proc.kill()
+                                raise ProviderUnavailableError(
+                                    "Antigravity execution dibatalkan oleh pengguna (user stop)."
+                                )
                             time.sleep(0.02)
                             continue
 
@@ -608,6 +964,37 @@ class AntigravityProvider(BaseProvider):
                                                     response_body=f"Circuit breaker: fast mode read limit exceeded ({len(files_read_set)} > 3)",
                                                 )
 
+                                        # Multi-Tool Signature Redundancy Tracking & Circuit Breaker (non-read_file)
+                                        if aegis_tool != "read_file":
+                                            tool_sig = _tool_call_signature(aegis_tool, params)
+                                            tool_count = tool_call_counts.get(tool_sig, 0) + 1
+                                            tool_call_counts[tool_sig] = tool_count
+
+                                            if tool_count > 2:
+                                                loop_warning = (
+                                                    f"[PERINGATAN REDUNDANSI] Tool '{aegis_tool}' dipanggil berulang ({tool_count}x) dengan parameter identik. "
+                                                    "Harap segera beralih ke analisis berkas atau perencanaan implementasi."
+                                                )
+                                                logger.warning("Redundant tool call detected: %s (%dx)", tool_sig, tool_count)
+                                                if event_sink:
+                                                    event_sink("warning", {
+                                                        "message": loop_warning,
+                                                        "tool": aegis_tool,
+                                                        "signature": tool_sig,
+                                                        "call_count": tool_count,
+                                                    })
+                                                    event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+
+                                            if tool_count >= 4 or (policy_mode == "fast" and tool_count >= 3):
+                                                proc.kill()
+                                                raise ProviderAPIError(
+                                                    f"Circuit Breaker Loop Terpicu: Tool '{aegis_tool}' dipanggil {tool_count}x dengan parameter identik. "
+                                                    "Eksekusi dihentikan untuk mencegah pemborosan token dan perulangan tak berujung.",
+                                                    status_code=429,
+                                                    endpoint="agy CLI",
+                                                    response_body=f"Circuit breaker: duplicate tool call loop ({tool_sig})",
+                                                )
+
                                         if event_sink:
                                             event_sink("tool_called", {
                                                 "tool": aegis_tool,
@@ -625,6 +1012,20 @@ class AntigravityProvider(BaseProvider):
                                             )
                                             if isinstance(output, str):
                                                 output = output + re_read_warning
+
+                                        out_text = str(output or "").strip().lower()
+                                        is_empty_search = out_text in ("", "[]", "{}", "0 results", "not found", "no match", "no files found", "none")
+                                        if is_empty_search and aegis_tool in ("search_code", "list_files"):
+                                            zero_result_streak += 1
+                                            if zero_result_streak >= 3:
+                                                zero_warning = (
+                                                    "\n\n[SISTEM GUARDRAIL] Peringatan: Tiga pencarian berturut-turut menghasilkan 0 hasil. "
+                                                    "Hentikan variasi pencarian acak dan periksa struktur berkas root proyek aktif."
+                                                )
+                                                if isinstance(output, str):
+                                                    output = output + zero_warning
+                                        else:
+                                            zero_result_streak = 0
                                         event_sink("tool_completed", {
                                             "tool": aegis_tool,
                                             "success": True,
@@ -647,15 +1048,56 @@ class AntigravityProvider(BaseProvider):
                                     text_delta = step_update.get("text_delta")
                                     if text_delta:
                                         accumulated_text.append(text_delta)
+                            elif item.get("event") == "result":
+                                res_obj = item.get("result") or {}
+                                final_response = res_obj.get("response") or ""
+                                raw_data = res_obj
+                                status_code_val = res_obj.get("status") or "SUCCESS"
+                                if status_code_val == "ERROR":
+                                    err_detail = res_obj.get("error") or "Antigravity CLI execution error"
+                                    try:
+                                        proc.kill()
+                                    except Exception:
+                                        pass
+                                    raise ProviderAPIError(
+                                        f"Antigravity CLI mengembalikan status ERROR: {err_detail}",
+                                        status_code=500,
+                                        endpoint="agy CLI",
+                                        response_body=err_detail,
+                                    )
+                                usage_obj = res_obj.get("usage") or {}
+                                if event_sink and usage_obj:
+                                    event_sink("provider_response", {
+                                        "usage": {
+                                            "prompt_tokens": usage_obj.get("input_tokens", 0),
+                                            "completion_tokens": usage_obj.get("output_tokens", 0),
+                                            "total_tokens": usage_obj.get("total_tokens", 0),
+                                        }
+                                    })
+                                break
                             elif "response" in item and item.get("response"):
                                 final_response = item["response"]
                                 raw_data = item
+                                break
                 except Exception:
                     proc.kill()
                     raise
 
-                stderr_text = proc.stderr.read().strip() if proc.stderr else ""
-                proc.wait()
+                stderr_text = ""
+                try:
+                    if proc.stderr:
+                        stderr_text = proc.stderr.read().strip()
+                except Exception:
+                    pass
+
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2)
+                except Exception:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
 
                 ret_code = getattr(proc, "returncode", 0)
                 if ret_code != 0 and not accumulated_text and not final_response:
@@ -680,15 +1122,43 @@ class AntigravityProvider(BaseProvider):
                 )
 
             # Jalur B: Standar subprocess.run (untuk mock unit test atau non-streaming)
+            if is_cancelled():
+                raise ProviderUnavailableError("Antigravity execution dibatalkan oleh pengguna (user stop).")
+
             try:
-                proc = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    env=env,
-                    cwd=target_cwd,
-                    timeout=timeout,
-                )
+                if subprocess.run is _orig_subprocess_run:
+                    proc_b = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        env=env,
+                        cwd=target_cwd,
+                    )
+                    start_b = time.time()
+                    while proc_b.poll() is None:
+                        if is_cancelled():
+                            proc_b.kill()
+                            raise ProviderUnavailableError(
+                                "Antigravity execution dibatalkan oleh pengguna (user stop)."
+                            )
+                        if time.time() - start_b > timeout:
+                            proc_b.kill()
+                            raise ProviderUnavailableError(
+                                f"Antigravity CLI timeout setelah {timeout} detik."
+                            )
+                        time.sleep(0.05)
+                    stdout_b, stderr_b = proc_b.communicate()
+                    proc = subprocess.CompletedProcess(cmd, proc_b.returncode, stdout_b, stderr_b)
+                else:
+                    proc = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        env=env,
+                        cwd=target_cwd,
+                        timeout=timeout,
+                    )
             except subprocess.TimeoutExpired as exc:
                 raise ProviderUnavailableError(
                     f"Antigravity CLI timeout setelah {timeout} detik."
@@ -715,6 +1185,8 @@ class AntigravityProvider(BaseProvider):
                 final_response = ""
                 raw_data = {}
                 file_read_counts: Dict[str, int] = {}
+                tool_call_counts: Dict[str, int] = {}
+                zero_result_streak = 0
                 for line in stdout.splitlines():
                     line_str = line.strip()
                     if not line_str:
@@ -762,6 +1234,27 @@ class AntigravityProvider(BaseProvider):
                                             event_sink("agent_reasoning_delta", {
                                                 "delta": f"\n{warning_msg}\n",
                                             })
+
+                                    # Multi-Tool Signature Redundancy Tracking (non-read_file)
+                                    if aegis_tool != "read_file":
+                                        tool_sig = _tool_call_signature(aegis_tool, params)
+                                        tool_count = tool_call_counts.get(tool_sig, 0) + 1
+                                        tool_call_counts[tool_sig] = tool_count
+                                        if tool_count > 2:
+                                            loop_warning = (
+                                                f"[PERINGATAN REDUNDANSI] Tool '{aegis_tool}' dipanggil berulang ({tool_count}x) dengan parameter identik. "
+                                                "Harap segera beralih ke analisis berkas atau perencanaan implementasi."
+                                            )
+                                            logger.warning("Redundant tool call detected: %s (%dx)", tool_sig, tool_count)
+                                            if event_sink:
+                                                event_sink("warning", {
+                                                    "message": loop_warning,
+                                                    "tool": aegis_tool,
+                                                    "signature": tool_sig,
+                                                    "call_count": tool_count,
+                                                })
+                                                event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
                                         "arguments": params,
@@ -778,6 +1271,20 @@ class AntigravityProvider(BaseProvider):
                                         )
                                         if isinstance(output, str):
                                             output = output + re_read_warning
+
+                                    out_text = str(output or "").strip().lower()
+                                    is_empty_search = out_text in ("", "[]", "{}", "0 results", "not found", "no match", "no files found", "none")
+                                    if is_empty_search and aegis_tool in ("search_code", "list_files"):
+                                        zero_result_streak += 1
+                                        if zero_result_streak >= 3:
+                                            zero_warning = (
+                                                "\n\n[SISTEM GUARDRAIL] Peringatan: Tiga pencarian berturut-turut menghasilkan 0 hasil. "
+                                                "Hentikan variasi pencarian acak dan periksa struktur berkas root proyek aktif."
+                                            )
+                                            if isinstance(output, str):
+                                                output = output + zero_warning
+                                    else:
+                                        zero_result_streak = 0
                                     event_sink("tool_completed", {
                                         "tool": aegis_tool,
                                         "success": True,
@@ -800,9 +1307,32 @@ class AntigravityProvider(BaseProvider):
                                 text_delta = step_update.get("text_delta")
                                 if text_delta:
                                     accumulated_text.append(text_delta)
+                        elif item.get("event") == "result":
+                            res_obj = item.get("result") or {}
+                            final_response = res_obj.get("response") or ""
+                            raw_data = res_obj
+                            if res_obj.get("status") == "ERROR":
+                                err_detail = res_obj.get("error") or "Antigravity CLI execution error"
+                                raise ProviderAPIError(
+                                    f"Antigravity CLI mengembalikan status ERROR: {err_detail}",
+                                    status_code=500,
+                                    endpoint="agy CLI",
+                                    response_body=err_detail,
+                                )
+                            usage_obj = res_obj.get("usage") or {}
+                            if event_sink and usage_obj:
+                                event_sink("provider_response", {
+                                    "usage": {
+                                        "prompt_tokens": usage_obj.get("input_tokens", 0),
+                                        "completion_tokens": usage_obj.get("output_tokens", 0),
+                                        "total_tokens": usage_obj.get("total_tokens", 0),
+                                    }
+                                })
+                            break
                         elif "response" in item and item.get("response"):
                             final_response = item["response"]
                             raw_data = item
+                            break
                 text = "".join(accumulated_text) or final_response or stdout
                 data = raw_data or {"status": "SUCCESS", "response": text}
             else:

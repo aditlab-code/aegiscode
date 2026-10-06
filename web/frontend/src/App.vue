@@ -19,7 +19,7 @@ import AppModal from "./components/ui/AppModal.vue";
 import AppButton from "./components/ui/AppButton.vue";
 import LoginOverlay from "./components/LoginOverlay.vue";
 import { formatTokens, usageTokens } from "./tokenFormat.js";
-import { shouldAdoptSubmittedTask, shouldFollowStartedTask } from "./taskView.js";
+import { isViewedTaskRunning, shouldAdoptSubmittedTask, shouldFollowStartedTask } from "./taskView.js";
 import { isEventForMonitoredTask } from "./services/taskStateReducer.js";
 import { useAuth } from "./services/authService.js"; import { startServerHealthMonitor } from "./services/serverService.js";
 import {
@@ -35,6 +35,13 @@ import { getDefaultCommands, matchesShortcut } from "./services/commandPaletteSe
 import { statusTagClass, computeTaskTelemetry } from "./services/taskService.js";
 import { buildLifecycleStates, activityPhaseIndex, addMilestone, VALIDATING_STEP } from "./lifecycle.js";
 import { useWorkspaceFiles } from "./services/fileCacheService.js";
+import {
+  loadWorkspaceContext,
+  saveWorkspaceContext,
+  saveGlobalActiveProjectId,
+  getGlobalActiveProjectId,
+  clearWorkspaceContext,
+} from "./services/workspaceContextService.js";
 
 // Layout & Navigation State
 const themeState = createThemeState(), responsive = createResponsiveState();
@@ -85,6 +92,11 @@ watch(selectedProviderInstanceId, (val) => {
 watch(selectedModelId, (val) => {
   if (typeof localStorage !== "undefined" && val) {
     try { localStorage.setItem("aegis_model_id", val); } catch (_) {}
+  }
+});
+watch(activeNav, (newNav) => {
+  if (activeProject.value?.id && newNav) {
+    saveWorkspaceContext(activeProject.value.id, { activeNav: newNav });
   }
 });
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
@@ -177,6 +189,7 @@ function handleEvent(evt) {
         deferredTaskIds.delete(startedId);
       }
       queueRefresh.value += 1;
+      refreshTaskHistory();
       break;
     }
     case "phase_changed": {
@@ -186,6 +199,7 @@ function handleEvent(evt) {
         activityPhase.value = String(p.phase).trim().toLowerCase();
         lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, idx);
       }
+      queueRefresh.value += 1;
       break;
     }
     case "tool_called":
@@ -292,9 +306,10 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
     const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
     if (res && res.task_id) {
       const qState = String(res.queue_state || (isRunning.value ? "pending" : "running")).toLowerCase();
+      const isViewingRunning = isViewedTaskRunning(task.id, runningTaskId.value);
       const shouldAdopt = shouldAdoptSubmittedTask({
         queueState: qState,
-        isViewingRunning: isRunning.value,
+        isViewingRunning,
       });
 
       if (qState === "pending") {
@@ -339,6 +354,7 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
         }
       }
       queueRefresh.value += 1;
+      refreshTaskHistory();
     }
   } catch (err) {
     error.value = `Failed to create task: ${err.message || err}`;
@@ -359,10 +375,17 @@ async function requestStop() {
   task.status = "cancelling";
   try {
     await cancelTask(targetId);
+    task.status = "cancelled";
+    runningTaskId.value = "";
   } catch (err) {
     console.warn("Cancel task notice:", err);
-    error.value = `Failed to cancel task: ${err.message || err}`;
-    task.status = previousStatus;
+    if (String(err?.message || err).includes("tidak ditemukan")) {
+      task.status = "cancelled";
+      runningTaskId.value = "";
+    } else {
+      error.value = `Failed to cancel task: ${err.message || err}`;
+      task.status = previousStatus;
+    }
   } finally {
     stopInProgress.value = false;
     stopConfirmOpen.value = false;
@@ -379,11 +402,25 @@ async function loadProjects() {
 async function loadActiveProject() {
   try {
     const r = await getActiveProject();
-    const p = r?.active_project || r?.project || null;
+    let p = r?.active_project || r?.project || null;
+    if (!p) {
+      const savedPid = getGlobalActiveProjectId();
+      if (savedPid) {
+        try {
+          const res = await setActiveProject(savedPid);
+          p = res?.active_project || res?.project || null;
+        } catch (_) {}
+      }
+    }
     if (p) {
       activeProject.value = lastProject.value = p;
+      saveGlobalActiveProjectId(p.id);
       setWorkspaceProject(p.id);
       fetchWorkspaceFiles(true);
+      const ctx = loadWorkspaceContext(p.id);
+      if (ctx?.activeNav) {
+        activeNav.value = ctx.activeNav;
+      }
     }
   } catch (_) {}
 }
@@ -406,13 +443,21 @@ async function handleOpenProject(target) {
     const res = await setActiveProject(id);
     activeProject.value = res?.active_project || (typeof target === "object" ? target : null) || projects.value.find((p) => p.id === id) || null;
     lastProject.value = activeProject.value;
+    saveGlobalActiveProjectId(id);
     setWorkspaceProject(id);
     resetTaskState();
     workbenchRef.value?.clearAllTabs?.();
     invalidateFileCache(id);
+    const ctx = loadWorkspaceContext(id);
+    if (ctx?.activeNav) {
+      activeNav.value = ctx.activeNav;
+    }
     await refreshAllConfig();
     await refreshTaskHistory();
     await syncActiveRunningTask();
+    if (!runningTaskId.value && ctx?.task?.viewedTaskId) {
+      await handleViewTask(ctx.task.viewedTaskId);
+    }
     fetchWorkspaceFiles(true);
   } catch (err) { error.value = `Failed to open project: ${err.message || err}`; }
   finally { launcherBusy.value = false; }
@@ -434,6 +479,7 @@ async function handleCloseProject() {
   try {
     await closeActiveProject();
     activeProject.value = null;
+    saveGlobalActiveProjectId(null);
     closeConfirmOpen.value = false;
     setWorkspaceProject(null);
     resetTaskState();
@@ -469,12 +515,22 @@ async function handleViewTask(t) {
   if (!t) return;
   const taskId = typeof t === "string" ? t : (t.task_id || t.id);
   if (!taskId) return;
-  const prompt = typeof t === "object" ? (t.prompt || t.task || "") : "";
-  const status = typeof t === "object" ? (t.status || "completed") : "completed";
+  if (activeProject.value?.id) {
+    saveWorkspaceContext(activeProject.value.id, {
+      task: { viewedTaskId: taskId }
+    });
+  }
+  let targetObj = typeof t === "object" ? t : null;
+  if (!targetObj && Array.isArray(taskHistory.value)) {
+    targetObj = taskHistory.value.find((item) => (item.task_id || item.id) === taskId) || null;
+  }
+  const prompt = targetObj ? (targetObj.prompt || targetObj.task || "") : "";
+  const isActuallyRunning = runningTaskId.value === taskId || (targetObj && ["running", "validating", "cancelling"].includes(targetObj.status));
+  const status = targetObj?.status || (isActuallyRunning ? "running" : "completed");
   task.id = taskId;
   task.prompt = prompt;
   task.status = status;
-  runningTaskId.value = status === "running" ? taskId : "";
+  runningTaskId.value = isActuallyRunning ? taskId : "";
   try {
     const res = await getTaskActivity(taskId, activeProject.value?.id || null);
     const allEvents = res.events || [];
@@ -483,6 +539,18 @@ async function handleViewTask(t) {
     taskTelemetry.rounds = tel.rounds;
     taskTelemetry.toolCalls = tel.toolCalls;
     taskTelemetry.observations = tel.observations;
+    const lastEvent = allEvents[allEvents.length - 1];
+    if (isActuallyRunning && lastEvent && ["task_started", "tool_called", "observation_received"].includes(lastEvent.event_type)) {
+      if (!allEvents.some((e) => ["task_completed", "task_failed", "task_cancelled"].includes(e.event_type))) {
+        task.status = "running";
+        runningTaskId.value = taskId;
+      }
+    } else if (!isActuallyRunning) {
+      if (!allEvents.some((e) => ["task_completed", "task_failed", "task_cancelled"].includes(e.event_type))) {
+        task.status = targetObj?.status === "incomplete" ? "incomplete" : (targetObj?.status || "failed");
+        runningTaskId.value = "";
+      }
+    }
   } catch (_) {
     activityEvents.value = [];
     taskTelemetry.rounds = 0;
@@ -565,7 +633,14 @@ onMounted(async () => {
   }, 5000);
   await loadActiveProject(); await loadProjects(); await refreshAllConfig();
   if (activeProject.value) await refreshTaskHistory();
-  await syncActiveRunningTask(); initAuth();
+  await syncActiveRunningTask();
+  if (activeProject.value?.id && !runningTaskId.value) {
+    const ctx = loadWorkspaceContext(activeProject.value.id);
+    if (ctx?.task?.viewedTaskId) {
+      await handleViewTask(ctx.task.viewedTaskId);
+    }
+  }
+  initAuth();
 });
 onBeforeUnmount(() => {
   responsive.unbindResizeListener();
@@ -623,7 +698,7 @@ onBeforeUnmount(() => {
           :task="task" :task-tag="taskTag" :task-duration-label="taskDurationLabel" :task-timer-live="isRunning"
           :task-tokens-label="taskTokensLabel" :task-tokens-tooltip="taskTokensTooltip" :show-reasoning="isRunning"
           :lifecycle-steps="lifecycleSteps" :lifecycle-pct="lifecyclePct" :activity-phase="activityPhase" :activity-events="activityEvents"
-          :is-running="isRunning" :stop-in-progress="stopInProgress" :error="error" :tier="responsive.tier.value"
+          :is-running="isRunning" :running-task-id="runningTaskId" :stop-in-progress="stopInProgress" :error="error" :tier="responsive.tier.value"
           :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)" :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
           :active-overlay="responsive.activeOverlay.value" @close-overlay="responsive.closeOverlays()" @toggle-assistant="toggleAssistantAction" @toggle-sidebar="toggleSidebarAction"
           @select-project="(id) => { const p = projects.find(proj => proj.id === id); if (p) handleOpenProject(p); }"
@@ -631,7 +706,7 @@ onBeforeUnmount(() => {
           @view-task="handleViewTask" @cursor-change="(pos) => { cursorPos = pos; }" @submit-task="handleComposerSubmit" @run-consultant-task="handleComposerSubmit"
           @update:provider-instance-id="(id) => { selectedProviderInstanceId = id; }" @update:model-id="(id) => { selectedModelId = id; }" @update:mode="(m) => { selectedMode = m; }"
           @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
-          @refresh-config="refreshAllConfig" @delete-history="handleDeleteHistory" @clear-history="handleClearHistory" @open-history-task="handleViewTask" @open-project-policy="(p) => { policyProject = p; }" @delete-project="handleDeleteProject" @open-project="handleOpenProject"
+          @refresh-config="refreshAllConfig" @refresh-history="refreshTaskHistory" @delete-history="handleDeleteHistory" @clear-history="handleClearHistory" @open-history-task="handleViewTask" @open-project-policy="(p) => { policyProject = p; }" @delete-project="handleDeleteProject" @open-project="handleOpenProject"
           @open-folder="handleOpenFolder" @open-path="() => { activeNav = 'explorer'; }" @open-explorer="activeNav = 'explorer'"
           @branch-info-updated="(info) => { gitBranchInfo = info; }"
         />

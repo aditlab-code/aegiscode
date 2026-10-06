@@ -2528,6 +2528,14 @@ class GatewayService:
                 ):
                     by_task[task_id] = info
 
+        # Sinkronkan status task aktif in-memory bila sedang running
+        with self._lock:
+            for tid, rec in self._tasks.items():
+                if project_id is not None and rec.project_id != project_id:
+                    continue
+                if rec.status == "running" and tid in by_task:
+                    by_task[tid]["status"] = "running"
+
         tasks = list(by_task.values())
         tasks.sort(key=lambda t: t.get("last_timestamp") or "", reverse=True)
         return tasks
@@ -2892,6 +2900,30 @@ class GatewayService:
             record = self._tasks.get(task_id)
             token = self._cancel_tokens.get(task_id)
         if record is None:
+            # Periksa apakah task tercatat di disk log
+            reader = self._reader_for_task(task_id)
+            if reader is not None:
+                info = reader.get_task_info() or {}
+                events = reader.load_events()
+                has_terminal = any(
+                    (e.get("event") or e.get("event_type")) in ("task_completed", "task_failed", "task_cancelled")
+                    for e in events
+                )
+                if not has_terminal:
+                    try:
+                        from agent_ai.projects.aegis_store import TaskLog
+                        TaskLog(reader.store, task_id).append(
+                            "task_cancelled",
+                            {"reason": "user_cancelled_stale_task"}
+                        )
+                    except Exception:
+                        pass
+                return {
+                    "task_id": task_id,
+                    "status": "cancelled",
+                    "queue_state": "done",
+                    "prompt": info.get("task", ""),
+                }
             raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
 
         # Hanya task yang belum terminal yang bisa dibatalkan. Task yang sudah
