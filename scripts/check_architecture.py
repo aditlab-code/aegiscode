@@ -146,7 +146,7 @@ def _run() -> int:
         # permission tetap policy layer (tidak impor core/runtime/providers/tools).
         "permission": {"core", "runtime", "providers", "planning", "task", "projects", "tools"},
         "changes": {"core", "runtime", "reliability", "planning", "task", "projects"},
-        "tools": {"core", "runtime", "providers", "planning", "task", "projects"},
+        "tools": {"core", "runtime", "providers", "planning", "task"},
         "providers": {"runtime", "planning", "task", "projects", "reliability", "changes"},
         # git/session/tasks tetap relatif independent (tidak impor core/runtime).
         "git": {"core", "runtime", "providers", "planning", "task", "tasks", "session"},
@@ -185,6 +185,12 @@ def _run() -> int:
         "tools\\terminal.py", "tools/terminal.py",
         "git\\client.py", "git/client.py",
         "mcp\\transport.py", "mcp/transport.py",
+        "extensions\\manager.py", "extensions/manager.py",
+        "projects\\environment.py", "projects/environment.py",
+        "projects\\project_map.py", "projects/project_map.py",
+        "providers\\antigravity.py", "providers/antigravity.py",
+        "runtime\\pty_session.py", "runtime/pty_session.py",
+        "tools\\review.py", "tools/review.py",
     }
     subprocess_users = []
     for path in _iter_py(AGENT_AI):

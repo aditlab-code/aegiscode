@@ -14,7 +14,7 @@ from agent_ai.providers.antigravity import (
     AntigravityProvider,
     _format_antigravity_policy_directive,
 )
-from agent_ai.providers.base import GenerateOptions, Message, ProviderAPIError
+from agent_ai.providers.base import GenerateOptions, Message, ProviderAPIError, ProviderUnavailableError
 from agent_ai.tools.filesystem import ReadFileTool
 
 
@@ -457,3 +457,125 @@ def test_redundant_reread_reset_on_file_mutation(monkeypatch: pytest.MonkeyPatch
     # Karena edit_file mereset hitungan, read ke-4 tidak memicu warning
     warning_events = [data for ev, data in emitted_events if ev == "warning"]
     assert len(warning_events) == 0
+
+
+def test_redundant_search_query_circuit_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa pencarian dengan parameter identik berulang 4x memicu circuit breaker."""
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock")
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.killed = False
+            self.returncode = 0
+            self.lines = [
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "search_code",
+                        "state": "ACTIVE",
+                        "step_index": i,
+                        "tool_info": {"parameters": {"query": "missing_symbol"}},
+                    },
+                }) + "\n"
+                for i in range(1, 5)
+            ]
+            self.stdout = self
+            self.stderr = self
+
+        def readline(self) -> str:
+            if self.lines:
+                return self.lines.pop(0)
+            return ""
+
+        def poll(self) -> int | None:
+            return 0 if not self.lines else None
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self) -> int:
+            return 0
+
+        def read(self) -> str:
+            return ""
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+
+    opts = GenerateOptions(extra={"event_sink": lambda ev, d: None, "mode": "balanced"})
+    with pytest.raises(ProviderAPIError) as exc_info:
+        p.generate(prompt="Cari simbol", options=opts)
+
+    assert exc_info.value.status_code == 429
+    assert "Circuit Breaker Loop Terpicu" in str(exc_info.value)
+    assert fake_proc.killed is True
+
+
+def test_antigravity_cancellation_kills_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa ketika cancel_check bernilai True, subproses Antigravity seketika dibunuh."""
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock")
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.killed = False
+            self.returncode = 0
+            self.lines = [
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "thought",
+                        "thought_delta": "sedang berpikir...",
+                    },
+                }) + "\n"
+            ]
+            self.stdout = self
+            self.stderr = self
+
+        def readline(self) -> str:
+            if self.lines:
+                return self.lines.pop(0)
+            return ""
+
+        def poll(self) -> int | None:
+            return None
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self) -> int:
+            return 0
+
+        def read(self) -> str:
+            return ""
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+
+    # Simulasikan cancel_check yang menjadi True saat proses berjalan
+    cancelled_flag = [False]
+
+    def check_cancel() -> bool:
+        return cancelled_flag[0]
+
+    def event_sink(ev: str, d: Any) -> None:
+        # Begitu menerima event reasoning pertama, pengguna mengklik Stop (cancel_check menjadi True)
+        if ev == "agent_reasoning_delta":
+            cancelled_flag[0] = True
+
+    opts = GenerateOptions(extra={
+        "event_sink": event_sink,
+        "cancel_check": check_cancel,
+        "mode": "balanced",
+    })
+
+    with pytest.raises(ProviderUnavailableError, match="dibatalkan oleh pengguna"):
+        p.generate(prompt="Jalankan tugas", options=opts)
+
+    assert fake_proc.killed is True
+
+

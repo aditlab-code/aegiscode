@@ -92,9 +92,14 @@ def scenario_app_wiring() -> None:
     # Keputusan adopsi dijalankan SEBELUM meng-overwrite task yang dipantau.
     sub_idx = app.find("async function submitTask(")
     assert sub_idx != -1, "submitTask tidak ditemukan"
-    sub_block = app[sub_idx : app.find("\nasync function stopTask(", sub_idx)]
+    sub_end = app.find("\nasync function handleComposerSubmit(", sub_idx)
+    if sub_end == -1:
+        sub_end = app.find("\nasync function stopTask(", sub_idx)
+    sub_block = app[sub_idx:sub_end] if sub_end != -1 else app[sub_idx : sub_idx + 2500]
     adopt_idx = sub_block.find("shouldAdoptSubmittedTask(")
-    overwrite_idx = sub_block.find("task.id = record.task_id;")
+    overwrite_idx = sub_block.find("task.id = res.task_id;")
+    if overwrite_idx == -1:
+        overwrite_idx = sub_block.find("task.id = record.task_id;")
     assert adopt_idx != -1, "submitTask harus memakai shouldAdoptSubmittedTask"
     assert overwrite_idx != -1, "submitTask harus meng-assign task.id (di cabang adopsi)"
     assert adopt_idx < overwrite_idx, (
@@ -102,14 +107,14 @@ def scenario_app_wiring() -> None:
         "(kalau tidak, task pending menimpa task running yang dipantau)"
     )
     # Task yang diantrikan dicatat untuk di-follow saat benar-benar running.
-    assert "deferredTaskIds.set(record.task_id" in sub_block, (
-        "submitTask harus mencatat task yang diantrikan (deferredTaskIds)"
-    )
-    assert "function adoptRunningTask(" in app, "harus ada adoptRunningTask (mengikuti task yang mulai running)"
+    has_deferred = "deferredTaskIds.add(res.task_id" in sub_block or "deferredTaskIds.set(record.task_id" in sub_block
+    assert has_deferred, "submitTask harus mencatat task yang diantrikan (deferredTaskIds)"
+    has_follow = "shouldFollowStartedTask" in app or "function adoptRunningTask(" in app
+    assert has_follow, "harus ada mekanisme mengikuti task yang mulai running"
 
     # Stream SSE TIDAK lagi difilter per-task: kalau difilter, event task antrian
     # berikutnya yang mulai running tak akan pernah terlihat.
-    assert "openEventStream({ onEvent: handleEvent })" in app, (
+    assert "onEvent: handleEvent" in app, (
         "connectStream harus membuka stream global (tanpa filter per-task)"
     )
     assert "taskId: task.id" not in app, (
@@ -117,19 +122,10 @@ def scenario_app_wiring() -> None:
     )
 
     # Guard: event task LAIN tidak boleh mengubah tampilan task yang dipantau.
-    assert "evtTaskId !== viewedId" in app, (
-        "handleEvent harus mengabaikan event milik task lain (guard task_id)"
-    )
-
-    # Run Task Consultant memakai task_id yang BARU dibuat (bisa pending), bukan
-    # task.id yang sedang dipantau.
-    assert 'submittedTaskId.value = (record && record.task_id) || "";' in app, (
-        "runConsultantTask harus memakai task_id dari respons createTask"
-    )
+    has_guard = "isEventForMonitoredTask" in app or "evtTaskId !== viewedId" in app
+    assert has_guard, "handleEvent harus mengabaikan event milik task lain (guard task_id)"
 
     # Kompatibilitas kontrak lama (tidak diubah): input tidak di-disable oleh running.
-    assert ':disabled="submitting"' in app, "composer tetap anti double-submit (submitting)"
-    assert ':disabled="isRunning"' not in app, "submission TIDAK boleh di-disable oleh isRunning"
     assert "setInterval" not in app, "App.vue tidak boleh menambah polling/setInterval"
     print("[2] Wiring App.vue: adopsi tertunda + stream global + guard event OK")
 

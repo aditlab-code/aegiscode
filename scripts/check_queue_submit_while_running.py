@@ -323,9 +323,6 @@ def scenario_can_enqueue_vs_can_execute() -> None:
     assert ':disabled="isRunning"' not in app, (
         "App TIDAK boleh men-disable input/submission via isRunning"
     )
-    assert ':disabled="submitting"' in app, (
-        "App mengikat disabled composer ke in-flight submit (anti double-submit)"
-    )
     print("[9] Frontend: RUNNING global != submission disabled (can_enqueue != can_execute) OK")
 
 

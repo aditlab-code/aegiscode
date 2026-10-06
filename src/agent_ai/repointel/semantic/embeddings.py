@@ -33,9 +33,21 @@ def build_embeddings(
             "Pasang dependensi opsional dengan: pip install aegis-agent[semantic]"
         ) from e
 
-    from agent_ai.runtime.telemetry.hardware import detect_embed_profile
+    try:
+        import importlib
 
-    profile = detect_embed_profile()
+        _hw = importlib.import_module("agent_ai.runtime.telemetry.hardware")
+        detect_embed_profile = getattr(_hw, "detect_embed_profile")
+        profile = detect_embed_profile()
+    except Exception:
+        from dataclasses import dataclass
+
+        @dataclass(frozen=True)
+        class _FallbackProfile:
+            threads: int = 2
+            batch_size: int = 16
+
+        profile = _FallbackProfile()
 
     chosen_model = model_name or EMBED_MODEL
     chosen_cache = cache_dir or resolve_model_cache()

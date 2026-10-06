@@ -55,6 +55,7 @@ from agent_ai.core.history import ConversationHistory
 from agent_ai.core.loop import AgentLoop, MaxIterationsExceeded
 from agent_ai.core.models import AgentObservation, AgentStatus
 from agent_ai.core.observability import EventSink, emit as emit_event
+from agent_ai.core.provider_contract import sanitize_provider_response
 from agent_ai.core.response import ActionType, LLMResponse, extract_reasoning_and_content
 from agent_ai.core.types import ToolCall, ToolResultPayload
 from agent_ai.providers.base import (
@@ -1744,6 +1745,12 @@ class AgentOrchestrator:
         if getattr(self.executor, "workspace_root", None) and "workspace_root" not in extra:
             extra["workspace_root"] = self.executor.workspace_root
             extra_updated = True
+        if "cancel_check" not in extra:
+            extra["cancel_check"] = self._cancel_requested
+            extra_updated = True
+        if self.cancel_token is not None and "cancel_token" not in extra:
+            extra["cancel_token"] = self.cancel_token
+            extra_updated = True
         if extra_updated or (call_options is None and extra):
             call_options = GenerateOptions(
                 temperature=call_options.temperature if call_options else None,
@@ -1759,7 +1766,7 @@ class AgentOrchestrator:
                 tools=tools or None,
                 tool_choice=self.tool_choice,
             )
-            return self.provider.normalize_response(gen_result)
+            return sanitize_provider_response(self.provider, gen_result)
 
         try:
             gen_result = self.provider.generate(
@@ -1768,7 +1775,7 @@ class AgentOrchestrator:
                 tools=tools or None,
                 tool_choice=self.tool_choice,
             )
-            response: LLMResponse = self.provider.normalize_response(gen_result)
+            response: LLMResponse = sanitize_provider_response(self.provider, gen_result)
         except Exception as exc:  # noqa: BLE001 - diteruskan ke penanganan existing
             self._record_llm_response(
                 self._response_record_error(
@@ -1896,7 +1903,8 @@ class AgentOrchestrator:
                     },
                 )
                 # Cancellation user punya prioritas tertinggi: hentikan retry.
-                if self._cancel_requested():
+                err_str = str(exc).lower()
+                if self._cancel_requested() or "dibatalkan oleh pengguna" in err_str or "user stop" in err_str:
                     loop.cancel(self._cancel_reason())
                     return None
                 # OPT-01: Hentikan retry bila error bersifat permanen / non-retryable
