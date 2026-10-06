@@ -19,7 +19,8 @@ import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
 import LoginOverlay from "./components/LoginOverlay.vue";
 import { formatTokens, usageTokens } from "./tokenFormat.js";
-import { shouldFollowStartedTask } from "./taskView.js";
+import { shouldAdoptSubmittedTask, shouldFollowStartedTask } from "./taskView.js";
+import { isEventForMonitoredTask } from "./services/taskStateReducer.js";
 import { useAuth } from "./services/authService.js"; import { startServerHealthMonitor } from "./services/serverService.js";
 import {
   openEventStream, getProjects, createProject, deleteProject, getActiveProject, setActiveProject, closeActiveProject, pickFolder,
@@ -49,10 +50,13 @@ const {
 } = useAuth();
 
 // Task & Agent State
-const connected = ref(false), task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
-const isRunning = computed(() => ["running", "validating"].includes(task.status));
+const gatewayHttpConnected = ref(false), sseStreamConnected = ref(false);
+const connected = computed(() => gatewayHttpConnected.value && sseStreamConnected.value);
+const task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
+const lastReceivedEventId = ref("");
+const isRunning = computed(() => ["running", "validating", "cancelling"].includes(task.status));
 const stopInProgress = ref(false), runningTaskId = ref(""), terminalTaskId = ref("");
-const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache } = useWorkspaceFiles();
+const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache, setWorkspaceProject } = useWorkspaceFiles();
 const activityEvents = ref([]), activityPhase = ref(""), lifecycleMilestones = ref([]), changes = ref([]);
 const validation = reactive({ state: "pending" }), liveFsChange = ref(null);
 const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
@@ -131,47 +135,61 @@ const defaultCommands = computed(() => getDefaultCommands({
 
 function handleEvent(evt) {
   if (!evt || !evt.event_type) return;
-  activityEvents.value.push(evt);
-  if (activityEvents.value.length > 500) activityEvents.value.shift();
-  const tel = computeTaskTelemetry(activityEvents.value);
-  taskTelemetry.rounds = tel.rounds; taskTelemetry.toolCalls = tel.toolCalls; taskTelemetry.observations = tel.observations;
+  if (evt.event_id) {
+    lastReceivedEventId.value = String(evt.event_id);
+  } else if (evt.lastEventId) {
+    lastReceivedEventId.value = String(evt.lastEventId);
+  }
+  const evtTaskId = evt.task_id || "";
+  const isForMonitored = isEventForMonitoredTask({ monitoredTaskId: task.id }, evt);
   const p = evt.payload || {};
-  if (evt.event_type === "provider_response") {
+
+  if (evt.event_type === "provider_response" && isForMonitored) {
     const u = usageTokens(p);
     if (u != null) {
       tokenCount.value = (tokenCount.value || 0) + u;
     }
   }
+
   switch (evt.event_type) {
     case "task_started": {
       const startedId = evt.task_id || task.id;
-      if (
-        shouldFollowStartedTask({
-          startedTaskId: startedId,
-          viewedTaskId: task.id,
-          isViewingRunning: isRunning.value,
-          viewingHistory: Boolean(reportTaskId.value),
-          deferredTaskIds,
-        })
-      ) {
+      const wasViewingThisPending = task.id === startedId && task.status === "pending";
+      const shouldFollow = shouldFollowStartedTask({
+        startedTaskId: startedId,
+        viewedTaskId: task.id,
+        isViewingRunning: isRunning.value,
+        viewingHistory: Boolean(reportTaskId.value),
+        deferredTaskIds,
+      });
+
+      if (wasViewingThisPending || shouldFollow) {
         task.id = startedId;
         deferredTaskIds.delete(startedId);
+        task.status = "running";
+        runningTaskId.value = startedId;
+        activityPhase.value = "planning";
+        lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, 0);
+        if (!taskStartedAt.value) taskStartedAt.value = eventTimeMs(evt);
+        durationTicker.start();
+        playStatusSound("running");
+      } else {
+        deferredTaskIds.delete(startedId);
       }
-      task.status = "running";
-      runningTaskId.value = startedId;
-      activityPhase.value = "planning";
-      lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, 0);
-      if (!taskStartedAt.value) taskStartedAt.value = eventTimeMs(evt);
-      durationTicker.start();
-      playStatusSound("running");
+      queueRefresh.value += 1;
       break;
     }
     case "phase_changed": {
+      if (!isForMonitored) break;
       const idx = activityPhaseIndex(p.phase);
-      if (idx >= 0) { activityPhase.value = String(p.phase).trim().toLowerCase(); lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, idx); }
+      if (idx >= 0) {
+        activityPhase.value = String(p.phase).trim().toLowerCase();
+        lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, idx);
+      }
       break;
     }
     case "tool_called":
+      if (!isForMonitored) break;
       if (p.tool) activityPhase.value = "running";
       break;
     case "tool_completed":
@@ -180,39 +198,79 @@ function handleEvent(evt) {
     case "recovery_completed":
       break;
     case "validation_started":
-      validation.state = "running"; task.status = "validating"; activityPhase.value = "validating";
+      if (!isForMonitored) break;
+      validation.state = "running";
+      task.status = "validating";
+      activityPhase.value = "validating";
       lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, VALIDATING_STEP);
       break;
     case "validation_completed":
+      if (!isForMonitored) break;
       validation.state = p.success === false ? "err" : "ok";
       break;
     case "change_detected":
       if (p.path && !p.path.includes(".aegis/")) {
-        const idx = changes.value.findIndex((c) => c.path === p.path), item = { kind: p.kind || "change", path: p.path, diff: p.diff };
-        if (idx >= 0) changes.value[idx] = item; else changes.value.push(item);
+        if (isForMonitored) {
+          const idx = changes.value.findIndex((c) => c.path === p.path);
+          const item = { kind: p.kind || "change", path: p.path, diff: p.diff };
+          if (idx >= 0) changes.value[idx] = item;
+          else changes.value.push(item);
+        }
         liveFsChange.value = { seq: ++liveFsChangeSeq, path: p.path, kind: p.kind || "change" };
       }
       break;
     case "task_completed":
     case "task_failed":
-    case "task_cancelled":
-      task.status = evt.event_type.replace("task_", ""); durationTicker.stop();
-      taskEndedAt.value = eventTimeMs(evt); terminalTaskId.value = evt.task_id || task.id; runningTaskId.value = "";
-      if (evt.event_type === "task_completed") explorerRefresh.value += 1;
-      queueRefresh.value += 1; playStatusSound(task.status); refreshTaskHistory();
+    case "task_cancelled": {
+      const termId = evt.task_id || task.id;
+      if (runningTaskId.value === termId) {
+        runningTaskId.value = "";
+      }
+      if (isForMonitored) {
+        task.status = evt.event_type.replace("task_", "");
+        durationTicker.stop();
+        taskEndedAt.value = eventTimeMs(evt);
+        terminalTaskId.value = termId;
+        if (evt.event_type === "task_completed") explorerRefresh.value += 1;
+        playStatusSound(task.status);
+      }
+      queueRefresh.value += 1;
+      refreshTaskHistory();
       break;
+    }
+  }
+
+  if (isForMonitored) {
+    activityEvents.value.push(evt);
+    if (activityEvents.value.length > 500) activityEvents.value.shift();
+    if (evt.event_type === "provider_request") {
+      taskTelemetry.rounds += 1;
+    } else if (evt.event_type === "tool_called") {
+      taskTelemetry.toolCalls += 1;
+    } else if (evt.event_type === "observation_received") {
+      taskTelemetry.observations += 1;
+    }
   }
 }
 
 function connectStream() {
-  if (eventSource) eventSource.close();
-  eventSource = openEventStream({ onEvent: handleEvent, onOpen: () => { connected.value = true; }, onError: () => { connected.value = false; } });
-  eventSource.onopen = () => { connected.value = true; }; eventSource.onerror = () => { connected.value = false; };
+  if (eventSource) {
+    try { eventSource.close(); } catch (_) {}
+    eventSource = null;
+  }
+  eventSource = openEventStream({
+    lastEventId: lastReceivedEventId.value || null,
+    onEvent: handleEvent,
+    onOpen: () => { sseStreamConnected.value = true; },
+    onError: () => { sseStreamConnected.value = false; },
+  });
+  eventSource.onopen = () => { sseStreamConnected.value = true; };
+  eventSource.onerror = () => { sseStreamConnected.value = false; };
 }
 async function syncActiveRunningTask() {
   try {
     const res = await listTaskQueue(activeProject.value?.id || null);
-    const active = (res?.tasks || []).find((t) => ["running", "validating"].includes(t.status));
+    const active = (res?.tasks || []).find((t) => ["running", "validating", "cancelling"].includes(t.status));
     if (active && (!task.id || task.status === "idle")) {
       task.id = active.task_id || active.id; task.prompt = active.prompt || active.task || ""; task.status = active.status;
       runningTaskId.value = task.id; if (!taskStartedAt.value) taskStartedAt.value = Date.now(); durationTicker.start();
@@ -233,23 +291,54 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
     if (selectedMode.value) meta.mode = selectedMode.value;
     const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
     if (res && res.task_id) {
-      if (isRunning.value) {
+      const qState = String(res.queue_state || (isRunning.value ? "pending" : "running")).toLowerCase();
+      const shouldAdopt = shouldAdoptSubmittedTask({
+        queueState: qState,
+        isViewingRunning: isRunning.value,
+      });
+
+      if (qState === "pending") {
         deferredTaskIds.add(res.task_id);
+        if (shouldAdopt) {
+          task.id = res.task_id;
+          task.prompt = text.trim();
+          task.status = "pending";
+          runningTaskId.value = "";
+          tokenCount.value = null;
+          taskTelemetry.rounds = 0;
+          taskTelemetry.toolCalls = 0;
+          taskTelemetry.observations = 0;
+          activityPhase.value = "";
+          lifecycleMilestones.value = [];
+          activityEvents.value = [];
+          changes.value = [];
+          taskStartedAt.value = null;
+          taskEndedAt.value = null;
+          durationTicker.stop();
+        }
       } else {
-        task.id = res.task_id;
-        task.prompt = text.trim();
-        task.status = "running";
-        runningTaskId.value = res.task_id;
-        tokenCount.value = null;
-        activityPhase.value = "planning";
-        lifecycleMilestones.value = [0];
-        activityEvents.value = [];
-        changes.value = [];
-        taskStartedAt.value = Date.now();
-        taskEndedAt.value = null;
-        durationTicker.start();
-        playStatusSound("running");
+        if (shouldAdopt) {
+          task.id = res.task_id;
+          task.prompt = text.trim();
+          task.status = "running";
+          runningTaskId.value = res.task_id;
+          tokenCount.value = null;
+          taskTelemetry.rounds = 0;
+          taskTelemetry.toolCalls = 0;
+          taskTelemetry.observations = 0;
+          activityPhase.value = "planning";
+          lifecycleMilestones.value = [0];
+          activityEvents.value = [];
+          changes.value = [];
+          taskStartedAt.value = Date.now();
+          taskEndedAt.value = null;
+          durationTicker.start();
+          playStatusSound("running");
+        } else {
+          deferredTaskIds.add(res.task_id);
+        }
       }
+      queueRefresh.value += 1;
     }
   } catch (err) {
     error.value = `Failed to create task: ${err.message || err}`;
@@ -267,11 +356,15 @@ async function requestStop() {
   const targetId = runningTaskId.value || task.id;
   if (!targetId || stopInProgress.value) return;
   stopInProgress.value = true;
-  try { await cancelTask(targetId); }
-  catch (err) { console.warn("Cancel task notice:", err); }
-  finally {
-    task.status = "idle";
-    runningTaskId.value = "";
+  const previousStatus = task.status;
+  task.status = "cancelling";
+  try {
+    await cancelTask(targetId);
+  } catch (err) {
+    console.warn("Cancel task notice:", err);
+    error.value = `Failed to cancel task: ${err.message || err}`;
+    task.status = previousStatus;
+  } finally {
     stopInProgress.value = false;
     stopConfirmOpen.value = false;
   }
@@ -285,7 +378,15 @@ async function loadProjects() {
 }
 
 async function loadActiveProject() {
-  try { const r = await getActiveProject(); const p = r?.active_project || r?.project || null; if (p) { activeProject.value = lastProject.value = p; fetchWorkspaceFiles(true); } } catch (_) {}
+  try {
+    const r = await getActiveProject();
+    const p = r?.active_project || r?.project || null;
+    if (p) {
+      activeProject.value = lastProject.value = p;
+      setWorkspaceProject(p.id);
+      fetchWorkspaceFiles(true);
+    }
+  } catch (_) {}
 }
 
 // Git Branch Awareness State & Synchronization
@@ -306,9 +407,10 @@ async function handleOpenProject(target) {
     const res = await setActiveProject(id);
     activeProject.value = res?.active_project || (typeof target === "object" ? target : null) || projects.value.find((p) => p.id === id) || null;
     lastProject.value = activeProject.value;
+    setWorkspaceProject(id);
     resetTaskState();
     workbenchRef.value?.clearAllTabs?.();
-    invalidateFileCache();
+    invalidateFileCache(id);
     await refreshAllConfig();
     await refreshTaskHistory();
     await syncActiveRunningTask();
@@ -331,8 +433,14 @@ async function handleDeleteProject(id) {
 
 async function handleCloseProject() {
   try {
-    await closeActiveProject(); activeProject.value = null; closeConfirmOpen.value = false;
-    resetTaskState(); await loadProjects(); workbenchRef.value?.clearAllTabs?.(); invalidateFileCache();
+    await closeActiveProject();
+    activeProject.value = null;
+    closeConfirmOpen.value = false;
+    setWorkspaceProject(null);
+    resetTaskState();
+    await loadProjects();
+    workbenchRef.value?.clearAllTabs?.();
+    invalidateFileCache();
   } catch (err) { error.value = `Failed to close project: ${err.message || err}`; }
 }
 
@@ -355,6 +463,7 @@ function resetTaskState() {
   runningTaskId.value = terminalTaskId.value = activityPhase.value = "";
   lifecycleMilestones.value = []; activityEvents.value = []; changes.value = [];
   validation.state = "pending"; taskStartedAt.value = taskEndedAt.value = null; durationTicker.stop();
+  taskTelemetry.rounds = 0; taskTelemetry.toolCalls = 0; taskTelemetry.observations = 0;
 }
 
 async function handleViewTask(t) {
@@ -369,12 +478,18 @@ async function handleViewTask(t) {
   runningTaskId.value = status === "running" ? taskId : "";
   try {
     const res = await getTaskActivity(taskId, activeProject.value?.id || null);
-    activityEvents.value = res.events || [];
-    const tel = computeTaskTelemetry(activityEvents.value);
+    const allEvents = res.events || [];
+    activityEvents.value = allEvents.slice(-500);
+    const tel = computeTaskTelemetry(allEvents);
     taskTelemetry.rounds = tel.rounds;
     taskTelemetry.toolCalls = tel.toolCalls;
     taskTelemetry.observations = tel.observations;
-  } catch (_) { activityEvents.value = []; }
+  } catch (_) {
+    activityEvents.value = [];
+    taskTelemetry.rounds = 0;
+    taskTelemetry.toolCalls = 0;
+    taskTelemetry.observations = 0;
+  }
   if (settingsOpen.value) settingsOpen.value = false;
 }
 
@@ -440,8 +555,14 @@ onMounted(async () => {
   if (typeof window !== "undefined") window.addEventListener("keydown", onKeyDown);
   connectStream();
   stopHealthMonitor = startServerHealthMonitor((ok) => {
-    if (ok) { connected.value = true; if (!eventSource || eventSource.readyState === 2) connectStream(); }
-    else connected.value = false;
+    gatewayHttpConnected.value = Boolean(ok);
+    if (ok) {
+      if (!eventSource || eventSource.readyState === 2 || !sseStreamConnected.value) {
+        connectStream();
+      }
+    } else {
+      sseStreamConnected.value = false;
+    }
   }, 5000);
   await loadActiveProject(); await loadProjects(); await refreshAllConfig();
   if (activeProject.value) await refreshTaskHistory();

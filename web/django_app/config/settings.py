@@ -127,6 +127,7 @@ CHANNEL_LAYERS = {
 }
 
 MIDDLEWARE = [
+    *(["django.middleware.security.SecurityMiddleware"] if IS_PRODUCTION else []),
     "django.middleware.common.CommonMiddleware",
 ]
 
@@ -198,4 +199,9 @@ GOOGLE_OAUTH_CLIENT_ID = _env("GOOGLE_OAUTH_CLIENT_ID")
 GOOGLE_OAUTH_CLIENT_SECRET = _env("GOOGLE_OAUTH_CLIENT_SECRET")
 GOOGLE_OAUTH_REDIRECT_URI = _env("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback")
 AEGIS_AUTH_TOKEN_EXPIRY = int(_env("AEGIS_AUTH_TOKEN_EXPIRY") or "604800")  # 7 days in seconds
+
+# ---------------------------------------------------------------------------
+# Authentication Boundary Guard (AEG-08)
+# ---------------------------------------------------------------------------
+AEGIS_AUTH_REQUIRED = _env_bool("AEGIS_AUTH_REQUIRED", default=IS_PRODUCTION)
 

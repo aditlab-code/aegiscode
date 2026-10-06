@@ -414,6 +414,11 @@ class BaseProvider(ABC):
     #: Provider seperti 9Router yang menentukan model sendiri dapat set ini ke False.
     requires_model: bool = True
 
+    #: Kapabilitas LLM (PR-07 / AEG-16)
+    context_window: int = 128000
+    supports_thinking: bool = False
+    reasoning_budget: Optional[int] = None
+
     @abstractmethod
     def generate(
         self,

@@ -125,6 +125,98 @@ def verify_aegis_session_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def is_loopback_address(ip: Optional[str]) -> bool:
+    """Periksa apakah IP client adalah loopback lokal."""
+    ip_clean = (ip or "").strip().lower()
+    return ip_clean in ("127.0.0.1", "::1", "localhost", "testserver", "testclient")
+
+
+def is_auth_required_for_request(request: HttpRequest) -> bool:
+    """Evaluasi apakah request ini wajib diautentikasi.
+
+    Jika AEGIS_AUTH_REQUIRED bernilai True, autentikasi selalu wajib (mode production/enterprise).
+    Jika AEGIS_AUTH_REQUIRED bernilai False (default lokal development), request dari
+    IP loopback lokal (127.0.0.1 / ::1 / testserver) diizinkan melewati pemeriksaan.
+    Request dari alamat IP non-loopback tetap wajib diautentikasi.
+    """
+    auth_required = getattr(settings, "AEGIS_AUTH_REQUIRED", False)
+    if auth_required:
+        return True
+
+    remote_ip = request.META.get("REMOTE_ADDR", "")
+    if is_loopback_address(remote_ip):
+        return False
+
+    return True
+
+
+def verify_websocket_auth(scope: Dict[str, Any]) -> tuple[bool, str, Optional[Dict[str, Any]]]:
+    """Verifikasi autentikasi dan origin untuk koneksi WebSocket Channels.
+
+    Returns:
+        tuple (is_allowed: bool, reason: str, user_info: dict | None)
+    """
+    headers = dict(scope.get("headers", []))
+    origin_bytes = headers.get(b"origin")
+    origin = origin_bytes.decode("utf-8") if origin_bytes else ""
+
+    # 1. Validasi Origin bila header origin dikirim browser
+    if origin:
+        from urllib.parse import urlparse
+
+        parsed_origin = urlparse(origin)
+        origin_host = parsed_origin.hostname or ""
+        allowed_hosts = list(getattr(settings, "ALLOWED_HOSTS", []))
+        is_origin_allowed = (
+            origin_host in allowed_hosts
+            or is_loopback_address(origin_host)
+            or "*" in allowed_hosts
+        )
+        if not is_origin_allowed:
+            return False, f"Origin '{origin}' tidak diizinkan.", None
+
+    # 2. Periksa IP client
+    client_info = scope.get("client")
+    client_ip = client_info[0] if (client_info and len(client_info) > 0) else ""
+    is_client_loopback = is_loopback_address(client_ip) or (client_info is None)
+
+    # 3. Ekstrak token dari query string (?token=...) atau header Authorization
+    token = ""
+    query_string = scope.get("query_string", b"").decode("utf-8")
+    if query_string:
+        from urllib.parse import parse_qs
+
+        qs_dict = parse_qs(query_string)
+        token_list = qs_dict.get("token")
+        if token_list and token_list[0]:
+            token = token_list[0].strip()
+
+    if not token:
+        auth_hdr = headers.get(b"authorization", b"").decode("utf-8")
+        if auth_hdr.startswith("Bearer "):
+            token = auth_hdr.split(" ", 1)[1].strip()
+
+    # 4. Validasi token bila ada
+    user_info = None
+    if token:
+        user_info = verify_aegis_session_token(token)
+
+    auth_required = getattr(settings, "AEGIS_AUTH_REQUIRED", False)
+
+    if user_info:
+        return True, "Authenticated via session token.", user_info
+
+    # Jika token dikirim tetapi tidak valid: tolak
+    if token and not user_info:
+        return False, "Session token tidak valid atau telah kedaluwarsa.", None
+
+    # Jika token tidak ada: periksa apakah boleh bypass untuk local loopback
+    if not auth_required and is_client_loopback:
+        return True, "Loopback local developer bypass.", {"sub": "local-dev", "name": "Local Developer"}
+
+    return False, "Authentication required. WebSocket connection rejected.", None
+
+
 def get_authenticated_user(request: HttpRequest) -> Optional[Dict[str, Any]]:
     """Extract and verify user identity from request Authorization header."""
     auth_header = request.headers.get("Authorization", "")
@@ -135,21 +227,29 @@ def get_authenticated_user(request: HttpRequest) -> Optional[Dict[str, Any]]:
 
 
 def require_auth(view_func: Callable) -> Callable:
-    """Decorator to enforce mandatory authentication on gateway API endpoints."""
+    """Decorator to enforce mandatory authentication on gateway API endpoints.
+
+    Supports transparent loopback bypass when AEGIS_AUTH_REQUIRED=False.
+    """
     @functools.wraps(view_func)
     def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
         user_info = get_authenticated_user(request)
-        if not user_info:
-            return JsonResponse(
-                {
-                    "error": {
-                        "code": "UNAUTHORIZED",
-                        "message": "Authentication required. Please sign in with Google.",
-                    }
-                },
-                status=401,
-            )
-        request.user_info = user_info
-        return view_func(request, *args, **kwargs)
+        if user_info:
+            request.user_info = user_info
+            return view_func(request, *args, **kwargs)
+
+        if not is_auth_required_for_request(request):
+            request.user_info = {"sub": "local-dev", "name": "Local Developer", "email": "local@aegis"}
+            return view_func(request, *args, **kwargs)
+
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "UNAUTHORIZED",
+                    "message": "Authentication required. Please sign in or provide a valid Bearer token.",
+                }
+            },
+            status=401,
+        )
 
     return _wrapped

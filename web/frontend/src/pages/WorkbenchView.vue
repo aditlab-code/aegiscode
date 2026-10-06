@@ -29,20 +29,25 @@ import MonacoDiffEditor from "../components/MonacoDiffEditor.vue";
 import SettingsOverlay from "./SettingsOverlay.vue";
 import WelcomeView from "../components/WelcomeView.vue";
 import AppModal from "../components/ui/AppModal.vue";
-import { discardProjectGitChanges, readFileContent } from "../api.js";
+import { discardProjectGitChanges, readFileContent, writeFileContent } from "../api.js";
 import {
   openTab,
   openDiffTab,
   closeTab,
   selectTab,
   getActiveTab,
+  setTabDirty,
 } from "../services/editorTabsService.js";
 import {
   isDirty,
   getModel,
+  getEntry,
+  getOrCreateModel,
   markSaved,
   applyExternalContent,
+  releaseModel,
 } from "../services/monacoModelRegistry.js";
+import { languageForFile } from "../editorLanguages.js";
 import { mapMonacoMarkersToDiagnostics, classifyDiagnostic } from "../services/diagnosticService.js";
 import { useWorkbenchLayout } from "../composables/useWorkbenchLayout.js";
 import { useWorkbenchTabs } from "../composables/useWorkbenchTabs.js";
@@ -749,6 +754,9 @@ function handleCloseTab(path, targetPane) {
 
   const result = closeTab(state, path);
   if (result.closed) {
+    releaseModel(path);
+    const editorRef = pane === "pane2" ? splitCodeEditorRef.value : activeCodeEditorRef.value;
+    editorRef?.releasePath?.(path);
     if (pane === "pane2" && pane2TabsState.tabs.value.length === 0 && splitActive.value) {
       splitActive.value = false;
       activePane.value = "pane1";
@@ -763,17 +771,45 @@ async function handleConfirmCloseSave() {
   const targetTab = closingTab.value;
   const pane = closingTabPane.value;
   const state = pane === "pane2" ? pane2TabsState : pane1TabsState;
+  const targetPath = targetTab.path;
+  const currentActive = pane === "pane2" ? pane2ActiveTabPath.value : pane1ActiveTabPath.value;
   const editorRef = pane === "pane2" ? splitCodeEditorRef.value : activeCodeEditorRef.value;
 
-  if (editorRef?.save) {
-    try {
-      await editorRef.save();
-    } catch (e) {
-      // save error handled in editor
+  let saveSuccess = false;
+  if (currentActive === targetPath && editorRef?.save) {
+    saveSuccess = await editorRef.save();
+  } else {
+    const entry = getEntry(targetPath);
+    if (entry?.model) {
+      try {
+        const content = entry.model.getValue ? entry.model.getValue() : "";
+        await writeFileContent(targetPath, content);
+        const versionId = entry.model.getAlternativeVersionId ? entry.model.getAlternativeVersionId() : 1;
+        markSaved(targetPath, versionId);
+        setTabDirty(pane1TabsState, targetPath, false);
+        setTabDirty(pane2TabsState, targetPath, false);
+        saveSuccess = true;
+      } catch (err) {
+        saveSuccess = false;
+        showBgToast({
+          type: "error",
+          title: "Save Failed",
+          message: err.message || "Gagal menyimpan berkas",
+        });
+      }
     }
   }
 
-  closeTab(state, targetTab.path, { force: true });
+  if (!saveSuccess) {
+    // JANGAN tutup tab jika penyimpanan gagal (AEG-02)
+    return;
+  }
+
+  const result = closeTab(state, targetPath, { force: true });
+  if (result.closed) {
+    releaseModel(targetPath);
+    editorRef?.releasePath?.(targetPath);
+  }
   confirmCloseOpen.value = false;
   closingTab.value = null;
 
@@ -796,8 +832,13 @@ function handleConfirmCloseDiscard() {
   const targetPath = closingTab.value.path;
   const pane = closingTabPane.value;
   const state = pane === "pane2" ? pane2TabsState : pane1TabsState;
+  const editorRef = pane === "pane2" ? splitCodeEditorRef.value : activeCodeEditorRef.value;
 
-  closeTab(state, targetPath, { force: true });
+  const result = closeTab(state, targetPath, { force: true });
+  if (result.closed) {
+    releaseModel(targetPath);
+    editorRef?.releasePath?.(targetPath);
+  }
   confirmCloseOpen.value = false;
   closingTab.value = null;
 
@@ -1005,14 +1046,21 @@ function openWelcomeTab() {
 }
 
 function clearAllTabs() {
-  editorTabsState.tabs.value = [];
-  editorTabsState.activeTab.value = "";
+  pane1TabsState.tabs.value.forEach((t) => releaseModel(t.path));
+  pane2TabsState.tabs.value.forEach((t) => releaseModel(t.path));
+  pane1TabsState.tabs.value = [];
+  pane1TabsState.activeTab.value = "";
+  pane2TabsState.tabs.value = [];
+  pane2TabsState.activeTab.value = "";
+  splitActive.value = false;
+  activePane.value = "pane1";
+  activeCodeEditorRef.value?.layout?.();
 }
 
 watch(
   () => props.activeProject?.id,
   (newId, oldId) => {
-    if (!newId && oldId) {
+    if (newId !== oldId) {
       clearAllTabs();
     }
   }
@@ -1030,13 +1078,21 @@ function handleOpenCloneGitModal() {
 }
 
 function handleCloneGitSubmit() {
-  if (!cloneGitUrl.value.trim()) return;
-  cloneGitBusy.value = true;
-  cloneGitNotice.value = "Connecting to repository…";
-  setTimeout(() => {
-    cloneGitBusy.value = false;
-    cloneGitNotice.value = "Git Clone pipeline initialized. Full background sync will connect in the next milestone.";
-  }, 1000);
+  const url = cloneGitUrl.value.trim();
+  if (!url) return;
+  const command = `git clone ${url}`;
+  if (navigator?.clipboard?.writeText) {
+    navigator.clipboard
+      .writeText(command)
+      .then(() => {
+        cloneGitNotice.value = `Command copied to clipboard: "${command}". Run it in your terminal, then use "Open Folder".`;
+      })
+      .catch(() => {
+        cloneGitNotice.value = `Run this in your terminal: "${command}", then use "Open Folder".`;
+      });
+  } else {
+    cloneGitNotice.value = `Run this in your terminal: "${command}", then use "Open Folder".`;
+  }
 }
 
 const isCurrentTabDirty = computed(() => {
@@ -1060,18 +1116,28 @@ async function handleApplyToEditor(payload) {
   const targetPath = payload?.path || activeTabPath.value || "scratchpad.js";
   const pane = splitActive.value && activePane.value === "pane2" ? "pane2" : "pane1";
   const state = pane === "pane2" ? pane2TabsState : pane1TabsState;
-  const editorRef = pane === "pane2" ? splitCodeEditorRef.value : activeCodeEditorRef.value;
 
-  const currentPath = pane === "pane2" ? pane2ActiveTabPath.value : pane1ActiveTabPath.value;
-  if (!currentPath || (payload?.path && currentPath !== payload.path)) {
-    openTab(state, targetPath);
-    await nextTick();
+  // 1. Pastikan model targetPath ada di registry agar kode langsung terpasang pada model yang tepat
+  let entry = getEntry(targetPath);
+  if (!entry) {
+    try {
+      const data = await readFileContent(targetPath);
+      const text = typeof data?.content === "string" ? data.content : "";
+      const lang = languageForFile(targetPath);
+      entry = getOrCreateModel(null, targetPath, text, lang);
+    } catch {
+      const lang = languageForFile(targetPath);
+      entry = getOrCreateModel(null, targetPath, "", lang);
+    }
   }
 
-  if (editorRef?.applyContent) {
-    editorRef.applyContent(code);
-    setTabDirty(state, targetPath, true);
-  }
+  // 2. Terapkan kode ke model (pushEditOperations menjaga riwayat undo)
+  applyExternalContent(targetPath, code);
+
+  // 3. Buka tab dan tandai dirty
+  openTab(state, targetPath);
+  setTabDirty(pane1TabsState, targetPath, true);
+  setTabDirty(pane2TabsState, targetPath, true);
 
   emit("apply-to-editor", {
     code,
@@ -2119,7 +2185,7 @@ defineExpose({
     >
       <div class="clone-git-dialog">
         <p class="clone-git-desc">
-          Enter a remote Git repository URL to clone into your local workspace.
+          Direct Git clone via UI is coming soon. Enter a remote Git repository URL below to generate and copy the clone command.
         </p>
         <div class="form-group">
           <label class="form-label" for="git-repo-url">Repository URL</label>
@@ -2143,7 +2209,7 @@ defineExpose({
             :disabled="cloneGitBusy"
             @click="cloneGitModalOpen = false"
           >
-            Cancel
+            Close
           </button>
           <button
             type="button"
@@ -2151,8 +2217,7 @@ defineExpose({
             :disabled="!cloneGitUrl.trim() || cloneGitBusy"
             @click="handleCloneGitSubmit"
           >
-            <span v-if="cloneGitBusy">Connecting…</span>
-            <span v-else>Clone Repository</span>
+            <span>Copy Clone Command</span>
           </button>
         </div>
       </div>

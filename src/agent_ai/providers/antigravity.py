@@ -18,6 +18,7 @@ Referensi: https://antigravity.google/docs/models/
 
 from __future__ import annotations
 import json
+import logging
 import os
 import re
 import shutil
@@ -28,6 +29,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 _orig_subprocess_run = subprocess.run
+logger = logging.getLogger(__name__)
 import requests
 
 from agent_ai.config.settings import AntigravityConfig, settings
@@ -125,26 +127,28 @@ def _format_antigravity_policy_directive(mode: str) -> str:
         "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
         "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
         "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
+        "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
     ]
 
     if mode_clean == "fast":
         rules.extend([
-            "4. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
+            "5. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
             "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
             "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
             "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
         ])
     elif mode_clean == "balanced":
         rules.extend([
-            "4. EXECUTION MODE: BALANCED:",
+            "5. EXECUTION MODE: BALANCED:",
             "   - Read only files directly related to the user's task (max 6-8 files).",
-            "   - Avoid redundant reads of the same file.",
+            "   - Avoid redundant reads of the same file. Once read, proceed with implementation immediately.",
             "   - Apply edits as soon as sufficient context is gathered.",
         ])
     else:  # deep
         rules.extend([
-            "4. EXECUTION MODE: DEEP:",
+            "5. EXECUTION MODE: DEEP:",
             "   - Thorough analysis and verification are permitted across the workspace.",
+            "   - Do not re-read the same file repeatedly without edits.",
             "   - Log files (.aegis/log/) remain strictly prohibited.",
             "   - Stay strictly within workspace boundaries.",
         ])
@@ -480,7 +484,7 @@ class AntigravityProvider(BaseProvider):
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
                 files_read_set: set[str] = set()
-
+                file_read_counts: Dict[str, int] = {}
                 try:
                     while True:
                         if time.time() - start_time > timeout:
@@ -539,6 +543,10 @@ class AntigravityProvider(BaseProvider):
                                                 if not norm_target.startswith(norm_cwd):
                                                     is_traversal_breach = True
 
+                                        if aegis_tool in ("edit_file", "write_file", "replace_file_content", "delete_file", "move_file"):
+                                            if norm_target in file_read_counts:
+                                                file_read_counts[norm_target] = 0
+
                                         if is_traversal_breach:
                                             proc.kill()
                                             raise ProviderAPIError(
@@ -568,6 +576,27 @@ class AntigravityProvider(BaseProvider):
                                                 )
                                             if target:
                                                 files_read_set.add(target)
+                                                read_count = file_read_counts.get(norm_target, 0) + 1
+                                                file_read_counts[norm_target] = read_count
+                                                if read_count > 2:
+                                                    warning_msg = (
+                                                        f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
+                                                        "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
+                                                    )
+                                                    logger.warning(
+                                                        "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
+                                                        target,
+                                                        read_count,
+                                                    )
+                                                    if event_sink:
+                                                        event_sink("warning", {
+                                                            "message": warning_msg,
+                                                            "target": target,
+                                                            "read_count": read_count,
+                                                        })
+                                                        event_sink("agent_reasoning_delta", {
+                                                            "delta": f"\n{warning_msg}\n",
+                                                        })
                                             if policy_mode == "fast" and len(files_read_set) > 3:
                                                 proc.kill()
                                                 raise ProviderAPIError(
@@ -588,6 +617,14 @@ class AntigravityProvider(BaseProvider):
                                             })
                                     elif state == "DONE" and event_sink:
                                         output = tool_info.get("output", "")
+                                        norm_t = target.replace("\\", "/").lower()
+                                        if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
+                                            re_read_warning = (
+                                                f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
+                                                "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
+                                            )
+                                            if isinstance(output, str):
+                                                output = output + re_read_warning
                                         event_sink("tool_completed", {
                                             "tool": aegis_tool,
                                             "success": True,
@@ -620,8 +657,9 @@ class AntigravityProvider(BaseProvider):
                 stderr_text = proc.stderr.read().strip() if proc.stderr else ""
                 proc.wait()
 
-                if proc.returncode != 0 and not accumulated_text and not final_response:
-                    err_msg = stderr_text or f"Exit code {proc.returncode}"
+                ret_code = getattr(proc, "returncode", 0)
+                if ret_code != 0 and not accumulated_text and not final_response:
+                    err_msg = stderr_text or f"Exit code {ret_code}"
                     raise ProviderAPIError(
                         f"Antigravity CLI mengembalikan error: {err_msg}",
                         status_code=proc.returncode,
@@ -676,6 +714,7 @@ class AntigravityProvider(BaseProvider):
                 accumulated_text = []
                 final_response = ""
                 raw_data = {}
+                file_read_counts: Dict[str, int] = {}
                 for line in stdout.splitlines():
                     line_str = line.strip()
                     if not line_str:
@@ -698,6 +737,31 @@ class AntigravityProvider(BaseProvider):
                                 params = tool_info.get("parameters") or {}
                                 target = _extract_agy_target(aegis_tool, params)
                                 if state == "ACTIVE":
+                                    norm_target = target.replace("\\", "/").lower()
+                                    if aegis_tool in ("edit_file", "write_file", "replace_file_content", "delete_file", "move_file"):
+                                        if norm_target in file_read_counts:
+                                            file_read_counts[norm_target] = 0
+                                    elif aegis_tool == "read_file" and target:
+                                        read_count = file_read_counts.get(norm_target, 0) + 1
+                                        file_read_counts[norm_target] = read_count
+                                        if read_count > 2:
+                                            warning_msg = (
+                                                f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
+                                                "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
+                                            )
+                                            logger.warning(
+                                                "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
+                                                target,
+                                                read_count,
+                                            )
+                                            event_sink("warning", {
+                                                "message": warning_msg,
+                                                "target": target,
+                                                "read_count": read_count,
+                                            })
+                                            event_sink("agent_reasoning_delta", {
+                                                "delta": f"\n{warning_msg}\n",
+                                            })
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
                                         "arguments": params,
@@ -706,6 +770,14 @@ class AntigravityProvider(BaseProvider):
                                     })
                                 elif state == "DONE":
                                     output = tool_info.get("output", "")
+                                    norm_t = target.replace("\\", "/").lower()
+                                    if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
+                                        re_read_warning = (
+                                            f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
+                                            "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
+                                        )
+                                        if isinstance(output, str):
+                                            output = output + re_read_warning
                                     event_sink("tool_completed", {
                                         "tool": aegis_tool,
                                         "success": True,

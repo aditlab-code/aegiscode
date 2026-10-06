@@ -1,7 +1,7 @@
 <script setup>
 // TerminalView — 100% pure native terminal (via @xterm/xterm & PTY socket bridge).
 // Keyboard input streams directly to PTY with zero input forms or send buttons.
-import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
   projectId: { type: String, default: "" },
@@ -79,7 +79,12 @@ function initPtySocket() {
 
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const projectSegment = props.projectId ? `${encodeURIComponent(props.projectId)}/` : "";
-  const wsUrl = `${proto}//${window.location.host}/ws/terminal/${projectSegment}`;
+  let tokenParam = "";
+  try {
+    const token = localStorage.getItem("aegis_auth_token") || "";
+    if (token) tokenParam = `?token=${encodeURIComponent(token)}`;
+  } catch (_) {}
+  const wsUrl = `${proto}//${window.location.host}/ws/terminal/${projectSegment}${tokenParam}`;
 
   try {
     const SocketCtor = window["Web" + "Socket"];
@@ -111,6 +116,22 @@ function initPtySocket() {
     socket = null;
   }
 }
+
+watch(
+  () => props.projectId,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      if (socket) {
+        socket.close();
+        socket = null;
+      }
+      if (term) {
+        term.reset();
+      }
+      initPtySocket();
+    }
+  }
+);
 
 function syncDimensions() {
   if (fitAddon && term && socket && socket.readyState === 1) {

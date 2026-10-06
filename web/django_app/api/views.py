@@ -18,6 +18,7 @@ from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from api.auth import require_auth
 from api.services import GatewayError, GatewayService, get_service
 from api.streaming import EventSubscription, sse_stream
 
@@ -67,14 +68,36 @@ def _handle(handler: Callable[..., JsonResponse]) -> Callable:
             return handler(request, service, **kwargs)
         except GatewayError as exc:
             return _error_response(exc)
+        except (FileNotFoundError, KeyError) as exc:
+            return _json_response(
+                {"error": {"code": "not_found", "message": str(exc)}},
+                status=404,
+            )
         except Exception as exc:  # noqa: BLE001 - generic fallback for extension UI
-            # Map CapabilityValidationError etc. to 400
             msg = str(exc)
-            if "validation" in msg.lower() or "enum" in msg.lower() or "unknown" in msg.lower():
-                return _json_response({"error": {"code": "validation_error", "message": msg}}, status=400)
-            # Map known extension errors to 404/409
-            if "not found" in msg.lower() or "unknown" in msg.lower():
-                return _json_response({"error": {"code": "not_found", "message": msg}}, status=404)
+            exc_type = type(exc).__name__
+            # Prioritaskan error 404 (not found / unknown entity / tidak ditemukan)
+            if (
+                "notfound" in exc_type.lower()
+                or "not found" in msg.lower()
+                or "tidak ditemukan" in msg.lower()
+                or "unknown" in msg.lower()
+            ):
+                return _json_response(
+                    {"error": {"code": "not_found", "message": msg}},
+                    status=404,
+                )
+            # Map validation errors to 400
+            if (
+                "validation" in exc_type.lower()
+                or "validation" in msg.lower()
+                or "enum" in msg.lower()
+                or isinstance(exc, ValueError)
+            ):
+                return _json_response(
+                    {"error": {"code": "validation_error", "message": msg}},
+                    status=400,
+                )
             raise
 
     wrapper.__name__ = handler.__name__
@@ -92,6 +115,7 @@ def health(request: HttpRequest, service: GatewayService) -> JsonResponse:
 
 
 @require_http_methods(["GET"])
+@require_auth
 @_handle
 def config(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/config -> provider/model/mode dari konfigurasi Aegis.
@@ -237,6 +261,10 @@ def llm_models(request: HttpRequest, service: GatewayService) -> JsonResponse:
         provider_id=body.get("provider_id"),
         model_name=body.get("model_name"),
         enabled=bool(body.get("enabled", True)),
+        context_window=body.get("context_window", 128000),
+        supports_thinking=bool(body.get("supports_thinking", False)),
+        reasoning_budget=body.get("reasoning_budget"),
+        timeout=body.get("timeout", 60),
     )
     return _json_response(record, status=201)
 
@@ -252,11 +280,17 @@ def llm_model_detail(
         return _json_response(service.delete_llm_model(model_id))
 
     body = _parse_json_body(request)
-    record = service.update_llm_model(
-        model_id,
-        model_name=body.get("model_name"),
-        enabled=body.get("enabled"),
-    )
+    update_kwargs: Dict[str, Any] = {
+        "model_name": body.get("model_name"),
+        "enabled": body.get("enabled"),
+        "context_window": body.get("context_window"),
+        "supports_thinking": body.get("supports_thinking"),
+        "timeout": body.get("timeout"),
+    }
+    if "reasoning_budget" in body:
+        update_kwargs["reasoning_budget"] = body.get("reasoning_budget")
+
+    record = service.update_llm_model(model_id, **update_kwargs)
     return _json_response(record)
 
 
@@ -519,6 +553,7 @@ def rename_entry(request: HttpRequest, service: GatewayService) -> JsonResponse:
 
 
 @require_http_methods(["GET"])
+@require_auth
 @_handle
 def files(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/files?path=... -> daftar file project aktif (read-only).
@@ -532,6 +567,7 @@ def files(request: HttpRequest, service: GatewayService) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
+@require_auth
 @_handle
 def file_content(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """Isi file project aktif untuk Code Editor (Workbench).
@@ -544,14 +580,16 @@ def file_content(request: HttpRequest, service: GatewayService) -> JsonResponse:
     menulis file dari browser. Path divalidasi terhadap active project root
     oleh tool Aegis existing (workspace boundary sama dengan Explorer).
     """
+    project_id = request.GET.get("project_id") or None
     if request.method == "GET":
         path = request.GET.get("path")
-        return _json_response(service.read_project_file(path))
+        return _json_response(service.read_project_file(path, project_id=project_id))
 
     body = _parse_json_body(request)
     path = body.get("path")
     content = body.get("content")
-    return _json_response(service.write_project_file(path, content))
+    project_id = body.get("project_id") or project_id
+    return _json_response(service.write_project_file(path, content, project_id=project_id))
 
 
 @csrf_exempt
@@ -580,6 +618,7 @@ def active_project(request: HttpRequest, service: GatewayService) -> JsonRespons
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
+@require_auth
 @_handle
 def tasks(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """GET /api/tasks -> daftar task (history); POST /api/tasks -> buat task.
@@ -1195,11 +1234,18 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
     service = get_service()
     session_id = request.GET.get("session_id") or None
     task_id = request.GET.get("task_id") or None
+    last_event_id = (
+        request.headers.get("Last-Event-ID")
+        or request.META.get("HTTP_LAST_EVENT_ID")
+        or request.GET.get("last_event_id")
+        or None
+    )
 
     subscription = EventSubscription(
         service.sessions,
         session_id=session_id,
         task_id=task_id,
+        last_event_id=last_event_id,
     )
     subscription.start()
 
@@ -1239,6 +1285,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
 # ---------------------------------------------------------------------------
 @csrf_exempt
 @require_http_methods(["POST"])
+@require_auth
 def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
     """POST /api/terminal/run → stream command output line-by-line as SSE.
 

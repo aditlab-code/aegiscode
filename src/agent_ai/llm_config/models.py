@@ -99,6 +99,10 @@ class ModelConfig:
         provider_id: id ProviderInstance pemilik (foreign key).
         model_name: nama model (mis. "openai/gpt-4o-mini").
         enabled: True bila model aktif dipakai.
+        context_window: kapasitas token context window model (default: 128000).
+        supports_thinking: True bila model mendukung reasoning/thinking token.
+        reasoning_budget: budget token penalaran eksplisit (opsional / nullable).
+        timeout: batas waktu request dalam detik (default: 60).
         created_at / updated_at: timestamp ISO-8601.
     """
 
@@ -106,6 +110,10 @@ class ModelConfig:
     model_name: str
     id: str = field(default_factory=_new_id)
     enabled: bool = True
+    context_window: int = 128000
+    supports_thinking: bool = False
+    reasoning_budget: Optional[int] = None
+    timeout: int = 60
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
@@ -115,6 +123,10 @@ class ModelConfig:
             "provider_id": self.provider_id,
             "model_name": self.model_name,
             "enabled": self.enabled,
+            "context_window": self.context_window,
+            "supports_thinking": self.supports_thinking,
+            "reasoning_budget": self.reasoning_budget,
+            "timeout": self.timeout,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -126,6 +138,14 @@ class ModelConfig:
             provider_id=data.get("provider_id", ""),
             model_name=data.get("model_name", ""),
             enabled=bool(data.get("enabled", True)),
+            context_window=int(data.get("context_window", 128000)),
+            supports_thinking=bool(data.get("supports_thinking", False)),
+            reasoning_budget=(
+                int(data["reasoning_budget"])
+                if data.get("reasoning_budget") is not None
+                else None
+            ),
+            timeout=int(data.get("timeout", 60)),
             created_at=data.get("created_at", "") or _now_iso(),
             updated_at=data.get("updated_at", "") or _now_iso(),
         )
@@ -133,11 +153,21 @@ class ModelConfig:
     @classmethod
     def from_row(cls, row: Any) -> "ModelConfig":
         """Bangun dari baris sqlite3.Row."""
+        keys = row.keys() if hasattr(row, "keys") else ()
+        context_window = row["context_window"] if "context_window" in keys else 128000
+        supports_thinking = bool(row["supports_thinking"]) if "supports_thinking" in keys else False
+        reasoning_budget = row["reasoning_budget"] if "reasoning_budget" in keys else None
+        timeout = row["timeout"] if "timeout" in keys else 60
+
         return cls(
             id=row["id"],
             provider_id=row["provider_id"],
             model_name=row["model_name"],
             enabled=bool(row["enabled"]),
+            context_window=int(context_window) if context_window is not None else 128000,
+            supports_thinking=supports_thinking,
+            reasoning_budget=int(reasoning_budget) if reasoning_budget is not None else None,
+            timeout=int(timeout) if timeout is not None else 60,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )

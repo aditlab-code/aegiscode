@@ -284,6 +284,10 @@ class LLMConfigService:
         provider_id: str,
         model_name: str,
         enabled: bool = True,
+        context_window: int = 128000,
+        supports_thinking: bool = False,
+        reasoning_budget: Optional[int] = None,
+        timeout: int = 60,
     ) -> ModelConfig:
         """Tambah model ke sebuah provider instance.
 
@@ -303,7 +307,13 @@ class LLMConfigService:
             )
         try:
             return self.store.create_model(
-                provider_id=provider_id, model_name=clean_model, enabled=bool(enabled)
+                provider_id=provider_id,
+                model_name=clean_model,
+                enabled=bool(enabled),
+                context_window=int(context_window),
+                supports_thinking=bool(supports_thinking),
+                reasoning_budget=int(reasoning_budget) if reasoning_budget is not None else None,
+                timeout=int(timeout),
             )
         except sqlite3.IntegrityError as exc:  # noqa: BLE001 - race/uniqueness
             raise LLMConfigConflictError(
@@ -326,8 +336,12 @@ class LLMConfigService:
         *,
         model_name: Optional[str] = None,
         enabled: Optional[bool] = None,
+        context_window: Optional[int] = None,
+        supports_thinking: Optional[bool] = None,
+        reasoning_budget: Any = ...,
+        timeout: Optional[int] = None,
     ) -> ModelConfig:
-        """Update model (nama/enabled)."""
+        """Update model (nama/enabled/kapabilitas)."""
         current = self._require_model(model_id)
         fields: Dict[str, Any] = {}
 
@@ -344,6 +358,20 @@ class LLMConfigService:
 
         if enabled is not None:
             fields["enabled"] = bool(enabled)
+
+        if context_window is not None:
+            fields["context_window"] = int(context_window)
+
+        if supports_thinking is not None:
+            fields["supports_thinking"] = bool(supports_thinking)
+
+        if reasoning_budget is not ...:
+            fields["reasoning_budget"] = (
+                int(reasoning_budget) if reasoning_budget is not None else None
+            )
+
+        if timeout is not None:
+            fields["timeout"] = int(timeout)
 
         if not fields:
             return current
@@ -561,20 +589,35 @@ class LLMConfigService:
         instance = self._require_instance(instance_id)
 
         selected_model = ""
+        context_window = 128000
+        supports_thinking = False
+        reasoning_budget: Optional[int] = None
+        timeout = 60
+
+        matched_model_config: Optional[ModelConfig] = None
         if model_id is not None:
             model = self._require_model(model_id)
             if model.provider_id != instance.id:
                 raise LLMConfigValidationError(
                     f"Model '{model_id}' bukan milik provider instance '{instance_id}'."
                 )
+            matched_model_config = model
             selected_model = model.model_name
         elif model_name is not None:
             selected_model = model_name
+            matched_model_config = self.store.find_model_by_name(instance.id, model_name)
         else:
             for model in self.store.list_models(instance.id):
                 if model.enabled:
+                    matched_model_config = model
                     selected_model = model.model_name
                     break
+
+        if matched_model_config:
+            context_window = matched_model_config.context_window
+            supports_thinking = matched_model_config.supports_thinking
+            reasoning_budget = matched_model_config.reasoning_budget
+            timeout = matched_model_config.timeout
 
         return {
             "instance_id": instance.id,
@@ -588,6 +631,10 @@ class LLMConfigService:
                 else None
             ),
             "model": selected_model,
+            "context_window": context_window,
+            "supports_thinking": supports_thinking,
+            "reasoning_budget": reasoning_budget,
+            "timeout": timeout,
             "enabled": instance.enabled,
         }
 

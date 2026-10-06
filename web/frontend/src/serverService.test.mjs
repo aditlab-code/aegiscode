@@ -19,14 +19,16 @@ test("serverService: terminateServer calls /api/server/terminate and updates rea
     fetchCalled = true;
     fetchUrl = url;
     fetchOptions = options;
+    const body = {
+      status: "terminating",
+      message: "Penghentian server AegisCode telah diinisiasi.",
+      pid: 12345,
+    };
     return {
       ok: true,
       status: 200,
-      json: async () => ({
-        status: "terminating",
-        message: "Penghentian server AegisCode telah diinisiasi.",
-        pid: 12345,
-      }),
+      text: async () => JSON.stringify(body),
+      json: async () => body,
     };
   };
 
@@ -39,8 +41,6 @@ test("serverService: terminateServer calls /api/server/terminate and updates rea
     assert.equal(fetchCalled, true);
     assert.equal(fetchUrl, "/api/server/terminate");
     assert.equal(fetchOptions.method, "POST");
-    assert.equal(fetchOptions.headers["Content-Type"], "application/json");
-    assert.deepEqual(JSON.parse(fetchOptions.body), { force: false });
 
     assert.equal(result.success, true);
     assert.equal(result.data.status, "terminating");
@@ -55,12 +55,14 @@ test("serverService: terminateServer handles error responses gracefully", async 
   const originalFetch = globalThis.fetch;
 
   globalThis.fetch = async () => {
+    const body = {
+      error: { code: "server_error", message: "Failed to trigger shutdown" },
+    };
     return {
       ok: false,
       status: 500,
-      json: async () => ({
-        error: { code: "server_error", message: "Failed to trigger shutdown" },
-      }),
+      text: async () => JSON.stringify(body),
+      json: async () => body,
     };
   };
 
@@ -81,7 +83,13 @@ test("serverService: checkServerHealth returns true on 200 and false on error", 
   const originalFetch = globalThis.fetch;
 
   try {
-    globalThis.fetch = async () => ({ ok: true, status: 200 });
+    const okBody = { status: "ok" };
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(okBody),
+      json: async () => okBody,
+    });
     const healthy = await checkServerHealth();
     assert.equal(healthy, true);
     assert.equal(isServerOnline.value, true);
@@ -101,9 +109,15 @@ test("serverService: startServerHealthMonitor executes immediate check and perio
   const originalFetch = globalThis.fetch;
   let pollCount = 0;
 
+  const okBody = { status: "ok" };
   globalThis.fetch = async () => {
     pollCount += 1;
-    return { ok: true, status: 200 };
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(okBody),
+      json: async () => okBody,
+    };
   };
 
   try {

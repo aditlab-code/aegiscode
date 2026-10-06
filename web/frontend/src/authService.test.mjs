@@ -86,12 +86,14 @@ test("authService: computes redirect URI based on window.location", () => {
 test("authService: fetchGoogleLoginUrl calls /api/auth/google/url", async () => {
   globalThis.fetch = async (url) => {
     assert.match(url, /\/api\/auth\/google\/url\?redirect_uri=/);
+    const payload = {
+      auth_url: "https://accounts.google.com/o/oauth2/v2/auth?state=xyz",
+      state: "xyz",
+    };
     return {
       ok: true,
-      json: async () => ({
-        auth_url: "https://accounts.google.com/o/oauth2/v2/auth?state=xyz",
-        state: "xyz",
-      }),
+      text: async () => JSON.stringify(payload),
+      json: async () => payload,
     };
   };
 
@@ -110,12 +112,14 @@ test("authService: exchangeOAuthCallback saves token and user on success", async
     assert.equal(body.code, "google_auth_code_123");
     assert.equal(body.state, "signed_state_token");
 
+    const payload = {
+      token: "minted.aegis.jwt",
+      user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
+    };
     return {
       ok: true,
-      json: async () => ({
-        token: "minted.aegis.jwt",
-        user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
-      }),
+      text: async () => JSON.stringify(payload),
+      json: async () => payload,
     };
   };
 
@@ -133,12 +137,14 @@ test("authService: verifyCurrentSession validates existing token", async () => {
     assert.equal(url, "/api/auth/me");
     assert.equal(options.headers.Authorization, "Bearer active_token");
 
+    const payload = {
+      authenticated: true,
+      user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
+    };
     return {
       ok: true,
-      json: async () => ({
-        authenticated: true,
-        user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
-      }),
+      text: async () => JSON.stringify(payload),
+      json: async () => payload,
     };
   };
 
@@ -155,7 +161,7 @@ test("authService: logoutUser clears local storage and notifies server", async (
   globalThis.fetch = async (url) => {
     if (url === "/api/auth/logout") {
       serverLogoutCalled = true;
-      return { ok: true, json: async () => ({ success: true }) };
+      return { ok: true, text: async () => JSON.stringify({ success: true }), json: async () => ({ success: true }) };
     }
     return { ok: false };
   };

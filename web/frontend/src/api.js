@@ -168,16 +168,20 @@ export function listFiles(path = ".", recursive = false) {
 
 // Code Editor (Workbench): baca isi file project aktif (ReadFileTool Aegis).
 // Frontend TIDAK membaca filesystem browser; isi file selalu dari backend.
-export function readFileContent(path) {
-  return request(`/files/content?path=${encodeURIComponent(path)}`);
+export function readFileContent(path, projectId = null) {
+  const query = new URLSearchParams({ path: String(path || "") });
+  if (projectId) query.set("project_id", projectId);
+  return request(`/files/content?${query.toString()}`);
 }
 
 // Code Editor (Workbench): simpan isi file project aktif (WriteFileTool Aegis).
 // Penulisan dilakukan backend di dalam workspace boundary existing.
-export function writeFileContent(path, content) {
+export function writeFileContent(path, content, projectId = null) {
+  const payload = { path, content };
+  if (projectId) payload.project_id = projectId;
   return request("/files/content", {
     method: "POST",
-    body: JSON.stringify({ path, content }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -603,12 +607,47 @@ export function setExtensionConfigValue(extensionId, key, value, opts = {}) {
 
 
 // --- #51 SSE ---------------------------------------------------------------
-// Membuka EventSource ke /api/events (opsional filter session_id/task_id).
+export const KNOWN_SSE_EVENTS = Object.freeze([
+  "task_created",
+  "task_started",
+  "phase_changed",
+  "agent_commentary",
+  "tool_called",
+  "tool_completed",
+  "tool_result",
+  "agent_observation",
+  "observation_received",
+  "provider_request",
+  "provider_response",
+  "validation_started",
+  "validation_completed",
+  "recovery_started",
+  "recovery_completed",
+  "policy_applied",
+  "policy_escalated",
+  "verification_strategy_applied",
+  "change_detected",
+  "approval_requested",
+  "approval_resolved",
+  "task_completed",
+  "task_failed",
+  "task_cancelled",
+]);
+
+// Membuka EventSource ke /api/events (opsional filter session_id/task_id/last_event_id).
 // Mengembalikan EventSource agar pemanggil dapat menutupnya (disconnect).
-export function openEventStream({ sessionId = null, taskId = null, onEvent = null, onOpen = null, onError = null } = {}) {
+export function openEventStream({
+  sessionId = null,
+  taskId = null,
+  lastEventId = null,
+  onEvent = null,
+  onOpen = null,
+  onError = null,
+} = {}) {
   const params = new URLSearchParams();
   if (sessionId) params.set("session_id", sessionId);
   if (taskId) params.set("task_id", taskId);
+  if (lastEventId) params.set("last_event_id", lastEventId);
   const qs = params.toString();
   const url = `${BASE}/events${qs ? `?${qs}` : ""}`;
 
@@ -618,28 +657,6 @@ export function openEventStream({ sessionId = null, taskId = null, onEvent = nul
 
   // Event Aegis dikirim dengan `event: <event_type>`. Kita dengarkan tipe
   // yang dikenal (#51) tanpa mengasumsikan semuanya selalu ada.
-  const KNOWN_EVENTS = [
-    "task_created",
-    "task_started",
-    "phase_changed",
-    "agent_commentary",
-    "tool_called",
-    "tool_completed",
-    "observation_received",
-    "provider_request",
-    "provider_response",
-    "validation_started",
-    "validation_completed",
-    "recovery_started",
-    "recovery_completed",
-    "change_detected",
-    "approval_requested",
-    "approval_resolved",
-    "task_completed",
-    "task_failed",
-    "task_cancelled",
-  ];
-
   const handle = (evt) => {
     let payload = null;
     try {
@@ -647,10 +664,18 @@ export function openEventStream({ sessionId = null, taskId = null, onEvent = nul
     } catch {
       payload = { raw: evt.data };
     }
+    if (payload && typeof payload === "object") {
+      if (evt.lastEventId && !payload.lastEventId) {
+        payload.lastEventId = evt.lastEventId;
+      }
+      if (!payload.event_type && evt.type && evt.type !== "message") {
+        payload.event_type = evt.type;
+      }
+    }
     if (onEvent) onEvent(payload);
   };
 
-  KNOWN_EVENTS.forEach((name) => source.addEventListener(name, handle));
+  KNOWN_SSE_EVENTS.forEach((name) => source.addEventListener(name, handle));
   // Fallback: event tanpa tipe eksplisit.
   source.onmessage = handle;
 

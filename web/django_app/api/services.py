@@ -334,6 +334,10 @@ class GatewayService:
             self._llm_config_service = LLMConfigService()
         return self._llm_config_service
 
+    @llm_config_service.setter
+    def llm_config_service(self, value: Any) -> None:
+        self._llm_config_service = value
+
     @property
     def consultant_service(self) -> Any:
         """ConsultantService Aegis (lazy).
@@ -655,14 +659,27 @@ class GatewayService:
 
     # ---- Model ----
     def create_llm_model(
-        self, provider_id: str, model_name: str, enabled: bool = True
+        self,
+        provider_id: str,
+        model_name: str,
+        enabled: bool = True,
+        context_window: int = 128000,
+        supports_thinking: bool = False,
+        reasoning_budget: Optional[int] = None,
+        timeout: int = 60,
     ) -> Dict[str, Any]:
         """Tambah model pada sebuah provider instance."""
         from agent_ai.llm_config import LLMConfigError
 
         try:
             model = self.llm_config_service.add_model(
-                provider_id, model_name, enabled=enabled
+                provider_id,
+                model_name,
+                enabled=enabled,
+                context_window=context_window,
+                supports_thinking=supports_thinking,
+                reasoning_budget=reasoning_budget,
+                timeout=timeout,
             )
         except LLMConfigError as exc:
             raise self._llm_error_to_gateway(exc) from exc
@@ -673,13 +690,23 @@ class GatewayService:
         model_id: str,
         model_name: Optional[str] = None,
         enabled: Optional[bool] = None,
+        context_window: Optional[int] = None,
+        supports_thinking: Optional[bool] = None,
+        reasoning_budget: Any = ...,
+        timeout: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Update model (nama/enabled; None = tidak diubah)."""
+        """Update model (nama/enabled/kapabilitas; None = tidak diubah)."""
         from agent_ai.llm_config import LLMConfigError
 
         try:
             model = self.llm_config_service.update_model(
-                model_id, model_name=model_name, enabled=enabled
+                model_id,
+                model_name=model_name,
+                enabled=enabled,
+                context_window=context_window,
+                supports_thinking=supports_thinking,
+                reasoning_budget=reasoning_budget,
+                timeout=timeout,
             )
         except LLMConfigError as exc:
             raise self._llm_error_to_gateway(exc) from exc
@@ -1270,15 +1297,14 @@ class GatewayService:
             raise ValidationError(f"Path project tidak ditemukan: {root}")
         return target
 
-    def read_project_file(self, path: str) -> Dict[str, Any]:
-        """Baca isi file project aktif via ReadFileTool Aegis.
+    def read_project_file(self, path: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Baca isi file project via ReadFileTool Aegis.
 
-        Dipakai Code Editor (Workbench) untuk memuat isi file. Read-only dan
-        tidak ada abstraksi filesystem baru: tool Aegis existing dipakai apa
-        adanya (termasuk batas ukuran file + validasi workspace boundary).
+        Bila project_id disertakan, root project target ditentukan spesifik.
+        Bila None, jatuh kembali ke active project global.
 
         Raises:
-            NotFoundError: bila tidak ada active project.
+            NotFoundError: bila tidak ada active/target project.
             ValidationError: bila path kosong / di luar root / tidak ditemukan.
         """
         from agent_ai.tools.base import ToolError
@@ -1287,21 +1313,21 @@ class GatewayService:
         if not path:
             raise ValidationError("Field 'path' wajib diisi.")
 
-        tool = ReadFileTool(root=self._active_project_root())
+        root = self._project_root_by_id(project_id) if project_id else self._active_project_root()
+        tool = ReadFileTool(root=root)
         try:
             return tool.execute(path=path)
         except ToolError as exc:
             raise ValidationError(str(exc)) from exc
 
-    def write_project_file(self, path: str, content: str) -> Dict[str, Any]:
-        """Simpan isi file project aktif via WriteFileTool Aegis.
+    def write_project_file(self, path: str, content: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Simpan isi file project via WriteFileTool Aegis.
 
-        Dipakai Code Editor (Workbench) untuk menyimpan hasil edit. Penulisan
-        dilakukan backend (bukan browser) memakai tool Aegis existing, jadi
-        validasi workspace boundary + penulisan atomic tetap sama.
+        Bila project_id disertakan, root project target ditentukan spesifik.
+        Bila None, jatuh kembali ke active project global.
 
         Raises:
-            NotFoundError: bila tidak ada active project.
+            NotFoundError: bila tidak ada active/target project.
             ValidationError: bila path kosong / di luar root / gagal ditulis.
         """
         from agent_ai.tools.base import ToolError
@@ -1312,7 +1338,8 @@ class GatewayService:
         if content is None:
             raise ValidationError("Field 'content' wajib diisi.")
 
-        tool = WriteFileTool(root=self._active_project_root())
+        root = self._project_root_by_id(project_id) if project_id else self._active_project_root()
+        tool = WriteFileTool(root=root)
         try:
             return tool.execute(path=path, content=content)
         except ToolError as exc:

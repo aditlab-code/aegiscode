@@ -219,3 +219,241 @@ def test_read_file_tool_rejects_log_directories(tmp_path: Path) -> None:
 
     with pytest.raises(ToolExecutionError, match="Akses ditolak: Pembacaan berkas internal log"):
         tool.execute(path=".aegis/log/test.log")
+
+
+def test_format_antigravity_policy_directive_redundant_read_directive() -> None:
+    """Verifikasi direktif pencegahan re-read redundan tercakup dalam prompt."""
+    directive = _format_antigravity_policy_directive("balanced")
+    expected_phrase = (
+        "Do NOT re-read the same source file repeatedly. "
+        "Once you have read a file, utilize its content immediately and proceed with your implementation."
+    )
+    assert expected_phrase in directive
+
+
+def test_redundant_reread_warning_injected_after_two_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa pembacaan berkas > 2 kali tanpa mutasi memicu event warning."""
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock")
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.killed = False
+            self.returncode = 0
+            self.lines = [
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 1,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "DONE",
+                        "step_index": 1,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}, "output": "content 1"},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 2,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "DONE",
+                        "step_index": 2,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}, "output": "content 2"},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 3,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "DONE",
+                        "step_index": 3,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}, "output": "content 3"},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "agent_response",
+                        "text_delta": "Perbaikan selesai",
+                    },
+                }) + "\n",
+                "",
+            ]
+            self.stdout = self
+            self.stderr = self
+
+        def readline(self) -> str:
+            if self.lines:
+                return self.lines.pop(0)
+            return ""
+
+        def poll(self) -> int | None:
+            return 0 if not self.lines else None
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self) -> int:
+            return 0
+
+        def read(self) -> str:
+            return ""
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+
+    emitted_events: List[tuple[str, Any]] = []
+
+    def sink(ev: str, data: Any) -> None:
+        emitted_events.append((ev, data))
+
+    opts = GenerateOptions(extra={"event_sink": sink, "mode": "balanced"})
+    res = p.generate(prompt="Lakukan perbaikan", options=opts)
+
+    assert res.text == "Perbaikan selesai"
+    # Verifikasi event warning dipancarkan untuk read ke-3
+    warning_events = [data for ev, data in emitted_events if ev == "warning"]
+    assert len(warning_events) == 1
+    assert warning_events[0]["target"] == "src/target.ts"
+    assert warning_events[0]["read_count"] == 3
+    assert "PERINGATAN REDUNDANSI" in warning_events[0]["message"]
+
+    # Verifikasi observation_received menyertakan injeksi guardrail pada read ke-3
+    observations = [data for ev, data in emitted_events if ev == "observation_received"]
+    assert len(observations) == 3
+    assert "[SISTEM GUARDRAIL]" not in observations[0]["content"]
+    assert "[SISTEM GUARDRAIL]" not in observations[1]["content"]
+    assert "[SISTEM GUARDRAIL]" in observations[2]["content"]
+
+
+def test_redundant_reread_reset_on_file_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa mutasi berkas mereset hitungan pembacaan berkas."""
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock")
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.killed = False
+            self.returncode = 0
+            self.lines = [
+                # Read 1
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 1,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                # Read 2
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 2,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                # Mutasi via edit_file
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "edit_file",
+                        "state": "ACTIVE",
+                        "step_index": 3,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                # Read setelah mutasi (dihitung sebagai read ke-1 baru)
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "tool",
+                        "tool_name": "read_file",
+                        "state": "ACTIVE",
+                        "step_index": 4,
+                        "tool_info": {"parameters": {"path": "src/target.ts"}},
+                    },
+                }) + "\n",
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "agent_response",
+                        "text_delta": "Perbaikan selesai",
+                    },
+                }) + "\n",
+                "",
+            ]
+            self.stdout = self
+            self.stderr = self
+
+        def readline(self) -> str:
+            if self.lines:
+                return self.lines.pop(0)
+            return ""
+
+        def poll(self) -> int | None:
+            return 0 if not self.lines else None
+
+        def kill(self) -> None:
+            self.killed = True
+
+        def wait(self) -> int:
+            return 0
+
+        def read(self) -> str:
+            return ""
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+
+    emitted_events: List[tuple[str, Any]] = []
+
+    def sink(ev: str, data: Any) -> None:
+        emitted_events.append((ev, data))
+
+    opts = GenerateOptions(extra={"event_sink": sink, "mode": "balanced"})
+    res = p.generate(prompt="Lakukan perbaikan", options=opts)
+
+    assert res.text == "Perbaikan selesai"
+    # Karena edit_file mereset hitungan, read ke-4 tidak memicu warning
+    warning_events = [data for ev, data in emitted_events if ev == "warning"]
+    assert len(warning_events) == 0

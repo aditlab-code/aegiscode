@@ -78,15 +78,18 @@ class EventSubscription:
         *,
         session_id: Optional[str] = None,
         task_id: Optional[str] = None,
+        last_event_id: Optional[str] = None,
         maxsize: int = DEFAULT_QUEUE_MAXSIZE,
     ) -> None:
         self.store = store
         self.session_id = session_id
         self.task_id = task_id
+        self.last_event_id = last_event_id
         self._queue: "queue.Queue[ExecutionEvent]" = queue.Queue(maxsize=maxsize)
         self._closed = False
         self._lock = threading.Lock()
         self._callback = self._on_event
+        self._last_delivered_seq = 0
 
     def _matches(self, event: ExecutionEvent) -> bool:
         """Cek apakah event lolos filter session/task."""
@@ -98,17 +101,42 @@ class EventSubscription:
 
     def _on_event(self, event: ExecutionEvent) -> None:
         """Callback store: masukkan event yang lolos filter ke queue."""
-        if self._closed or not self._matches(event):
-            return
-        try:
-            self._queue.put_nowait(event)
-        except queue.Full:
-            # Bounded: drop event bila subscriber lambat (anti memory leak).
-            pass
+        with self._lock:
+            if self._closed or not self._matches(event):
+                return
+            if event.sequence <= self._last_delivered_seq:
+                return
+            try:
+                self._queue.put_nowait(event)
+                self._last_delivered_seq = max(self._last_delivered_seq, event.sequence)
+            except queue.Full:
+                # Bounded: drop event bila subscriber lambat (anti memory leak).
+                pass
 
     def start(self) -> None:
-        """Mulai subscription (daftarkan callback ke store)."""
-        self.store.subscribe(self._callback)
+        """Mulai subscription: daftarkan callback ke store dan replay missed events."""
+        with self._lock:
+            if self.last_event_id:
+                events = self.store.get_events()
+                for e in events:
+                    if str(e.event_id) == str(self.last_event_id) or str(e.sequence) == str(self.last_event_id):
+                        self._last_delivered_seq = max(self._last_delivered_seq, e.sequence)
+                        break
+
+            self.store.subscribe(self._callback)
+
+            if self._last_delivered_seq > 0 or self.last_event_id:
+                replay_events = self.store.get_events(
+                    session_id=self.session_id,
+                    task_id=self.task_id,
+                )
+                for rev in replay_events:
+                    if rev.sequence > self._last_delivered_seq:
+                        try:
+                            self._queue.put_nowait(rev)
+                            self._last_delivered_seq = max(self._last_delivered_seq, rev.sequence)
+                        except queue.Full:
+                            break
 
     def close(self) -> None:
         """Akhiri subscription (unsubscribe dari store). Idempotent."""

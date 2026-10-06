@@ -26,6 +26,23 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def connect(self) -> None:
         self._loop = asyncio.get_running_loop()
+
+        # Verifikasi Autentikasi dan Origin sebelum shell dialokasikan (AEG-08)
+        from api.auth import verify_websocket_auth
+
+        is_allowed, reason, user_info = verify_websocket_auth(self.scope)
+        if not is_allowed:
+            logger.warning("Terminal WebSocket rejected: %s", reason)
+            await self.accept()
+            await self.send(
+                text_data=f"\r\n\x1b[31m[Security: {reason}]\x1b[0m\r\n"
+            )
+            close_code = 4003 if "Origin" in reason else 4001
+            await self.close(code=close_code)
+            return
+
+        self.scope["user_info"] = user_info
+
         url_route = self.scope.get("url_route", {})
         kwargs = url_route.get("kwargs", {})
         self.project_id = kwargs.get("project_id") or ""
@@ -37,14 +54,21 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
                 service = get_service()
                 root = service._project_root_by_id(self.project_id)
-                if root.is_dir():
-                    workspace_root = str(root)
+                if not root.is_dir():
+                    raise FileNotFoundError(f"Project directory {root} tidak ditemukan.")
+                workspace_root = str(root)
             except Exception as exc:
                 logger.warning(
                     "Could not resolve workspace for project %s: %s",
                     self.project_id,
                     exc,
                 )
+                await self.accept()
+                await self.send(
+                    text_data=f"\r\n\x1b[31m[Error: Workspace project '{self.project_id}' tidak valid: {exc}]\x1b[0m\r\n"
+                )
+                await self.close(code=4004)
+                return
 
         await self.accept()
 
