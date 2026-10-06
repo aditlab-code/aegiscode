@@ -409,6 +409,10 @@ class AgentOrchestrator:
         environment = self._environment_context_message()
         if environment is not None:
             messages.append(environment)
+        # Execution Policy directive (Fast/Balanced/Deep guardrail):
+        policy_directive = self._policy_directive_message()
+        if policy_directive is not None:
+            messages.append(policy_directive)
         messages.append(Message(role="user", content=task, parts=user_parts))
         messages.extend(history)
         return messages
@@ -653,6 +657,28 @@ class AgentOrchestrator:
         if not text:
             return None
         return Message(role="system", content=text)
+
+    def _policy_directive_message(self) -> Optional[Message]:
+        """Arahan operasional Execution Policy (Fast, Balanced, Deep) sebagai system message.
+
+        Membimbing LLM agar berperilaku efisien sesuai mode yang sedang aktif:
+        - Fast: Batas maks 3 berkas, prioritaskan search_code, eskalasi jika perlu.
+        - Balanced: Eksplorasi moderat terarah (maks 8 berkas).
+        - Deep: Eksplorasi menyeluruh tanpa batasan berkas.
+        """
+        mode = self.effective_mode
+        if not mode:
+            return None
+        try:
+            from agent_ai.runtime.policy import directive_prompt_for_mode
+
+            text = directive_prompt_for_mode(mode)
+            if not text:
+                return None
+            return Message(role="system", content=text)
+        except Exception:  # noqa: BLE001 - direktif policy tidak boleh menggagalkan loop
+            return None
+
 
     # ------------------------------------------------------------------ #
     # Runtime context compaction (hemat token tanpa kehilangan memori)
@@ -1704,16 +1730,25 @@ class AgentOrchestrator:
         penanganan loop yang sudah ada.
         """
         call_options = options
-        if self.event_sink is not None:
-            if call_options is None:
-                call_options = GenerateOptions(extra={"event_sink": self.event_sink})
-            elif "event_sink" not in (call_options.extra or {}):
-                call_options = GenerateOptions(
-                    temperature=call_options.temperature,
-                    max_tokens=call_options.max_tokens,
-                    model=call_options.model,
-                    extra={**(call_options.extra or {}), "event_sink": self.event_sink},
-                )
+        extra = dict(call_options.extra or {}) if (call_options and call_options.extra) else {}
+        extra_updated = False
+        if self.event_sink is not None and "event_sink" not in extra:
+            extra["event_sink"] = self.event_sink
+            extra_updated = True
+        if self.execution_policy is not None and "execution_policy" not in extra:
+            extra["execution_policy"] = self.execution_policy
+            extra["mode"] = self.execution_policy.get("effective_mode") or "balanced"
+            extra_updated = True
+        if getattr(self.executor, "workspace_root", None) and "workspace_root" not in extra:
+            extra["workspace_root"] = self.executor.workspace_root
+            extra_updated = True
+        if extra_updated or (call_options is None and extra):
+            call_options = GenerateOptions(
+                temperature=call_options.temperature if call_options else None,
+                max_tokens=call_options.max_tokens if call_options else None,
+                model=call_options.model if call_options else None,
+                extra=extra,
+            )
 
         if getattr(self, "response_log", None) is None:
             gen_result = self.provider.generate(
@@ -2266,6 +2301,9 @@ class AgentOrchestrator:
         brain_context = self._bible_context_message_for_task(task)
         if brain_context is not None:
             history.append_system_message(brain_context.content)
+        policy_directive = self._policy_directive_message()
+        if policy_directive is not None:
+            history.append_system_message(policy_directive.content)
         history.append_user_message(task, parts=user_parts)
 
         tools = self._tool_definitions()

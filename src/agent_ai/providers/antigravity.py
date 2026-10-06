@@ -116,6 +116,40 @@ def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
     return str(params.get("path") or params.get("command") or params.get("target") or "")
 
 
+def _format_antigravity_policy_directive(mode: str) -> str:
+    """Format prompt direktif guardrail ketat untuk Antigravity CLI."""
+    mode_clean = (mode or "balanced").lower().strip()
+
+    rules = [
+        "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
+        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
+        "2. TASK EXECUTION FOCUS: Do NOT waste steps summarizing or reading entire documentation directories (.aegis/bible/). Locate the target source files and perform modifications directly.",
+    ]
+
+    if mode_clean == "fast":
+        rules.extend([
+            "3. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
+            "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
+            "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
+            "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
+        ])
+    elif mode_clean == "balanced":
+        rules.extend([
+            "3. EXECUTION MODE: BALANCED:",
+            "   - Read only files directly related to the user's task (max 6-8 files).",
+            "   - Avoid redundant reads of the same file.",
+            "   - Apply edits as soon as sufficient context is gathered.",
+        ])
+    else:  # deep
+        rules.extend([
+            "3. EXECUTION MODE: DEEP:",
+            "   - Thorough analysis and verification are permitted across the workspace.",
+            "   - Log files (.aegis/log/) remain strictly prohibited.",
+        ])
+
+    return "\n".join(rules)
+
+
 def _extract_tool_call_dict(tc: Any) -> Dict[str, Any]:
     """Ekstrak nama, arguments, dan id dari dict atau objek ToolCall."""
     if isinstance(tc, dict):
@@ -299,10 +333,14 @@ class AntigravityProvider(BaseProvider):
         self,
         messages: Any,
         tools: Optional[List[ToolDefinition]] = None,
+        policy_directive: Optional[str] = None,
     ) -> str:
         """Format daftar pesan Message/dict menjadi teks dialog terstruktur."""
         formatted_turns: List[str] = []
         tools_injected = False
+
+        if policy_directive:
+            formatted_turns.append(f"[SYSTEM]:\n{policy_directive}")
 
         for msg in messages:
             role = _extract_msg_role(msg).lower()
@@ -364,13 +402,22 @@ class AntigravityProvider(BaseProvider):
 
         cli = self._resolve_cli_path()
         if cli:
+            policy_mode = (
+                (options.extra.get("execution_policy", {}).get("effective_mode") if options and options.extra else None)
+                or (options.extra.get("mode") if options and options.extra else None)
+                or "balanced"
+            )
+            policy_directive = _format_antigravity_policy_directive(policy_mode)
+
             if messages:
-                input_text = self._format_messages_to_prompt(messages, tools=tool_defs if tool_defs else None)
+                input_text = self._format_messages_to_prompt(
+                    messages, tools=tool_defs if tool_defs else None, policy_directive=policy_directive
+                )
             elif prompt:
                 if tool_defs:
-                    input_text = f"[SYSTEM]:\n{_format_tools_prompt(tool_defs)}\n\n[USER]:\n{prompt}"
+                    input_text = f"[SYSTEM]:\n{policy_directive}\n\n{_format_tools_prompt(tool_defs)}\n\n[USER]:\n{prompt}"
                 else:
-                    input_text = prompt
+                    input_text = f"[SYSTEM]:\n{policy_directive}\n\n[USER]:\n{prompt}"
             else:
                 input_text = ""
 
@@ -387,7 +434,6 @@ class AntigravityProvider(BaseProvider):
             target_cwd: Optional[str] = None
             if cwd and os.path.exists(str(cwd)):
                 target_cwd = str(Path(cwd).resolve())
-
 
             # Bila event_sink tersedia, gunakan stream-json agar intermediate tool
             # calls dipancarkan real-time ke UI timeline Aegis saat agy berjalan.
@@ -428,6 +474,7 @@ class AntigravityProvider(BaseProvider):
                 final_response = ""
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
+                files_read_set: set[str] = set()
 
                 try:
                     while True:
@@ -467,13 +514,48 @@ class AntigravityProvider(BaseProvider):
                                     params = tool_info.get("parameters") or {}
                                     target = _extract_agy_target(aegis_tool, params)
 
-                                    if state == "ACTIVE" and event_sink:
-                                        event_sink("tool_called", {
-                                            "tool": aegis_tool,
-                                            "arguments": params,
-                                            "target": target,
-                                            "call_id": call_id,
-                                        })
+                                    if state == "ACTIVE":
+                                        # Active Streaming Circuit Breaker:
+                                        # 1. Blokir pembacaan berkas log internal (.aegis/log/ dsb)
+                                        # 2. Batasi pembacaan berkas unik di mode fast (maks 3 berkas)
+                                        if aegis_tool == "read_file":
+                                            norm_target = target.replace("\\", "/").lower()
+                                            is_log_target = (
+                                                "/.aegis/log/" in norm_target
+                                                or norm_target.startswith(".aegis/log/")
+                                                or "/.aether/log/" in norm_target
+                                                or norm_target.startswith(".aether/log/")
+                                                or (norm_target.endswith(".log") and (".aegis" in norm_target or ".aether" in norm_target))
+                                            )
+                                            if is_log_target:
+                                                proc.kill()
+                                                raise ProviderAPIError(
+                                                    f"Pelanggaran Guardrail Keamanan: Antigravity CLI dihentikan karena mencoba membaca berkas log '{target}'. "
+                                                    "Membaca berkas log dilarang untuk mencegah token overflow.",
+                                                    status_code=400,
+                                                    endpoint="agy CLI",
+                                                    response_body=f"Circuit breaker: forbidden log file read '{target}'",
+                                                )
+                                            if target:
+                                                files_read_set.add(target)
+                                            if policy_mode == "fast" and len(files_read_set) > 3:
+                                                proc.kill()
+                                                raise ProviderAPIError(
+                                                    f"Pelanggaran Guardrail Efisiensi Mode Fast: Antigravity CLI telah membaca {len(files_read_set)} berkas "
+                                                    f"(batas mode Fast adalah 3 berkas unik). Eksekusi dihentikan. "
+                                                    "Gunakan mode Balanced jika memerlukan analisis lintas berkas yang lebih luas.",
+                                                    status_code=429,
+                                                    endpoint="agy CLI",
+                                                    response_body=f"Circuit breaker: fast mode read limit exceeded ({len(files_read_set)} > 3)",
+                                                )
+
+                                        if event_sink:
+                                            event_sink("tool_called", {
+                                                "tool": aegis_tool,
+                                                "arguments": params,
+                                                "target": target,
+                                                "call_id": call_id,
+                                            })
                                     elif state == "DONE" and event_sink:
                                         output = tool_info.get("output", "")
                                         event_sink("tool_completed", {

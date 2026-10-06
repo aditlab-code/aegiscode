@@ -47,6 +47,7 @@ _IGNORED_DIRS = {
     ".mypy_cache",
     ".pytest_cache",
     ".aegis",
+    ".aether",
 }
 
 # Batas default agar tidak membaca seluruh project tanpa sengaja.
@@ -579,6 +580,19 @@ class ReadFileTool(BaseTool):
         if not target.is_file():
             raise ToolValidationError(f"'{rel_path}' bukan sebuah file.")
 
+        key_path = self._rel_key(target)
+        norm_key = key_path.replace("\\", "/").lower()
+        if (
+            norm_key.startswith(".aegis/log/")
+            or norm_key.startswith(".aether/log/")
+            or "/.aegis/log/" in norm_key
+            or "/.aether/log/" in norm_key
+        ):
+            raise ToolExecutionError(
+                f"Akses ditolak: Pembacaan berkas internal log '{rel_path}' dilarang "
+                "untuk mencegah token overflow dan inefisiensi konteks."
+            )
+
         try:
             stat = target.stat()
         except OSError as exc:
@@ -600,6 +614,18 @@ class ReadFileTool(BaseTool):
         if lock is not None:
             lock.acquire()
         try:
+            # Execution Policy Guardrail: cek batas kuota pembacaan berkas utuh
+            is_full_read = (
+                symbol is None
+                and arguments.get("start_line") is None
+                and arguments.get("end_line") is None
+                and mode != "structure"
+            )
+            if is_full_read and cache is not None:
+                can_read, guardrail_msg = cache.can_read_full(key_path)
+                if not can_read:
+                    raise ToolExecutionError(guardrail_msg)
+
             # Fast path: rentang yang SUDAH tersedia (exact/covered) dikembalikan
             # tanpa physical read, selama file belum berubah (signature sama).
             if (
@@ -679,6 +705,8 @@ class ReadFileTool(BaseTool):
             )
 
             if start_line is None:
+                if cache is not None:
+                    cache.record_full_read(key_path)
                 # Tanpa range: perilaku lama (seluruh file) tidak berubah.
                 result = {
                     "path": rel_path,

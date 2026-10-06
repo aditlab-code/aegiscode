@@ -1000,8 +1000,13 @@ class AgentRuntime:
         elif getattr(options, "extra", None) is None:
             options.extra = {}
 
-        if self.project_root and isinstance(getattr(options, "extra", None), dict):
-            options.extra["workspace_root"] = str(self.project_root)
+        if isinstance(getattr(options, "extra", None), dict):
+            if self.project_root:
+                options.extra["workspace_root"] = str(self.project_root)
+            policy = self._policy_for_orchestrator()
+            if policy:
+                options.extra["execution_policy"] = policy
+                options.extra["mode"] = policy.get("effective_mode") or "balanced"
         return AgentOrchestrator(
             provider=provider,
             executor=self.executor,
@@ -1224,6 +1229,7 @@ class AgentRuntime:
         ):
             # Tidak ada mode dari mana pun -> policy tidak aktif (behavior lama).
             self.policy = None
+            self._sync_policy_with_executor(None)
             return None
         state = self.policy_resolver.resolve(requested, metadata=metadata)
         state = self._apply_policy_escalation(state, metadata)
@@ -1231,7 +1237,29 @@ class AgentRuntime:
         self.verification_strategy = strategy_for_mode(state.effective_mode)
         self._emit_verification_strategy(self.verification_strategy)
         self._emit_policy_applied(state)
+        self._sync_policy_with_executor(state)
         return state
+
+    def _sync_policy_with_executor(self, state: Optional[ExecutionPolicyState]) -> None:
+        """Sinkronkan mode eksekusi aktif ke toolset runtime (read_cache & policy tool)."""
+        mode = state.effective_mode if state is not None else None
+        registry = getattr(self.executor, "registry", None)
+        if registry is None:
+            return
+
+        # 1. Update ToolReadCache (guardrail kuota pembacaan berkas per mode)
+        read_cache = getattr(registry, "read_cache", None)
+        if read_cache is not None and hasattr(read_cache, "set_policy_mode"):
+            read_cache.set_policy_mode(mode)
+
+        # 2. Hubungkan escalator callback ke RequestPolicyEscalationTool bila terdaftar
+        try:
+            if hasattr(registry, "has") and registry.has("request_policy_escalation"):
+                tool = registry.get("request_policy_escalation")
+                if hasattr(tool, "set_escalator"):
+                    tool.set_escalator(self.escalate_policy)
+        except Exception:  # noqa: BLE001 - sync best-effort
+            pass
 
     def _apply_policy_escalation(
         self,
@@ -1315,6 +1343,7 @@ class AgentRuntime:
         )
         self._emit_event("policy_escalated", payload)
         self._emit_verification_strategy(self.verification_strategy, previous_mode=previous)
+        self._sync_policy_with_executor(state)
         return state
 
     def _emit_verification_strategy(
