@@ -1,12 +1,12 @@
-/* AETHER Bottom Collapsible Dock Styles */
+/* AegisCode Bottom Collapsible Dock Styles — UI Kit Alignment */
 
 .app-bottom-dock {
   flex: 0 0 auto;
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-soft);
+  background: var(--terminal);
+  border-top: 1px solid var(--line);
   box-sizing: border-box;
   overflow: hidden;
   height: 32px;
@@ -26,17 +26,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 32px;
-  padding: 0 8px;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border-soft);
+  height: 36px;
+  padding: 0 12px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
   user-select: none;
 }
 
 .dock-tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 12px;
   height: 100%;
 }
 
@@ -44,13 +44,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 10px;
+  padding: 0 4px;
   height: 100%;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--text-dim);
-  font-size: 11.5px;
+  color: var(--muted);
+  font-size: 11px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -60,8 +60,8 @@
 }
 
 .dock-tab-btn.active {
-  color: var(--text, #ffffff);
-  border-bottom-color: var(--accent, #2d7d4e);
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .dock-actions {
@@ -78,14 +78,15 @@
   height: 24px;
   background: transparent;
   border: none;
-  color: var(--text-dim);
+  color: var(--muted);
   cursor: pointer;
   border-radius: 4px;
+  transition: all 0.12s ease;
 }
 
 .dock-act-btn:hover {
-  color: var(--text, #ffffff);
-  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text);
+  background: var(--hover);
 }
 
 .dock-body {

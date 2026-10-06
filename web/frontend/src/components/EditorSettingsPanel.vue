@@ -7,6 +7,8 @@ import {
   saveEditorSettings,
   toMonacoOptions,
 } from "../services/editorSettingsService.js";
+import AppButton from "./ui/AppButton.vue";
+import AppCard from "./ui/AppCard.vue";
 
 const initial = getStoredEditorSettings();
 
@@ -208,16 +210,15 @@ function resetDefaults() {
 <template>
   <div class="editor-settings-root">
     <!-- Header panel -->
-    <div class="panel settings-panel">
-      <div class="panel-head">
-        <div>
+    <AppCard variant="panel" class="settings-panel">
+      <template #header>
+        <div class="panel-head">
           <div class="title">Text Editor Settings</div>
-          <div class="desc">Configure Monaco typography, line spacing, word wrap, and minimap.</div>
+          <AppButton variant="ghost" size="sm" @click="resetDefaults">
+            Reset to Defaults
+          </AppButton>
         </div>
-        <button type="button" class="btn-aether btn-ghost-a" @click="resetDefaults">
-          Reset to Defaults
-        </button>
-      </div>
+      </template>
 
       <div class="panel-body">
         <div v-if="notice" class="sv-alert ok" style="margin-bottom: 12px;">{{ notice }}</div>
@@ -365,20 +366,19 @@ function resetDefaults() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Live Code Preview Canvas -->
-    <div class="panel settings-panel">
-      <div class="panel-head">
-        <div>
-          <div class="title">Live Code Preview</div>
-          <div class="desc">Interactive rendering of your typography and minimap configuration</div>
-        </div>
-        <span class="chip chip-sm ok">Live Sync</span>
-      </div>
-      <div class="panel-body">
-        <div class="ed-preview-frame">
+        <div class="ed-sub-divider"></div>
+
+        <!-- Live Code Preview Sub-section -->
+        <div class="ed-sub-section">
+          <div class="ed-sub-header">
+            <div>
+              <div class="ed-sub-title">Live Code Preview</div>
+              <div class="ed-sub-desc">Interactive rendering of your typography and minimap configuration</div>
+            </div>
+            <span class="chip chip-sm ok">Live Sync</span>
+          </div>
+          <div class="ed-preview-frame">
           <div class="ed-preview-topbar">
             <div class="ed-preview-dots">
               <span class="dot red"></span>
@@ -408,7 +408,8 @@ function resetDefaults() {
         </div>
       </div>
     </div>
-  </div>
+  </AppCard>
+</div>
 </template>
 
 <style scoped>
@@ -416,6 +417,33 @@ function resetDefaults() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.ed-sub-divider {
+  height: 1px;
+  background: var(--line, var(--border-soft));
+  margin: 18px 0 14px;
+}
+.ed-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ed-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ed-sub-title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text);
+}
+.ed-sub-desc {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
 }
 
 .ed-settings-grid {

@@ -22,21 +22,55 @@
   background: var(--bg-drawer);
 }
 
+.rd-header-title-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rd-sparkle-ico {
+  color: var(--accent, #a78bfa);
+  flex-shrink: 0;
+}
+
+.rd-main-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.rd-badge-pill {
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.12);
+  color: var(--accent, #a78bfa);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .right-drawer-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--edge, var(--border-soft));
+  padding: 2px;
+  border-radius: 6px;
 }
 
 .rd-tab-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 4px;
+  padding: 2px 9px;
   background: transparent;
   border: none;
-  color: var(--text-dim);
-  font-size: 12px;
+  color: var(--dim, var(--text-dim));
+  font-size: 10.5px;
   font-weight: 500;
   cursor: pointer;
   border-radius: 4px;
@@ -45,12 +79,17 @@
 
 .rd-tab-btn:hover {
   color: var(--text);
-  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
 }
 
 .rd-tab-btn.active {
-  color: var(--text, #ffffff);
-  background: var(--bg-elev);
+  color: #ffffff;
+  background: var(--accent, #7c3aed);
+}
+
+.rd-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .rd-close-btn {

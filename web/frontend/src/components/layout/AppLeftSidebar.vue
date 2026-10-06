@@ -187,8 +187,58 @@ function statusTagClass(st) {
 
 <template>
   <aside class="app-left-sidebar" aria-label="Tool Sidebar">
-    <!-- Header: Workspace & Project Switcher -->
+    <!-- Header: Section Title & Project Switcher -->
     <div class="sidebar-header">
+      <div class="sidebar-section-title-row">
+        <span class="sidebar-section-title">{{ activeNav.toUpperCase() }}</span>
+        <div class="sidebar-header-actions">
+          <button
+            type="button"
+            class="collapse-sidebar-btn"
+            title="Collapse Sidebar"
+            aria-label="Collapse Sidebar"
+            @click="emit('collapse-sidebar')"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <button
+            v-if="activeProject"
+            type="button"
+            class="close-project-btn"
+            title="Close Workspace"
+            aria-label="Close Project"
+            @click="emit('close-project')"
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <div class="project-switcher-row">
         <div class="project-select-wrapper">
           <select
@@ -206,50 +256,6 @@ function statusTagClass(st) {
             </option>
           </select>
         </div>
-        <button
-          type="button"
-          class="collapse-sidebar-btn"
-          title="Collapse Sidebar"
-          aria-label="Collapse Sidebar"
-          @click="emit('collapse-sidebar')"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-            <line x1="9" y1="3" x2="9" y2="21"/>
-          </svg>
-        </button>
-        <button
-          type="button"
-          class="close-project-btn"
-          title="Close Workspace"
-          aria-label="Close Project"
-          @click="emit('close-project')"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
       </div>
     </div>
 

@@ -514,13 +514,11 @@ watch(activeTab, (tab) => {
   <!-- Runtime aktif (Configuration: Provider, model, credential, mode). -->
   <section class="panel">
     <div class="panel-head">
-      <div>
-        <div class="title">Configuration</div>
-        <div class="desc">Provider, model, dan credential yang dipakai AegisCode.</div>
-      </div>
+      <div class="title">Configuration</div>
       <div class="sv-config-head-actions">
         <AppButton
           variant="ghost"
+          size="sm"
           :disabled="loading || busy || !activeInstance"
           :busy="testResults[activeInstance?.id] === 'testing…'"
           title="Test connectivity to active provider"
@@ -528,9 +526,6 @@ watch(activeTab, (tab) => {
         >
           <span v-if="testResults[activeInstance?.id] === 'testing…'">Testing…</span>
           <span v-else>Test Connection</span>
-        </AppButton>
-        <AppButton variant="ghost" :disabled="loading || busy" @click="load">
-          Refresh
         </AppButton>
       </div>
     </div>
@@ -660,10 +655,7 @@ watch(activeTab, (tab) => {
   <!-- Provider instance + model (relasi Provider -> Model). -->
   <section class="panel">
     <div class="panel-head">
-      <div>
-        <div class="title">Providers &amp; Models</div>
-        <div class="desc">{{ providers.length }} provider instance(s)</div>
-      </div>
+      <div class="title">Providers &amp; Models</div>
     </div>
     <div class="panel-body">
       <div v-if="!providers.length" class="wb-empty">Belum ada provider instance.</div>
@@ -950,8 +942,9 @@ watch(activeTab, (tab) => {
 }
 
 .sv-prov {
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
+  border: 1px solid var(--line, var(--border-soft));
+  border-radius: 6px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
   padding: 14px;
   display: grid;
   gap: 12px;
@@ -1068,8 +1061,9 @@ watch(activeTab, (tab) => {
 }
 
 .sv-form {
-  border: 1px dashed var(--border-soft);
-  border-radius: 12px;
+  border: 1px dashed var(--line, var(--border-soft));
+  border-radius: 6px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
   padding: 14px;
   display: grid;
   gap: 10px;
@@ -1115,8 +1109,9 @@ watch(activeTab, (tab) => {
   justify-content: space-between;
   gap: 14px;
   padding: 12px 14px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
+  border: 1px solid var(--line, var(--border-soft));
+  border-radius: 6px;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
 }
 .sv-cred-name {
   display: flex;
@@ -1157,7 +1152,16 @@ watch(activeTab, (tab) => {
 .sv-config-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: var(--inset, rgba(0, 0, 0, 0.25));
+}
+
+[data-theme="light"] .sv-config-grid {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .sv-config-row {
@@ -1165,10 +1169,19 @@ watch(activeTab, (tab) => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
+  padding: 12px 16px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--line);
+}
+
+[data-theme="light"] .sv-config-row {
+  border-bottom-color: var(--line, rgba(73, 64, 97, 0.1));
+}
+
+.sv-config-row:last-child {
+  border-bottom: none;
 }
 
 .sv-config-label {

@@ -12,11 +12,11 @@ import AppActivityBar from "./components/layout/AppActivityBar.vue";
 import AppFooter from "./components/layout/AppFooter.vue";
 import WorkbenchView from "./pages/WorkbenchView.vue";
 import ProjectLauncher from "./components/ProjectLauncher.vue";
-import TaskComposer from "./components/TaskComposer.vue";
 import ReportViewer from "./components/ReportViewer.vue";
 import ProjectPolicyPanel from "./components/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
+import AppButton from "./components/ui/AppButton.vue";
 import LoginOverlay from "./components/LoginOverlay.vue";
 import { formatTokens, usageTokens } from "./tokenFormat.js";
 import { shouldAdoptSubmittedTask, shouldFollowStartedTask } from "./taskView.js";
@@ -39,7 +39,7 @@ import { useWorkspaceFiles } from "./services/fileCacheService.js";
 // Layout & Navigation State
 const themeState = createThemeState(), responsive = createResponsiveState();
 const activeNav = ref("explorer"), settingsOpen = ref(false), settingsTab = ref("providers");
-const composerOpen = ref(false), commandPaletteOpen = ref(false), commandPaletteMode = ref("commands");
+const commandPaletteOpen = ref(false), commandPaletteMode = ref("commands");
 const closeConfirmOpen = ref(false), stopConfirmOpen = ref(false), policyProject = ref(null);
 const reportTaskId = ref(""), currentReport = ref(""), workbenchRef = ref(null);
 const notice = ref(""), error = ref(""), cursorPos = ref({ ln: 1, col: 1 }), activeLanguage = ref("Vue 3");
@@ -348,7 +348,6 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
 async function handleComposerSubmit(payload) {
   const text = typeof payload === "string" ? payload : payload?.text;
   if (!text) return;
-  composerOpen.value = false;
   await submitTask(text, payload?.providerInstanceId || null, payload?.modelId || null, payload?.executionMode || null, payload?.images || null);
 }
 
@@ -545,7 +544,7 @@ function onKeyDown(e) {
   } else if (matchesShortcut(e, "Cmd+,") || matchesShortcut(e, "Ctrl+,")) {
     e.preventDefault(); workbenchRef.value?.openSettings?.("providers");
   } else if (e.key === "Escape") {
-    commandPaletteOpen.value = composerOpen.value = settingsOpen.value = closeConfirmOpen.value = stopConfirmOpen.value = false;
+    commandPaletteOpen.value = settingsOpen.value = closeConfirmOpen.value = stopConfirmOpen.value = false;
     reportTaskId.value = ""; policyProject.value = null;
   }
 }
@@ -578,66 +577,94 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="ide-root" :class="[`tier-${responsive.tier.value}`]">
-    <AppNavbar
-      :project="activeProject" :tier="responsive.tier.value" :changes-count="changes.length" :is-running="isRunning" :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
-      :user="currentUser" @logout="handleLogout" @open-explorer="activeNav = 'explorer'"
-      @open-command-palette="commandPaletteOpen = true; commandPaletteMode = 'commands'" @toggle-assistant="toggleAssistantAction()"
-    />
-
-    <div class="ide-main-row">
-      <AppActivityBar
-        v-model:active-nav="activeNav"
-        :sidebar-open="responsive.sidebarOpen.value"
-        :is-dark="themeState.isDark.value"
+  <div
+    class="ide-root"
+    :data-theme="themeState.isDark.value ? 'dark' : 'light'"
+    :class="[`tier-${responsive.tier.value}`]"
+  >
+    <div class="ide-window" :class="[`tier-${responsive.tier.value}`]">
+      <AppNavbar
+        :project="activeProject"
+        :tier="responsive.tier.value"
         :changes-count="changes.length"
+        :is-running="isRunning"
+        :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
+        :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)"
+        :bottom-dock-visible="workbenchRef?.bottomDockOpen || false"
+        :is-dark="themeState.isDark.value"
+        :user="currentUser"
+        @logout="handleLogout"
+        @open-explorer="activeNav = 'explorer'"
+        @open-command-palette="commandPaletteOpen = true; commandPaletteMode = 'commands'"
+        @toggle-assistant="toggleAssistantAction()"
+        @toggle-sidebar="toggleSidebarAction()"
+        @toggle-terminal="workbenchRef?.toggleBottomDock()"
         @toggle-theme="themeState.toggleTheme()"
-        @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
-        @toggle-sidebar="toggleSidebarAction"
-        @open-sidebar="toggleSidebarAction(true)"
       />
 
-      <WorkbenchView
-        ref="workbenchRef" :active-project="activeProject" :projects="projects" :selected-project-id="activeProject?.id || ''"
-        :config="config" :providers="llmProviders" :provider-instance-id="selectedProviderInstanceId" :model-id="selectedModelId" :mode="selectedMode"
-        :task-provider="activeProviderLabel" :task-model="activeModelLabel"
-        :task-history="taskHistory" :settings-tab="settingsTab" :active-nav="activeNav" :changes="changes" :validation="validation"
-        :explorer-refresh="explorerRefresh" :live-fs-change="liveFsChange" :queue-refresh="queueRefresh" :connected="connected" :agent-status="agentStatus"
-        :task="task" :task-tag="taskTag" :task-duration-label="taskDurationLabel" :task-timer-live="isRunning"
-        :task-tokens-label="taskTokensLabel" :task-tokens-tooltip="taskTokensTooltip" :show-reasoning="isRunning"
-        :lifecycle-steps="lifecycleSteps" :lifecycle-pct="lifecyclePct" :activity-phase="activityPhase" :activity-events="activityEvents"
-        :is-running="isRunning" :stop-in-progress="stopInProgress" :error="error" :tier="responsive.tier.value"
-        :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)" :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
-        :active-overlay="responsive.activeOverlay.value" @close-overlay="responsive.closeOverlays()" @toggle-assistant="toggleAssistantAction" @toggle-sidebar="toggleSidebarAction"
-        @select-project="(id) => { const p = projects.find(proj => proj.id === id); if (p) handleOpenProject(p); }"
-        @close-project="handleCloseProject" @open-composer="composerOpen = true" @request-stop="requestStop" @stop-task="requestStop" @open-report="handleOpenReport"
-        @view-task="handleViewTask" @cursor-change="(pos) => { cursorPos = pos; }" @submit-task="handleComposerSubmit" @run-consultant-task="handleComposerSubmit"
-        @update:provider-instance-id="(id) => { selectedProviderInstanceId = id; }" @update:model-id="(id) => { selectedModelId = id; }" @update:mode="(m) => { selectedMode = m; }"
-        @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
-        @refresh-config="refreshAllConfig" @delete-history="handleDeleteHistory" @clear-history="handleClearHistory" @open-history-task="handleViewTask" @open-project-policy="(p) => { policyProject = p; }" @delete-project="handleDeleteProject" @open-project="handleOpenProject"
-        @open-folder="handleOpenFolder" @open-path="() => { activeNav = 'explorer'; }" @open-explorer="activeNav = 'explorer'"
-        @branch-info-updated="(info) => { gitBranchInfo = info; }"
+      <div class="ide-main-row">
+        <AppActivityBar
+          v-model:active-nav="activeNav"
+          :sidebar-open="responsive.sidebarOpen.value"
+          :is-dark="themeState.isDark.value"
+          :changes-count="changes.length"
+          @toggle-theme="themeState.toggleTheme()"
+          @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
+          @toggle-sidebar="toggleSidebarAction"
+          @open-sidebar="toggleSidebarAction(true)"
+        />
+
+        <WorkbenchView
+          ref="workbenchRef" :active-project="activeProject" :projects="projects" :selected-project-id="activeProject?.id || ''"
+          :config="config" :providers="llmProviders" :provider-instance-id="selectedProviderInstanceId" :model-id="selectedModelId" :mode="selectedMode"
+          :task-provider="activeProviderLabel" :task-model="activeModelLabel"
+          :task-history="taskHistory" :settings-tab="settingsTab" :active-nav="activeNav" :changes="changes" :validation="validation"
+          :explorer-refresh="explorerRefresh" :live-fs-change="liveFsChange" :queue-refresh="queueRefresh" :connected="connected" :agent-status="agentStatus"
+          :task="task" :task-tag="taskTag" :task-duration-label="taskDurationLabel" :task-timer-live="isRunning"
+          :task-tokens-label="taskTokensLabel" :task-tokens-tooltip="taskTokensTooltip" :show-reasoning="isRunning"
+          :lifecycle-steps="lifecycleSteps" :lifecycle-pct="lifecyclePct" :activity-phase="activityPhase" :activity-events="activityEvents"
+          :is-running="isRunning" :stop-in-progress="stopInProgress" :error="error" :tier="responsive.tier.value"
+          :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)" :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
+          :active-overlay="responsive.activeOverlay.value" @close-overlay="responsive.closeOverlays()" @toggle-assistant="toggleAssistantAction" @toggle-sidebar="toggleSidebarAction"
+          @select-project="(id) => { const p = projects.find(proj => proj.id === id); if (p) handleOpenProject(p); }"
+          @close-project="handleCloseProject" @open-composer="() => workbenchRef?.handleOpenAgentComposer?.()" @request-stop="requestStop" @stop-task="requestStop" @open-report="handleOpenReport"
+          @view-task="handleViewTask" @cursor-change="(pos) => { cursorPos = pos; }" @submit-task="handleComposerSubmit" @run-consultant-task="handleComposerSubmit"
+          @update:provider-instance-id="(id) => { selectedProviderInstanceId = id; }" @update:model-id="(id) => { selectedModelId = id; }" @update:mode="(m) => { selectedMode = m; }"
+          @open-settings="(tab) => { if (tab) settingsTab = tab; workbenchRef?.openSettings?.(tab || 'providers'); }"
+          @refresh-config="refreshAllConfig" @delete-history="handleDeleteHistory" @clear-history="handleClearHistory" @open-history-task="handleViewTask" @open-project-policy="(p) => { policyProject = p; }" @delete-project="handleDeleteProject" @open-project="handleOpenProject"
+          @open-folder="handleOpenFolder" @open-path="() => { activeNav = 'explorer'; }" @open-explorer="activeNav = 'explorer'"
+          @branch-info-updated="(info) => { gitBranchInfo = info; }"
+        />
+      </div>
+
+      <AppFooter
+        :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
+        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
+        :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
+        @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
       />
     </div>
 
-    <AppFooter
-      :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
-      :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
-      :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
-      @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
-    />
-
-    <AppModal v-if="composerOpen" :model-value="composerOpen" title="New Agent Task" max-width="640px" @close="composerOpen = false">
-      <TaskComposer :running="isRunning" :config="config" :providers="llmProviders" :task-history="taskHistory" v-model:provider-instance-id="selectedProviderInstanceId" v-model:model-id="selectedModelId" v-model:mode="selectedMode" v-model:execution-mode="selectedExecutionMode" @submit="handleComposerSubmit" @stop="requestStop" />
-    </AppModal>
     <ReportViewer v-if="reportTaskId" :task-id="reportTaskId" :status="task.status" :report="currentReport" @close="reportTaskId = ''" />
     <ProjectPolicyPanel v-if="policyProject" :project="policyProject" @close="policyProject = null" />
     <AppCommandPalette v-model="commandPaletteOpen" v-model:mode="commandPaletteMode" :files="workspaceFiles" :commands="defaultCommands" @close="commandPaletteOpen = false" @select-file="(f) => workbenchRef?.handleOpenFile?.(f)" />
     <AppModal v-if="closeConfirmOpen" :model-value="closeConfirmOpen" title="Close Workspace" max-width="420px" @close="closeConfirmOpen = false">
-      <div class="confirm-dialog-content"><p>Close workspace "{{ activeProject?.name }}"?</p><div class="confirm-dialog-actions"><button type="button" class="btn btn-ghost" @click="closeConfirmOpen = false">Cancel</button><button type="button" class="btn btn-danger" @click="handleCloseProject">Close</button></div></div>
+      <div class="confirm-dialog-content">
+        <p>Close workspace "{{ activeProject?.name }}"?</p>
+        <div class="confirm-dialog-actions">
+          <AppButton variant="ghost" size="sm" @click="closeConfirmOpen = false">Cancel</AppButton>
+          <AppButton variant="danger" size="sm" @click="handleCloseProject">Close</AppButton>
+        </div>
+      </div>
     </AppModal>
     <AppModal v-if="stopConfirmOpen" :model-value="stopConfirmOpen" title="Stop Task" max-width="420px" @close="stopConfirmOpen = false">
-      <div class="confirm-dialog-content"><p>Stop running task?</p><div class="confirm-dialog-actions"><button type="button" class="btn btn-ghost" @click="stopConfirmOpen = false">Cancel</button><button type="button" class="btn btn-danger" :disabled="stopInProgress" @click="requestStop">Stop</button></div></div>
+      <div class="confirm-dialog-content">
+        <p>Stop running task?</p>
+        <div class="confirm-dialog-actions">
+          <AppButton variant="ghost" size="sm" @click="stopConfirmOpen = false">Cancel</AppButton>
+          <AppButton variant="danger" size="sm" :disabled="stopInProgress" @click="requestStop">Stop</AppButton>
+        </div>
+      </div>
     </AppModal>
     <LoginOverlay
       v-if="!isAuthenticated && config?.auth_required"

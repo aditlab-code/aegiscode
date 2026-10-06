@@ -277,16 +277,13 @@ onBeforeUnmount(() => {
 
         <div class="settings-header-actions" style="display: flex; align-items: center; gap: 8px;">
           <AppButton
-            variant="ghost"
-            size="sm"
+            variant="icon"
             class="settings-close-btn"
             title="Close Settings (Esc)"
             aria-label="Close settings"
             @click="emit('close')"
           >
-            <span class="btn-text">Close</span>
-            <kbd class="shortcut-badge">Esc</kbd>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
@@ -385,10 +382,7 @@ onBeforeUnmount(() => {
             <AppCard variant="panel" class="settings-panel">
               <template #header>
                 <div class="panel-head">
-                  <div>
-                    <div class="title">Project Registry</div>
-                    <div class="desc">{{ projects.length }} workspace(s) registered in AEGIS.</div>
-                  </div>
+                  <div class="title">Project Registry</div>
                 </div>
               </template>
               <div v-if="!projects.length" class="panel-body">
@@ -465,10 +459,7 @@ onBeforeUnmount(() => {
             <AppCard variant="panel" class="settings-panel">
               <template #header>
                 <div class="panel-head">
-                  <div>
-                    <div class="title">Task History</div>
-                    <div class="desc">{{ taskHistory.length }} recorded task(s) in history log.</div>
-                  </div>
+                  <div class="title">Task History</div>
                 </div>
               </template>
 
