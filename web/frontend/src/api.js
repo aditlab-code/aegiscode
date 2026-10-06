@@ -335,6 +335,24 @@ export function discardProjectGitChanges(projectId, filePath = null) {
   );
 }
 
+export function initProjectGit(projectId) {
+  return request(
+    `/projects/${encodeURIComponent(projectId)}/git/init`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export function deinitProjectGit(projectId) {
+  return request(
+    `/projects/${encodeURIComponent(projectId)}/git/deinit`,
+    {
+      method: "POST",
+    }
+  );
+}
+
 export function createTask(task, projectId = null, metadata = null, executionMode = null, images = null, activeFile = null) {
   const body = { task };
   if (projectId) body.project_id = projectId;

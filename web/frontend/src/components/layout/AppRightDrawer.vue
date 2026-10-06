@@ -656,7 +656,7 @@ const statusIconPath = computed(() => {
   gap: 7px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-card);
+  background: transparent;
   min-height: 36px;
   cursor: default;
   overflow: hidden;

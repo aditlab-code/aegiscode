@@ -124,6 +124,16 @@ html:not([data-wallpaper="disabled"]) .app-right-drawer {
   border-left: none !important;
 }
 
+html:not([data-wallpaper="disabled"]) .right-drawer-body,
+html:not([data-wallpaper="disabled"]) .rd-activity-view,
+html:not([data-wallpaper="disabled"]) .rd-scroll-area,
+html:not([data-wallpaper="disabled"]) .rd-consultant-view,
+html:not([data-wallpaper="disabled"]) .consultant-wrapper.consultant-embedded,
+html:not([data-wallpaper="disabled"]) .consultant-content-pane.consultant-embedded-pane,
+html:not([data-wallpaper="disabled"]) .consultant-body.embedded-view,
+html:not([data-wallpaper="disabled"]) .consultant-embedded-pane .consultant-chat,
+html:not([data-wallpaper="disabled"]) .consultant-embedded-pane .consultant-messages,
+html:not([data-wallpaper="disabled"]) .task-hstrip,
 html:not([data-wallpaper="disabled"]) .rd-card-integrated,
 html:not([data-wallpaper="disabled"]) .rd-composer,
 html:not([data-wallpaper="disabled"]) .consultant-foot {

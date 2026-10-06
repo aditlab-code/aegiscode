@@ -1480,6 +1480,7 @@ class GatewayService:
         from agent_ai.git.repository import GitRepositoryFacade
 
         facade = GitRepositoryFacade(root=root)
+        gi_rules = facade.gitignore_patterns()
         is_repo = facade.is_repository()
         if not is_repo:
             return {
@@ -1488,6 +1489,7 @@ class GatewayService:
                 "branch_info": None,
                 "clean": True,
                 "files": [],
+                "gitignore_rules": gi_rules,
             }
         st = facade.status()
         b_info = facade.branch_info()
@@ -1497,6 +1499,7 @@ class GatewayService:
             "branch_info": b_info.to_dict(),
             "clean": st.clean,
             "files": [f.to_dict() for f in st.files],
+            "gitignore_rules": gi_rules,
         }
 
     def git_branches(self, project_id: str) -> Dict[str, Any]:
@@ -1581,6 +1584,36 @@ class GatewayService:
             "is_repository": True,
             "ok": res.get("ok", False),
             "file_path": res.get("file_path"),
+        }
+
+    def git_init(self, project_id: str) -> Dict[str, Any]:
+        """Inisialisasi Git repository baru pada root project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        res = facade.init()
+        is_repo = facade.is_repository()
+        return {
+            "ok": res.get("ok", False) and is_repo,
+            "is_repository": is_repo,
+            "message": res.get("message", "Git repository initialized"),
+            "error": res.get("error"),
+        }
+
+    def git_deinit(self, project_id: str) -> Dict[str, Any]:
+        """De-initialize Git repository pada root project (hapus .git)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        res = facade.deinit()
+        is_repo = facade.is_repository()
+        return {
+            "ok": res.get("ok", False) and not is_repo,
+            "is_repository": is_repo,
+            "message": res.get("message", "Git repository de-initialized"),
+            "error": res.get("error"),
         }
 
     # ------------------------------------------------------------------ #

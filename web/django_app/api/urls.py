@@ -106,6 +106,16 @@ urlpatterns = [
         views.project_git_discard,
         name="project_git_discard",
     ),
+    path(
+        "projects/<str:project_id>/git/init",
+        views.project_git_init,
+        name="project_git_init",
+    ),
+    path(
+        "projects/<str:project_id>/git/deinit",
+        views.project_git_deinit,
+        name="project_git_deinit",
+    ),
     # Project Policy / Permission (PROJECT-LOCAL). Mendahului
     # "projects/<str:project_id>" agar sub-path literal tidak di-shadow.
     path(

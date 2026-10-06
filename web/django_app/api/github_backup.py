@@ -198,17 +198,19 @@ class GitBackupClient:
     ) -> None:
         self.git_executable = git_executable
         self.timeout = timeout
-        self._facade = facade
+        self._custom_facade = facade
+        self._facade: Optional[GitRepositoryFacade] = None
         self._facade_root: Optional[Path] = None
 
     # -- read facade (reuse) --------------------------------------------- #
     def facade(self, root: Path) -> GitRepositoryFacade:
         """Facade read-only untuk root project (di-cache per root)."""
-        if self._facade is not None:
-            return self._facade
-        if self._facade_root is None or self._facade_root != Path(root):
-            self._facade = GitRepositoryFacade(root=Path(root))
-            self._facade_root = Path(root)
+        if self._custom_facade is not None:
+            return self._custom_facade
+        resolved_root = Path(root).resolve()
+        if self._facade_root is None or self._facade_root != resolved_root:
+            self._facade = GitRepositoryFacade(root=resolved_root)
+            self._facade_root = resolved_root
         return self._facade
 
     # -- env / redaction -------------------------------------------------- #
@@ -449,6 +451,7 @@ class GithubBackupService:
                 detected_remote = out.strip()
             except Exception:
                 detected_remote = ""
+        local_gi_rules = facade.gitignore_patterns()
         data: Dict[str, Any] = {
             **status,
             "is_repository": is_repo,
@@ -457,6 +460,7 @@ class GithubBackupService:
             "repository": status.get("repository") or detected_remote,
             "branch": status.get("branch") or current_branch or "main",
             "gitignore_ok": aegis_is_ignored(root),
+            "gitignore_rules": local_gi_rules,
             "changes": {"modified": 0, "added": 0, "deleted": 0, "total": 0},
         }
         if is_repo:
@@ -465,9 +469,12 @@ class GithubBackupService:
     def _changes_summary(
         self, root: Path, config: Optional[GithubBackupConfig]
     ) -> Dict[str, int]:
-        """Ringkasan perubahan yang AKAN di-backup (mengikuti exclude)."""
-        exclude = list(config.exclude) if config else []
+        """Ringkasan perubahan yang AKAN di-backup (mengikuti exclude dan .gitignore lokal)."""
         facade = self._read_facade(root)
+        exclude = list(config.exclude) if config else []
+        for r in facade.gitignore_patterns():
+            if r not in exclude:
+                exclude.append(r)
         summary = {"modified": 0, "added": 0, "deleted": 0, "total": 0}
         try:
             status = facade.status()
@@ -711,8 +718,11 @@ class GithubBackupService:
         # 1) Pastikan `.aegis/` di-ignore (mandatory).
         ensure_aegis_ignored(root)
 
-        # 2) Tentukan path yang akan di-commit (selalu kecualikan `.aegis/`).
+        # 2) Tentukan path yang akan di-commit (selalu kecualikan `.aegis/` dan .gitignore lokal).
         exclude_patterns = list(config.exclude if config and exclude is None else (exclude or []))
+        for r in facade.gitignore_patterns():
+            if r not in exclude_patterns:
+                exclude_patterns.append(r)
         try:
             status = facade.status()
         except Exception as exc:  # noqa: BLE001

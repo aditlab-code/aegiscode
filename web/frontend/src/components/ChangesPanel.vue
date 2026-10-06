@@ -15,6 +15,8 @@ const props = defineProps({
 const emit = defineEmits(["open-file", "open-diff", "discard-change"]);
 
 const localGitChanges = ref([]);
+const isRepository = ref(true);
+const gitignoreRules = ref([]);
 
 const confirmDiscardAll = ref(false);
 const discardAllBusy = ref(false);
@@ -117,14 +119,43 @@ function isInternalOrIgnored(path) {
   return false;
 }
 
+function matchesGitignore(path, rules) {
+  if (!rules || !rules.length || !path) return false;
+  const p = String(path).trim().replace(/\\/g, "/").replace(/^\.\//, "");
+  for (const raw of rules) {
+    let r = String(raw).trim();
+    if (!r || r.startsWith("#")) continue;
+    if (r.endsWith("/")) {
+      const dirName = r.slice(0, -1);
+      if (p === dirName || p.startsWith(`${dirName}/`) || p.includes(`/${dirName}/`)) {
+        return true;
+      }
+      continue;
+    }
+    if (r.startsWith("*.")) {
+      const ext = r.slice(1);
+      if (p.endsWith(ext)) return true;
+      continue;
+    }
+    if (p === r || p.endsWith(`/${r}`) || p.startsWith(`${r}/`) || p.includes(`/${r}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function loadGitChanges() {
   const pId = props.project?.id || props.project?.project_id;
   if (!pId) {
     localGitChanges.value = [];
+    isRepository.value = true;
+    gitignoreRules.value = [];
     return;
   }
   try {
     const res = await getProjectGitStatus(pId);
+    isRepository.value = res?.is_repository !== false;
+    gitignoreRules.value = Array.isArray(res?.gitignore_rules) ? res.gitignore_rules : [];
     if (res?.is_repository && Array.isArray(res.files)) {
       localGitChanges.value = res.files
         .filter((f) => !isInternalOrIgnored(f?.path))
@@ -144,6 +175,7 @@ async function loadGitChanges() {
     }
   } catch (e) {
     localGitChanges.value = [];
+    gitignoreRules.value = [];
   }
 }
 
@@ -160,7 +192,11 @@ const displayChanges = computed(() => {
     props.changes && props.changes.length > 0
       ? props.changes
       : localGitChanges.value;
-  return (raw || []).filter((c) => !isInternalOrIgnored(c?.path || c?.detail));
+  return (raw || []).filter(
+    (c) =>
+      !isInternalOrIgnored(c?.path || c?.detail) &&
+      !matchesGitignore(c?.path || c?.detail, gitignoreRules.value)
+  );
 });
 
 function onRowClick(c) {
@@ -287,7 +323,7 @@ defineExpose({ loadGitChanges });
           Cancel
         </button>
       </div>
-      <div v-else-if="displayChanges.length > 0" class="drawer-sec-actions">
+      <div v-else-if="isRepository && displayChanges.length > 0" class="drawer-sec-actions">
         <button
           type="button"
           class="sc-discard-all-btn"
@@ -302,7 +338,8 @@ defineExpose({ loadGitChanges });
 
     <!-- Body = SATU scroll owner: header tetap, kartu perubahan + diff mengalir di area ini -->
     <div v-show="!collapsed" class="sc-changes-body changes-body">
-      <div v-if="!displayChanges.length" class="sc-empty-hint">No changes yet.</div>
+      <div v-if="!isRepository" class="sc-empty-hint">Not a Git repository.</div>
+      <div v-else-if="!displayChanges.length" class="sc-empty-hint">No changes yet.</div>
 
       <template v-else>
         <div class="changes-list">

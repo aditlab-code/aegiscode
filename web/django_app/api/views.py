@@ -490,6 +490,26 @@ def project_git_discard(
 @csrf_exempt
 @require_http_methods(["POST"])
 @_handle
+def project_git_init(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/init -> inisialisasi Git repository baru."""
+    return _json_response(service.git_init(project_id))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_deinit(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/deinit -> de-initialize Git repository."""
+    return _json_response(service.git_deinit(project_id))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
 def open_in_explorer(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """POST /api/open-in-explorer -> buka Windows Explorer pada ACTIVE PROJECT.
 

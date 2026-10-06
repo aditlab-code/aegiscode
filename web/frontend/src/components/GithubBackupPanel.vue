@@ -9,8 +9,10 @@
 import { computed, reactive, ref, watch } from "vue";
 import {
   createGithubCheckpoint,
+  deinitProjectGit,
   getGithubConfig,
   getProjectGitBranches,
+  initProjectGit,
   listGithubCheckpoints,
   restoreGithubCheckpoint,
   saveGithubConfig,
@@ -28,6 +30,9 @@ const emit = defineEmits(["branch-info-updated"]);
 
 const loading = ref(false);
 const busy = ref(false);
+const initializingGit = ref(false);
+const deinitializingGit = ref(false);
+const confirmDeinit = ref(false);
 const error = ref("");
 const notice = ref("");
 
@@ -218,6 +223,50 @@ async function commitCheckpoint() {
   }
 }
 
+async function handleInitGit() {
+  const id = projectId();
+  if (!id) return;
+  initializingGit.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await initProjectGit(id);
+    if (res?.ok || res?.is_repository) {
+      notice.value = "Git repository initialized successfully.";
+      await load();
+    } else {
+      error.value = res?.error || "Failed to initialize Git repository.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    initializingGit.value = false;
+  }
+}
+
+async function handleDeinitGit() {
+  const id = projectId();
+  if (!id) return;
+  deinitializingGit.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await deinitProjectGit(id);
+    if (res?.ok) {
+      notice.value = "Git repository de-initialized successfully.";
+      confirmDeinit.value = false;
+      configureOpen.value = false;
+      await load();
+    } else {
+      error.value = res?.error || "Failed to de-initialize Git repository.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    deinitializingGit.value = false;
+  }
+}
+
 async function refreshStatus(id) {
   try {
     applyConfig(await getGithubConfig(id));
@@ -292,6 +341,40 @@ watch(
 
     <div v-if="!project" class="sc-empty">Select a workspace first.</div>
     <div v-else-if="loading && !config.configured && !config.is_repository" class="sc-empty">Loading Source Control…</div>
+
+    <!-- Non-Git repository view -->
+    <div v-else-if="!config.is_repository" class="sc-non-repo-card">
+      <div class="sc-non-repo-header">
+        <svg class="sc-non-repo-ico" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span class="sc-non-repo-title">Workspace is not a Git repository</span>
+      </div>
+      <p class="sc-non-repo-desc">
+        Folder ini tidak memiliki repositori Git lokal (.git). Perubahan atau histori repositori di luar workspace tidak ditampilkan demi isolasi proyek.
+      </p>
+      <div class="sc-non-repo-actions">
+        <button
+          type="button"
+          class="sc-init-btn"
+          :disabled="initializingGit || loading"
+          @click="handleInitGit"
+        >
+          {{ initializingGit ? "Initializing…" : "Initialize Git Repository" }}
+        </button>
+        <button
+          type="button"
+          class="sc-refresh-outline-btn"
+          :disabled="loading"
+          title="Refresh detection"
+          @click="load"
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
 
     <template v-else>
       <!-- Active Branch Card (Local branch, remote tracking, sync counts) -->
@@ -386,6 +469,44 @@ watch(
             <button class="sc-btn sc-btn-secondary" type="button" :disabled="busy" @click="test">
               Test Connection
             </button>
+          </div>
+
+          <!-- Danger Zone: De-initialize Git -->
+          <div class="sc-danger-zone">
+            <div class="sc-danger-title">Danger Zone</div>
+            <div v-if="!confirmDeinit" class="sc-danger-action-row">
+              <button
+                class="sc-btn sc-danger-btn"
+                type="button"
+                :disabled="busy || deinitializingGit"
+                @click="confirmDeinit = true"
+              >
+                De-initialize Git Repository
+              </button>
+            </div>
+            <div v-else class="sc-danger-confirm-card">
+              <span class="sc-danger-warning">
+                Hapus direktori lokal .git? Seluruh riwayat commit lokal akan dihapus dan proyek kembali ke status non-repository.
+              </span>
+              <div class="sc-danger-confirm-btns">
+                <button
+                  class="sc-btn sc-confirm-danger-yes-btn"
+                  type="button"
+                  :disabled="deinitializingGit"
+                  @click="handleDeinitGit"
+                >
+                  {{ deinitializingGit ? "Removing…" : "Yes, Delete .git" }}
+                </button>
+                <button
+                  class="sc-btn sc-confirm-danger-no-btn"
+                  type="button"
+                  :disabled="deinitializingGit"
+                  @click="confirmDeinit = false"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -567,6 +688,85 @@ watch(
   color: var(--text-faint);
   font-size: 12px;
   padding: 8px 0;
+}
+
+/* Non-repository card */
+.sc-non-repo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: 10px;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-soft);
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.sc-non-repo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-normal, #e2e8f0);
+}
+
+.sc-non-repo-ico {
+  color: var(--warning, #f59e0b);
+  flex-shrink: 0;
+}
+
+.sc-non-repo-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sc-non-repo-desc {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint, #94a3b8);
+}
+
+.sc-non-repo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sc-init-btn {
+  background: var(--accent, #3b82f6);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.sc-init-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.sc-init-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sc-refresh-outline-btn {
+  background: transparent;
+  color: var(--text-normal, #e2e8f0);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.sc-refresh-outline-btn:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
 }
 
 /* Active Branch Card & Header */
@@ -753,6 +953,81 @@ watch(
   display: flex;
   gap: 6px;
   margin-top: 4px;
+}
+
+/* Danger Zone */
+.sc-danger-zone {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-danger-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--danger, #ef4444);
+}
+.sc-danger-action-row {
+  display: flex;
+}
+.sc-danger-btn {
+  background: transparent;
+  color: var(--danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sc-danger-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: var(--danger, #ef4444);
+}
+.sc-danger-confirm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+}
+.sc-danger-warning {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-normal, #fca5a5);
+}
+.sc-danger-confirm-btns {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.sc-confirm-danger-yes-btn {
+  background: var(--danger, #ef4444);
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sc-confirm-danger-yes-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.sc-confirm-danger-no-btn {
+  background: transparent;
+  color: var(--text-normal);
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 /* Commit Block */
