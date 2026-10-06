@@ -4,8 +4,8 @@ import { listFiles } from "../api.js";
 /**
  * In-memory reactive cache of relative workspace file paths with workspace isolation.
  */
-const workspaceFiles = ref([]);
-const filesLoading = ref(false);
+export const workspaceFiles = ref([]);
+export const filesLoading = ref(false);
 let activeProjectId = null;
 let requestSeq = 0;
 let inflightPromise = null;
@@ -32,7 +32,10 @@ export function setWorkspaceProject(projectId) {
  * @returns {Array<string>}
  */
 export function getCachedFiles(projectId = null) {
-  const targetKey = (projectId !== null ? projectId : activeProjectId) || "__default__";
+  if (projectId !== null && projectId !== activeProjectId) {
+    return cacheByProject.get(projectId) || [];
+  }
+  const targetKey = activeProjectId || "__default__";
   if (cacheByProject.has(targetKey)) {
     return cacheByProject.get(targetKey);
   }
@@ -88,7 +91,6 @@ export async function fetchWorkspaceFiles(forceOrProjectId = false, maybeForce =
     force = Boolean(forceOrProjectId);
   }
 
-  const thisSeq = ++requestSeq;
   const targetKey = targetProjectId || "__default__";
 
   if (!force) {
@@ -104,6 +106,7 @@ export async function fetchWorkspaceFiles(forceOrProjectId = false, maybeForce =
     }
   }
 
+  const thisSeq = ++requestSeq;
   filesLoading.value = true;
   const promise = (async () => {
     try {

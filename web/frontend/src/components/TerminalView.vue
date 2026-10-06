@@ -88,10 +88,10 @@ function initPtySocket() {
 
   try {
     const SocketCtor = window["Web" + "Socket"];
-    if (!SocketCtor) return;
-    socket = new SocketCtor(wsUrl);
+    const thisSocket = new SocketCtor(wsUrl);
+    socket = thisSocket;
 
-    socket.onopen = () => {
+    thisSocket.onopen = () => {
       if (fitAddon && term) {
         fitAddon.fit();
         syncDimensions();
@@ -99,18 +99,22 @@ function initPtySocket() {
       }
     };
 
-    socket.onmessage = (event) => {
+    thisSocket.onmessage = (event) => {
       if (term) {
         term.write(event.data);
       }
     };
 
-    socket.onclose = () => {
-      socket = null;
+    thisSocket.onclose = () => {
+      if (socket === thisSocket) {
+        socket = null;
+      }
     };
 
-    socket.onerror = () => {
-      socket = null;
+    thisSocket.onerror = () => {
+      if (socket === thisSocket) {
+        socket = null;
+      }
     };
   } catch (err) {
     socket = null;

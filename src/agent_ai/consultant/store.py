@@ -11,12 +11,15 @@ Path default: <repo>/data/consultant_sessions.json (global, injectable for tests
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from agent_ai.consultant.models import ConsultantTurn
+
+logger = logging.getLogger(__name__)
 
 
 class ConsultantSessionStore:
@@ -38,6 +41,7 @@ class ConsultantSessionStore:
             path = str(repo_root / "data" / "consultant_sessions.json")
         self._path = Path(path)
         self._lock = threading.Lock()
+        self.last_save_error: Optional[str] = None
         # In-memory index: (project_id, session_id) -> session dict
         self._sessions: Dict[Tuple[str, str], Dict[str, Any]] = {}
         self._load()
@@ -49,8 +53,8 @@ class ConsultantSessionStore:
         try:
             with self._path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            # Corrupt or unreadable file -> start fresh
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Gagal memuat sessions dari %s: %s (memulai dari kosong)", self._path, exc)
             return
         if not isinstance(data, dict):
             return
@@ -80,8 +84,10 @@ class ConsultantSessionStore:
                     separators=(",", ":"),
                 )
             tmp_path.replace(self._path)
-        except OSError:
-            # Best effort; if rename fails, cleanup temp
+            self.last_save_error = None
+        except OSError as exc:
+            self.last_save_error = str(exc)
+            logger.warning("Gagal menyimpan consultant sessions ke %s: %s", self._path, exc)
             try:
                 tmp_path.unlink(missing_ok=True)
             except OSError:

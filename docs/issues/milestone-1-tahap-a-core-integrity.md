@@ -137,9 +137,9 @@ Dokumen ini memuat spesifikasi teknis, verifikasi kode, usulan perbaikan, dan kr
 
 ## 3. Gerbang Penyelesaian (Gate A Checklist)
 
-- [ ] AI-01: Contract test adapter OpenAI-compatible dengan mock callback lulus tanpa serialisasi error.
-- [ ] AI-02: Tes eksekusi command pada mode Ask menolak script interpretasi mutatif.
-- [ ] AI-03: Tes pembatalan saat jeda retry memastikan hanya 1 pemanggilan provider yang dieksekusi.
-- [ ] BUG-01: Tes unit Monaco switchToFile bebas dari ReferenceError.
-- [ ] BUG-02: Tes async save lambat membuktikan teks ketikan baru tetap mempertahankan status dirty.
-- [ ] BUG-06: Tes konkuren `fetchWorkspaceFiles` mengembalikan hasil utuh dan mereset status loading.
+- [x] AI-01: Contract test adapter OpenAI-compatible dengan mock callback lulus tanpa serialisasi error.
+- [x] AI-02: Tes eksekusi command pada mode Ask menolak script interpretasi mutatif.
+- [x] AI-03: Tes pembatalan saat jeda retry memastikan hanya 1 pemanggilan provider yang dieksekusi.
+- [x] BUG-01: Tes unit Monaco switchToFile bebas dari ReferenceError.
+- [x] BUG-02: Tes async save lambat membuktikan teks ketikan baru tetap mempertahankan status dirty.
+- [x] BUG-06: Tes konkuren `fetchWorkspaceFiles` mengembalikan hasil utuh dan mereset status loading.

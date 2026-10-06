@@ -126,13 +126,13 @@ async function switchToFile(targetPath, previousPath = "") {
 
     detachModelSubscriptions();
 
+    const lang = languageForFile(props.name || targetPath);
     let entry = getEntry(targetPath);
     if (!acquiredPaths.has(targetPath)) {
       if (!entry) {
         const data = await readFileContent(targetPath);
         if (disposed || !container.value || thisLoadId !== loadSeq) return;
         const text = typeof data?.content === "string" ? data.content : "";
-        const lang = languageForFile(props.name || targetPath);
         entry = getOrCreateModel(monaco, targetPath, text, lang);
       } else {
         entry = getOrCreateModel(monaco, targetPath);
@@ -157,7 +157,7 @@ async function switchToFile(targetPath, previousPath = "") {
     function runSyntaxCheck() {
       if (syntaxTimer) clearTimeout(syntaxTimer);
       syntaxTimer = setTimeout(() => {
-        if (!model || disposed) return;
+        if (!model || disposed || thisLoadId !== loadSeq) return;
         const textVal = model.getValue();
         const syntaxErrors = validateCodeSyntax(textVal, lang, targetPath);
         emit("syntax-change", { path: targetPath, errors: syntaxErrors });
@@ -284,17 +284,18 @@ async function save() {
   const targetModel = model;
   if (!targetModel) return false;
 
+  const snapshotVersionId = targetModel.getAlternativeVersionId ? targetModel.getAlternativeVersionId() : 1;
   const value = targetModel.getValue ? targetModel.getValue() : editor.getValue();
   saving.value = true;
   saveError.value = "";
   try {
     await writeFileContent(targetPath, value);
     if (targetModel) {
-      const newVersionId = targetModel.getAlternativeVersionId ? targetModel.getAlternativeVersionId() : 1;
-      savedVersionId = newVersionId;
-      markSaved(targetPath, newVersionId);
-      dirty.value = false;
-      emit("dirty-change", { path: targetPath, dirty: false });
+      savedVersionId = snapshotVersionId;
+      markSaved(targetPath, snapshotVersionId);
+      const currentVersionId = targetModel.getAlternativeVersionId ? targetModel.getAlternativeVersionId() : 1;
+      dirty.value = currentVersionId !== savedVersionId;
+      emit("dirty-change", { path: targetPath, dirty: dirty.value });
     }
     emit("saved", { path: targetPath });
     return true;

@@ -7,7 +7,9 @@
 import { ref, computed, watch } from "vue";
 import { classifyDiagnostic } from "../services/diagnosticService.js";
 
-export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFileModified = null, onProblemOccurred = null } = {}) {
+export const MAX_LIVE_BUFFER = 500;
+
+export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFileModified = null, onProblemOccurred = null, maxBufferSize = MAX_LIVE_BUFFER } = {}) {
   const localOutputLines = ref([]);
   const localProblems = ref([]);
 
@@ -23,8 +25,13 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
 
     function addProblem(item) {
       const text = typeof item === "string" ? item : (item?.text || item?.message || "");
-      if (!text || seen.has(text)) return;
-      seen.add(text);
+      if (!text) return;
+      const file = item?.file || "";
+      const line = item?.line || 0;
+      const col = item?.col || 0;
+      const key = `${file}:${line}:${col}:${text}`;
+      if (seen.has(key)) return;
+      seen.add(key);
       list.push(typeof item === "object" ? item : { text, ts: Date.now() });
     }
     const diags = typeof editorDiagnostics === "function" ? editorDiagnostics() : editorDiagnostics?.value;
@@ -57,13 +64,22 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
   });
 
   let lastProcessedEventCount = 0;
+  let lastFirstEventSignature = null;
   watch(
     () => props.activityEvents,
     (events) => {
       if (!events || !events.length) {
         lastProcessedEventCount = 0;
+        lastFirstEventSignature = null;
         return;
       }
+      const firstEvt = events[0];
+      const currentFirstSig = firstEvt ? (firstEvt.id || firstEvt.event_id || firstEvt.timestamp || JSON.stringify(firstEvt)) : null;
+      if (lastFirstEventSignature !== null && currentFirstSig !== lastFirstEventSignature) {
+        lastProcessedEventCount = 0;
+      }
+      lastFirstEventSignature = currentFirstSig;
+
       const newEvents = events.slice(lastProcessedEventCount);
       lastProcessedEventCount = events.length;
 
@@ -121,6 +137,13 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
           });
         }
       }
+
+      if (localOutputLines.value.length > maxBufferSize) {
+        localOutputLines.value = localOutputLines.value.slice(-maxBufferSize);
+      }
+      if (localProblems.value.length > maxBufferSize) {
+        localProblems.value = localProblems.value.slice(-maxBufferSize);
+      }
     },
     { deep: true }
   );
@@ -141,6 +164,12 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
       if (newErr) {
         localProblems.value.push({ text: newErr, ts: Date.now() });
         localOutputLines.value.push({ text: `[error] ${newErr}`, ts: Date.now() });
+        if (localProblems.value.length > maxBufferSize) {
+          localProblems.value = localProblems.value.slice(-maxBufferSize);
+        }
+        if (localOutputLines.value.length > maxBufferSize) {
+          localOutputLines.value = localOutputLines.value.slice(-maxBufferSize);
+        }
       }
     }
   );

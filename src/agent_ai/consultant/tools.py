@@ -126,6 +126,12 @@ _FILE_MUTATING_COMMANDS = frozenset(
     }
 )
 
+# Interpreter skrip dan flag evaluasi inline yang berpotensi mengeksekusi mutasi file
+_SCRIPT_INTERPRETERS = frozenset(
+    {"python", "python3", "py", "node", "perl", "ruby", "bash", "sh", "zsh"}
+)
+_INLINE_EVAL_FLAGS = frozenset({"-c", "-e", "--eval"})
+
 
 def _has_redirect_outside_quotes(command: str) -> bool:
     """True bila command memuat redirect `>`/`>>` di luar string kutip.
@@ -183,6 +189,15 @@ def consultant_command_violation(command: str) -> Optional[str]:
         sub = tokens[1].lower()
         if sub in _DESTRUCTIVE_GIT_SUBCOMMANDS:
             return f"git {sub} mengubah repository (git write)"
+
+    # Deteksi interpreter skrip dengan evaluasi kode inline yang berpotensi mutatif
+    if first in _SCRIPT_INTERPRETERS:
+        for tok in tokens[1:]:
+            if tok in _INLINE_EVAL_FLAGS:
+                return (
+                    f"evaluasi kode inline '{first} {tok}' berpotensi memodifikasi file; "
+                    "jalankan file skrip pengujian/diagnostik atau beralih ke mode Agent"
+                )
 
     return None
 

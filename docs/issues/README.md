@@ -17,9 +17,9 @@ Seluruh perbaikan dikerjakan di branch pengembangan utama (`master`) dengan pemi
 
 | Milestone | Tahap | Fokus Utama | Target Prioritas | Jumlah Item | Status | Dokumen Rujukan |
 |---|---|---|---|---|---|---|
-| **Milestone 1** | Tahap A | Integritas Penyimpanan & Batas Aman AI | P1 | 6 Isu | Siap Dikerjakan | [milestone-1-tahap-a-core-integrity.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-1-tahap-a-core-integrity.md) |
-| **Milestone 2** | Tahap B | Konsistensi Sesi, Live Events, & Validasi Input | P2 | 9 Isu | Antrean (Queue) | [milestone-2-tahap-b-session-events.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-2-tahap-b-session-events.md) |
-| **Milestone 3** | Tahap C | Efisiensi Token, Thinking Adapter, & Pengujian Beban | OPT & Riset | 8 Optimasi + 6 Risiko | Terencana | [milestone-3-tahap-c-optimization-scale.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-3-tahap-c-optimization-scale.md) |
+| **Milestone 1** | Tahap A | Integritas Penyimpanan & Batas Aman AI | P1 | 6 Isu | Selesai (Terverifikasi 100%) | [milestone-1-tahap-a-core-integrity.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-1-tahap-a-core-integrity.md) |
+| **Milestone 2** | Tahap B | Konsistensi Sesi, Live Events, & Validasi Input | P2 | 9 Isu | Selesai (Terverifikasi 100%) | [milestone-2-tahap-b-session-events.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-2-tahap-b-session-events.md) |
+| **Milestone 3** | Tahap C | Efisiensi Token, Thinking Adapter, & Pengujian Beban | OPT & Riset | 8 Optimasi + 6 Risiko | Selesai (Terverifikasi 100%) | [milestone-3-tahap-c-optimization-scale.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/issues/milestone-3-tahap-c-optimization-scale.md) |
 
 ---
 

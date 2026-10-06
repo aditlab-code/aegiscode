@@ -2984,10 +2984,13 @@ class GatewayService:
             ValidationError: message kosong / provider tidak tersedia / gambar
                 tidak valid.
         """
-        if not message or not str(message).strip():
-            raise ValidationError("Field 'message' wajib diisi dan tidak boleh kosong.")
-
         normalized_images = self._normalize_images(images)
+
+        if not message or not str(message).strip():
+            if normalized_images:
+                message = "Tolong analisis gambar yang dilampirkan."
+            else:
+                raise ValidationError("Field 'message' wajib diisi dan tidak boleh kosong.")
 
         # Default ke active project (konsisten dengan _resolve_workspace_root)
         # agar sesi Consultant ter-tag dan TERISOLASI per project.

@@ -1870,6 +1870,10 @@ class AgentOrchestrator:
         round_index = self._next_llm_round()
 
         for attempt in range(1, max_attempts + 1):
+            # Cancellation user punya prioritas tertinggi: hentikan sebelum memanggil provider.
+            if self._cancel_requested():
+                loop.cancel(self._cancel_reason())
+                return None
             try:
                 response = self._call_provider(
                     messages=messages,
@@ -1895,6 +1899,21 @@ class AgentOrchestrator:
                 if self._cancel_requested():
                     loop.cancel(self._cancel_reason())
                     return None
+                # OPT-01: Hentikan retry bila error bersifat permanen / non-retryable
+                # (misal auth error, invalid schema, atau serialisasi payload JSON).
+                from agent_ai.providers.base import ProviderError
+                is_permanent = False
+                if isinstance(exc, ProviderError) and not getattr(exc, "retryable", False):
+                    is_permanent = True
+                elif isinstance(exc, (TypeError, ValueError)) and "serializ" in str(exc).lower():
+                    is_permanent = True
+                elif any(k in type(exc).__name__ for k in ("Authentication", "PermissionDenied", "NotFound", "BadRequest", "InvalidRequest")):
+                    is_permanent = True
+                elif getattr(exc, "status_code", None) in (400, 401, 403, 404) or getattr(exc, "code", None) in (400, 401, 403, 404):
+                    is_permanent = True
+
+                if is_permanent:
+                    break
                 # Kuota attempt habis -> lifecycle ditutup sebagai FAILED.
                 if attempt >= max_attempts:
                     break
@@ -1913,9 +1932,12 @@ class AgentOrchestrator:
                     },
                 )
                 # Jeda konfigurabel SEBELUM pengulangan berikutnya
-                # (`api_retry.failed_sleep`). 0.0 = tanpa jeda (behavior lama).
+                # (`api_retry.failed_sleep`).
                 if failed_sleep > 0:
                     time.sleep(failed_sleep)
+                    if self._cancel_requested():
+                        loop.cancel(self._cancel_reason())
+                        return None
                 continue
 
             # Sukses (attempt awal atau salah satu retry).

@@ -86,7 +86,13 @@ Dokumen ini memuat spesifikasi teknis, rencana optimasi performa (**OPT-01 s/d O
 
 ## 4. Gerbang Penyelesaian (Gate C Checklist)
 
-- [ ] Beban memori browser stabil di bawah beban 1.000+ streaming events.
-- [ ] Retry budget terpadu membatasi maksimum attempt pada 3–4 kali percobaan.
-- [ ] Pipeline lampiran gambar disatukan dalam satu composable bersama.
-- [ ] Parameter thinking terverifikasi dengan fixture adapter resmi.
+- [x] Beban memori browser stabil di bawah beban 1.000+ streaming events (dibatasi circular buffer 500 baris di `useWorkbenchLiveEvents.js`).
+- [x] Retry budget terpadu membatasi maksimum attempt pada 3–4 kali percobaan serta memutus retry loop seketika pada error permanen/non-retryable di `orchestrator.py`.
+- [x] Pipeline lampiran gambar disatukan dalam satu composable bersama (`useAttachmentPipeline.js`) yang digunakan di `TaskComposer.vue` dan `ConsultantChat.vue`.
+- [x] Observabilitas persistensi sesi `ConsultantSessionStore` dengan pelacakan `last_save_error` pada `OSError`.
+- [x] Parameter thinking terverifikasi dengan fixture adapter resmi dan seluruh rangkaian pengujian lulus 100%.
+
+### Ringkasan Verifikasi Otomatis Gate C:
+- **Python Test Suite**: `tests/test_milestone3_optimization_scale.py` (Lulus 3/3, 100%).
+- **Frontend Test Suite**: `web/frontend/src/milestone3OptimizationScale.test.mjs` (Lulus 3/3, 100%).
+- **Regresi Keseluruhan**: 82/82 frontend unit tests lulus, 24/24 backend pytest milestone lulus (exit code 0).

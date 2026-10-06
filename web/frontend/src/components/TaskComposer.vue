@@ -9,6 +9,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import PromptAutocompletePopover from "./ui/PromptAutocompletePopover.vue";
 import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
+import { useAttachmentPipeline } from "../composables/useAttachmentPipeline.js";
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },
@@ -84,54 +85,18 @@ function onSelectSuggestion(item) {
   text.value = applySelectedItem(item, text.value, textarea.value);
 }
 
-// Attachment gambar (multimodal). Mekanisme IDENTIK dengan Consultant Chat
-// (batas & format sama): maks 8 gambar, JPEG/PNG/WebP.
-// { name, mimeType, dataUrl, base64 } — dikirim sebagai `images` ke backend.
-const MAX_ATTACHMENTS = 8;
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const attachments = ref([]);
-const attachError = ref("");
+// Attachment gambar (multimodal) dikelola via useAttachmentPipeline.
+const {
+  attachments,
+  attachError,
+  clearAttachments,
+  removeAttachment,
+  triggerAttach: doTriggerAttach,
+  onFilesPicked,
+} = useAttachmentPipeline({ scopeLabel: "task" });
 
 function triggerAttach() {
-  if (props.disabled) return;
-  const el = fileInput.value;
-  if (el) el.click();
-}
-
-function onFilesPicked(e) {
-  const files = Array.from(e.target.files || []);
-  e.target.value = "";
-  for (const file of files) {
-    if (attachments.value.length >= MAX_ATTACHMENTS) {
-      attachError.value = `Maksimum ${MAX_ATTACHMENTS} gambar per task.`;
-      break;
-    }
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      attachError.value = `Format tidak didukung: ${file.type || "unknown"} (pakai JPEG/PNG/WebP).`;
-      continue;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result || "");
-      const comma = dataUrl.indexOf(",");
-      const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : "";
-      if (!base64) return;
-      attachments.value.push({
-        name: file.name || "image",
-        mimeType: file.type,
-        dataUrl,
-        base64,
-      });
-    };
-    reader.onerror = () => {
-      attachError.value = `Gagal membaca gambar: ${file.name}`;
-    };
-    reader.readAsDataURL(file);
-  }
-}
-
-function removeAttachment(index) {
-  attachments.value.splice(index, 1);
+  doTriggerAttach(fileInput.value, props.disabled);
 }
 
 // Label mode ramah-user: Fast / Balanced / Deep.
@@ -208,11 +173,10 @@ function submit() {
         }))
       : null,
   };
-  attachError.value = "";
+  clearAttachments();
   pushHistory(value);
   emit("submit", payload);
   text.value = "";
-  attachments.value = [];
 }
 </script>
 

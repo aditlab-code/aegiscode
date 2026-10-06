@@ -189,12 +189,12 @@ Dokumen ini memuat spesifikasi teknis, verifikasi kode, usulan perbaikan, dan kr
 
 ## 3. Gerbang Penyelesaian (Gate B Checklist)
 
-- [ ] AI-04: Kontrak pengiriman gambar/teks sinkron antara UI dan endpoint API.
-- [ ] AI-05: Pemeriksaan AST memastikan tidak ada fungsi duplikat di `service.py`.
-- [ ] AI-06: Tes out-of-order response obrolan tidak menimpa sesi aktif.
-- [ ] BUG-03: Penambahan 9 berkas sekaligus hanya menerima tepat 8 berkas.
-- [ ] BUG-04: String Python multiline dengan tanda kurung lulus validasi tanpa error palsu.
-- [ ] BUG-05: Simulasi penutupan socket lama tidak mematikan koneksi terminal baru.
-- [ ] BUG-07: Permintaan cache untuk proyek yang belum dikenal mengembalikan array kosong.
-- [ ] BUG-08: Penggantian riwayat event dengan panjang sama tetap memproses event baru.
-- [ ] BUG-09: Dua pesan error identik di lokasi berbeda tampil lengkap pada panel Problems.
+- [x] AI-04: Kontrak pengiriman gambar/teks sinkron antara UI dan endpoint API.
+- [x] AI-05: Pemeriksaan AST memastikan tidak ada fungsi duplikat di `service.py`.
+- [x] AI-06: Tes out-of-order response obrolan tidak menimpa sesi aktif.
+- [x] BUG-03: Penambahan 9 berkas sekaligus hanya menerima tepat 8 berkas.
+- [x] BUG-04: String Python multiline dengan tanda kurung lulus validasi tanpa error palsu.
+- [x] BUG-05: Simulasi penutupan socket lama tidak mematikan koneksi terminal baru.
+- [x] BUG-07: Permintaan cache untuk proyek yang belum dikenal mengembalikan array kosong.
+- [x] BUG-08: Penggantian riwayat event dengan panjang sama tetap memproses event baru.
+- [x] BUG-09: Dua pesan error identik di lokasi berbeda tampil lengkap pada panel Problems.
