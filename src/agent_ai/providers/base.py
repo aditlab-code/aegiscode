@@ -396,7 +396,7 @@ class GenerateResult:
     model: str = ""
     provider: str = ""
     raw: Dict[str, Any] = field(default_factory=dict)
-
+    reasoning: Optional[str] = None
 
 class BaseProvider(ABC):
     """Abstract base class untuk semua provider AI.

@@ -4,13 +4,8 @@
 import { nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps({
-  lines:     { type: Array,   default: () => [] },
-  running:   { type: Boolean, default: false },
-  readOnly:  { type: Boolean, default: false },
-  projectId: { type: String,  default: "" },
+  projectId: { type: String, default: "" },
 });
-
-const emit = defineEmits(["run-command", "abort-command"]);
 
 const isBrowser = typeof window !== "undefined";
 const terminalContainer = ref(null);
@@ -245,14 +240,6 @@ onBeforeUnmount(() => {
     <!-- 100% Native xterm container -->
     <div ref="xtermElement" class="xterm-viewport"></div>
 
-    <!-- SSR Fallback / Test Contract container (renders structured lines in SSR/testing) -->
-    <div v-if="!isBrowser" class="term-ssr-fallback" style="display: none">
-      <div v-for="(line, i) in lines" :key="i" class="log-line">
-        <span v-if="line.tool">{{ line.tool }}</span>
-        <span v-if="line.text">{{ line.text }}</span>
-        <span v-if="line.target">{{ line.target }}</span>
-      </div>
-    </div>
   </div>
 </template>
 

@@ -123,28 +123,30 @@ def _format_antigravity_policy_directive(mode: str) -> str:
     rules = [
         "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
         "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
-        "2. TASK EXECUTION FOCUS: Do NOT waste steps summarizing or reading entire documentation directories (.aegis/bible/). Locate the target source files and perform modifications directly.",
+        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
+        "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
     ]
 
     if mode_clean == "fast":
         rules.extend([
-            "3. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
+            "4. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
             "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
             "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
             "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
         ])
     elif mode_clean == "balanced":
         rules.extend([
-            "3. EXECUTION MODE: BALANCED:",
+            "4. EXECUTION MODE: BALANCED:",
             "   - Read only files directly related to the user's task (max 6-8 files).",
             "   - Avoid redundant reads of the same file.",
             "   - Apply edits as soon as sufficient context is gathered.",
         ])
     else:  # deep
         rules.extend([
-            "3. EXECUTION MODE: DEEP:",
+            "4. EXECUTION MODE: DEEP:",
             "   - Thorough analysis and verification are permitted across the workspace.",
             "   - Log files (.aegis/log/) remain strictly prohibited.",
+            "   - Stay strictly within workspace boundaries.",
         ])
 
     return "\n".join(rules)
@@ -440,6 +442,8 @@ class AntigravityProvider(BaseProvider):
             use_streaming = event_sink is not None
             output_format = "stream-json" if use_streaming else "json"
             cmd = [cli, "-p", input_text, "--model", model, "--output-format", output_format]
+            if options and options.max_tokens is not None:
+                cmd.extend(["--max-tokens", str(options.max_tokens)])
             if target_cwd:
                 cmd.extend(["--add-dir", target_cwd])
             env = os.environ.copy()
@@ -471,6 +475,7 @@ class AntigravityProvider(BaseProvider):
                     ) from exc
 
                 accumulated_text: List[str] = []
+                accumulated_thoughts: List[str] = []
                 final_response = ""
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
@@ -516,10 +521,35 @@ class AntigravityProvider(BaseProvider):
 
                                     if state == "ACTIVE":
                                         # Active Streaming Circuit Breaker:
-                                        # 1. Blokir pembacaan berkas log internal (.aegis/log/ dsb)
-                                        # 2. Batasi pembacaan berkas unik di mode fast (maks 3 berkas)
+                                        # 1. Blokir pelanggaran batas workspace (directory traversal keluar dari root)
+                                        # 2. Blokir pembacaan berkas log internal (.aegis/log/ dsb)
+                                        # 3. Batasi pembacaan berkas unik di mode fast (maks 3 berkas)
+                                        norm_target = target.replace("\\", "/").lower()
+
+                                        is_traversal_breach = False
+                                        if aegis_tool == "run_command":
+                                            cmd_tokens = norm_target.split()
+                                            if any(tok == ".." or tok.startswith("../") or "/../" in tok for tok in cmd_tokens):
+                                                is_traversal_breach = True
+                                        elif aegis_tool in ("read_file", "edit_file", "write_file", "delete_file"):
+                                            if norm_target.startswith("../") or "/../" in norm_target:
+                                                is_traversal_breach = True
+                                            elif target_cwd and norm_target.startswith("/"):
+                                                norm_cwd = target_cwd.replace("\\", "/").lower()
+                                                if not norm_target.startswith(norm_cwd):
+                                                    is_traversal_breach = True
+
+                                        if is_traversal_breach:
+                                            proc.kill()
+                                            raise ProviderAPIError(
+                                                f"Pelanggaran Batasan Workspace: Operasi '{target}' mengakses direktori di luar root proyek. "
+                                                "Eksekusi dibatasi ketat di dalam root proyek aktif.",
+                                                status_code=403,
+                                                endpoint="agy CLI",
+                                                response_body=f"Circuit breaker: workspace boundary violation '{target}'",
+                                            )
+
                                         if aegis_tool == "read_file":
-                                            norm_target = target.replace("\\", "/").lower()
                                             is_log_target = (
                                                 "/.aegis/log/" in norm_target
                                                 or norm_target.startswith(".aegis/log/")
@@ -570,6 +600,12 @@ class AntigravityProvider(BaseProvider):
                                             "success": True,
                                             "target": target,
                                         })
+                                elif step_type in ("thought", "reasoning"):
+                                    thought_delta = step_update.get("thought_delta") or step_update.get("text_delta")
+                                    if thought_delta:
+                                        accumulated_thoughts.append(thought_delta)
+                                        if event_sink:
+                                            event_sink("agent_reasoning_delta", {"delta": thought_delta})
                                 elif step_type == "agent_response":
                                     text_delta = step_update.get("text_delta")
                                     if text_delta:
@@ -602,6 +638,7 @@ class AntigravityProvider(BaseProvider):
                     model=model,
                     provider=self.name,
                     raw=raw_data,
+                    reasoning="\n".join(accumulated_thoughts).strip() or None,
                 )
 
             # Jalur B: Standar subprocess.run (untuk mock unit test atau non-streaming)
@@ -633,6 +670,7 @@ class AntigravityProvider(BaseProvider):
                 )
 
             stdout = proc.stdout.strip()
+            accumulated_thoughts: List[str] = []
             # Bila stdout berisi baris-baris stream-json dan event_sink aktif
             if stdout.startswith("{") and "\n{" in stdout and event_sink:
                 accumulated_text = []
@@ -680,6 +718,12 @@ class AntigravityProvider(BaseProvider):
                                         "success": True,
                                         "target": target,
                                     })
+                            elif step_type in ("thought", "reasoning"):
+                                thought_delta = step_update.get("thought_delta") or step_update.get("text_delta")
+                                if thought_delta:
+                                    accumulated_thoughts.append(thought_delta)
+                                    if event_sink:
+                                        event_sink("agent_reasoning_delta", {"delta": thought_delta})
                             elif step_type == "agent_response":
                                 text_delta = step_update.get("text_delta")
                                 if text_delta:
@@ -702,6 +746,7 @@ class AntigravityProvider(BaseProvider):
                 model=model,
                 provider=self.name,
                 raw=data,
+                reasoning="\n".join(accumulated_thoughts).strip() or None,
             )
 
         # Fallback ke HTTP endpoint bila API key tersedia
@@ -787,14 +832,18 @@ class AntigravityProvider(BaseProvider):
             data = resp.json()
             choices = data.get("choices") or []
             first_text = ""
+            reasoning_text = None
             if choices and isinstance(choices[0], dict):
-                first_text = choices[0].get("message", {}).get("content", "") or ""
+                msg = choices[0].get("message", {})
+                first_text = msg.get("content", "") or ""
+                reasoning_text = msg.get("reasoning_content") or msg.get("reasoning") or None
 
             return GenerateResult(
                 text=first_text,
                 model=model,
                 provider=self.name,
-                raw=data,
+                raw=data if isinstance(data, dict) else {},
+                reasoning=reasoning_text,
             )
 
         raise ProviderNotConfiguredError(
@@ -861,6 +910,7 @@ class AntigravityProvider(BaseProvider):
                     raw=raw,
                     provider=self.name,
                     model=result.model,
+                    reasoning=result.reasoning or first_msg.get("reasoning_content") or first_msg.get("reasoning") or None,
                 )
 
         # Branch B: Text-Embedded Tool Calls (CLI bridge & embedded responses)
@@ -981,4 +1031,5 @@ class AntigravityProvider(BaseProvider):
             raw=raw,
             provider=self.name,
             model=result.model,
+            reasoning=result.reasoning or first_msg.get("reasoning_content") or first_msg.get("reasoning") or None,
         )

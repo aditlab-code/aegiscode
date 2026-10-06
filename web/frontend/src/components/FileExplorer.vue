@@ -3,7 +3,13 @@
 // Data dari ListFilesTool Aegis via gateway (#50). TIDAK ada abstraksi
 // filesystem baru di frontend. Root = active project root (bukan ".").
 import { computed, ref, watch } from "vue";
-import { listFiles, getProjectGitStatus } from "../api.js";
+import {
+  listFiles,
+  getProjectGitStatus,
+  revealInExplorer,
+  deleteEntry,
+  renameEntry,
+} from "../api.js";
 // Node tree RECURSIVE (menggantikan rendering 2-level hard-coded). Komponen ini
 // merender satu baris lalu memanggil dirinya sendiri untuk anak-anaknya, jadi
 // kedalaman folder tidak lagi dibatasi di template.
@@ -283,19 +289,30 @@ async function toggleDirByPath(full) {
 }
 
 // --- Live filesystem update (event change_detected) -------------------------
-// Normalisasi path relatif (posix, tanpa "./" & trailing slash).
+// Normalisasi path relatif (posix, tanpa "./" & trailing slash, berbasis tokenisasi aman).
 function normalizeRel(p) {
   if (!p) return "";
-  let s = String(p).replace(/\\/g, "/");
-  while (s.startsWith("./")) s = s.slice(2);
-  return s.replace(/\/+$/, "");
+  const cleaned = String(p).replace(/\\/g, "/");
+  const segments = cleaned.split("/").filter((seg) => seg && seg !== ".");
+  const safe = [];
+  for (const seg of segments) {
+    if (seg === "..") {
+      if (safe.length > 0) safe.pop();
+    } else {
+      safe.push(seg);
+    }
+  }
+  return safe.join("/");
 }
 
 // Direktori induk dari path relatif ("." bila di root).
 function parentDirOf(rel) {
-  const s = normalizeRel(rel);
-  const idx = s.lastIndexOf("/");
-  return idx <= 0 ? "." : s.slice(0, idx);
+  const norm = normalizeRel(rel);
+  if (!norm || norm === ".") return ".";
+  const segments = norm.split("/").filter(Boolean);
+  if (segments.length <= 1) return ".";
+  segments.pop();
+  return segments.join("/");
 }
 
 // Refresh SATU direktori tanpa mereset state expand/selected.
@@ -344,8 +361,14 @@ function remapExpanded(oldPrefix, newPrefix) {
 
 async function applyLiveChange(change) {
   if (!change || !change.path) return;
+  const rawPath = String(change.path);
+  if (rawPath.startsWith("/") || rawPath.startsWith("..") || rawPath.includes("../")) {
+    const normalized = normalizeRel(rawPath);
+    if (!normalized) return;
+  }
   const kind = String(change.kind || "").toLowerCase();
   const newPath = normalizeRel(change.path);
+  if (!newPath) return;
   if (kind.includes("move") || kind.includes("renam")) {
     const oldPath = normalizeRel(change.old_path || "");
     if (oldPath) {
@@ -448,50 +471,44 @@ function ctxCopyFullPath(entry) {
 function ctxReveal(entry) {
   const abs = absoluteFromRel(ctxTargetPath(entry));
   closeContextMenu();
-  revealInExplorer(abs);
+  doRevealInExplorer(abs);
 }
 
-async function revealInExplorer(path) {
+async function doRevealInExplorer(path) {
   try {
-    const resp = await fetch("/api/reveal-in-explorer", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
-    });
-    if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
-      error.value = data.error?.message || "Gagal membuka Explorer.";
-    }
+    await revealInExplorer(path);
   } catch (e) {
     error.value = e.message || "Gagal membuka Explorer.";
   }
 }
 
-function ctxRename(entry) {
+async function ctxRename(entry) {
+  const rel = ctxTargetPath(entry);
   closeContextMenu();
-  error.value = "Rename is not yet available.";
+  const oldName = entry.name;
+  const newName = prompt(`Ubah nama "${oldName}":`, oldName);
+  if (!newName || newName.trim() === "" || newName.trim() === oldName) return;
+  const parent = parentDirOf(rel);
+  const targetNewRel = parent === "." ? newName.trim() : `${parent}/${newName.trim()}`;
+  try {
+    await renameEntry(rel, targetNewRel);
+    await load(currentPath.value);
+  } catch (e) {
+    error.value = e.message || "Gagal mengubah nama.";
+  }
 }
 
 function ctxDelete(entry) {
   const rel = ctxTargetPath(entry);
   closeContextMenu();
   if (!confirm(`Hapus "${entry.name}" dari project?`)) return;
-  deleteEntry(rel, entry.type);
+  doDeleteEntry(rel, entry.type);
 }
 
-async function deleteEntry(relPath, type) {
+async function doDeleteEntry(relPath, type) {
   try {
-    const resp = await fetch("/api/delete-entry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: relPath, type }),
-    });
-    if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
-      error.value = data.error?.message || "Gagal menghapus.";
-    } else {
-      await load(currentPath.value);
-    }
+    await deleteEntry(relPath, type);
+    await load(currentPath.value);
   } catch (e) {
     error.value = e.message || "Gagal menghapus.";
   }

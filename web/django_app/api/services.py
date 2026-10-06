@@ -380,12 +380,6 @@ class GatewayService:
         """Delete a consultant session."""
         return self.consultant_service.delete_session(session_id, project_id=project_id)
 
-    def reset_consultant_session(
-        self, session_id: str, project_id: Optional[str] = None
-    ) -> bool:
-        """Clear a consultant session's turns (keep metadata)."""
-        return self.consultant_service.reset_session(session_id, project_id=project_id)
-
     @property
     def github_backup_service(self) -> Any:
         """GithubBackupService (lazy) — fitur OPTIONAL per project.
@@ -1180,6 +1174,45 @@ class GatewayService:
             raise ValidationError(f"Gagal menghapus '{rel_path}': {exc}") from exc
 
         return {"deleted": True, "path": str(target)}
+
+    def rename_project_file(
+        self, old_path: str, new_path: str, project_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Ubah nama file atau folder di dalam active project root.
+
+        Memvalidasi path traversal (larangan path di luar project root).
+        """
+        active = self.get_project(project_id) if project_id else self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+
+        from pathlib import Path as _Path
+        import shutil
+
+        root_resolved = _Path(root).resolve()
+        src = (root_resolved / old_path).resolve()
+        dst = (root_resolved / new_path).resolve()
+
+        if src != root_resolved and root_resolved not in src.parents:
+            raise ValidationError(f"Path sumber '{old_path}' berada di luar project root.")
+        if dst != root_resolved and root_resolved not in dst.parents:
+            raise ValidationError(f"Path tujuan '{new_path}' berada di luar project root.")
+        if not src.exists():
+            raise ValidationError(f"Path tidak ditemukan: {old_path}")
+        if dst.exists():
+            raise ValidationError(f"Path tujuan sudah ada: {new_path}")
+
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+        except Exception as exc:  # noqa: BLE001
+            raise ValidationError(f"Gagal mengubah nama '{old_path}' menjadi '{new_path}': {exc}") from exc
+
+        return {"renamed": True, "old_path": str(src), "new_path": str(dst)}
 
     def list_project_files(self, path: str = ".", recursive: bool = False) -> Dict[str, Any]:
         """Daftar file project aktif (read-only) via ListFilesTool Aegis.
@@ -2986,17 +3019,6 @@ class GatewayService:
                 entry["filename"] = str(item["filename"])
             normalized.append(entry)
         return normalized
-
-    def _normalize_consult_images(
-        self, images: Optional[Any]
-    ) -> Optional[List[Dict[str, Any]]]:
-        """Alias backward-compatible untuk `_normalize_images`.
-
-        Dipertahankan agar pemanggil/verifier lama (jalur Consultant) tetap
-        bekerja; implementasi tunggal ada di `_normalize_images` sehingga
-        batas jumlah/ukuran gambar IDENTIK di jalur Consultant dan Agent Task.
-        """
-        return self._normalize_images(images)
 
     def _build_consultant_provider(
         self,

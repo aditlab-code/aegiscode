@@ -4,7 +4,7 @@
 .wb-breadcrumbs-bar {
   flex: 0 0 auto;
   height: 26px;
-  background: var(--bg-panel, #141318);
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border-soft, #383447);
   display: flex;
   align-items: center;
@@ -59,13 +59,13 @@
 
 .breadcrumb-current {
   font-weight: 600;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   cursor: default;
 }
 
 .breadcrumb-current:hover {
   background: var(--accent-soft, rgba(16, 240, 154, 0.12));
-  color: var(--accent, #10f09a);
+  color: var(--accent);
 }
 
 .breadcrumbs-list {
@@ -100,7 +100,7 @@
 
 .crumb-file.current {
   font-weight: 600;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   cursor: default;
 }
 
@@ -115,7 +115,7 @@
   align-items: center;
   justify-content: space-between;
   height: 30px;
-  background: var(--bg-panel, #141318);
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border-soft, #383447);
   box-sizing: border-box;
 }
@@ -131,7 +131,7 @@
   display: flex;
   align-items: stretch;
   height: 30px;
-  background: var(--bg-panel, #141318);
+  background: var(--bg-panel);
   border-bottom: 1px solid var(--border-soft, #383447);
   overflow-x: auto;
   overflow-y: hidden;
@@ -168,8 +168,8 @@
 
 .wb-tab-item.active {
   color: var(--text, #f5f3fa);
-  background: var(--bg, #0e0d14);
-  border-bottom-color: var(--accent, #2d7d4e);
+  background: var(--bg);
+  border-bottom-color: var(--accent);
 }
 
 .wb-tab-item .tab-icon {
@@ -179,7 +179,7 @@
 }
 
 .wb-tab-item.active .tab-icon {
-  color: var(--accent-muted, #5ebd87);
+  color: var(--accent-muted);
 }
 
 .wb-tab-item .tab-title {
@@ -191,7 +191,7 @@
 
 .wb-tab-item .tab-dot {
   font-size: 9px;
-  color: var(--accent-muted, #5ebd87);
+  color: var(--accent-muted);
   margin-left: -2px;
   line-height: 1;
 }
@@ -271,7 +271,7 @@
 }
 
 .wb-tab-save-btn.dirty {
-  color: var(--accent, #2d7d4e);
+  color: var(--accent);
 }
 
 .wb-tab-save-btn:disabled {
@@ -284,7 +284,7 @@
   top: 3px;
   right: 3px;
   font-size: 7px;
-  color: var(--accent, #2d7d4e);
+  color: var(--accent);
   line-height: 1;
 }
 
@@ -327,7 +327,7 @@
 }
 
 .wb-tab-inline-popover .pop-save {
-  background: var(--accent, #2d7d4e);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -581,7 +581,7 @@
 }
 
 .wb-tab-split-btn.active {
-  color: var(--accent, #2d7d4e);
+  color: var(--accent);
   background: var(--bg-hover, #262332);
 }
 
@@ -594,7 +594,7 @@
   height: 100%;
   position: relative;
   overflow: hidden;
-  background: var(--bg, #0e0d14);
+  background: var(--bg);
 }
 
 /* Side by side (vertical split) */
@@ -631,12 +631,12 @@
 }
 
 .wb-split-pane.is-focused-pane {
-  outline: 1px solid var(--accent, #10f09a);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
 .wb-split-pane.is-focused-pane .wb-pane-tabs-bar {
-  border-top: 2px solid var(--accent, #10f09a);
+  border-top: 2px solid var(--accent);
 }
 
 .wb-pane-tabs-bar {
@@ -694,7 +694,7 @@
 }
 
 .wb-split-divider:hover {
-  background: var(--accent, #2d7d4e);
+  background: var(--accent);
 }
 
 .wb-split-divider.divider-vertical {

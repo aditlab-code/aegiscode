@@ -6,7 +6,7 @@
 
 const BASE = "/api";
 
-async function request(path, options = {}) {
+export async function request(path, options = {}) {
   let authToken = "";
   try {
     authToken = localStorage.getItem("aegis_auth_token") || "";
@@ -37,7 +37,11 @@ async function request(path, options = {}) {
     data = { raw: text };
   }
   if (!resp.ok) {
-    const message = data?.error?.message || `HTTP ${resp.status}`;
+    const message =
+      data?.error?.message ||
+      (typeof data?.error === "string" ? data.error : null) ||
+      data?.detail ||
+      `HTTP ${resp.status}`;
     const err = new Error(message);
     err.status = resp.status;
     err.code = data?.error?.code;
@@ -49,6 +53,10 @@ async function request(path, options = {}) {
 // --- #50 endpoints ---------------------------------------------------------
 export function getHealth() {
   return request("/health");
+}
+
+export function terminateServer() {
+  return request("/server/terminate", { method: "POST" });
 }
 
 // Konfigurasi provider/model/mode dari Aegis (TIDAK hardcode di frontend).
@@ -94,8 +102,8 @@ export function createLLMCredential(name, value) {
 }
 
 export function deleteLLMCredential(name, force = false) {
-  return request("/llm/credentials/delete", {
-    method: "POST",
+  return request("/llm/credentials", {
+    method: "DELETE",
     body: JSON.stringify({ name, force }),
   });
 }
@@ -176,6 +184,27 @@ export function writeFileContent(path, content) {
 // Buka Windows Explorer pada ACTIVE PROJECT (path dari backend, bukan frontend).
 export function openInExplorer() {
   return request("/open-in-explorer", { method: "POST" });
+}
+
+export function revealInExplorer(path) {
+  return request("/reveal-in-explorer", {
+    method: "POST",
+    body: JSON.stringify({ path }),
+  });
+}
+
+export function deleteEntry(path, type) {
+  return request("/delete-entry", {
+    method: "POST",
+    body: JSON.stringify({ path, type }),
+  });
+}
+
+export function renameEntry(oldPath, newPath) {
+  return request("/files/rename", {
+    method: "POST",
+    body: JSON.stringify({ old_path: oldPath, new_path: newPath }),
+  });
 }
 
 // --- Project Launcher / Active Project -------------------------------------
@@ -561,9 +590,6 @@ export function getExtensionConfigSchema(extensionId, projectId = null) {
   return request(`/extensions/config/${encodeURIComponent(extensionId)}${qs}`);
 }
 
-export function getExtensionConfigValue(extensionId, key) {
-  return request(`/extensions/config/${encodeURIComponent(extensionId)}/${encodeURIComponent(key)}`);
-}
 
 export function setExtensionConfigValue(extensionId, key, value, opts = {}) {
   const body = { value };
@@ -575,12 +601,6 @@ export function setExtensionConfigValue(extensionId, key, value, opts = {}) {
   });
 }
 
-export function resolveExtensionResult(payload) {
-  return request("/extensions/result", {
-    method: "POST",
-    body: JSON.stringify(payload || {}),
-  });
-}
 
 // --- #51 SSE ---------------------------------------------------------------
 // Membuka EventSource ke /api/events (opsional filter session_id/task_id).

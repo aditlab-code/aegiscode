@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import re
 from typing import Any, Dict, List, Optional
-
 
 def _usage_int(value: Any) -> Optional[int]:
     """Angka token valid (int >= 0) atau None (bukan angka/kosong/negatif)."""
@@ -33,6 +33,32 @@ def _usage_int(value: Any) -> Optional[int]:
         return result if result >= 0 else None
     return None
 
+_THINK_TAG_REGEX = re.compile(
+    r"<(?:think|thought)>([\s\S]*?)(?:</(?:think|thought)>|$)",
+    flags=re.IGNORECASE,
+)
+
+
+def extract_reasoning_and_content(raw_text: str) -> tuple[str, str]:
+    """Pisahkan blok penalaran (<think>...</think> / <thought>...</thought>) dari teks final.
+
+    Returns:
+        (clean_content, reasoning_text)
+    """
+    if not raw_text:
+        return "", ""
+
+    reasoning_parts: List[str] = []
+
+    def _replace_match(m: re.Match[str]) -> str:
+        thought_body = m.group(1).strip()
+        if thought_body:
+            reasoning_parts.append(thought_body)
+        return ""
+
+    clean_content = _THINK_TAG_REGEX.sub(_replace_match, raw_text).strip()
+    reasoning_text = "\n\n".join(reasoning_parts).strip()
+    return clean_content, reasoning_text
 
 def response_usage(raw: Any) -> Optional[Dict[str, int]]:
     """Token usage AKTUAL dari payload mentah provider (provider-agnostic).
@@ -79,7 +105,11 @@ def response_usage(raw: Any) -> Optional[Dict[str, int]]:
             usage["completion"] = completion
         if total is not None:
             usage["total"] = total
-
+        completion_details = nested.get("completion_tokens_details")
+        if isinstance(completion_details, dict):
+            reasoning_tokens = _usage_int(completion_details.get("reasoning_tokens"))
+            if reasoning_tokens is not None:
+                usage["reasoning_tokens"] = reasoning_tokens
     # 2) Bentuk Ollama native (top-level prompt_eval_count / eval_count).
     if "prompt" not in usage:
         prompt_eval = _usage_int(raw.get("prompt_eval_count"))
@@ -170,7 +200,7 @@ class LLMResponse:
     model: str = ""
     truncated: bool = False
     incomplete_tool_calls: int = 0
-
+    reasoning: Optional[str] = None
     # ------------------------------------------------------------------ #
     # Convenience
     # ------------------------------------------------------------------ #

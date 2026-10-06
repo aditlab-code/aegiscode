@@ -120,6 +120,7 @@ urlpatterns = [
     path("delete-entry", views.delete_entry, name="delete_entry"),
     path("files", views.files, name="files"),
     path("files/content", views.file_content, name="file_content"),
+    path("files/rename", views.rename_entry, name="rename_entry"),
     path("tasks", views.tasks, name="tasks"),
     # Approval (ASK) — keputusan user untuk action yang ditahan policy.
     # Literal route \"tasks/approvals\" HARUS mendahului \"tasks/<str:task_id>\"

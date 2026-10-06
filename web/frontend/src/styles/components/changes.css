@@ -191,9 +191,9 @@
 }
 
 .file-discard-btn:hover {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--err);
+  background: rgba(247, 118, 142, 0.14);
+  border-color: rgba(247, 118, 142, 0.35);
 }
 
 .sc-discard-all-btn {
@@ -201,16 +201,16 @@
   font-weight: 500;
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(247, 118, 142, 0.1);
+  color: var(--err);
+  border: 1px solid rgba(247, 118, 142, 0.25);
   cursor: pointer;
   transition: all 0.12s ease;
 }
 
 .sc-discard-all-btn:hover {
-  background: rgba(239, 68, 68, 0.22);
-  border-color: #f87171;
+  background: rgba(247, 118, 142, 0.22);
+  border-color: var(--err);
   color: #fff;
 }
 
@@ -223,7 +223,7 @@
 .sc-confirm-text {
   font-size: 10px;
   font-weight: 600;
-  color: #f87171;
+  color: var(--err);
   margin-right: 1px;
 }
 
@@ -232,14 +232,14 @@
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;
-  background: #ef4444;
+  background: var(--err);
   color: #fff;
-  border: 1px solid #dc2626;
+  border: 1px solid var(--err);
   cursor: pointer;
   transition: all 0.12s ease;
 }
 .sc-confirm-yes-btn:hover:not(:disabled) {
-  background: #dc2626;
+  background: var(--danger);
 }
 .sc-confirm-yes-btn:disabled {
   opacity: 0.6;
@@ -271,7 +271,7 @@
 .row-confirm-text {
   font-size: 10px;
   font-weight: 600;
-  color: #f87171;
+  color: var(--err);
   margin-right: 2px;
 }
 
@@ -291,11 +291,11 @@
 }
 
 .row-confirm-btn.confirm-yes {
-  background: #ef4444;
+  background: var(--err);
   color: #fff;
 }
 .row-confirm-btn.confirm-yes:hover:not(:disabled) {
-  background: #dc2626;
+  background: var(--danger);
 }
 .row-confirm-btn.confirm-yes:disabled {
   opacity: 0.6;

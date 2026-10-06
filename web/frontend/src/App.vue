@@ -17,6 +17,9 @@ import ReportViewer from "./components/ReportViewer.vue";
 import ProjectPolicyPanel from "./components/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
+import LoginOverlay from "./components/LoginOverlay.vue";
+import { formatTokens, usageTokens } from "./tokenFormat.js";
+import { shouldFollowStartedTask } from "./taskView.js";
 import { useAuth } from "./services/authService.js"; import { startServerHealthMonitor } from "./services/serverService.js";
 import {
   openEventStream, getProjects, createProject, deleteProject, getActiveProject, setActiveProject, closeActiveProject, pickFolder,
@@ -57,6 +60,14 @@ const savedExecutionMode = (typeof localStorage !== "undefined" && localStorage.
 const savedProviderInstanceId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_provider_instance_id")) || "";
 const savedModelId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_model_id")) || "";
 const llmProviders = ref([]), selectedProviderInstanceId = ref(savedProviderInstanceId), selectedModelId = ref(savedModelId), selectedMode = ref(savedExecutionMode || "balanced"), selectedExecutionMode = ref("queue");
+const tokenCount = ref(null);
+const taskTokensLabel = computed(() => formatTokens(tokenCount.value));
+const taskTokensTooltip = computed(() =>
+  tokenCount.value != null
+    ? `${tokenCount.value.toLocaleString()} tokens`
+    : "Token usage not reported"
+);
+const deferredTaskIds = reactive(new Set());
 watch(selectedMode, (val) => {
   if (typeof localStorage !== "undefined" && val) {
     try { localStorage.setItem("aegis_execution_mode", val); } catch (_) {}
@@ -125,13 +136,36 @@ function handleEvent(evt) {
   const tel = computeTaskTelemetry(activityEvents.value);
   taskTelemetry.rounds = tel.rounds; taskTelemetry.toolCalls = tel.toolCalls; taskTelemetry.observations = tel.observations;
   const p = evt.payload || {};
+  if (evt.event_type === "provider_response") {
+    const u = usageTokens(p);
+    if (u != null) {
+      tokenCount.value = (tokenCount.value || 0) + u;
+    }
+  }
   switch (evt.event_type) {
-    case "task_started":
-      task.status = "running"; runningTaskId.value = evt.task_id || task.id; activityPhase.value = "planning";
+    case "task_started": {
+      const startedId = evt.task_id || task.id;
+      if (
+        shouldFollowStartedTask({
+          startedTaskId: startedId,
+          viewedTaskId: task.id,
+          isViewingRunning: isRunning.value,
+          viewingHistory: Boolean(reportTaskId.value),
+          deferredTaskIds,
+        })
+      ) {
+        task.id = startedId;
+        deferredTaskIds.delete(startedId);
+      }
+      task.status = "running";
+      runningTaskId.value = startedId;
+      activityPhase.value = "planning";
       lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, 0);
       if (!taskStartedAt.value) taskStartedAt.value = eventTimeMs(evt);
-      durationTicker.start(); playStatusSound("running");
+      durationTicker.start();
+      playStatusSound("running");
       break;
+    }
     case "phase_changed": {
       const idx = activityPhaseIndex(p.phase);
       if (idx >= 0) { activityPhase.value = String(p.phase).trim().toLowerCase(); lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, idx); }
@@ -199,13 +233,27 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
     if (selectedMode.value) meta.mode = selectedMode.value;
     const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
     if (res && res.task_id) {
-      task.id = res.task_id; task.prompt = text.trim(); task.status = "running";
-      runningTaskId.value = res.task_id; activityPhase.value = "planning";
-      lifecycleMilestones.value = [0]; activityEvents.value = []; changes.value = [];
-      taskStartedAt.value = Date.now(); taskEndedAt.value = null;
-      durationTicker.start(); playStatusSound("running");
+      if (isRunning.value) {
+        deferredTaskIds.add(res.task_id);
+      } else {
+        task.id = res.task_id;
+        task.prompt = text.trim();
+        task.status = "running";
+        runningTaskId.value = res.task_id;
+        tokenCount.value = null;
+        activityPhase.value = "planning";
+        lifecycleMilestones.value = [0];
+        activityEvents.value = [];
+        changes.value = [];
+        taskStartedAt.value = Date.now();
+        taskEndedAt.value = null;
+        durationTicker.start();
+        playStatusSound("running");
+      }
     }
-  } catch (err) { error.value = `Failed to create task: ${err.message || err}`; }
+  } catch (err) {
+    error.value = `Failed to create task: ${err.message || err}`;
+  }
 }
 
 async function handleComposerSubmit(payload) {
@@ -435,6 +483,7 @@ onBeforeUnmount(() => {
         :task-history="taskHistory" :settings-tab="settingsTab" :active-nav="activeNav" :changes="changes" :validation="validation"
         :explorer-refresh="explorerRefresh" :live-fs-change="liveFsChange" :queue-refresh="queueRefresh" :connected="connected" :agent-status="agentStatus"
         :task="task" :task-tag="taskTag" :task-duration-label="taskDurationLabel" :task-timer-live="isRunning"
+        :task-tokens-label="taskTokensLabel" :task-tokens-tooltip="taskTokensTooltip" :show-reasoning="isRunning"
         :lifecycle-steps="lifecycleSteps" :lifecycle-pct="lifecyclePct" :activity-phase="activityPhase" :activity-events="activityEvents"
         :is-running="isRunning" :stop-in-progress="stopInProgress" :error="error" :tier="responsive.tier.value"
         :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)" :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
@@ -469,7 +518,13 @@ onBeforeUnmount(() => {
     <AppModal v-if="stopConfirmOpen" :model-value="stopConfirmOpen" title="Stop Task" max-width="420px" @close="stopConfirmOpen = false">
       <div class="confirm-dialog-content"><p>Stop running task?</p><div class="confirm-dialog-actions"><button type="button" class="btn btn-ghost" @click="stopConfirmOpen = false">Cancel</button><button type="button" class="btn btn-danger" :disabled="stopInProgress" @click="requestStop">Stop</button></div></div>
     </AppModal>
-    <table v-if="false"><thead><tr><th class="th-actions">Actions</th></tr></thead><tbody><tr><td><button class="hist-report-btn">Report</button></td></tr></tbody></table>
+    <LoginOverlay
+      v-if="!isAuthenticated && config?.auth_required"
+      :loading="authLoading"
+      :loading-message="authLoadingMessage"
+      :error="authError"
+      @clear-error="authError = ''"
+    />
   </div>
 </template>
 <style scoped>

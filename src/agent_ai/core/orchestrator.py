@@ -55,7 +55,7 @@ from agent_ai.core.history import ConversationHistory
 from agent_ai.core.loop import AgentLoop, MaxIterationsExceeded
 from agent_ai.core.models import AgentObservation, AgentStatus
 from agent_ai.core.observability import EventSink, emit as emit_event
-from agent_ai.core.response import ActionType, LLMResponse
+from agent_ai.core.response import ActionType, LLMResponse, extract_reasoning_and_content
 from agent_ai.core.types import ToolCall, ToolResultPayload
 from agent_ai.providers.base import (
     BaseProvider,
@@ -161,7 +161,7 @@ class OrchestratorResult:
     # True bila kegagalan berasal dari provider (bukan tool/command).
     # Dipakai oleh Provider Fallback (#45) untuk memutuskan perpindahan provider.
     provider_error: bool = False
-
+    reasoning: Optional[str] = None
     @property
     def success(self) -> bool:
         return self.status == AgentStatus.DONE
@@ -813,6 +813,8 @@ class AgentOrchestrator:
             return history.to_provider_format(), {}
 
         overhead = self._tool_definitions_tokens(tools)
+        if budget > 0 and overhead >= budget:
+            overhead = min(overhead, max(0, budget // 2))
         before = history.estimate_tokens()
         original = history.messages
         # `comp_stats` = KOMPOSISI keputusan anggaran (observability):
@@ -2047,32 +2049,33 @@ class AgentOrchestrator:
                 self._provider_response_payload(response),
             )
 
-            # Commentary natural dari LLM (bukan log tool). Hanya diemit bila
-            # response punya teks bermakna (bukan kosong / bukan code/tool
-            # payload). Tidak mengarang commentary dari nama tool.
-            commentary = self._extract_commentary(response)
-            if commentary:
-                emit_event(
-                    self.event_sink,
-                    "agent_commentary",
-                    {"text": commentary, "iteration": loop.iteration},
-                )
-
-            # 2) Sinyal penyelesaian dari model adalah source of truth.
-            #    FINAL (tanpa tool call) -> selesai. Bila action FINAL datang
-            #    bersama tool call, `completion` tidak None tetapi response
-            #    bukan is_final; tool call dieksekusi dulu lalu loop berhenti.
-            #    Response yang TERPOTONG (finish_reason=length) TIDAK dianggap
-            #    final: tool-call tak lengkap sudah DIBUANG oleh provider (tidak
-            #    ada file parsial), dan agent diberi kesempatan melanjutkan.
             truncated = bool(getattr(response, "truncated", False))
             if truncated:
                 truncation_recoveries += 1
             else:
                 truncation_recoveries = 0
             completion = self._completion_signal(response)
-            if response.is_final and not truncated:
-                loop.finish(result=completion)
+            is_final_turn = bool(response.is_final and not truncated)
+
+            # Commentary natural dari LLM (bukan log tool). Hanya diemit bila
+            # response punya teks bermakna (bukan kosong / bukan code/tool
+            # payload). Tidak mengarang commentary dari nama tool.
+            # Hindari duplikasi bila teks commentary identik dengan final completion.
+            commentary = self._extract_commentary(response)
+            if commentary:
+                clean_commentary, _ = extract_reasoning_and_content(commentary)
+                clean_comp, _ = extract_reasoning_and_content(completion or "")
+                if not (is_final_turn and clean_commentary.strip() == clean_comp.strip()):
+                    emit_event(
+                        self.event_sink,
+                        "agent_commentary",
+                        {"text": clean_commentary, "iteration": loop.iteration},
+                    )
+
+            if is_final_turn:
+                clean_completion, reasoning_text = extract_reasoning_and_content(completion or "")
+                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                loop.finish(result=clean_completion)
                 break
             if truncated:
                 emit_event(
@@ -2237,6 +2240,7 @@ class AgentOrchestrator:
             steps=loop.to_dict()["steps"],
             learning=learning,
             provider_error=provider_error,
+            reasoning=getattr(self, "_last_reasoning", None),
         )
 
     # ------------------------------------------------------------------ #
@@ -2401,18 +2405,23 @@ class AgentOrchestrator:
                 loop.cancel(self._cancel_reason())
                 break
 
-            # Commentary natural dari LLM (bila ada); bukan reasoning buatan.
-            commentary = self._extract_commentary(response)
-            if commentary:
-                emit_event(
-                    self.event_sink,
-                    "agent_commentary",
-                    {"text": commentary, "iteration": loop.iteration},
-                )
-
             truncated = bool(getattr(response, "truncated", False))
             if not truncated:
                 truncation_recoveries = 0
+
+            is_final_turn = bool(not response.has_tool_calls and not truncated)
+
+            # Commentary natural dari LLM (bila ada); bukan reasoning buatan.
+            commentary = self._extract_commentary(response)
+            if commentary:
+                clean_commentary, _ = extract_reasoning_and_content(commentary)
+                clean_comp, _ = extract_reasoning_and_content(response.text or "")
+                if not (is_final_turn and clean_commentary.strip() == clean_comp.strip()):
+                    emit_event(
+                        self.event_sink,
+                        "agent_commentary",
+                        {"text": clean_commentary, "iteration": loop.iteration},
+                    )
 
             # LLM TIDAK memanggil tool -> jawaban final (source of truth LLM).
             # Ini SATU-SATUNYA jalur completion continuous loop. TIDAK ada
@@ -2442,8 +2451,10 @@ class AgentOrchestrator:
                     # menghasilkan jawaban final (bukan FAILED karena cap).
                     history.append_user_message(self._truncation_message().content)
                     continue
-                history.append_assistant_message(content=response.text or "")
-                loop.finish(result=response.text or "")
+                clean_res, reasoning_text = extract_reasoning_and_content(response.text or "")
+                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                history.append_assistant_message(content=clean_res)
+                loop.finish(result=clean_res)
                 break
 
             # LLM memanggil tool: simpan assistant(tool_calls) penuh lebih dulu,
@@ -2642,6 +2653,7 @@ class AgentOrchestrator:
             steps=loop.to_dict()["steps"],
             learning=learning,
             provider_error=provider_error,
+            reasoning=getattr(self, "_last_reasoning", None),
         )
 
     def _record_tool_result(

@@ -3,7 +3,7 @@
 // TIDAK ada diff engine di frontend: hanya menampilkan perubahan yang
 // dilaporkan Aegis. Diff detail ditampilkan bila payload menyediakannya.
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
-import { getProjectGitStatus } from "../api.js";
+import { getProjectGitStatus, getProjectGitDiff } from "../api.js";
 
 const props = defineProps({
   changes: { type: Array, default: () => [] },
@@ -177,10 +177,32 @@ function toggleCollapse() {
 // Accordion: hanya SATU baris terbuka pada satu waktu (index terpilih).
 // -1 = semua tertutup (diff TIDAK dirender secara default).
 const expandedIndex = ref(-1);
-function toggleRow(i) {
-  expandedIndex.value = expandedIndex.value === i ? -1 : i;
-}
+const loadingDiff = ref({});
 
+async function toggleRow(i, c) {
+  if (expandedIndex.value === i) {
+    expandedIndex.value = -1;
+    return;
+  }
+  expandedIndex.value = i;
+  if (c && !c.diff && props.project) {
+    const projectId = props.project.id || props.project.project_id;
+    const filePath = c.path || c.detail;
+    if (projectId && filePath) {
+      loadingDiff.value[i] = true;
+      try {
+        const res = await getProjectGitDiff(projectId, filePath);
+        if (res && typeof res.diff === "string") {
+          c.diff = res.diff;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch git diff for", filePath, err);
+      } finally {
+        loadingDiff.value[i] = false;
+      }
+    }
+  }
+}
 // Klasifikasi kind perubahan (created/added/new, deleted/removed, modified/...).
 function kindOf(c) {
   return (c.kind || "change").toLowerCase();
@@ -287,7 +309,7 @@ defineExpose({ loadGitChanges });
           <template v-for="(c, i) in displayChanges" :key="i">
             <!-- Kartu satu baris: caret + status + nama file (ellipsis) + +/- -->
             <div class="file-row" :class="{ open: expandedIndex === i }" @click="onRowClick(c)">
-              <span class="file-caret" aria-hidden="true" title="Toggle inline preview" @click.stop="toggleRow(i)">{{ expandedIndex === i ? "▾" : "▸" }}</span>
+              <span class="file-caret" aria-hidden="true" title="Toggle inline preview" @click.stop="toggleRow(i, c)">{{ expandedIndex === i ? "▾" : "▸" }}</span>
               <span class="file-status" :class="tagClass(c)" :title="tagLabel(c)">{{ tagCode(c) }}</span>
               <span class="file-name" :title="rowTitle(c)">{{ c.path || c.detail || "(unknown)" }}</span>
               <span class="file-stat">
@@ -341,8 +363,9 @@ defineExpose({ loadGitChanges });
 
             <!-- Diff muncul saat caret diklik (accordion) -->
             <div v-if="expandedIndex === i" class="file-diff">
-              <div v-if="c.diff" class="file-diff-body"><pre>{{ c.diff }}</pre></div>
-              <div v-else class="file-diff-note">Diff detail is not available from AEGIS. Click row to open Monaco Diff.</div>
+              <div v-if="loadingDiff[i]" class="file-diff-note">Loading diff…</div>
+              <div v-else-if="c.diff" class="file-diff-body"><pre>{{ c.diff }}</pre></div>
+              <div v-else class="file-diff-note">Diff detail is not available. Click row to open Monaco Diff.</div>
             </div>
           </template>
         </div>

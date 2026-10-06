@@ -74,6 +74,7 @@ class ConsultantResult:
     tool_events: List[Dict[str, Any]] = field(default_factory=list)
     task_proposal: Optional[str] = None
     mode: str = DEFAULT_CONSULTANT_MODE
+    reasoning: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -85,4 +86,5 @@ class ConsultantResult:
             "tool_events": self.tool_events,
             "task_proposal": self.task_proposal,
             "mode": self.mode,
+            "reasoning": self.reasoning,
         }

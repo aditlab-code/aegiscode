@@ -1,4 +1,3 @@
-from agent_ai.core.agent import Agent, AgentResponse
 from agent_ai.core.coding import CodingTask
 from agent_ai.core.executor import ToolExecutor
 from agent_ai.core.history import ConversationHistory
@@ -34,8 +33,6 @@ from agent_ai.core.types import (
 )
 
 __all__ = [
-    "Agent",
-    "AgentResponse",
     "AgentOrchestrator",
     "OrchestratorResult",
     "CodingTask",

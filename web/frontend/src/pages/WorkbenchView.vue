@@ -29,16 +29,12 @@ import MonacoDiffEditor from "../components/MonacoDiffEditor.vue";
 import SettingsOverlay from "./SettingsOverlay.vue";
 import WelcomeView from "../components/WelcomeView.vue";
 import AppModal from "../components/ui/AppModal.vue";
-import { streamTerminalCommand, discardProjectGitChanges, readFileContent } from "../api.js";
+import { discardProjectGitChanges, readFileContent } from "../api.js";
 import {
-  createEditorTabsState,
   openTab,
   openDiffTab,
   closeTab,
   selectTab,
-  setTabDirty,
-  setTabSaved,
-  setTabConflict,
   getActiveTab,
 } from "../services/editorTabsService.js";
 import {
@@ -48,6 +44,9 @@ import {
   applyExternalContent,
 } from "../services/monacoModelRegistry.js";
 import { mapMonacoMarkersToDiagnostics, classifyDiagnostic } from "../services/diagnosticService.js";
+import { useWorkbenchLayout } from "../composables/useWorkbenchLayout.js";
+import { useWorkbenchTabs } from "../composables/useWorkbenchTabs.js";
+import { useWorkbenchLiveEvents } from "../composables/useWorkbenchLiveEvents.js";
 
 const props = defineProps({
   config: {
@@ -306,45 +305,20 @@ const emit = defineEmits([
   "branch-info-updated",
 ]);
 
-// 1. Column Sizing & Visibility State
-const sidebarWidth = ref(260);
-const sidebarVisible = ref(props.sidebarVisible ?? true);
-const assistantWidth = ref(380);
-const assistantVisible = ref(props.assistantVisible ?? true);
-const assistantTab = ref("agents");
-
-watch(
-  () => props.sidebarVisible,
-  (val) => {
-    if (typeof val === "boolean") sidebarVisible.value = val;
-  }
-);
-
-watch(
-  () => props.assistantVisible,
-  (val) => {
-    if (typeof val === "boolean") assistantVisible.value = val;
-  }
-);
-
-function toggleSidebar(forceState) {
-  if (typeof forceState === "boolean") {
-    sidebarVisible.value = forceState;
-  } else {
-    sidebarVisible.value = !sidebarVisible.value;
-  }
-  emit("toggle-sidebar", sidebarVisible.value);
-}
-
-function toggleAssistant(forceState) {
-  if (typeof forceState === "boolean") {
-    assistantVisible.value = forceState;
-  } else {
-    assistantVisible.value = !assistantVisible.value;
-  }
-  emit("toggle-assistant", assistantVisible.value);
-}
-
+// 1. Column Sizing & Visibility State (via useWorkbenchLayout)
+const {
+  sidebarWidth,
+  sidebarVisible,
+  assistantWidth,
+  assistantVisible,
+  assistantTab,
+  bottomDockOpen,
+  dockHeight,
+  dockActiveTab,
+  toggleSidebar,
+  toggleAssistant,
+  toggleBottomDock,
+} = useWorkbenchLayout(props, emit);
 const activeConsultantSessionId = ref("");
 
 function handleOpenConsultantSession(sessionId) {
@@ -476,15 +450,7 @@ const effectiveConsultantProps = computed(() => {
   };
 });
 
-// 2. Bottom Dock State & Live Buffers
-const bottomDockOpen = ref(false);
-const dockHeight = ref(220);
-const dockActiveTab = ref("terminal");
-
-const localTerminalLines = ref([]);
-const localOutputLines = ref([]);
-const localProblems = ref([]);
-
+// 2. Editor Diagnostics & Multi-Tab State (via useWorkbenchTabs)
 const activeEditorMarkers = ref([]);
 const activeEditorSyntaxErrors = ref([]);
 
@@ -502,380 +468,55 @@ const activeEditorDiagnostics = computed(() => {
   return unique;
 });
 
-const effectiveTerminalLines = computed(() => {
-  return props.terminalLines && props.terminalLines.length
-    ? props.terminalLines
-    : localTerminalLines.value;
-});
+const {
+  pane1TabsState,
+  pane2TabsState,
+  editorTabsState,
+  activeCodeEditorRef,
+  splitCodeEditorRef,
+  splitActive,
+  splitDirection,
+  splitRatio,
+  activePane,
+  conflictFile,
+  conflictAgentText,
+  conflictUserText,
+  conflictAddedLines,
+  conflictRemovedLines,
+  triggerConflictResolution,
+  checkAndHandleAgentFileConflict,
+  resolveKeepMine,
+  resolveAcceptAgent,
+  resolveReviewDiff,
+  effectiveSplitDirection,
+  pane1Style,
+  pane2Style,
+  triggerEditorLayout,
+  pane1ActiveTab,
+  pane1ActiveTabPath,
+  isPane1TabDirty,
+  pane2ActiveTab,
+  pane2ActiveTabPath,
+  isPane2TabDirty,
+  activeTab,
+  activeTabPath,
+} = useWorkbenchTabs(props);
 
-const effectiveOutputLines = computed(() => {
-  return props.outputLines && props.outputLines.length
-    ? props.outputLines
-    : localOutputLines.value;
-});
-
-const effectiveProblems = computed(() => {
-  const list = [];
-  const seen = new Set();
-
-  function addProblem(item) {
-    if (!item) return;
-    const text = typeof item === "string" ? item : (item.text || item.message || JSON.stringify(item));
-    const file = item.file || "";
-    const line = item.line || null;
-    const col = item.col || null;
-    const key = `${file}:${line}:${text}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-
-    const parsed = classifyDiagnostic(text);
-    list.push({
-      id: item.id || `prob-${list.length}-${Date.now()}`,
-      text,
-      type: item.type || parsed.type || "error",
-      severity: item.severity || parsed.severity || "error",
-      label: item.label || parsed.label || "Error",
-      file: file || parsed.file || "",
-      line: line || parsed.line || null,
-      col: col || parsed.col || null,
-      source: item.source || "system",
-    });
-  }
-
-  // 1. Editor diagnostics (Syntax errors, type errors, lints from open editor)
-  if (Array.isArray(activeEditorDiagnostics.value)) {
-    for (const d of activeEditorDiagnostics.value) {
-      if (d.type !== "info") {
-        addProblem(d);
-      }
-    }
-  }
-
-  // 2. Output stream errors & syntax errors
-  if (Array.isArray(effectiveOutputLines.value)) {
-    for (let i = 0; i < effectiveOutputLines.value.length; i++) {
-      const line = effectiveOutputLines.value[i];
-      const parsed = classifyDiagnostic(line, i);
-      if (parsed.type === "syntax" || parsed.type === "type" || parsed.type === "error") {
-        addProblem(parsed);
-      }
-    }
-  }
-
-  // 3. Props / Local problems
-  const explicitProblems = props.problems && props.problems.length
-    ? props.problems
-    : localProblems.value;
-  for (const p of explicitProblems) {
-    addProblem(p);
-  }
-
-  return list;
-});
-
-let lastProcessedEventCount = 0;
-watch(
-  () => props.activityEvents,
-  (events) => {
-    if (!events || !events.length) {
-      lastProcessedEventCount = 0;
-      return;
-    }
-    const newEvents = events.slice(lastProcessedEventCount);
-    lastProcessedEventCount = events.length;
-
-    for (const evt of newEvents) {
-      // Backend emits `event_type`; fallback to `type`/`event` for compatibility.
-      const type = evt.event_type || evt.type || evt.event || "";
-      const p = evt.payload || evt.data || evt;
-      const ts = evt.timestamp || Date.now();
-
-      if (type === "tool_called") {
-        localTerminalLines.value.push({
-          kind: "call",
-          tool: p.tool || "tool",
-          target: p.path || p.command || p.query || "",
-          ts,
-        });
-        localOutputLines.value.push({
-          text: `[tool:call] ${p.tool || "tool"} ${p.path || p.command || p.query || ""}`.trim(),
-          ts,
-        });
-      } else if (type === "tool_completed") {
-        const isSuccess = p.success !== false && !p.error;
-        localTerminalLines.value.push({
-          kind: "result",
-          tool: p.tool || "tool",
-          success: isSuccess,
-          error: p.error,
-          ts,
-        });
-        if (!isSuccess) {
-          localProblems.value.push({
-            text: `Tool '${p.tool || "tool"}' error: ${p.error || "Execution failed"}`,
-            ts,
-          });
-        } else {
-          const isFileWriteTool = [
-            "write_file",
-            "write_to_file",
-            "replace_file_content",
-            "replace_content",
-            "patch_file",
-            "apply_patch",
-          ].includes(p.tool);
-          const writtenPath = p.path || p.target || p.file_path || p.file;
-          if (isFileWriteTool && writtenPath) {
-            checkAndHandleAgentFileConflict(writtenPath);
-          }
-        }
-      } else if (type === "file_written" || type === "file_modified") {
-        const writtenPath = p.path || p.target || p.file_path || p.file;
-        if (writtenPath) {
-          checkAndHandleAgentFileConflict(writtenPath);
-        }
-      } else if (type === "validation_completed") {
-        if (p.success === false || p.passed === false || p.error) {
-          localProblems.value.push({
-            text: `Validation failed: ${p.error || p.message || "Checks did not pass"}`,
-            ts,
-          });
-        }
-      } else if (type === "task_failed") {
-        localProblems.value.push({
-          text: `Task failed: ${p.error || "Unknown error"}`,
-          ts,
-        });
-        localOutputLines.value.push({
-          text: `[task:failed] ${p.error || "Unknown error"}`,
-          ts,
-        });
-      }
-    }
-  },
-  { deep: true }
-);
-
-// Auto-open dock and switch to Problems tab when a new problem arrives.
-let lastProblemCount = 0;
-watch(effectiveProblems, (problems) => {
-  if (problems.length > lastProblemCount) {
-    lastProblemCount = problems.length;
+// 3. Live Buffers & SSE Event Handling (via useWorkbenchLiveEvents)
+const {
+  localOutputLines,
+  localProblems,
+  effectiveOutputLines,
+  effectiveProblems,
+} = useWorkbenchLiveEvents(props, {
+  editorDiagnostics: activeEditorDiagnostics,
+  onFileModified: (p) => checkAndHandleAgentFileConflict(p),
+  onProblemOccurred: () => {
     bottomDockOpen.value = true;
     dockActiveTab.value = "problems";
-  } else if (problems.length === 0) {
-    lastProblemCount = 0;
-  }
+  },
 });
-
-watch(
-  () => props.error,
-  (newErr) => {
-    if (newErr) {
-      localProblems.value.push({ text: newErr, ts: Date.now() });
-      localOutputLines.value.push({ text: `[error] ${newErr}`, ts: Date.now() });
-    }
-  }
-);
-// 3. Multi-Tab Monaco Editor State (Dual-Window Architecture)
-const pane1TabsState = createEditorTabsState();
-const pane2TabsState = createEditorTabsState();
-// Aliased for single-pane backward compatibility
-const editorTabsState = pane1TabsState;
-
-const activeCodeEditorRef = ref(null);
-const splitCodeEditorRef = ref(null);
-
-// Split Tab State (Responsive Side-by-Side or Stacked)
-const splitActive = ref(Boolean(props.initialSplitActive));
-const splitDirection = ref(props.initialSplitDirection || "vertical");
-const splitRatio = ref(50);
-const activePane = ref("pane1"); // "pane1" (Window 1 / Left) or "pane2" (Window 2 / Right)
-
-// --- Smart Agent Dirty Conflict Resolution ---
-const conflictFile = ref(null);
-const conflictAgentText = ref("");
-const conflictUserText = ref("");
-
-const conflictAddedLines = computed(() => {
-  if (!conflictAgentText.value || !conflictUserText.value) return 0;
-  const agentLines = new Set(conflictAgentText.value.split("\n"));
-  const userLines = new Set(conflictUserText.value.split("\n"));
-  return [...agentLines].filter((l) => !userLines.has(l)).length;
-});
-
-const conflictRemovedLines = computed(() => {
-  if (!conflictAgentText.value || !conflictUserText.value) return 0;
-  const agentLines = new Set(conflictAgentText.value.split("\n"));
-  const userLines = new Set(conflictUserText.value.split("\n"));
-  return [...userLines].filter((l) => !agentLines.has(l)).length;
-});
-
-async function triggerConflictResolution(filePath) {
-  try {
-    const data = await readFileContent(filePath);
-    conflictAgentText.value = typeof data?.content === "string" ? data.content : "";
-    conflictUserText.value = getModel(filePath)?.getValue?.() ?? "";
-    setTabConflict(pane1TabsState, filePath, true);
-    setTabConflict(pane2TabsState, filePath, true);
-    conflictFile.value = filePath;
-  } catch (err) {
-    console.error("Conflict detection failed to load disk content:", err);
-  }
-}
-
-async function checkAndHandleAgentFileConflict(filePath) {
-  if (!filePath) return;
-  const isDirtyFile =
-    isDirty(filePath) ||
-    pane1TabsState.tabs.value.some((t) => t.path === filePath && t.dirty) ||
-    pane2TabsState.tabs.value.some((t) => t.path === filePath && t.dirty);
-
-  if (isDirtyFile) {
-    await triggerConflictResolution(filePath);
-  } else {
-    try {
-      const data = await readFileContent(filePath);
-      if (typeof data?.content === "string") {
-        applyExternalContent(filePath, data.content);
-        const m = getModel(filePath);
-        if (m?.getAlternativeVersionId) {
-          markSaved(filePath, m.getAlternativeVersionId());
-        }
-        setTabDirty(pane1TabsState, filePath, false);
-        setTabDirty(pane2TabsState, filePath, false);
-      }
-    } catch {
-      // Abaikan reload error latar belakang jika file belum ada
-    }
-  }
-}
-
-function resolveKeepMine() {
-  if (conflictFile.value) {
-    setTabConflict(pane1TabsState, conflictFile.value, false);
-    setTabConflict(pane2TabsState, conflictFile.value, false);
-    conflictFile.value = null;
-  }
-}
-
-function resolveAcceptAgent() {
-  if (conflictFile.value) {
-    const target = conflictFile.value;
-    applyExternalContent(target, conflictAgentText.value);
-    const m = getModel(target);
-    if (m?.getAlternativeVersionId) {
-      markSaved(target, m.getAlternativeVersionId());
-    }
-    setTabDirty(pane1TabsState, target, false);
-    setTabDirty(pane2TabsState, target, false);
-    setTabConflict(pane1TabsState, target, false);
-    setTabConflict(pane2TabsState, target, false);
-    conflictFile.value = null;
-  }
-}
-
-async function resolveReviewDiff() {
-  if (conflictFile.value) {
-    const target = conflictFile.value;
-    setTabConflict(pane1TabsState, target, false);
-    setTabConflict(pane2TabsState, target, false);
-    openDiffTab(pane2TabsState, target);
-    if (!splitActive.value) {
-      toggleSplitEditor();
-    }
-    conflictFile.value = null;
-  }
-}
-
-// Effective split direction responsive to tier/mobile/compact
-const effectiveSplitDirection = computed(() => {
-  if (props.tier === "mobile" || props.tier === "compact") {
-    return "horizontal"; // stacked on smaller screens
-  }
-  return splitDirection.value;
-});
-
-const pane1Style = computed(() => {
-  if (effectiveSplitDirection.value === "vertical") {
-    return {
-      width: `calc(${splitRatio.value}% - 2px)`,
-      height: "100%",
-      flex: `0 0 calc(${splitRatio.value}% - 2px)`,
-      minWidth: "0",
-    };
-  }
-  return {
-    height: `calc(${splitRatio.value}% - 2px)`,
-    width: "100%",
-    flex: `0 0 calc(${splitRatio.value}% - 2px)`,
-    minHeight: "0",
-  };
-});
-
-const pane2Style = computed(() => {
-  if (effectiveSplitDirection.value === "vertical") {
-    return {
-      width: `calc(${100 - splitRatio.value}% - 2px)`,
-      height: "100%",
-      flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
-      minWidth: "0",
-    };
-  }
-  return {
-    height: `calc(${100 - splitRatio.value}% - 2px)`,
-    width: "100%",
-    flex: `0 0 calc(${100 - splitRatio.value}% - 2px)`,
-    minHeight: "0",
-  };
-});
-
-function triggerEditorLayout() {
-  activeCodeEditorRef.value?.layout?.();
-  splitCodeEditorRef.value?.layout?.();
-}
-
-// Initialize initial tabs if provided for Pane 1
-if (props.initialTabs && props.initialTabs.length > 0) {
-  for (const t of props.initialTabs) {
-    const tab = openTab(pane1TabsState, t);
-    if (tab && t && typeof t === "object" && t.dirty) {
-      tab.dirty = true;
-    }
-  }
-  if (props.initialActiveTab) {
-    selectTab(pane1TabsState, props.initialActiveTab);
-  }
-}
-
-watch(
-  () => props.initialActiveTab,
-  (newTab) => {
-    if (newTab) {
-      selectTab(pane1TabsState, newTab);
-    }
-  }
-);
-
-// Pane 1 Computeds
-const pane1ActiveTab = computed(() => getActiveTab(pane1TabsState));
-const pane1ActiveTabPath = computed(() => (pane1ActiveTab.value ? pane1ActiveTab.value.path : ""));
-const isPane1TabDirty = computed(() => Boolean(pane1ActiveTab.value?.dirty));
-
-// Pane 2 Computeds
-const pane2ActiveTab = computed(() => getActiveTab(pane2TabsState));
-const pane2ActiveTabPath = computed(() => (pane2ActiveTab.value ? pane2ActiveTab.value.path : ""));
-const isPane2TabDirty = computed(() => Boolean(pane2ActiveTab.value?.dirty));
-
-// Overall Active Tab (tracks focused pane)
-const activeTab = computed(() => {
-  if (splitActive.value && activePane.value === "pane2") {
-    return pane2ActiveTab.value || pane1ActiveTab.value;
-  }
-  return pane1ActiveTab.value || pane2ActiveTab.value;
-});
-const activeTabPath = computed(() => (activeTab.value ? activeTab.value.path : ""));
-
+const effectiveTerminalLines = computed(() => props.terminalLines || []);
 // Compatibility aliases for splitTab and splitTabPath
 const splitTab = computed(() => pane2ActiveTab.value);
 const splitTabPath = computed(() => pane2ActiveTabPath.value);
@@ -1452,100 +1093,19 @@ function handleBreadcrumbSelect(path) {
 
 // Bottom Dock Controls
 function handleClearDock(tab) {
-  if (tab === "terminal") {
-    localTerminalLines.value = [];
-  } else if (tab === "output") {
+  if (tab === "output") {
     localOutputLines.value = [];
   } else if (tab === "problems") {
     localProblems.value = [];
   } else {
-    localTerminalLines.value = [];
     localOutputLines.value = [];
     localProblems.value = [];
   }
 }
 
-// Interactive terminal: user-submitted commands streamed from backend.
 const terminalRunning = ref(false);
-let _terminalAbortController = null;
-
-async function handleTerminalCommand(command) {
-  if (!command || terminalRunning.value) return;
-
-  // Open and focus terminal dock.
-  bottomDockOpen.value = true;
-  dockActiveTab.value = "terminal";
-
-  // Echo the command as an input line.
-  localTerminalLines.value.push({ kind: "input", text: command, ts: Date.now() });
-
-  terminalRunning.value = true;
-  const projectId = props.activeProject?.id || "";
-  let exitCode = null;
-  let aborted = false;
-  let success = true;
-
-  _terminalAbortController = new AbortController();
-  const signal = _terminalAbortController.signal;
-
-  try {
-    await streamTerminalCommand(projectId, command, (eventType, data) => {
-      if (eventType === "terminal_output") {
-        localTerminalLines.value.push({ kind: "text", text: data.text ?? "", ts: Date.now() });
-      } else if (eventType === "terminal_done") {
-        exitCode = data.exit_code ?? null;
-        success = data.success !== false;
-      } else if (eventType === "terminal_error") {
-        localTerminalLines.value.push({ kind: "text", text: `✗ ${data.error}`, ts: Date.now() });
-        success = false;
-      }
-    }, signal);
-  } catch (err) {
-    if (signal.aborted) {
-      aborted = true;
-    } else {
-      localTerminalLines.value.push({ kind: "text", text: `✗ ${err.message}`, ts: Date.now() });
-      success = false;
-    }
-  } finally {
-    _terminalAbortController = null;
-  }
-
-  if (aborted) {
-    // ^C echo already added by TerminalView; just reset state.
-  } else {
-    // Append result line.
-    localTerminalLines.value.push({
-      kind: "result",
-      tool: command.split(" ")[0],
-      target: "",
-      success,
-      error: success ? undefined : `exit ${exitCode ?? "?"}`,
-      ts: Date.now(),
-    });
-  }
-  terminalRunning.value = false;
-}
-
-function handleAbortCommand() {
-  if (_terminalAbortController) {
-    // Echo ^C to terminal before aborting stream.
-    localTerminalLines.value.push({ kind: "text", text: "^C", ts: Date.now() });
-    _terminalAbortController.abort();
-  }
-}
-
-function toggleBottomDock(tab = "terminal") {
-  if (!bottomDockOpen.value) {
-    bottomDockOpen.value = true;
-    if (tab) dockActiveTab.value = tab;
-  } else if (tab && dockActiveTab.value !== tab) {
-    dockActiveTab.value = tab;
-  } else {
-    bottomDockOpen.value = false;
-  }
-  emit("toggle-dock", tab);
-}
+function handleTerminalCommand() {}
+function handleAbortCommand() {}
 
 function closeOverlay() {
   emit("close-overlay");
@@ -2479,8 +2039,6 @@ defineExpose({
           @update:active-tab="dockActiveTab = $event"
           @clear="handleClearDock"
           @close="bottomDockOpen = false"
-          @run-command="handleTerminalCommand"
-          @abort-command="handleAbortCommand"
           @navigate-to-location="handleNavigateToLocation"
         />
       </main>

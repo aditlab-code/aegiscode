@@ -6,6 +6,7 @@
  */
 
 import { ref, computed } from "vue";
+import { request } from "../api.js";
 
 const TOKEN_STORAGE_KEY = "aegis_auth_token";
 const USER_STORAGE_KEY = "aegis_auth_user";
@@ -92,11 +93,7 @@ function dispatchAuthChange() {
  */
 export async function fetchGoogleLoginUrl(redirectUri = null) {
   const uri = encodeURIComponent(redirectUri || getRedirectUri());
-  const resp = await fetch(`/api/auth/google/url?redirect_uri=${uri}`);
-  if (!resp.ok) {
-    throw new Error(`Failed to initialize Google login: HTTP ${resp.status}`);
-  }
-  return resp.json();
+  return request(`/auth/google/url?redirect_uri=${uri}`);
 }
 
 /**
@@ -109,17 +106,10 @@ export async function exchangeOAuthCallback(code, state, redirectUri = null) {
     redirect_uri: redirectUri || getRedirectUri(),
   };
 
-  const resp = await fetch("/api/auth/google/callback", {
+  const data = await request("/auth/google/callback", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-
-  const data = await resp.json();
-  if (!resp.ok) {
-    const msg = data?.error?.message || `OAuth callback failed: HTTP ${resp.status}`;
-    throw new Error(msg);
-  }
 
   if (data?.token) {
     setAuthToken(data.token);
@@ -139,18 +129,7 @@ export async function verifyCurrentSession() {
   if (!token) return null;
 
   try {
-    const resp = await fetch("/api/auth/me", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!resp.ok) {
-      clearAuthSession();
-      return null;
-    }
-
-    const data = await resp.json();
+    const data = await request("/auth/me");
     if (data?.authenticated && data?.user) {
       setStoredUser(data.user);
       return data.user;
@@ -158,6 +137,10 @@ export async function verifyCurrentSession() {
     clearAuthSession();
     return null;
   } catch (err) {
+    if (err?.status === 401) {
+      clearAuthSession();
+      return null;
+    }
     console.warn("Session verification network failure:", err);
     // If backend is temporarily unreachable, preserve cached user in dev
     return getStoredUser();
@@ -173,12 +156,8 @@ export async function logoutUser() {
 
   try {
     if (token) {
-      await fetch("/api/auth/logout", {
+      await request("/auth/logout", {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
       });
     }
   } catch {
@@ -286,15 +265,10 @@ export function useAuth() {
  * Dev-only login bypass for local manual testing.
  */
 export async function devLogin(email = "aditwicaksono34@gmail.com", name = "Adit Wicaksono") {
-  const resp = await fetch("/api/auth/dev-login", {
+  const data = await request("/auth/dev-login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, name }),
   });
-  const data = await resp.json();
-  if (!resp.ok) {
-    throw new Error(data?.error?.message || "Dev login failed");
-  }
   if (data?.token) {
     setAuthToken(data.token);
     if (data.user) {

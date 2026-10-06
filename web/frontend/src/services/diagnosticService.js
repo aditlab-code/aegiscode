@@ -11,8 +11,11 @@ export const TYPE_REGEX = /\b(?:typeerror|cannot find name|is not assignable to 
 export const LINT_REGEX = /\b(?:warning|eslint|flake8|ruff|no-unused|unused (?:var|variable|import)|deprecated|prefer-|rule:)\b/i;
 export const ERROR_REGEX = /\b(?:error|exception|failed|traceback|referenceerror|fatal|cannot read propert(?:y|ies))\b/i;
 
+// Compiler boundary matcher (Python traceback, Rust compiler, ESLint / GCC)
+export const COMPILER_DIAGNOSTIC_REGEX = /^\s*(?:File\s+"[^"]+",\s*line\s*\d+|[a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+:\d+:\d+:|error\[E\d+\])/m;
+
 // Regex to capture file location: "path/to/file.ext:42:15" or File "path/to/file.ext", line 42
-export const FILE_LINE_REGEX = /(?:File\s+"([^"]+)",\s*line\s*(\d+)|([a-zA-Z0-9_\-\.\/\\~]+\.[a-zA-Z0-9]+):(\d+)(?::(\d+))?)/;
+export const FILE_LINE_REGEX = /(?:File\s+"([^"]+)",\s*line\s*(\d+)|(?:^|\s)([a-zA-Z0-9_\-\.\/\\~]+\.[a-zA-Z0-9]+):(\d+)(?::(\d+))?)/;
 
 /**
  * Classify a raw string line or object into a diagnostic item.

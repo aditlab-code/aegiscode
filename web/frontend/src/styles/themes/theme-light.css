@@ -30,8 +30,6 @@
   --accent-dim: #1e4080;
   --accent-soft: rgba(41, 89, 170, 0.16);
   --accent-muted:#2959aa;
-  --dioptase-green: #2959aa;
-  --dioptase-bright:#3d59a1;
 
   /* Accent 2: Tokyo Night Violet / Magenta */
   --accent-2:     #7c3aed; /* Violet / Magenta */
@@ -64,6 +62,7 @@
 }
 
 /* Badges & Slider Tracks */
+[data-theme="light"] .app-badge,
 [data-theme="light"] .aether-badge,
 [data-theme="light"] .seg-badge,
 [data-theme="light"] .badge-n,

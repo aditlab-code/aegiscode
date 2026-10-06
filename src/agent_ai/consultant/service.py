@@ -634,19 +634,23 @@ class ConsultantService:
 
         proposal = extract_task_proposal(reply)
 
-        # Simpan giliran ke konteks sesi (untuk konsultasi berikutnya).
+        from agent_ai.core.response import extract_reasoning_and_content
+        clean_reply, reasoning_block = extract_reasoning_and_content(reply)
+
+        # Simpan giliran ke konteks sesi (untuk konsultasi berikutnya) — HANYA jawaban bersih!
         session.add("user", str(message).strip())
-        session.add("consultant", reply)
+        session.add("consultant", clean_reply)
         # Write-through: persist updated session (with new turns) to disk.
         self._store.save_session(session.to_dict())
 
         return ConsultantResult(
             session_id=session.session_id,
-            reply=reply,
+            reply=clean_reply,
             status="done" if result.status == AgentStatus.DONE else "failed",
             error=None if result.status == AgentStatus.DONE else result.error,
             iterations=int(getattr(result, "iterations", 0) or 0),
             tool_events=tool_events,
             task_proposal=proposal,
             mode=effective_mode,
+            reasoning=getattr(result, "reasoning", None) or reasoning_block or None,
         )

@@ -137,16 +137,23 @@ def llm_config(request: HttpRequest, service: GatewayService) -> JsonResponse:
 
 
 @csrf_exempt
-@require_http_methods(["POST"])
+@require_http_methods(["POST", "DELETE"])
 @_handle
 def llm_credentials(request: HttpRequest, service: GatewayService) -> JsonResponse:
-    """POST /api/llm/credentials -> set API key .env (body: {name, value})."""
+    """POST /api/llm/credentials -> set API key .env (body: {name, value}).
+    DELETE /api/llm/credentials -> hapus API key .env (body: {name, force?}).
+    """
     body = _parse_json_body(request)
+    if request.method == "DELETE":
+        return _json_response(
+            service.delete_llm_credential(
+                body.get("name"), force=bool(body.get("force", False))
+            )
+        )
     record = service.create_llm_credential(
         name=body.get("name"), value=body.get("value")
     )
     return _json_response(record, status=201)
-
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -493,6 +500,24 @@ def delete_entry(request: HttpRequest, service: GatewayService) -> JsonResponse:
     return _json_response(service.delete_project_entry(rel_path, entry_type))
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def rename_entry(request: HttpRequest, service: GatewayService) -> JsonResponse:
+    """POST /api/files/rename -> ubah nama file atau folder di dalam project.
+
+    Body: { old_path, new_path, project_id? }.
+    """
+    body = _parse_json_body(request)
+    old_path = body.get("old_path") or body.get("oldPath")
+    new_path = body.get("new_path") or body.get("newPath")
+    project_id = body.get("project_id")
+    if not old_path or not new_path:
+        from api.services import ValidationError
+        raise ValidationError("Field 'old_path' dan 'new_path' wajib diisi.")
+    return _json_response(service.rename_project_file(str(old_path), str(new_path), project_id=project_id))
+
+
 @require_http_methods(["GET"])
 @_handle
 def files(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -808,42 +833,6 @@ def task_report(request: HttpRequest, service: GatewayService, task_id: str) -> 
 # ---------------------------------------------------------------------------
 # Extension UI System (Task 05) - generic contract
 # ---------------------------------------------------------------------------
-def _ext_ui_context() -> Any:
-    """Build runtime UI context: registry + capability + loader state.
-
-    We reuse existing singletons where possible. For generic API we create
-    ephemeral registries populated via ExtensionLoader from default extensions dir.
-    Results are dynamic (reads loader state on each call).
-    """
-    # Attempt to reuse global loader if Django has one; otherwise build fresh via loader
-    # For simplicity, build a fresh loader reading existing Extension directory
-    from agent_ai.extensions.capabilities import CapabilityRegistry
-    from agent_ai.extensions.registry import ExtensionRegistry
-    from agent_ai.extensions.loader import ExtensionLoader
-    from agent_ai.extensions.ui import UICatalog, build_form_schema_for_extension
-
-    # We load extensions each time? For UI listing we need current capabilities.
-    # To avoid heavy reload, we try to find existing global registry cached on service
-    service = get_service()
-    cap_reg = getattr(service, "_ext_capability_registry", None)
-    ext_reg = getattr(service, "_ext_registry", None)
-    if cap_reg is None:
-        cap_reg = CapabilityRegistry()
-        ext_reg = ExtensionRegistry()
-        loader = ExtensionLoader(registry=ext_reg, capability_registry=cap_reg, enable_entry_points=False)
-        try:
-            loader.load_all()
-        except Exception:
-            pass
-        # Cache on service for subsequent calls
-        try:
-            service._ext_capability_registry = cap_reg  # type: ignore[attr-defined]
-            service._ext_registry = ext_reg  # type: ignore[attr-defined]
-        except Exception:
-            pass
-    return cap_reg, ext_reg
-
-
 @require_http_methods(["GET"])
 @_handle
 def extensions_ui(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -856,7 +845,10 @@ def extensions_ui(request: HttpRequest, service: GatewayService) -> JsonResponse
     """
     from agent_ai.extensions.ui import UICatalog
 
-    cap_reg, ext_reg = _ext_ui_context()
+    manager = service._get_extension_manager()
+    cap_reg = manager.capabilities
+    ext_reg = manager.registry
+
     extension_id = request.GET.get("extension_id") or None
     ui_type = request.GET.get("type") or None
     enabled_raw = request.GET.get("enabled_only", "1")
@@ -876,7 +868,9 @@ def extension_config(request: HttpRequest, service: GatewayService, extension_id
     from agent_ai.extensions.ui import build_form_schema_for_extension
     from agent_ai.extensions.config import get_config_store
 
-    cap_reg, ext_reg = _ext_ui_context()
+    manager = service._get_extension_manager()
+    cap_reg = manager.capabilities
+    ext_reg = manager.registry
     # Verify extension exists
     if not cap_reg.list_by_extension(extension_id) and (ext_reg is None or not ext_reg.exists(extension_id)):
         # Not a hard fail: if no config, return empty form schema
@@ -907,7 +901,9 @@ def extension_config_key(request: HttpRequest, service: GatewayService, extensio
     from agent_ai.extensions.config import get_config_store, ConfigValidationError
     from agent_ai.extensions.capabilities import CapabilityValidationError as _CVE
 
-    cap_reg, ext_reg = _ext_ui_context()
+    manager = service._get_extension_manager()
+    cap_reg = manager.capabilities
+    ext_reg = manager.registry
     store = get_config_store()
     manifest = Manifest(id=extension_id, name=extension_id, version="1", description="", api_version="1", raw={}, source_path="")
     ctx = ExtensionContext(manifest=manifest, capability_registry=cap_reg, config_store=store)
@@ -1215,11 +1211,20 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
     stream = sse_stream(subscription, is_disconnected=is_disconnected)
 
     async def sse_event_stream():
-        # Kirim comment frame inisial agar Daphne/reverse proxy langsung flush status HTTP 200 dan headers ke client
-        yield ": connected\n\n"
-        async for chunk in stream:
-            yield chunk
-
+        try:
+            # Kirim comment frame inisial agar Daphne/reverse proxy langsung flush status HTTP 200 dan headers ke client
+            yield ": connected\n\n"
+            async for chunk in stream:
+                yield chunk
+        finally:
+            if hasattr(stream, "close"):
+                import inspect
+                if inspect.iscoroutinefunction(stream.close):
+                    await stream.close()
+                else:
+                    stream.close()
+            if hasattr(subscription, "close"):
+                subscription.close()
     response = StreamingHttpResponse(
         sse_event_stream(),
         content_type="text/event-stream",
@@ -1282,6 +1287,7 @@ def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
         return f"event: {event_type}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
     def stream_output():
+        proc = None
         try:
             if use_shell:
                 target = command
@@ -1304,12 +1310,21 @@ def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
                 yield _sse("terminal_output", {"text": raw_line.rstrip("\n"), "stream": "stdout"})
             proc.wait()
             yield _sse("terminal_done", {"exit_code": proc.returncode, "success": proc.returncode == 0})
+        except GeneratorExit:
+            if proc and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
         except FileNotFoundError:
             prog = command.split()[0] if command else command
             yield _sse("terminal_error", {"error": f"Command tidak ditemukan: {prog}"})
         except Exception as exc:  # noqa: BLE001
             yield _sse("terminal_error", {"error": str(exc)})
-
+        finally:
+            if proc and proc.poll() is None:
+                proc.kill()
     response = StreamingHttpResponse(stream_output(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
@@ -1362,7 +1377,7 @@ def auth_dev_login(request: HttpRequest) -> JsonResponse:
     """Dev-only login bypass for local manual testing when Google credentials are not yet configured."""
     if not getattr(settings, "DEBUG", False):
         return _json_response(
-            {"error": {"code": "FORBIDDEN", "message": "Dev login is only allowed when DJANGO_DEBUG=true."}},
+            {"error": {"code": "dev_login_disabled", "message": "dev-login hanya diizinkan saat DEBUG=True"}},
             status=403,
         )
     from api.auth import create_aegis_session_token

@@ -54,6 +54,8 @@ from agent_ai.projects.models import (
 
 #: Nama folder root metadata project AegisCode.
 AEGIS_DIR_NAME = ".aegis"
+#: Nama folder root knowledge Antigravity native.
+BRAIN_DIR_NAME = ".brain"
 #: Subfolder log task.
 LOG_DIR_NAME = "log"
 #: Subfolder (di dalam `log/`) untuk log response mentah API LLM per task.
@@ -150,14 +152,27 @@ class AegisProjectStore:
         root: root project target (folder project yang dikerjakan AegisCode).
     """
 
-    def __init__(self, root: Union[str, Path]) -> None:
+    def __init__(self, root: Union[str, Path], use_brain: bool = False) -> None:
         self.root = Path(root).resolve()
         target_dir = self.root / AEGIS_DIR_NAME
         self.aegis_dir = target_dir
         self.log_dir = target_dir / LOG_DIR_NAME
         self.response_log_dir = self.log_dir / RESPONSE_LOG_DIR_NAME
-        self.bible_dir = target_dir / BIBLE_DIR_NAME
 
+        brain_path = self.root / BRAIN_DIR_NAME
+        aether_path = self.root / ".aether" / BIBLE_DIR_NAME
+        aegis_path = target_dir / BIBLE_DIR_NAME
+
+        # Layered Discovery untuk Knowledge/Bible:
+        # Tier 1 (Antigravity Native / Explicit Brain): <root>/.brain/
+        # Tier 2 (Aegis Default): <root>/.aegis/bible/
+        # Tier 3 (Legacy Fallback): <root>/.aether/bible/
+        if use_brain or brain_path.exists():
+            self.bible_dir = brain_path
+        elif not aegis_path.exists() and aether_path.exists():
+            self.bible_dir = aether_path
+        else:
+            self.bible_dir = aegis_path
     def ensure(self) -> bool:
         """Pastikan `.aegis/`, `.aegis/log/`, `.aegis/bible/` ada.
 
@@ -185,13 +200,33 @@ class AegisProjectStore:
         return self.response_log_dir / f"{name}{RESPONSE_LOG_SUFFIX}"
 
     def bible_path(self, category: str) -> Path:
-        """Path file kategori Bible (alias dinormalisasi)."""
-        return self.bible_dir / f"{canonical_bible_category(category)}.md"
+        """Path file kategori Bible (alias dinormalisasi) dengan 3-tier fallback."""
+        cat_file = f"{canonical_bible_category(category)}.md"
+        primary = self.bible_dir / cat_file
+        if primary.exists():
+            return primary
+        for cand in [
+            self.root / BRAIN_DIR_NAME / cat_file,
+            self.root / AEGIS_DIR_NAME / BIBLE_DIR_NAME / cat_file,
+            self.root / ".aether" / BIBLE_DIR_NAME / cat_file,
+        ]:
+            if cand.exists():
+                return cand
+        return primary
 
     def index_path(self) -> Path:
-        """Path file manifest Bible (`index.md`)."""
-        return self.bible_dir / BIBLE_INDEX_NAME
-
+        """Path file manifest Bible (`index.md`) dengan 3-tier fallback."""
+        primary = self.bible_dir / BIBLE_INDEX_NAME
+        if primary.exists():
+            return primary
+        for cand in [
+            self.root / BRAIN_DIR_NAME / BIBLE_INDEX_NAME,
+            self.root / AEGIS_DIR_NAME / BIBLE_DIR_NAME / BIBLE_INDEX_NAME,
+            self.root / ".aether" / BIBLE_DIR_NAME / BIBLE_INDEX_NAME,
+        ]:
+            if cand.exists():
+                return cand
+        return primary
     def environment_path(self) -> Path:
         """Path file Environment Context (`<root>/.aegis/ENVIRONMENT.md`)."""
         return self.aegis_dir / ENVIRONMENT_FILE_NAME
@@ -381,9 +416,11 @@ class BibleStore:
 
     categories = BIBLE_CATEGORIES
 
-    def __init__(self, root: Union[str, Path, AegisProjectStore]) -> None:
-        self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
-
+    def __init__(self, root: Union[str, Path, AegisProjectStore], use_brain: bool = False) -> None:
+        if isinstance(root, AegisProjectStore):
+            self.store = root
+        else:
+            self.store = AegisProjectStore(root, use_brain=use_brain)
     # ------------------------------------------------------------------ #
     # Layout
     # ------------------------------------------------------------------ #
