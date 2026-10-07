@@ -204,3 +204,12 @@ graph TD
 3. **Contract-First Synchronization**: Canonical JSON Schemas governing Server-Sent Events (SSE) and REST payloads to prevent breaking changes between Django Gateway and the Vue frontend.
 4. **Audit Log Persistence**: Mandatory test run tracking recorded in `docs/QA/logs/` adhering to [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
 
+
+---
+
+## Catatan Tambahan: Discovery State, Eksekusi Task, dan Loop Agent
+
+- **Discovery pengetahuan proyek (3 tingkat)**: Tier 1 `.brain/` (pengetahuan native Antigravity), Tier 2 `.aegis/bible/` (default Aegis), Tier 3 `.aether/bible/` (fallback lama). State workspace memakai `.aegis/` dan `data/aegis.db`, dengan fallback transparan ke `.aether/` dan `data/aether.db`.
+- **Mode eksekusi task**: `Queue` menunggu slot serial (FIFO), cocok untuk edit di area yang sama; `Parallel` berjalan langsung berdampingan dengan task lain, cocok untuk area independen. Keduanya tampil di Task Queue global; History adalah arsip log persisten `.aegis/`.
+- **Loop agent**: prompt, task preparation (konteks dan rencana advisory), continuous loop (LLM memutuskan, tool call, observasi), lalu validasi dan laporan. Tidak ada detektor "selesai" heuristik; loop berakhir hanya saat LLM memberi jawaban final tanpa tool call.
+- **Port server**: dibaca dari `data/settings.json` (`port`), fallback `8000`, dan otomatis memakai port bebas berikutnya jika terpakai; dapat ditimpa via `AEGIS_PORT` (atau `AETHER_PORT` lama).

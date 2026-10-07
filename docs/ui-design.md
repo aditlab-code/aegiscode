@@ -124,3 +124,23 @@ AegisCode Studio mengadopsi estetika *Cyberpunk Midnight* berbasis palet resmi [
 - **Kode & Terminal (Mono)**: `JetBrains Mono`, `SFMono-Regular`, Consolas, `Liberation Mono`, monospace
 
 
+
+---
+
+## 5. Aturan Responsif & Breakpoint Workbench
+
+Ringkasan aturan layout yang telah diimplementasikan (sebelumnya di rencana UI IDE masa depan).
+
+| Tier | Lebar | Perilaku |
+| :--- | :--- | :--- |
+| Desktop | > 1280px | Tiga kolom penuh (sidebar kiri, editor, drawer kanan) dengan splitter yang dapat diseret |
+| Compact | 900px - 1280px | Editor meluas; drawer kanan menjadi drawer mengambang |
+| Mobile | < 900px | Sidebar dan drawer menjadi overlay slide-out; editor 100% lebar |
+
+- **Backdrop overlay**: saat sidebar atau drawer terbuka sebagai overlay, tampilkan `.overlay-backdrop` semi-transparan; klik backdrop atau tombol `Escape` menutup overlay.
+- **Pemangkasan berprioritas (header)**: > 1280px path penuh dan semua chip; 900-1280px path dipangkas ke basename; < 900px chip sekunder disembunyikan.
+- **Pemangkasan berprioritas (statusbar)**: 900-1280px sembunyikan encoding dan indentasi; < 900px hanya `Ln/Col`, model aktif, dan indikator sinkronisasi.
+- **Ukuran desktop**: splitter 4px dan tinggi tab 28px dipertahankan tanpa inflasi padding mobile.
+- **Splitter**: sidebar kiri 200-450px, drawer kanan 320-650px, bottom dock 150-400px; klik ganda untuk reset.
+- **Pintasan**: `Cmd/Ctrl + P` (buka berkas), `Cmd/Ctrl + K` (perintah agent), `Ctrl + \`` (bottom dock).
+- **Kekangan**: tidak ada perubahan pada `web/django_app/` untuk pekerjaan UI murni.

@@ -45,15 +45,13 @@ Dokumentasi strategi pengujian mutu, penanganan uji rapuh (*flaky*), dan catatan
 
 ---
 
-## 4. Peta Jalan Masa Depan (`docs/future-roadmap/`)
+## 4. Peta Jalan Aktif (`Roadmap.md`)
 
-Peta jalan pelaksanaan berorientasi dependensi yang murni memuat fitur yang belum diimplementasikan:
+Roadmap aktif tunggal di root repositori (prioritas, fase 0-5, rincian teknis stabilisasi, orchestrator, HITL dan desktop native, metrik, backlog):
 
 | Dokumen | Deskripsi |
 | :--- | :--- |
-| **[docs/future-roadmap/future_roadmap.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/future-roadmap/future_roadmap.md)** | Roadmap utama yang mencakup Phase 2 (Mesin Semantik & Split-Brain), Phase 3 (HITL Guardrails), Phase 4 (Tauri v2 Native Desktop), dan Backlog Pasca-MVP. |
-| **[docs/future-roadmap/rag_local_future.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/future-roadmap/rag_local_future.md)** | Perencanaan teknis mendalam untuk integrasi `fastembed`, embedded `sqlite-vec` di `.aegis/vectors.db`, AST chunking, dan RRF. |
-| **[docs/future-roadmap/ui_ide_future.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/future-roadmap/ui_ide_future.md)** | Rencana perluasan kapabilitas UI/UX AegisCode Studio untuk rilis aplikasi desktop native. |
+| **[Roadmap.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/Roadmap.md)** | Sumber tunggal roadmap aktif. Fase lama diarsipkan di `docs/history/legacy-roadmap.md`. |
 
 ---
 
@@ -63,7 +61,7 @@ Catatan fase yang telah selesai, dokumen migrasi, dan riwayat evolusi basis kode
 
 | Dokumen | Deskripsi |
 | :--- | :--- |
-| **[docs/history/completed-features.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/history/completed-features.md)** | Dokumentasi rilis dan pengujian fitur yang telah selesai: Phase 0 (Antigravity Provider & OAuth) dan Phase 1 (Fondasi Interaksi & Git Local Monaco Diff). |
+| **[docs/history/legacy-roadmap.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/history/legacy-roadmap.md)** | Satu-satunya arsip fase lama: Phase 0 (Antigravity & OAuth), Phase 1 (UI & Git Monaco Diff), Phase 2.1-2.2 (Local RAG & RRF). |
 | **[docs/history/community-fork.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/history/community-fork.md)** | Catatan strategi pemisahan edisi komunitas sumber terbuka dan edisi komersial/enterprise. |
 | **[docs/history/developer_guide_legacy.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/history/developer_guide_legacy.md)** | Panduan orientasi teknis lawas dan konfigurasi lingkungan awal. |
 

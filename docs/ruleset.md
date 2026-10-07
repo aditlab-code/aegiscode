@@ -113,7 +113,7 @@ Repositori menerapkan strategi penemuan status dua arah:
    - Jaminan Kualitas & Log QA: `docs/QA/QA_PLAN.md` & `docs/QA/QA_LOGS_RULES.md`
    - Regulasi Git Multi-Remote: `docs/Gitmaster.md`
    - Fitur Inti & Provider: `docs/core-features/`
-   - Rencana Masa Depan: `docs/future-roadmap/`
+   - Rencana Masa Depan: `Roadmap.md`
    - Riwayat Implementasi Selesai: `docs/history/`
    - Indeks Navigasi: `docs/README.md`
 
