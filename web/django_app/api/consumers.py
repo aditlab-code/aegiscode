@@ -23,7 +23,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
         self.pty: Optional[PTYSession] = None
         self.project_id: str = ""
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-
+        self._is_disconnected: bool = False
     async def connect(self) -> None:
         self._loop = asyncio.get_running_loop()
 
@@ -90,9 +90,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     def _handle_pty_output(self, data: bytes) -> None:
         """Callback from PTY reader thread. Dispatches output to WebSocket."""
-        if not self._loop or self._loop.is_closed():
+        if self._is_disconnected or not self._loop or self._loop.is_closed():
             return
-
         text = data.decode("utf-8", errors="replace")
         coro = self.send(text_data=text)
         try:
@@ -137,9 +136,15 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             self.pty.write(text_data)
 
     async def disconnect(self, close_code: int) -> None:
+        self._is_disconnected = True
         if self.pty is not None:
+            pty_to_clean = self.pty
+            self.pty = None
+
             from api.lifecycle import get_lifecycle_manager
 
-            get_lifecycle_manager().unregister_pty(self.pty)
-            self.pty.terminate()
-            self.pty = None
+            get_lifecycle_manager().unregister_pty(pty_to_clean)
+            try:
+                await asyncio.wait_for(asyncio.to_thread(pty_to_clean.terminate), timeout=1.0)
+            except (asyncio.TimeoutError, Exception) as exc:
+                logger.warning("PTY async teardown timed out or failed: %s", exc)

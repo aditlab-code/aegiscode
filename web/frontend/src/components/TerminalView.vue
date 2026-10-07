@@ -73,6 +73,17 @@ function getActiveTerminalTheme() {
   }
   return TOKYO_NIGHT_STORM_TERMINAL;
 }
+function cleanupSocket() {
+  if (socket) {
+    socket.onopen = null;
+    socket.onmessage = null;
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.close();
+    socket = null;
+  }
+}
+
 
 function initPtySocket() {
   if (!isBrowser || socket) return;
@@ -125,10 +136,7 @@ watch(
   () => props.projectId,
   (newId, oldId) => {
     if (newId !== oldId) {
-      if (socket) {
-        socket.close();
-        socket = null;
-      }
+      cleanupSocket();
       if (term) {
         term.reset();
       }
@@ -243,10 +251,7 @@ onBeforeUnmount(() => {
     resizeObserver.disconnect();
     resizeObserver = null;
   }
-  if (socket) {
-    socket.close();
-    socket = null;
-  }
+  cleanupSocket();
   if (term) {
     term.dispose();
     term = null;

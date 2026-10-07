@@ -30,6 +30,34 @@ else:
     termios = None  # type: ignore[assignment]
 
 
+def _find_posix_descendants(parent_pid: int) -> list[int]:
+    """Recursively discover all child and descendant PIDs for a given process."""
+    descendants: list[int] = []
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-P", str(parent_pid)],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=0.5,
+        )
+        direct = [int(p.strip()) for p in out.strip().split() if p.strip().isdigit()]
+    except Exception:
+        try:
+            out = subprocess.check_output(
+                ["ps", "-o", "pid=", "--ppid", str(parent_pid)],
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=0.5,
+            )
+            direct = [int(p.strip()) for p in out.strip().split() if p.strip().isdigit()]
+        except Exception:
+            direct = []
+
+    for child in direct:
+        descendants.append(child)
+        descendants.extend(_find_posix_descendants(child))
+    return descendants
+
 class BasePTYSession(abc.ABC):
     """Abstract base class defining the PTY session interface."""
 
@@ -37,6 +65,8 @@ class BasePTYSession(abc.ABC):
         self.workspace_root = workspace_root
         self.on_output = on_output
         self.is_alive = False
+        self._lock = threading.Lock()
+        self._terminated = False
 
     @property
     @abc.abstractmethod
@@ -75,61 +105,69 @@ class PosixPTYSession(BasePTYSession):
 
     @property
     def pid(self) -> Optional[int]:
-        return self.proc.pid if self.proc is not None else None
+        with self._lock:
+            return self.proc.pid if self.proc is not None else None
 
     def start(self, shell_cmd: Optional[list[str]] = None) -> None:
-        if self.is_alive:
-            return
+        with self._lock:
+            if self.is_alive:
+                return
 
-        if shell_cmd is None:
-            # Use user's default shell or fallback to bash/sh
-            default_shell = os.environ.get("SHELL", "/bin/bash")
-            if not os.path.exists(default_shell):
-                default_shell = "/bin/sh"
-            shell_cmd = [default_shell]
+            if shell_cmd is None:
+                # Use user's default shell or fallback to bash/sh
+                default_shell = os.environ.get("SHELL", "/bin/bash")
+                if not os.path.exists(default_shell):
+                    default_shell = "/bin/sh"
+                shell_cmd = [default_shell]
 
-        # Allocate pseudo-terminal master/slave pair
-        master_fd, slave_fd = pty.openpty()
-        self.master_fd = master_fd
+            # Allocate pseudo-terminal master/slave pair
+            master_fd, slave_fd = pty.openpty()
+            self.master_fd = master_fd
 
-        child_env = os.environ.copy()
-        child_env["TERM"] = "xterm-256color"
-        child_env["COLORTERM"] = "truecolor"
+            child_env = os.environ.copy()
+            child_env["TERM"] = "xterm-256color"
+            child_env["COLORTERM"] = "truecolor"
 
-        # Resolve working directory safely
-        cwd = self.workspace_root if os.path.isdir(self.workspace_root) else os.getcwd()
+            # Resolve working directory safely
+            cwd = self.workspace_root if os.path.isdir(self.workspace_root) else os.getcwd()
 
-        try:
-            # Spawn shell with slave_fd as stdin/stdout/stderr
-            # start_new_session=True creates a new process group (setsid)
-            self.proc = subprocess.Popen(
-                shell_cmd,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                cwd=cwd,
-                env=child_env,
-                start_new_session=True,
-                close_fds=True,
-            )
-        finally:
-            # Slave fd must be closed in parent process so master_fd receives EOF when child exits
             try:
-                os.close(slave_fd)
-            except OSError:
-                pass
+                # Spawn shell with slave_fd as stdin/stdout/stderr
+                # start_new_session=True creates a new process group (setsid)
+                self.proc = subprocess.Popen(
+                    shell_cmd,
+                    stdin=slave_fd,
+                    stdout=slave_fd,
+                    stderr=slave_fd,
+                    cwd=cwd,
+                    env=child_env,
+                    start_new_session=True,
+                    close_fds=True,
+                )
+            finally:
+                # Slave fd must be closed in parent process so master_fd receives EOF when child exits
+                try:
+                    os.close(slave_fd)
+                except OSError:
+                    pass
 
-        self.is_alive = True
-        self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
-        self._reader_thread.start()
+            self.is_alive = True
+            self._terminated = False
+            self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
+            self._reader_thread.start()
 
     def _read_loop(self) -> None:
         """Continuously read output from master_fd in non-blocking select mode."""
-        while self.is_alive and self.master_fd is not None:
+        while True:
+            with self._lock:
+                if not self.is_alive or self.master_fd is None:
+                    break
+                fd = self.master_fd
+
             try:
-                r, _, _ = select.select([self.master_fd], [], [], 0.05)
-                if self.master_fd in r:
-                    data = os.read(self.master_fd, 4096)
+                r, _, _ = select.select([fd], [], [], 0.05)
+                if fd in r:
+                    data = os.read(fd, 4096)
                     if not data:
                         # EOF indicates shell has exited
                         break
@@ -137,68 +175,98 @@ class PosixPTYSession(BasePTYSession):
             except (OSError, ValueError):
                 break
         self.terminate()
-
     def write(self, data: str) -> None:
         """Send input string or control character (e.g. \\x03 for Ctrl+C) to shell."""
-        if self.is_alive and self.master_fd is not None:
+        with self._lock:
+            fd = self.master_fd
+            alive = self.is_alive
+        if alive and fd is not None:
             try:
-                os.write(self.master_fd, data.encode("utf-8"))
+                os.write(fd, data.encode("utf-8"))
             except OSError:
                 pass
 
     def resize(self, rows: int, cols: int) -> None:
         """Synchronize window dimensions with PTY device via TIOCSWINSZ ioctl."""
-        if self.is_alive and self.master_fd is not None and fcntl and struct and termios:
+        with self._lock:
+            fd = self.master_fd
+            alive = self.is_alive
+        if alive and fd is not None and fcntl and struct and termios:
             try:
                 winsize = struct.pack("HHHH", max(1, int(rows)), max(1, int(cols)), 0, 0)
-                fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+                fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
             except (OSError, ValueError):
                 pass
 
     def terminate(self) -> None:
         """Cleanly terminate shell process group and release master file descriptor."""
-        if not self.is_alive and self.master_fd is None and self.proc is None:
-            return
+        with self._lock:
+            if self._terminated:
+                return
+            self._terminated = True
+            self.is_alive = False
 
-        self.is_alive = False
-
-        if self.master_fd is not None:
-            try:
-                os.close(self.master_fd)
-            except OSError:
-                pass
+            fd_to_close = self.master_fd
             self.master_fd = None
 
-        if self.proc is not None:
-            # Attempt gentle SIGTERM on process group
+            proc_to_kill = self.proc
+            self.proc = None
+
+            reader_thread = self._reader_thread
+            self._reader_thread = None
+
+        if fd_to_close is not None:
             try:
-                pgid = os.getpgid(self.proc.pid)
-                os.killpg(pgid, signal.SIGTERM)
-            except (ProcessLookupError, OSError):
+                os.close(fd_to_close)
+            except OSError:
+                pass
+
+        if proc_to_kill is not None:
+            pid = proc_to_kill.pid
+            # Discover all child/descendant PIDs and their process groups
+            child_pids = _find_posix_descendants(pid)
+            all_pids = {pid} | set(child_pids)
+            pgids = set()
+            for p in all_pids:
                 try:
-                    self.proc.terminate()
+                    pgids.add(os.getpgid(p))
+                except (ProcessLookupError, OSError):
+                    pass
+
+            # Attempt gentle SIGTERM on all process groups and individual PIDs
+            for pgid in pgids:
+                try:
+                    os.killpg(pgid, signal.SIGTERM)
+                except (ProcessLookupError, OSError):
+                    pass
+            for p in all_pids:
+                try:
+                    os.kill(p, signal.SIGTERM)
                 except (ProcessLookupError, OSError):
                     pass
 
             # Wait briefly for process to exit cleanly
             try:
-                self.proc.wait(timeout=0.3)
+                proc_to_kill.wait(timeout=0.2)
             except subprocess.TimeoutExpired:
-                # Force kill if still lingering
-                try:
-                    pgid = os.getpgid(self.proc.pid)
-                    os.killpg(pgid, signal.SIGKILL)
-                except (ProcessLookupError, OSError):
+                # Force kill process groups and lingering child PIDs
+                for pgid in pgids:
                     try:
-                        self.proc.kill()
+                        os.killpg(pgid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                for p in all_pids:
+                    try:
+                        os.kill(p, signal.SIGKILL)
                     except (ProcessLookupError, OSError):
                         pass
                 try:
-                    self.proc.wait(timeout=0.2)
+                    proc_to_kill.wait(timeout=0.1)
                 except Exception:
                     pass
-
-            self.proc = None
+        # Prevent self-join deadlock
+        if reader_thread is not None and threading.current_thread() != reader_thread:
+            reader_thread.join(timeout=0.2)
 
 
 class WindowsPTYFallback(BasePTYSession):
@@ -211,34 +279,41 @@ class WindowsPTYFallback(BasePTYSession):
 
     @property
     def pid(self) -> Optional[int]:
-        return self.proc.pid if self.proc is not None else None
+        with self._lock:
+            return self.proc.pid if self.proc is not None else None
 
     def start(self, shell_cmd: Optional[list[str]] = None) -> None:
-        if self.is_alive:
-            return
+        with self._lock:
+            if self.is_alive:
+                return
 
-        if shell_cmd is None:
-            shell_cmd = ["cmd.exe"]
+            if shell_cmd is None:
+                shell_cmd = ["cmd.exe"]
 
-        cwd = self.workspace_root if os.path.isdir(self.workspace_root) else os.getcwd()
+            cwd = self.workspace_root if os.path.isdir(self.workspace_root) else os.getcwd()
 
-        self.proc = subprocess.Popen(
-            shell_cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=cwd,
-            text=False,
-            bufsize=0,
-        )
-        self.is_alive = True
-        self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
-        self._reader_thread.start()
+            self.proc = subprocess.Popen(
+                shell_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+                text=False,
+                bufsize=0,
+            )
+            self.is_alive = True
+            self._terminated = False
+            self._reader_thread = threading.Thread(target=self._read_loop, daemon=True)
+            self._reader_thread.start()
 
     def _read_loop(self) -> None:
-        while self.is_alive and self.proc and self.proc.stdout:
+        while True:
+            with self._lock:
+                if not self.is_alive or not self.proc or not self.proc.stdout:
+                    break
+                stdout = self.proc.stdout
             try:
-                chunk = self.proc.stdout.read(1024)
+                chunk = stdout.read(1024)
                 if not chunk:
                     break
                 self.on_output(chunk)
@@ -247,10 +322,13 @@ class WindowsPTYFallback(BasePTYSession):
         self.terminate()
 
     def write(self, data: str) -> None:
-        if self.is_alive and self.proc and self.proc.stdin:
+        with self._lock:
+            proc = self.proc
+            alive = self.is_alive
+        if alive and proc and proc.stdin:
             try:
-                self.proc.stdin.write(data.encode("utf-8"))
-                self.proc.stdin.flush()
+                proc.stdin.write(data.encode("utf-8"))
+                proc.stdin.flush()
             except OSError:
                 pass
 
@@ -259,14 +337,49 @@ class WindowsPTYFallback(BasePTYSession):
         pass
 
     def terminate(self) -> None:
-        self.is_alive = False
-        if self.proc:
-            try:
-                self.proc.terminate()
-            except OSError:
-                pass
+        with self._lock:
+            if self._terminated:
+                return
+            self._terminated = True
+            self.is_alive = False
+
+            proc_to_kill = self.proc
             self.proc = None
 
+            reader_thread = self._reader_thread
+            self._reader_thread = None
+
+        if proc_to_kill is not None:
+            pid = proc_to_kill.pid
+            if os.name == "nt":
+                try:
+                    creationflags = 0x08000000 if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(pid)],
+                        capture_output=True,
+                        creationflags=creationflags,
+                        timeout=1.0,
+                    )
+                except Exception:
+                    pass
+            try:
+                proc_to_kill.terminate()
+            except OSError:
+                pass
+            try:
+                proc_to_kill.wait(timeout=0.2)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc_to_kill.kill()
+                except OSError:
+                    pass
+                try:
+                    proc_to_kill.wait(timeout=0.1)
+                except Exception:
+                    pass
+
+        if reader_thread is not None and threading.current_thread() != reader_thread:
+            reader_thread.join(timeout=0.2)
 
 def create_pty_session(
     workspace_root: str,
