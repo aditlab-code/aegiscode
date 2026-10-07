@@ -8,7 +8,7 @@
 //   - Pergantian tab di pane yang sama menggunakan editor.setModel(model) sehingga
 //     DOM Monaco tidak dihancurkan ulang dan riwayat undo/redo tetap persisten.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { readFileContent, writeFileContent } from "../api.js";
+import { readFileContent, writeFileContent, runProjectLint } from "../api.js";
 import { languageForFile, languageLabel } from "../editorLanguages.js";
 import {
   getStoredEditorSettings,
@@ -33,6 +33,8 @@ const props = defineProps({
   embedded: { type: Boolean, default: true },
   // Instance identifier
   instanceId: { type: String, default: "primary" },
+  // Project ID untuk integrasi linting
+  projectId: { type: String, default: "" },
 });
 
 const emit = defineEmits([
@@ -43,6 +45,7 @@ const emit = defineEmits([
   "cursor-change",
   "markers-change",
   "syntax-change",
+  "diagnostics-updated",
 ]);
 
 const container = ref(null);
@@ -159,18 +162,28 @@ async function switchToFile(targetPath, previousPath = "") {
       syntaxTimer = setTimeout(() => {
         if (!model || disposed || thisLoadId !== loadSeq) return;
         const textVal = model.getValue();
-        const syntaxErrors = validateCodeSyntax(textVal, lang, targetPath);
-        emit("syntax-change", { path: targetPath, errors: syntaxErrors });
-        if (monaco?.editor?.setModelMarkers) {
-          const monacoMarkers = syntaxErrors.map((err) => ({
-            severity: err.severity === "warning" ? 4 : 8,
-            message: err.text,
-            startLineNumber: err.line || 1,
-            startColumn: err.col || 1,
-            endLineNumber: err.line || 1,
-            endColumn: (err.col || 1) + 15,
-          }));
-          monaco.editor.setModelMarkers(model, "aegis-syntax", monacoMarkers);
+        // Validasi sintaks lokal deterministik HANYA untuk JSON dan berkas .gitignore / ignore
+        const isDeterministicFormat = lang === "json" || targetPath.endsWith(".json") || targetPath.toLowerCase().includes("ignore");
+        if (isDeterministicFormat) {
+          const syntaxErrors = validateCodeSyntax(textVal, lang, targetPath);
+          emit("syntax-change", { path: targetPath, errors: syntaxErrors });
+          if (monaco?.editor?.setModelMarkers) {
+            const monacoMarkers = syntaxErrors.map((err) => ({
+              severity: err.severity === "warning" ? 4 : 8,
+              message: err.text,
+              startLineNumber: err.line || 1,
+              startColumn: err.col || 1,
+              endLineNumber: err.line || 1,
+              endColumn: (err.col || 1) + 15,
+            }));
+            monaco.editor.setModelMarkers(model, "aegis-syntax", monacoMarkers);
+          }
+        } else {
+          // Berkas kode (.js, .ts, .tsx, .py, dsb) sepenuhnya ditangani oleh Universal Linter
+          emit("syntax-change", { path: targetPath, errors: [] });
+          if (monaco?.editor?.setModelMarkers) {
+            monaco.editor.setModelMarkers(model, "aegis-syntax", []);
+          }
         }
       }, 200);
     }
@@ -298,6 +311,33 @@ async function save() {
       emit("dirty-change", { path: targetPath, dirty: dirty.value });
     }
     emit("saved", { path: targetPath });
+
+    if (props.projectId) {
+      try {
+        const lintRes = await runProjectLint(props.projectId, targetPath, "file");
+        if (lintRes && Array.isArray(lintRes.diagnostics)) {
+          if (monaco?.editor?.setModelMarkers && targetModel) {
+            const markers = lintRes.diagnostics.map((d) => ({
+              severity: d.severity === "error" ? 8 : (d.severity === "warning" ? 4 : 2),
+              message: d.message || "",
+              startLineNumber: d.line || 1,
+              startColumn: d.col || 1,
+              endLineNumber: d.end_line || d.line || 1,
+              endColumn: d.end_col || (d.col ? d.col + 5 : 10),
+              source: d.source || "aegis-linter",
+            }));
+            monaco.editor.setModelMarkers(targetModel, "aegis-linter", markers);
+          }
+          emit("diagnostics-updated", {
+            path: targetPath,
+            diagnostics: lintRes.diagnostics,
+          });
+        }
+      } catch (lintErr) {
+        console.warn("Linter runner error:", lintErr);
+      }
+    }
+
     return true;
   } catch (e) {
     saveError.value = e.message || "Gagal menyimpan file.";

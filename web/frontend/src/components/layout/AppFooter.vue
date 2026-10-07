@@ -44,7 +44,7 @@ const props = defineProps({
   },
   aetherVersion: {
     type: String,
-    default: "0.2.01",
+    default: "0.2.05",
   },
   aegisVersion: {
     type: String,

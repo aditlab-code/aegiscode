@@ -510,6 +510,20 @@ def project_git_deinit(
 @csrf_exempt
 @require_http_methods(["POST"])
 @_handle
+def project_lint(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/lint -> jalankan linter workspace."""
+    body = _parse_json_body(request)
+    file_path = body.get("file_path") or body.get("filePath")
+    scope = body.get("scope", "file")
+    return _json_response(service.lint_project(project_id, target_file=file_path, scope=scope))
+
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
 def open_in_explorer(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """POST /api/open-in-explorer -> buka Windows Explorer pada ACTIVE PROJECT.
 
@@ -1238,6 +1252,141 @@ def consultant_session_detail(
 
         raise NotFoundError("Session not found")
     return _json_response({"deleted": True, "session_id": session_id})
+
+
+# ---------------------------------------------------------------------------
+# Unified Threaded Session API (Unified Threaded Session Architecture)
+# ---------------------------------------------------------------------------
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+@require_auth
+@_handle
+def sessions_view(request: HttpRequest, service: GatewayService) -> JsonResponse:
+    """GET /api/sessions -> daftar sesi terpadu (newest first).
+    POST /api/sessions -> buat sesi terpadu baru.
+    """
+    if request.method == "GET":
+        project_id = request.GET.get("project_id") or None
+        if not project_id:
+            try:
+                project_id = service.project_store.get_active_project_id() or None
+            except Exception:
+                project_id = None
+        return _json_response({"sessions": service.list_unified_sessions(project_id=project_id)})
+
+    body = _parse_json_body(request)
+    project_id = body.get("project_id") or None
+    title = body.get("title") or None
+    if not project_id:
+        try:
+            project_id = service.project_store.get_active_project_id() or None
+        except Exception:
+            project_id = None
+    session = service.create_unified_session(project_id=project_id, title=title)
+    return _json_response(session, status=201)
+
+
+@csrf_exempt
+@require_http_methods(["GET", "PATCH", "DELETE"])
+@require_auth
+@_handle
+def session_detail_view(
+    request: HttpRequest, service: GatewayService, session_id: str
+) -> JsonResponse:
+    """GET /api/sessions/<id> -> detail sesi terpadu beserta turns.
+    PATCH /api/sessions/<id> -> rename judul sesi.
+    DELETE /api/sessions/<id> -> hapus sesi terpadu.
+    """
+    project_id = request.GET.get("project_id") or None
+    if not project_id:
+        try:
+            project_id = service.project_store.get_active_project_id() or None
+        except Exception:
+            project_id = None
+
+    if request.method == "GET":
+        sess = service.get_unified_session(session_id, project_id=project_id)
+        if sess is None:
+            from api.services import NotFoundError
+
+            raise NotFoundError("Session not found")
+        return _json_response(sess)
+
+    if request.method == "PATCH":
+        body = _parse_json_body(request)
+        title = body.get("title")
+        if not title or not str(title).strip():
+            from api.services import ValidationError
+
+            raise ValidationError("Field 'title' wajib diisi.")
+        updated = service.rename_unified_session(
+            session_id, str(title).strip(), project_id=project_id
+        )
+        if updated is None:
+            from api.services import NotFoundError
+
+            raise NotFoundError("Session not found")
+        return _json_response(updated)
+
+    # DELETE
+    deleted = service.delete_unified_session(session_id, project_id=project_id)
+    if not deleted:
+        from api.services import NotFoundError
+
+        raise NotFoundError("Session not found")
+    return _json_response({"deleted": True, "session_id": session_id})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@require_auth
+@_handle
+def session_turns_view(
+    request: HttpRequest, service: GatewayService, session_id: str
+) -> JsonResponse:
+    """POST /api/sessions/<id>/turns -> kirim giliran (ask atau agent)."""
+    body = _parse_json_body(request)
+    content = body.get("content") or body.get("message") or ""
+    mode = body.get("mode") or "ask"
+    provider_instance_id = body.get("provider_instance_id") or None
+    model_id = body.get("model_id") or None
+    images = body.get("images") or None
+    active_file = body.get("active_file") or None
+    project_id = body.get("project_id") or None
+    execution_mode = body.get("execution_mode") or None
+    requested_mode = body.get("requested_mode") or None
+
+    if not project_id:
+        try:
+            project_id = service.project_store.get_active_project_id() or None
+        except Exception:
+            project_id = None
+
+    res = service.create_unified_turn(
+        session_id=session_id,
+        content=str(content),
+        mode=str(mode),
+        provider_instance_id=provider_instance_id,
+        model_id=model_id,
+        images=images,
+        active_file=active_file,
+        project_id=project_id,
+        execution_mode=execution_mode,
+        requested_mode=requested_mode,
+    )
+    return _json_response(res, status=201)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@require_auth
+@_handle
+def session_cancel_view(
+    request: HttpRequest, service: GatewayService, session_id: str
+) -> JsonResponse:
+    """POST /api/sessions/<id>/cancel -> batalkan giliran task aktif sesi."""
+    res = service.cancel_unified_session(session_id)
+    return _json_response(res)
 
 
 @require_http_methods(["GET"])

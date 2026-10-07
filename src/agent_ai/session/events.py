@@ -59,6 +59,8 @@ class EventType(str, Enum):
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
     TASK_CANCELLED = "task_cancelled"
+    WARNING = "warning"
+    AGENT_REASONING_DELTA = "agent_reasoning_delta"
 
 
 @dataclass(frozen=True)

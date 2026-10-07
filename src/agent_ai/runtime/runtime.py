@@ -32,9 +32,11 @@ TIDAK dipakai oleh jalur normal.
 """
 
 from __future__ import annotations
-
 import json
+import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional
+
+logger = logging.getLogger(__name__)
 
 from agent_ai.core.cancel import CancellationToken
 from agent_ai.core.executor import ToolExecutor
@@ -1103,7 +1105,8 @@ class AgentRuntime:
             try:
                 et = EventType(event_type)
             except ValueError:
-                et = EventType.PHASE_CHANGED
+                logger.warning("Unknown execution event type: %s", event_type)
+                return
             event = make_event(
                 session_id=self.session_id,
                 event_type=et,

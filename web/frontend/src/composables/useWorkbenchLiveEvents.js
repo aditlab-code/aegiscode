@@ -63,27 +63,35 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
     return list;
   });
 
-  let lastProcessedEventCount = 0;
-  let lastFirstEventSignature = null;
+  function getEventKey(evt, index) {
+    if (!evt) return String(index);
+    if (evt.event_id) return String(evt.event_id);
+    if (evt.id) return String(evt.id);
+    if (evt.sequence !== undefined && evt.sequence !== null) return `seq-${evt.sequence}`;
+    const type = evt.event_type || evt.type || evt.event || "";
+    const ts = evt.timestamp || "";
+    const p = evt.payload || evt.data || {};
+    return `${type}:${ts}:${JSON.stringify(p)}`;
+  }
+
+  const processedEventKeys = new Set();
+  const MAX_PROCESSED_KEYS = 2000;
+
   watch(
     () => props.activityEvents,
     (events) => {
       if (!events || !events.length) {
-        lastProcessedEventCount = 0;
-        lastFirstEventSignature = null;
+        processedEventKeys.clear();
         return;
       }
-      const firstEvt = events[0];
-      const currentFirstSig = firstEvt ? (firstEvt.id || firstEvt.event_id || firstEvt.timestamp || JSON.stringify(firstEvt)) : null;
-      if (lastFirstEventSignature !== null && currentFirstSig !== lastFirstEventSignature) {
-        lastProcessedEventCount = 0;
-      }
-      lastFirstEventSignature = currentFirstSig;
 
-      const newEvents = events.slice(lastProcessedEventCount);
-      lastProcessedEventCount = events.length;
-
-      for (const evt of newEvents) {
+      for (let i = 0; i < events.length; i++) {
+        const evt = events[i];
+        const key = getEventKey(evt, i);
+        if (processedEventKeys.has(key)) {
+          continue;
+        }
+        processedEventKeys.add(key);
         const type = evt.event_type || evt.type || evt.event || "";
         const p = evt.payload || evt.data || evt;
         const ts = evt.timestamp || Date.now();
@@ -135,6 +143,13 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
             text: `[task:failed] ${p.error || "Unknown error"}`,
             ts,
           });
+        }
+      }
+
+      if (processedEventKeys.size > MAX_PROCESSED_KEYS) {
+        const toDelete = Array.from(processedEventKeys).slice(0, 500);
+        for (const k of toDelete) {
+          processedEventKeys.delete(k);
         }
       }
 

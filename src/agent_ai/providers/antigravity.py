@@ -1065,15 +1065,6 @@ class AntigravityProvider(BaseProvider):
                                         endpoint="agy CLI",
                                         response_body=err_detail,
                                     )
-                                usage_obj = res_obj.get("usage") or {}
-                                if event_sink and usage_obj:
-                                    event_sink("provider_response", {
-                                        "usage": {
-                                            "prompt_tokens": usage_obj.get("input_tokens", 0),
-                                            "completion_tokens": usage_obj.get("output_tokens", 0),
-                                            "total_tokens": usage_obj.get("total_tokens", 0),
-                                        }
-                                    })
                                 break
                             elif "response" in item and item.get("response"):
                                 final_response = item["response"]
@@ -1319,15 +1310,6 @@ class AntigravityProvider(BaseProvider):
                                     endpoint="agy CLI",
                                     response_body=err_detail,
                                 )
-                            usage_obj = res_obj.get("usage") or {}
-                            if event_sink and usage_obj:
-                                event_sink("provider_response", {
-                                    "usage": {
-                                        "prompt_tokens": usage_obj.get("input_tokens", 0),
-                                        "completion_tokens": usage_obj.get("output_tokens", 0),
-                                        "total_tokens": usage_obj.get("total_tokens", 0),
-                                    }
-                                })
                             break
                         elif "response" in item and item.get("response"):
                             final_response = item["response"]

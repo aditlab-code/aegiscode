@@ -92,8 +92,12 @@ def response_usage(raw: Any) -> Optional[Dict[str, int]]:
     if isinstance(nested, dict):
         prompt = _usage_int(nested.get("prompt_tokens"))
         if prompt is None:
+            prompt = _usage_int(nested.get("input_tokens"))
+        if prompt is None:
             prompt = _usage_int(nested.get("prompt"))
         completion = _usage_int(nested.get("completion_tokens"))
+        if completion is None:
+            completion = _usage_int(nested.get("output_tokens"))
         if completion is None:
             completion = _usage_int(nested.get("completion"))
         total = _usage_int(nested.get("total_tokens"))

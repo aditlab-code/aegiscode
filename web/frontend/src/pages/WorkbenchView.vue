@@ -206,6 +206,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isSubmitting: {
+    type: Boolean,
+    default: false,
+  },
   error: {
     type: String,
     default: "",
@@ -312,6 +316,7 @@ const emit = defineEmits([
   "refresh-history",
   "open-history-task",
   "open-consultant-session",
+  "open-session",
   "open-folder",
   "delete-project",
   "open-path",
@@ -341,6 +346,7 @@ function handleOpenConsultantSession(sessionId) {
     toggleAssistant(true);
   }
   activeConsultantSessionId.value = sessionId || "";
+  emit("open-session", sessionId);
   emit("open-consultant-session", sessionId);
 }
 
@@ -481,9 +487,14 @@ const effectiveConsultantProps = computed(() => {
 // 2. Editor Diagnostics & Multi-Tab State (via useWorkbenchTabs)
 const activeEditorMarkers = ref([]);
 const activeEditorSyntaxErrors = ref([]);
+const activeEditorLinterDiagnostics = ref([]);
 
 const activeEditorDiagnostics = computed(() => {
-  const merged = [...activeEditorMarkers.value, ...activeEditorSyntaxErrors.value];
+  const merged = [
+    ...activeEditorMarkers.value,
+    ...activeEditorSyntaxErrors.value,
+    ...activeEditorLinterDiagnostics.value,
+  ];
   const seen = new Set();
   const unique = [];
   for (const d of merged) {
@@ -1025,9 +1036,30 @@ function onSyntaxChange(payload) {
   }
 }
 
+function onDiagnosticsUpdated(payload) {
+  if (payload?.diagnostics) {
+    activeEditorLinterDiagnostics.value = payload.diagnostics.map((d) => ({
+      id: `lint-${d.file}-${d.line}-${d.col}-${Date.now()}`,
+      text: d.message,
+      type: d.severity === "error" ? "error" : (d.severity === "warning" ? "lint" : "info"),
+      severity: d.severity,
+      label: d.severity === "error" ? "Lint Error" : "Lint / Warning",
+      file: d.file,
+      line: d.line,
+      col: d.col,
+      endLine: d.end_line,
+      endCol: d.end_col,
+      source: d.source || "aegis-linter",
+      ruleId: d.rule_id,
+      ts: Date.now(),
+    }));
+  }
+}
+
 watch(activeTabPath, () => {
   activeEditorMarkers.value = [];
   activeEditorSyntaxErrors.value = [];
+  activeEditorLinterDiagnostics.value = [];
 });
 
 async function handleNavigateToLocation(loc) {
@@ -1397,6 +1429,7 @@ defineExpose({
           @view-task="emit('view-task', $event)"
           @open-history-task="emit('open-history-task', $event)"
           @refresh-history="emit('refresh-history')"
+          @open-session="handleOpenConsultantSession"
           @open-consultant-session="handleOpenConsultantSession"
           @open-folder="emit('open-folder')"
           @select-tab="(path, pane) => handleSelectTab(path, pane)"
@@ -1853,6 +1886,7 @@ defineExpose({
                   v-else-if="pane1ActiveTabPath"
                   ref="activeCodeEditorRef"
                   :path="pane1ActiveTabPath"
+                  :project-id="activeProject?.id || ''"
                   instance-id="primary"
                   embedded
                   @saved="(e) => onEditorSaved(e, 'pane1')"
@@ -1860,6 +1894,7 @@ defineExpose({
                   @cursor-change="onCursorChange"
                   @markers-change="onMarkersChange"
                   @syntax-change="onSyntaxChange"
+                  @diagnostics-updated="onDiagnosticsUpdated"
                   @error="onEditorError"
                   @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
                 />
@@ -2084,6 +2119,7 @@ defineExpose({
                   v-else-if="pane2ActiveTabPath"
                   ref="splitCodeEditorRef"
                   :path="pane2ActiveTabPath"
+                  :project-id="activeProject?.id || ''"
                   instance-id="split"
                   embedded
                   @saved="(e) => onEditorSaved(e, 'pane2')"
@@ -2091,6 +2127,7 @@ defineExpose({
                   @cursor-change="onCursorChange"
                   @markers-change="onMarkersChange"
                   @syntax-change="onSyntaxChange"
+                  @diagnostics-updated="onDiagnosticsUpdated"
                   @error="onEditorError"
                   @close="handleCloseTab(pane2ActiveTabPath, 'pane2')"
                 />
@@ -2122,6 +2159,7 @@ defineExpose({
             v-else-if="pane1ActiveTabPath"
             ref="activeCodeEditorRef"
             :path="pane1ActiveTabPath"
+            :project-id="activeProject?.id || ''"
             instance-id="primary"
             embedded
             @saved="(e) => onEditorSaved(e, 'pane1')"
@@ -2129,6 +2167,7 @@ defineExpose({
             @cursor-change="onCursorChange"
             @markers-change="onMarkersChange"
             @syntax-change="onSyntaxChange"
+            @diagnostics-updated="onDiagnosticsUpdated"
             @error="onEditorError"
             @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
           />
@@ -2162,7 +2201,7 @@ defineExpose({
                         </div>
                         <div class="brand-text-block">
                           <h1 class="brand-title welcome-title">AegisCode Studio</h1>
-                          <span class="version-tag">v0.2.01</span>
+                          <span class="version-tag">v0.2.05</span>
                         </div>
                       </div>
                       <p class="brand-tagline welcome-project">
@@ -2381,6 +2420,7 @@ defineExpose({
           :show-reasoning="showReasoning"
           :activity-copied="activityCopied"
           :is-running="isRunning"
+          :is-submitting="isSubmitting"
           :stop-in-progress="stopInProgress"
           :error="error"
           :consultant-props="effectiveConsultantProps"

@@ -25,6 +25,7 @@ agar pilihan tidak di-hardcode di frontend.
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -257,6 +258,7 @@ class GatewayService:
         project_store: Optional[ProjectStore] = None,
         llm_config_service: Optional[Any] = None,
         consultant_service: Optional[Any] = None,
+        unified_session_store: Optional[Any] = None,
     ) -> None:
         self.projects = project_registry or ProjectRegistry()
         self.preparation = task_preparation or TaskPreparation()
@@ -280,6 +282,8 @@ class GatewayService:
         # GitHub Backup (fitur OPTIONAL per project). Lazy: hanya dibangun saat
         # endpoint backup dipakai, sehingga jalur read-only tetap ringan.
         self._github_backup_service = None
+        # Unified Threaded Session Architecture (SQLite store).
+        self._unified_session_store = unified_session_store
         self._tasks: Dict[str, TaskRecord] = {}
         # PreparedTask asli (bukan ringkasan) untuk diteruskan ke runtime.
         self._prepared: Dict[str, Any] = {}
@@ -383,6 +387,172 @@ class GatewayService:
     ) -> bool:
         """Delete a consultant session."""
         return self.consultant_service.delete_session(session_id, project_id=project_id)
+    @property
+    def unified_session_store(self) -> Any:
+        """UnifiedSessionStore (SQLite) — Unified Threaded Session Architecture."""
+        if self._unified_session_store is None:
+            from agent_ai.session.unified_store import UnifiedSessionStore
+
+            self._unified_session_store = UnifiedSessionStore()
+        return self._unified_session_store
+
+    # ------------------------------------------------------------------ #
+    # Unified Threaded Session Architecture (#Fase 2)
+    # ------------------------------------------------------------------ #
+    def list_unified_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar sesi terpadu, terbaru lebih dahulu."""
+        return self.unified_session_store.list_sessions(project_id=project_id)
+
+    def get_unified_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Ambil sesi terpadu beserta seluruh turn-nya."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if sess is None:
+            return None
+        return sess.to_dict()
+
+    def create_unified_session(
+        self, project_id: Optional[str] = None, title: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Buat sesi terpadu baru."""
+        sess = self.unified_session_store.create_session(project_id=project_id, title=title)
+        return sess.to_dict()
+
+    def rename_unified_session(
+        self, session_id: str, title: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Ubah judul sesi terpadu."""
+        sess = self.unified_session_store.rename_session(session_id, title, project_id=project_id)
+        return sess.to_dict() if sess else None
+
+    def delete_unified_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> bool:
+        """Hapus sesi terpadu beserta seluruh turn-nya."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if sess and sess.active_task_id:
+            try:
+                self.cancel_task(sess.active_task_id)
+            except Exception:
+                pass
+        return self.unified_session_store.delete_session(session_id, project_id=project_id)
+
+    def cancel_unified_session(self, session_id: str) -> Dict[str, Any]:
+        """Batalkan giliran agen aktif pada sesi terpadu."""
+        sess = self.unified_session_store.get_session(session_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError("Session not found")
+        if sess.active_task_id:
+            try:
+                self.cancel_task(sess.active_task_id)
+            except Exception:
+                pass
+        self.unified_session_store.update_session_state(session_id, "idle", active_task_id=None)
+        return {"session_id": session_id, "cancelled": True}
+
+    def create_unified_turn(
+        self,
+        session_id: str,
+        content: str,
+        *,
+        mode: str = "ask",
+        provider_instance_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
+        execution_mode: Optional[str] = None,
+        requested_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Jalankan satu giliran pada sesi terpadu (ask atau agent)."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError(f"Session '{session_id}' tidak ditemukan.")
+
+        target_mode = "agent" if str(mode).strip().lower() == "agent" else "ask"
+        from agent_ai.session.unified_models import TurnExecutionData, UnifiedTurn, new_turn_id
+
+        # Simpan giliran user
+        user_turn = UnifiedTurn(
+            turn_id=new_turn_id(),
+            role="user",
+            mode=target_mode,
+            content=content,
+            created_at=time.time(),
+            images=images,
+        )
+        self.unified_session_store.append_turn(session_id, user_turn)
+
+        if target_mode == "ask":
+            # Mode Ask: analisis read-only melalui ConsultantService
+            consult_mode = "investigate" if requested_mode in ("investigate", "deep") else "quick"
+            consult_res = self.consult(
+                message=content,
+                session_id=session_id,
+                provider_instance_id=provider_instance_id,
+                model_id=model_id,
+                project_id=project_id or sess.project_id,
+                mode=consult_mode,
+                images=images,
+                active_file=active_file,
+            )
+            asst_turn = UnifiedTurn(
+                turn_id=new_turn_id(),
+                role="assistant",
+                mode="ask",
+                content=consult_res.get("reply") or "",
+                created_at=time.time(),
+            )
+            self.unified_session_store.append_turn(session_id, asst_turn)
+            return {
+                "session_id": session_id,
+                "user_turn": user_turn.to_dict(),
+                "assistant_turn": asst_turn.to_dict(),
+                "consultant_result": consult_res,
+            }
+        else:
+            # Mode Agent: eksekusi modifikasi berkas melalui TaskPreparation & TaskExecutor
+            metadata = {
+                "session_id": session_id,
+                "provider_instance_id": provider_instance_id,
+                "model_id": model_id,
+                "requested_mode": requested_mode,
+                "skip_turn_sync": True,
+            }
+            task_rec = self.create_task(
+                task=content,
+                project_id=project_id or sess.project_id,
+                metadata=metadata,
+                execution_mode=execution_mode,
+                images=images,
+                active_file=active_file,
+            )
+            task_id = task_rec["task_id"]
+            exec_data = TurnExecutionData(
+                task_id=task_id,
+                status=task_rec.get("status", "running"),
+            )
+            asst_turn = UnifiedTurn(
+                turn_id=new_turn_id(),
+                role="assistant",
+                mode="agent",
+                content="",
+                created_at=time.time(),
+                execution=exec_data,
+            )
+            self.unified_session_store.append_turn(session_id, asst_turn)
+            self.unified_session_store.update_session_state(session_id, "running", active_task_id=task_id)
+            return {
+                "session_id": session_id,
+                "user_turn": user_turn.to_dict(),
+                "assistant_turn": asst_turn.to_dict(),
+                "task": task_rec,
+            }
 
     @property
     def github_backup_service(self) -> Any:
@@ -1617,6 +1787,21 @@ class GatewayService:
         }
 
     # ------------------------------------------------------------------ #
+    # Universal Linter Service
+    # ------------------------------------------------------------------ #
+    def lint_project(
+        self,
+        project_id: str,
+        target_file: Optional[str] = None,
+        scope: str = "file",
+    ) -> Dict[str, Any]:
+        """Jalankan linter untuk project berdasarkan project_id."""
+        from api.linter import run_project_lint
+
+        root = self._project_root_by_id(project_id)
+        return run_project_lint(str(root), target_file=target_file, scope=scope)
+
+    # ------------------------------------------------------------------ #
     # Tasks
     # ------------------------------------------------------------------ #
     def _prepare_task_image_parts(
@@ -1729,11 +1914,20 @@ class GatewayService:
         task_id = new_task_id()
         prepared = self.preparation.prepare(enriched_task, task_id=task_id)
 
-        # Session Aegis untuk event streaming (#51). Satu session per task.
-        session = self.sessions.create_session(
-            project_id=project_id,
-            metadata={"task_id": task_id},
-        )
+        task_meta = dict(metadata or {})
+        # Penyelarasan ID Sesi: gunakan session_id dari metadata bila ada
+        unified_sid = task_meta.get("session_id")
+
+        # Session Aegis untuk event streaming (#51).
+        # Gunakan session_id unified bila memungkinkan agar sinkron dengan database
+        session_id_to_use = unified_sid
+        session = self.sessions.get_session(session_id_to_use) if session_id_to_use else None
+        if session is None:
+            session = self.sessions.create_session(
+                project_id=project_id,
+                metadata={"task_id": task_id, "unified_session_id": unified_sid},
+                session_id=session_id_to_use,
+            )
         self.sessions.create_task_reference(session.session_id, task_id)
 
         record = TaskRecord(
@@ -1747,7 +1941,7 @@ class GatewayService:
                 "plan_kind": prepared.metadata.get("plan_kind"),
                 "step_count": prepared.metadata.get("step_count", 0),
             },
-            metadata=dict(metadata or {}),
+            metadata=task_meta,
             session_id=session.session_id,
             execution_mode=execution_mode_norm,
         )
@@ -1759,6 +1953,50 @@ class GatewayService:
             # Attachment gambar per-task (dipakai jalur eksekusi Agent).
             if image_parts:
                 self._task_attachments[task_id] = image_parts
+
+            # Sinkronkan task ke unified_session_store jika belum ada turn untuk task_id ini
+            if unified_sid and not task_meta.get("skip_turn_sync"):
+                try:
+                    u_sess = self.unified_session_store.get_session(unified_sid)
+                    if u_sess:
+                        has_turn = any(
+                            t.execution and t.execution.task_id == task_id
+                            for t in u_sess.turns
+                        )
+                        if not has_turn:
+                            from agent_ai.session.unified_models import (
+                                TurnExecutionData,
+                                UnifiedTurn,
+                                new_turn_id,
+                            )
+
+                            u_turn = UnifiedTurn(
+                                turn_id=new_turn_id(),
+                                role="user",
+                                mode="agent",
+                                content=task.strip(),
+                                created_at=time.time(),
+                                images=images,
+                            )
+                            self.unified_session_store.append_turn(unified_sid, u_turn)
+                            exec_data = TurnExecutionData(
+                                task_id=task_id,
+                                status=record.status,
+                            )
+                            a_turn = UnifiedTurn(
+                                turn_id=new_turn_id(),
+                                role="assistant",
+                                mode="agent",
+                                content="",
+                                created_at=time.time(),
+                                execution=exec_data,
+                            )
+                            self.unified_session_store.append_turn(unified_sid, a_turn)
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "running", active_task_id=task_id
+                            )
+                except Exception:
+                    pass
 
         # Event TASK_CREATED (memakai event Aegis existing).
         self._emit(
@@ -2184,6 +2422,39 @@ class GatewayService:
             elif status in ("completed", "failed", "cancelled"):
                 record.queue_state = "done"
 
+            # Sinkronisasi ke UnifiedSessionStore bila task terkait unified session.
+            unified_sid = (record.metadata or {}).get("session_id")
+            if unified_sid:
+                try:
+                    u_sess = self.unified_session_store.get_session(unified_sid)
+                    if u_sess:
+                        target_turn = None
+                        for t in u_sess.turns:
+                            if t.execution and t.execution.task_id == task_id:
+                                target_turn = t
+                                break
+                        if target_turn:
+                            from agent_ai.session.unified_models import TurnExecutionData
+
+                            exec_data = target_turn.execution or TurnExecutionData(task_id=task_id)
+                            exec_data.status = status
+                            if result is not None:
+                                exec_data.report = result
+                            if error is not None:
+                                exec_data.error = error
+                            self.unified_session_store.update_turn_execution(
+                                unified_sid, target_turn.turn_id, exec_data
+                            )
+                        if status in ("completed", "failed", "cancelled"):
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "idle", active_task_id=None
+                            )
+                        elif status == "running":
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "running", active_task_id=task_id
+                            )
+                except Exception:
+                    pass
     def _emit(
         self,
         session_id: str,
@@ -2195,6 +2466,19 @@ class GatewayService:
         """Emit event ke SessionStore Aegis (tanpa event bus baru)."""
         try:
             self.emit_event(session_id, event_type, task_id=task_id, payload=payload)
+            if task_id:
+                rec = self._tasks.get(task_id)
+                if rec:
+                    unified_sid = (rec.metadata or {}).get("session_id")
+                    if unified_sid and unified_sid != session_id:
+                        if not self.sessions.get_session(unified_sid):
+                            try:
+                                self.sessions.create_session(
+                                    session_id=unified_sid, project_id=rec.project_id
+                                )
+                            except Exception:
+                                pass
+                        self.emit_event(unified_sid, event_type, task_id=task_id, payload=payload)
         except Exception:  # noqa: BLE001 - event emission tidak boleh crash
             return
 
@@ -3067,8 +3351,54 @@ class GatewayService:
             if isinstance(exc, VisionError):
                 raise ValidationError(f"Gambar tidak dapat diproses: {exc}") from exc
             raise
-        return result.to_dict()
+        res_dict = result.to_dict()
+        # Penyelarasan ID Sesi & Persistensi State:
+        # Simpan giliran ke UnifiedSessionStore agar sesi percakapan selaras
+        res_sid = result.session_id
+        if res_sid:
+            try:
+                u_sess = self.unified_session_store.get_session(res_sid)
+                if not u_sess:
+                    u_sess = self.unified_session_store.create_session(
+                        project_id=project_id,
+                        title=self.unified_session_store._auto_title(str(message).strip()),
+                        session_id=res_sid,
+                    )
+                has_user = any(
+                    t.role == "user" and t.mode == "ask" and t.content == str(message).strip()
+                    for t in u_sess.turns
+                )
+                if not has_user:
+                    from agent_ai.session.unified_models import UnifiedTurn, new_turn_id
 
+                    u_turn = UnifiedTurn(
+                        turn_id=new_turn_id(),
+                        role="user",
+                        mode="ask",
+                        content=str(message).strip(),
+                        created_at=time.time(),
+                        images=normalized_images,
+                    )
+                    self.unified_session_store.append_turn(res_sid, u_turn)
+
+                has_asst = any(
+                    t.role == "assistant" and t.mode == "ask" and t.content == (result.reply or "")
+                    for t in u_sess.turns
+                )
+                if not has_asst and result.reply:
+                    from agent_ai.session.unified_models import UnifiedTurn, new_turn_id
+
+                    a_turn = UnifiedTurn(
+                        turn_id=new_turn_id(),
+                        role="assistant",
+                        mode="ask",
+                        content=result.reply or "",
+                        created_at=time.time(),
+                    )
+                    self.unified_session_store.append_turn(res_sid, a_turn)
+            except Exception:
+                pass
+        return res_dict
     def _normalize_images(
         self, images: Optional[Any]
     ) -> Optional[List[Dict[str, Any]]]:
@@ -3512,11 +3842,22 @@ class GatewayService:
 
         if not isinstance(event_type, EventType):
             event_type = EventType(event_type)
+
+        data_payload = dict(payload or {})
+        # Penanda tipe konteks (Isolasi Aliran Event SSE)
+        if "context_type" not in data_payload:
+            if task_id:
+                data_payload["context_type"] = "agent"
+                data_payload.setdefault("mode", "agent")
+            else:
+                data_payload["context_type"] = "consultation"
+                data_payload.setdefault("mode", "ask")
+
         event = make_event(
             session_id=session_id,
             event_type=event_type,
             task_id=task_id,
-            payload=payload,
+            payload=data_payload,
         )
         stored = self.sessions.append_event(event)
         return stored.to_dict()

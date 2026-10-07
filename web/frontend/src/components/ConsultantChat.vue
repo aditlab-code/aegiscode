@@ -130,7 +130,7 @@ async function loadSessions() {
 }
 
 async function switchSession(id) {
-  if (switchingSession.value || id === sessionId.value) return;
+  if (sending.value || switchingSession.value || id === sessionId.value) return;
   switchingSession.value = true;
   error.value = "";
   try {
@@ -174,14 +174,21 @@ async function resumeSessionFromId(id) {
     const turns = sess.turns || [];
     messages.value = turns.map((t) => {
       if (t.role === "user") {
-        return { role: "user", text: t.text || "" };
+        return {
+          role: "user",
+          text: t.content || t.text || "",
+          mode: t.mode || "ask",
+          images: t.images || [],
+        };
       }
       return {
         role: "assistant",
-        text: t.text || "",
-        tools: [],
-        taskProposal: null,
-        failed: false,
+        text: t.content || t.text || (t.execution?.report || ""),
+        mode: t.mode || "ask",
+        execution: t.execution || null,
+        tools: summarizeTools((t.execution && t.execution.tool_events) || t.tools || []),
+        taskProposal: t.taskProposal || null,
+        failed: t.execution?.status === "failed",
       };
     });
     scrollToBottom();
@@ -549,13 +556,15 @@ function onSelectSuggestion(item) {
   input.value = applySelectedItem(item, input.value, composer.value);
   nextTick(autoGrow);
 }
-
+let consultSeq = 0;
 async function send() {
   const text = input.value.trim();
   const pending = attachments.value.slice();
   const savedDraftText = input.value;
   const savedDraftAttachments = pending;
   if ((!text && !pending.length) || sending.value) return;
+  const reqSessionId = sessionId.value || null;
+  const currentSeq = ++consultSeq;
   error.value = "";
   messages.value.push({
     role: "user",
@@ -585,6 +594,7 @@ async function send() {
           }))
         : null,
     });
+    if (currentSeq !== consultSeq || (reqSessionId && sessionId.value !== reqSessionId)) return;
     sessionId.value = data.session_id || sessionId.value;
     messages.value.push({
       role: "assistant",
@@ -600,8 +610,8 @@ async function send() {
     }
     emit("consultant-event", { type: "sending_completed", prompt: text, error: null, data });
   } catch (e) {
+    if (currentSeq !== consultSeq || (reqSessionId && sessionId.value !== reqSessionId)) return;
     error.value = e.message || "Consultant request failed.";
-    // Pulihkan draft jika submit gagal agar input tidak hilang
     if (!input.value && savedDraftText) {
       input.value = savedDraftText;
     }
@@ -617,8 +627,10 @@ async function send() {
     });
     emit("consultant-event", { type: "sending_completed", prompt: text, error: error.value, data: null });
   } finally {
-    sending.value = false;
-    scrollToBottom();
+    if (currentSeq === consultSeq) {
+      sending.value = false;
+      scrollToBottom();
+    }
   }
 }
 
@@ -935,6 +947,23 @@ onMounted(() => {
               >
                 Apply to Editor
               </button>
+            </div>
+          </div>
+          <!-- Agent Execution Details for Agent Turns -->
+          <div v-if="msg.role === 'assistant' && msg.execution" class="consultant-execution-box">
+            <div class="cmsg-exec-header">
+              <span class="cmsg-exec-badge" :class="msg.execution.status">
+                Agent Task: {{ msg.execution.status }}
+              </span>
+              <span v-if="msg.execution.task_id" class="cmsg-exec-id">
+                #{{ String(msg.execution.task_id).slice(0, 8) }}
+              </span>
+            </div>
+            <div v-if="msg.execution.changes && msg.execution.changes.length" class="cmsg-exec-changes">
+              <span class="cmsg-changes-label">Changes:</span>
+              <span v-for="(ch, ci) in msg.execution.changes" :key="ci" class="cmsg-change-chip">
+                {{ ch.path || ch.file || ch }}
+              </span>
             </div>
           </div>
           <div v-if="msg.role === 'assistant' && msg.tools && msg.tools.length" class="consultant-tools">
@@ -1300,8 +1329,8 @@ onMounted(() => {
                 v-for="s in sessions"
                 :key="s.session_id"
                 class="consultant-session-item"
-                :class="{ active: s.session_id === sessionId }"
-                @click="switchSession(s.session_id)"
+                :class="{ active: s.session_id === sessionId, disabled: sending }"
+                @click="!sending && switchSession(s.session_id)"
               >
                 <div class="cs-item-main">
                   <template v-if="renamingSessionId === s.session_id">

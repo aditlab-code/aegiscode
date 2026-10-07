@@ -92,7 +92,20 @@ export function classifyDiagnostic(item, idx = 0) {
  */
 export function mapMonacoMarkersToDiagnostics(markers = [], filePath = "") {
   if (!Array.isArray(markers)) return [];
-  return markers.map((m, idx) => {
+  return markers
+    .filter((m) => {
+      if (!m) return false;
+      const src = String(m.source || "").toLowerCase();
+      if (src === "typescript" || src === "javascript" || src === "ts" || src === "js") {
+        return false;
+      }
+      const msg = typeof m.message === "string" ? m.message : "";
+      if (msg.includes("Cannot find module") || msg.includes("Cannot use JSX")) {
+        return false;
+      }
+      return true;
+    })
+    .map((m, idx) => {
     let type = "lint";
     let severity = "warning";
     let label = "Lint / Warning";
@@ -551,8 +564,9 @@ export function validateGitignoreSyntax(code = "", filePath = "") {
 }
 
 /**
- * Fast, lightweight syntax analyzer for common programming languages.
- * Validates JSON, bracket balances, and block terminators (e.g. Python ':').
+ * Fast, lightweight syntax analyzer for deterministically supported formats.
+ * Validates JSON and .gitignore patterns locally.
+ * Programming languages (JS/TS/Vue/Python) are delegated to the workspace linter runner.
  * @param {string} code
  * @param {string} language
  * @param {string} filePath
@@ -560,15 +574,13 @@ export function validateGitignoreSyntax(code = "", filePath = "") {
  */
 export function validateCodeSyntax(code = "", language = "", filePath = "") {
   if (!code || typeof code !== "string") return [];
-  const errors = [];
-  const lines = code.split("\n");
 
-  // 1. JSON validation
+  // 1. JSON validation (deterministik murni)
   if (language === "json" || filePath.endsWith(".json")) {
     return validateJsonSyntax(code, filePath);
   }
 
-  // 2. Gitignore / Ignore files validation
+  // 2. Gitignore / Ignore files validation (deterministik murni)
   const lowerPath = filePath.toLowerCase();
   const lowerLang = String(language || "").toLowerCase();
   if (
@@ -585,7 +597,9 @@ export function validateCodeSyntax(code = "", language = "", filePath = "") {
     return validateGitignoreSyntax(code, filePath);
   }
 
-  // 2. Bracket balance & basic syntax check (for JS, TS, Python, etc.)
+  // 3. Bracket balance & basic syntax check (for JS, TS, Python, etc.)
+  const errors = [];
+  const lines = code.split("\n");
   const stack = [];
   const pairs = { ")": "(", "}": "{", "]": "[" };
   let inBlockComment = false;

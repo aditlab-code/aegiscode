@@ -102,6 +102,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isSubmitting: {
+    type: Boolean,
+    default: false,
+  },
   stopInProgress: {
     type: Boolean,
     default: false,
@@ -272,7 +276,7 @@ function setTab(tab) {
 
 function handleSubmit() {
   const text = promptText.value.trim();
-  if (!text || props.isRunning) return;
+  if (!text || props.isSubmitting) return;
   pushHistory(text);
   emit("submit-task", text);
   promptText.value = "";
@@ -605,8 +609,8 @@ defineExpose({
               <button
                 type="button"
                 class="chat-send-btn"
-                :disabled="isRunning || !promptText.trim()"
-                title="Send prompt to AegisCode (Enter)"
+                :disabled="isSubmitting || !promptText.trim()"
+                :title="isRunning ? 'Enqueue task to queue (Enter)' : 'Send prompt to AegisCode (Enter)'"
                 aria-label="Send Task"
                 @click="handleSubmit"
               >
@@ -614,7 +618,7 @@ defineExpose({
                   <line x1="22" y1="2" x2="11" y2="13" />
                   <polygon points="22 2 15 22 11 13 2 9 22 2" />
                 </svg>
-                <span>Send</span>
+                <span>{{ isRunning ? 'Enqueue' : 'Send' }}</span>
               </button>
             </div>
           </div>
