@@ -1154,7 +1154,10 @@ class AgentRuntime:
         try:
             if self._working_state_manager is None:
                 return
-            tool = payload.get("tool") or payload.get("metadata", {}).get("tool")
+            from agent_ai.runtime.activity import normalize_canonical_tool_name
+
+            raw_tool = payload.get("tool") or payload.get("metadata", {}).get("tool")
+            tool = normalize_canonical_tool_name(raw_tool)
             content = payload.get("content")
             if not tool or content is None:
                 return
@@ -1169,8 +1172,7 @@ class AgentRuntime:
             if tool in ("read_file", "view_image", "atlas_query", "rig_query"):
                 if path:
                     self._working_state_manager.record_files_inspected(str(path))
-            elif tool in ("write_file", "edit_file", "delete_file", "move_file",
-                          "create_skill", "delete_skill", "update_skill"):
+            elif tool in ("write_file", "edit_file", "delete_file", "move_file"):
                 if path:
                     self._working_state_manager.record_files_changed(str(path))
         except Exception:  # noqa: BLE001 - state update tidak boleh crash
@@ -1179,17 +1181,24 @@ class AgentRuntime:
     def _emit_activity_phase_for_tool(self, payload: Dict[str, Any]) -> None:
         """Klasifikasi payload `tool_called` -> activity phase (terpusat)."""
         try:
-            from agent_ai.runtime.activity import classify_tool_activity
+            from agent_ai.runtime.activity import (
+                classify_tool_activity,
+                normalize_canonical_tool_name,
+            )
+
+            tool = payload.get("tool")
+            canonical_tool = normalize_canonical_tool_name(tool)
+            if canonical_tool and "canonical_tool" not in payload:
+                payload["canonical_tool"] = canonical_tool
 
             phase = classify_tool_activity(
-                payload.get("tool"), payload.get("arguments")
+                canonical_tool or tool, payload.get("arguments")
             )
         except Exception:  # noqa: BLE001 - klasifikasi tidak boleh menggagalkan task
             return
         if phase is None:
             return
         self._set_activity_phase(phase.value)
-
     def _set_activity_phase(self, phase: str) -> None:
         """Set + emit activity phase (dedup: hanya bila phase berubah).
 

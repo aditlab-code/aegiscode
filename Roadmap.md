@@ -31,7 +31,7 @@ Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan 
 | Fase 0 | Baseline dan freeze arsitektur | Selesai |
 | Fase 1 | Lifecycle task dan kontrak event kanonik | Prioritas Utama |
 | Fase 2 | Modularisasi orchestrator/runtime | Prioritas Lanjutan |
-| Fase 3 | Normalisasi boundary provider | Direncanakan |
+| Fase 3 | Normalisasi boundary provider | Sedang Berjalan |
 | Fase 4 | Reliability gate dan Triple-Gate QA | Direncanakan |
 | Fase 5 | HITL guardrails, UI Studio, Tauri v2 | Pasca-Stabilisasi |
 
@@ -64,8 +64,8 @@ Alur kanonik: Prompt, task preparation, context selection, agent iteration, prov
 
 Model event minimum: `event_id`, `task_id`, `session_id`, `sequence`, `type` (reasoning, tool_call, tool_result, status, error, completed), `status` (queued, running, waiting, completed, failed, cancelled), `payload`, `created_at`.
 
-- [ ] Reducer idempotent di backend dan frontend; validasi duplicate dan gap sequence.
-- [ ] Queue, Activity, History, dan Reasoning view diproyeksikan dari event yang sama; tanpa parsing JSON provider per view.
+- [x] Reducer idempotent di backend dan frontend; validasi duplicate dan gap sequence (`taskStateReducer.js` deteksi/resolve missing sequence gap, `store.py` append idempotent).
+- [x] Queue, Activity, History, dan Reasoning view diproyeksikan dari event yang sama; tanpa parsing JSON provider per view.
 - [x] History dibentuk dari state terminal task/session; aksi CRUD in-situ (rename & delete history di sidebar kiri setara Threads) terintegrasi secara persisten (`.aegis/log/`, backend PATCH/DELETE endpoint, in-memory state); queue tidak bergantung polling tidak konsisten.
 - [ ] Task tidak masuk scheduler dua kali; pembatalan berhenti pada safe boundary; timeout, retry, malformed response, dan tool error menghasilkan status terminal jelas.
 - [ ] Ketahanan SSE: exponential backoff, sinkronisasi `last_event_id`, tanpa event hilang atau ganda.
@@ -101,9 +101,9 @@ Definition of done: facade kompatibel, dependensi satu arah, state task terisola
 ## 6. Fase 3: Normalisasi Boundary Provider
 
 - [ ] Skema kanonik `ProviderRequest` (model, messages, tools, generation_options, runtime_context), `ProviderEvent` (text, reasoning, tool_call, usage, error, done), `ProviderError` (kategori, retryable, provider, raw_reference).
-- [ ] Wire JSON hanya di adapter; Antigravity menjadi provider referensi pengujian, bukan satu-satunya sumber logika agent.
-- [ ] Uji encoding/decoding nama tool, streaming text dan reasoning, respons kosong dan malformed.
-- [ ] Retry hanya untuk error retryable; timeout tidak meninggalkan task `running`.
+- [x] Wire JSON hanya di adapter; kanonisasi dialek tool terpusat di orkestrator (`normalize_canonical_tool_name`), adapter provider mendelegasikan ke orkestrator, payload `tool_called` memuat `canonical_tool`, dan frontend bersih dari hardcode mapping.
+- [x] Uji encoding/decoding nama tool, streaming text dan reasoning, respons kosong dan malformed.
+- [x] Retry hanya untuk error retryable; idle activity timeout & max execution cap pada streaming/reasoning (Antigravity Provider) mencegah task stuck `running`.
 - [ ] Fallback provider tidak menggandakan tool call; capability provider tercatat eksplisit.
 
 ## 7. Fase 4: Reliability Gate & Strict QA

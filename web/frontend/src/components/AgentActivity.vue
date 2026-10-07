@@ -434,7 +434,7 @@ const EVENT_DESCRIBERS = {
     };
   },
   agent_reasoning_delta: (d, base, index) => {
-    const delta = String(d.delta || "").trim();
+    const delta = String(d.delta || d.reasoning || "").trim();
     if (!delta) return null;
     return {
       ...base,

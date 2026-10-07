@@ -81,21 +81,9 @@ def _extract_msg_content(msg: Any) -> str:
 
 def _map_agy_tool_name(agy_name: str) -> str:
     """Petakan nama tool internal Antigravity CLI (agy) ke nama tool standar Aegis."""
-    name = (agy_name or "").lower().strip()
-    if name in ("view_file", "read_file", "read_symbol", "view_symbol"):
-        return "read_file"
-    if name in ("write_to_file", "write_file"):
-        return "write_file"
-    if name in ("edit_file", "edit_file_part"):
-        return "edit_file"
-    if name in ("list_dir", "find_files", "find_by_name"):
-        return "list_files"
-    if name in ("grep", "grep_search", "search_file"):
-        return "search_code"
-    if name == "run_command":
-        return "run_command"
-    return name
+    from agent_ai.runtime.activity import normalize_canonical_tool_name
 
+    return normalize_canonical_tool_name(agy_name)
 
 def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
     """Ekstrak path/command/target dari parameter tool Antigravity CLI."""
@@ -781,9 +769,17 @@ class AntigravityProvider(BaseProvider):
                 env["GOOGLE_CLOUD_QUOTA_PROJECT"] = self.config.project_id
             if self.config.location:
                 env["GOOGLE_CLOUD_LOCATION"] = self.config.location
-
-            timeout = self.config.timeout or 120
-
+            base_timeout = self.config.timeout or 120
+            # Bila execution policy adalah 'balanced' atau 'deep' (atau model berkemampuan thinking/reasoning),
+            # naikkan timeout minimal menjadi 180 detik agar tidak terputus saat proses reasoning/thinking berlangsung.
+            if policy_mode in ("balanced", "deep") or getattr(self, "supports_thinking", False) or "flash-medium" in model or "pro-high" in model:
+                timeout = max(base_timeout, 180)
+            else:
+                timeout = base_timeout
+            # Idle timeout: batas waktu keheningan tanpa output baru (inactivity window)
+            idle_timeout = getattr(self.config, "idle_timeout", 60) or 60
+            # Max timeout: batas absolut keselamatan eksekusi (safety ceiling)
+            max_timeout = max(timeout, 600)
             cancel_check = (
                 options.extra.get("cancel_check")
                 if options and options.extra and callable(options.extra.get("cancel_check"))
@@ -827,6 +823,7 @@ class AntigravityProvider(BaseProvider):
                 final_response = ""
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
+                last_activity_time = start_time
                 files_read_set: set[str] = set()
                 file_read_counts: Dict[str, int] = {}
                 tool_call_counts: Dict[str, int] = {}
@@ -838,10 +835,15 @@ class AntigravityProvider(BaseProvider):
                             raise ProviderUnavailableError(
                                 "Antigravity execution dibatalkan oleh pengguna (user stop)."
                             )
-                        if time.time() - start_time > timeout:
+                        if time.time() - last_activity_time > idle_timeout:
                             proc.kill()
                             raise ProviderUnavailableError(
-                                f"Antigravity CLI timeout setelah {timeout} detik."
+                                f"Antigravity CLI idle timeout: tidak ada aktivitas selama {idle_timeout} detik."
+                            )
+                        if time.time() - start_time > max_timeout:
+                            proc.kill()
+                            raise ProviderUnavailableError(
+                                f"Antigravity CLI melebihi batas waktu eksekusi maksimum {max_timeout} detik."
                             )
                         line = proc.stdout.readline() if proc.stdout else ""
                         if not line:
@@ -864,6 +866,7 @@ class AntigravityProvider(BaseProvider):
                         except Exception:
                             continue
 
+                        last_activity_time = time.time()
                         if isinstance(item, dict):
                             if item.get("event") == "step_update":
                                 step_update = item.get("step_update") or {}
@@ -952,6 +955,7 @@ class AntigravityProvider(BaseProvider):
                                                         })
                                                         event_sink("agent_reasoning_delta", {
                                                             "delta": f"\n{warning_msg}\n",
+                                                            "reasoning": f"\n{warning_msg}\n",
                                                         })
                                             if policy_mode == "fast" and len(files_read_set) > 3:
                                                 proc.kill()
@@ -983,7 +987,10 @@ class AntigravityProvider(BaseProvider):
                                                         "signature": tool_sig,
                                                         "call_count": tool_count,
                                                     })
-                                                    event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+                                                    event_sink("agent_reasoning_delta", {
+                                                        "delta": f"\n{loop_warning}\n",
+                                                        "reasoning": f"\n{loop_warning}\n",
+                                                    })
 
                                             if tool_count >= 4 or (policy_mode == "fast" and tool_count >= 3):
                                                 proc.kill()
@@ -1043,7 +1050,10 @@ class AntigravityProvider(BaseProvider):
                                     if thought_delta:
                                         accumulated_thoughts.append(thought_delta)
                                         if event_sink:
-                                            event_sink("agent_reasoning_delta", {"delta": thought_delta})
+                                            event_sink("agent_reasoning_delta", {
+                                                "delta": thought_delta,
+                                                "reasoning": thought_delta,
+                                            })
                                 elif step_type == "agent_response":
                                     text_delta = step_update.get("text_delta")
                                     if text_delta:
@@ -1224,6 +1234,7 @@ class AntigravityProvider(BaseProvider):
                                             })
                                             event_sink("agent_reasoning_delta", {
                                                 "delta": f"\n{warning_msg}\n",
+                                                "reasoning": f"\n{warning_msg}\n",
                                             })
 
                                     # Multi-Tool Signature Redundancy Tracking (non-read_file)
@@ -1244,7 +1255,10 @@ class AntigravityProvider(BaseProvider):
                                                     "signature": tool_sig,
                                                     "call_count": tool_count,
                                                 })
-                                                event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+                                                event_sink("agent_reasoning_delta", {
+                                                    "delta": f"\n{loop_warning}\n",
+                                                    "reasoning": f"\n{loop_warning}\n",
+                                                })
 
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
@@ -1293,7 +1307,10 @@ class AntigravityProvider(BaseProvider):
                                 if thought_delta:
                                     accumulated_thoughts.append(thought_delta)
                                     if event_sink:
-                                        event_sink("agent_reasoning_delta", {"delta": thought_delta})
+                                        event_sink("agent_reasoning_delta", {
+                                            "delta": thought_delta,
+                                            "reasoning": thought_delta,
+                                        })
                             elif step_type == "agent_response":
                                 text_delta = step_update.get("text_delta")
                                 if text_delta:

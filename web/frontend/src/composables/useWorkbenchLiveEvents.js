@@ -9,10 +9,10 @@ import { classifyDiagnostic } from "../services/diagnosticService.js";
 
 export const MAX_LIVE_BUFFER = 500;
 
-export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFileModified = null, onProblemOccurred = null, maxBufferSize = MAX_LIVE_BUFFER } = {}) {
+export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFileModified = null, onProblemOccurred = null, onSequenceGap = null, maxBufferSize = MAX_LIVE_BUFFER } = {}) {
   const localOutputLines = ref([]);
   const localProblems = ref([]);
-
+  let lastObservedSequence = 0;
   const effectiveOutputLines = computed(() => {
     return props.outputLines && props.outputLines.length
       ? props.outputLines
@@ -82,6 +82,7 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
     (events) => {
       if (!events || !events.length) {
         processedEventKeys.clear();
+        lastObservedSequence = 0;
         return;
       }
 
@@ -92,13 +93,33 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
           continue;
         }
         processedEventKeys.add(key);
+
+        // Validasi sequence gap
+        const seq = typeof evt.sequence === "number" ? evt.sequence : null;
+        if (seq !== null && seq > 0) {
+          if (lastObservedSequence > 0 && seq > lastObservedSequence + 1) {
+            if (typeof onSequenceGap === "function") {
+              onSequenceGap({
+                lastSequence: lastObservedSequence,
+                receivedSequence: seq,
+                missingFrom: lastObservedSequence + 1,
+                missingTo: seq - 1,
+                event: evt,
+              });
+            }
+          }
+          if (seq > lastObservedSequence) {
+            lastObservedSequence = seq;
+          }
+        }
+
         const type = evt.event_type || evt.type || evt.event || "";
         const p = evt.payload || evt.data || evt;
         const ts = evt.timestamp || Date.now();
-
         if (type === "tool_called") {
+          const displayTool = p.canonical_tool || p.tool || "tool";
           localOutputLines.value.push({
-            text: `[tool:call] ${p.tool || "tool"} ${p.path || p.command || p.query || ""}`.trim(),
+            text: `[tool:call] ${displayTool} ${p.path || p.target || p.command || p.query || ""}`.trim(),
             ts,
           });
         } else if (type === "tool_completed") {
@@ -109,14 +130,16 @@ export function useWorkbenchLiveEvents(props, { editorDiagnostics = null, onFile
               ts,
             });
           } else {
+            const toolName = p.canonical_tool || p.tool || "";
             const isFileWriteTool = [
               "write_file",
+              "edit_file",
               "write_to_file",
               "replace_file_content",
               "replace_content",
               "patch_file",
               "apply_patch",
-            ].includes(p.tool);
+            ].includes(toolName);
             const writtenPath = p.path || p.target || p.file_path || p.file;
             if (isFileWriteTool && writtenPath && onFileModified) {
               onFileModified(writtenPath);

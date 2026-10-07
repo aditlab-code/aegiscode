@@ -32,7 +32,55 @@ class ActivityPhase(str, Enum):
     VALIDATING = "validating"
 
 
-#: Nama tool AKTUAL (registry AETHER) -> activity phase.
+#: Pemetaan nama tool dari berbagai provider/dialek ke nama tool kanonik Aegis.
+_CANONICAL_TOOL_MAP: Mapping[str, str] = {
+    # --- Inspecting (retrieval / pemahaman project) ---
+    "read_file": "read_file",
+    "view_file": "read_file",
+    "read_symbol": "read_file",
+    "view_symbol": "read_file",
+    "cat": "read_file",
+    "view_image": "view_image",
+    "search_code": "search_code",
+    "grep": "search_code",
+    "grep_search": "search_code",
+    "search_file": "search_code",
+    "hybrid_search": "search_code",
+    "list_files": "list_files",
+    "list_dir": "list_files",
+    "find_files": "list_files",
+    "find_by_name": "list_files",
+    "atlas_query": "atlas_query",
+    "rig_query": "rig_query",
+    "project_map_status": "project_map_status",
+    "refresh_project_map": "refresh_project_map",
+    "semantic_search": "semantic_search",
+    "refresh_semantic_index": "refresh_semantic_index",
+
+    # --- Editing (mutasi workspace) ---
+    "write_file": "write_file",
+    "write_to_file": "write_file",
+    "edit_file": "edit_file",
+    "edit_file_part": "edit_file",
+    "replace_file_content": "edit_file",
+    "replace_content": "edit_file",
+    "patch_file": "edit_file",
+    "apply_patch": "edit_file",
+    "delete_file": "delete_file",
+    "move_file": "move_file",
+    "create_skill": "edit_file",
+    "delete_skill": "edit_file",
+    "update_skill": "edit_file",
+
+    # --- Running (terminal / shell) ---
+    "run_command": "run_command",
+    "bash": "run_command",
+    "terminal_exec": "run_command",
+    "execute_command": "run_command",
+    "exec": "run_command",
+}
+
+#: Nama tool AKTUAL & ALIAS -> activity phase.
 #:
 #: - Inspecting = memahami/mencari informasi project (read-only knowledge).
 #: - Editing    = mengubah workspace (mutasi file).
@@ -41,29 +89,51 @@ class ActivityPhase(str, Enum):
 #: `run_command` dipetakan ke `RUNNING` sebagai default; ia bisa dipromosikan
 #: ke `VALIDATING` oleh `classify_tool_activity` bila command-nya jelas
 #: merupakan verifikasi hasil kerja (lihat `is_validation_command`).
-_TOOL_ACTIVITY = {
-    # --- Inspecting (retrieval / pemahaman project) ---
+_TOOL_ACTIVITY: Mapping[str, ActivityPhase] = {
+    # --- Inspecting ---
     "read_file": ActivityPhase.INSPECTING,
+    "view_file": ActivityPhase.INSPECTING,
+    "read_symbol": ActivityPhase.INSPECTING,
+    "view_symbol": ActivityPhase.INSPECTING,
+    "cat": ActivityPhase.INSPECTING,
+    "view_image": ActivityPhase.INSPECTING,
     "search_code": ActivityPhase.INSPECTING,
+    "grep": ActivityPhase.INSPECTING,
+    "grep_search": ActivityPhase.INSPECTING,
+    "search_file": ActivityPhase.INSPECTING,
+    "hybrid_search": ActivityPhase.INSPECTING,
     "list_files": ActivityPhase.INSPECTING,
-    # Project Map (Agent): termasuk refresh_project_map. refresh_project_map
-    # menulis artefak map (.aegis/map) tetapi konsepnya "project map /
-    # inspection" (memahami project), sehingga dikelompokkan sebagai inspecting.
+    "list_dir": ActivityPhase.INSPECTING,
+    "find_files": ActivityPhase.INSPECTING,
+    "find_by_name": ActivityPhase.INSPECTING,
     "atlas_query": ActivityPhase.INSPECTING,
     "rig_query": ActivityPhase.INSPECTING,
     "project_map_status": ActivityPhase.INSPECTING,
     "refresh_project_map": ActivityPhase.INSPECTING,
-    # Semantic Search & Vector DB (Phase 2.1)
     "semantic_search": ActivityPhase.INSPECTING,
     "refresh_semantic_index": ActivityPhase.INSPECTING,
 
-    # --- Editing (mutasi workspace) ---
+    # --- Editing ---
     "write_file": ActivityPhase.EDITING,
+    "write_to_file": ActivityPhase.EDITING,
     "edit_file": ActivityPhase.EDITING,
+    "edit_file_part": ActivityPhase.EDITING,
+    "replace_file_content": ActivityPhase.EDITING,
+    "replace_content": ActivityPhase.EDITING,
+    "patch_file": ActivityPhase.EDITING,
+    "apply_patch": ActivityPhase.EDITING,
     "delete_file": ActivityPhase.EDITING,
     "move_file": ActivityPhase.EDITING,
-    # --- Running (terminal) ---
+    "create_skill": ActivityPhase.EDITING,
+    "delete_skill": ActivityPhase.EDITING,
+    "update_skill": ActivityPhase.EDITING,
+
+    # --- Running ---
     "run_command": ActivityPhase.RUNNING,
+    "bash": ActivityPhase.RUNNING,
+    "terminal_exec": ActivityPhase.RUNNING,
+    "execute_command": ActivityPhase.RUNNING,
+    "exec": ActivityPhase.RUNNING,
 }
 
 
@@ -117,11 +187,24 @@ def is_validation_command(command: Any) -> bool:
     Heuristik deterministik pada string command (test/lint/type-check/check
     script). BUKAN subsystem validation baru: source utama tetap event
     `validation_started`/`validation_completed` milik runtime (bila aktif).
+    Mendukung argumen string, dictionary (command/CommandLine/cmd), maupun list token.
     """
+    if isinstance(command, Mapping):
+        command = command.get("command") or command.get("CommandLine") or command.get("cmd")
+    elif isinstance(command, (list, tuple)):
+        command = " ".join(str(c) for c in command)
     text = str(command or "").strip()
     if not text:
         return False
     return _VALIDATION_COMMAND_RE.search(text) is not None
+
+
+def normalize_canonical_tool_name(tool_name: Optional[str]) -> str:
+    """Normalisasi nama tool dari dialek apa pun ke nama kanonik Aegis."""
+    if not tool_name:
+        return ""
+    clean = str(tool_name).strip().lower()
+    return _CANONICAL_TOOL_MAP.get(clean, clean)
 
 
 def classify_tool_activity(
@@ -130,9 +213,9 @@ def classify_tool_activity(
     """Tentukan activity phase dari sebuah tool call (deterministik).
 
     Args:
-        tool_name: nama tool AKTUAL (mis. "read_file"). Case-insensitive.
-        arguments: argumen tool. Dipakai khusus untuk `run_command`
-            (membedakan running vs validating dari string `command`).
+        tool_name: nama tool AKTUAL atau dialek provider (mis. "read_file", "view_file"). Case-insensitive.
+        arguments: argumen tool. Dipakai khusus untuk `run_command` / `bash`
+            (membedakan running vs validating dari string `command` atau `CommandLine`).
 
     Returns:
         `ActivityPhase` bila tool dikenali; `None` bila tool tidak
@@ -140,16 +223,24 @@ def classify_tool_activity(
     """
     if not tool_name:
         return None
-    phase = _TOOL_ACTIVITY.get(str(tool_name).strip().lower())
+    canonical = normalize_canonical_tool_name(tool_name)
+    phase = _TOOL_ACTIVITY.get(canonical) or _TOOL_ACTIVITY.get(str(tool_name).strip().lower())
     if phase is None:
         return None
     if phase is ActivityPhase.RUNNING:
         command = None
         if isinstance(arguments, Mapping):
-            command = arguments.get("command")
+            command = arguments.get("command") or arguments.get("CommandLine") or arguments.get("cmd")
+        elif isinstance(arguments, (str, list, tuple)):
+            command = arguments
         if is_validation_command(command):
             return ActivityPhase.VALIDATING
     return phase
 
 
-__all__ = ["ActivityPhase", "classify_tool_activity", "is_validation_command"]
+__all__ = [
+    "ActivityPhase",
+    "classify_tool_activity",
+    "is_validation_command",
+    "normalize_canonical_tool_name",
+]

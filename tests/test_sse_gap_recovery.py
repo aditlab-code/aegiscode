@@ -180,3 +180,28 @@ def test_api_events_last_event_id_header():
             await stream.aclose()
 
     asyncio.run(_run())
+def test_session_store_append_event_idempotent():
+    """InMemorySessionStore menolak duplikasi event_id dan melaporkan status idempotent."""
+    store = InMemorySessionStore()
+
+    ev1 = make_event(
+        session_id="s_idem",
+        event_type=EventType.TASK_STARTED,
+        task_id="t_idem",
+        payload={"step": 1},
+    )
+
+    stored, is_new = store.append_event_idempotent(ev1)
+    assert is_new is True
+    assert stored.sequence == 1
+    assert stored.event_id == ev1.event_id
+
+    # Append ulang event dengan event_id yang sama persis
+    stored2, is_new2 = store.append_event_idempotent(ev1)
+    assert is_new2 is False
+    assert stored2.sequence == 1
+    assert stored2.event_id == ev1.event_id
+
+    # Pastikan total event tetap 1
+    events = store.get_events(session_id="s_idem")
+    assert len(events) == 1

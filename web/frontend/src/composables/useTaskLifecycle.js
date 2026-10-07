@@ -192,8 +192,6 @@ function handleEvent(evt) {
       break;
     }
     case "tool_called":
-      if (!isForMonitored) break;
-      if (p.tool) activityPhase.value = "running";
       break;
     case "tool_completed":
     case "observation_received":

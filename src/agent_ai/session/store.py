@@ -77,6 +77,15 @@ class SessionStore(ABC):
         """Tambahkan event (append-only). Mengembalikan event dengan sequence."""
         raise NotImplementedError
 
+    def append_event_idempotent(self, event: ExecutionEvent) -> tuple[ExecutionEvent, bool]:
+        """Tambahkan event secara idempotent.
+
+        Jika event dengan event_id yang sama sudah pernah tersimpan,
+        kembalikan event yang ada dengan flag False (bukan event baru).
+        Jika belum ada, append dan kembalikan dengan flag True.
+        """
+        return self.append_event(event), True
+
     @abstractmethod
     def get_events(
         self,
@@ -116,6 +125,7 @@ class InMemorySessionStore(SessionStore):
     def __init__(self) -> None:
         self._sessions: Dict[str, Session] = {}
         self._events: List[ExecutionEvent] = []
+        self._events_by_id: Dict[str, ExecutionEvent] = {}
         self._sequence: int = 0
         # Subscriber live (minimal): callback dipanggil saat event di-append.
         self._subscribers: List[EventSubscriber] = []
@@ -198,6 +208,10 @@ class InMemorySessionStore(SessionStore):
         sequence duplikat tanpa menyerialkan seluruh eksekusi tool.
         """
         with self._event_lock:
+            # Periksa apakah event_id sudah ada
+            if event.event_id and event.event_id in self._events_by_id:
+                return self._events_by_id[event.event_id]
+
             self._sequence += 1
             sequence = self._sequence
             # ExecutionEvent frozen -> buat salinan dengan sequence.
@@ -212,7 +226,8 @@ class InMemorySessionStore(SessionStore):
                 status=event.status or (event.payload.get("status") if isinstance(event.payload, dict) else None),
             )
             self._events.append(stored)
-        # Notifikasi subscriber (live streaming). Kegagalan satu subscriber
+            if event.event_id:
+                self._events_by_id[event.event_id] = stored
         # tidak boleh mengganggu append event atau subscriber lain.
         for callback in list(self._subscribers):
             try:
@@ -220,6 +235,12 @@ class InMemorySessionStore(SessionStore):
             except Exception:  # noqa: BLE001 - subscriber error tidak boleh crash
                 continue
         return stored
+    def append_event_idempotent(self, event: ExecutionEvent) -> tuple[ExecutionEvent, bool]:
+        """Append event secara idempotent dan laporkan apakah event benar-benar baru."""
+        with self._event_lock:
+            if event.event_id and event.event_id in self._events_by_id:
+                return self._events_by_id[event.event_id], False
+        return self.append_event(event), True
 
     def subscribe(self, callback: EventSubscriber) -> EventSubscriber:
         """Daftarkan callback live (dipanggil saat event baru di-append)."""

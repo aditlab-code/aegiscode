@@ -2104,7 +2104,14 @@ class AgentOrchestrator:
 
             if is_final_turn:
                 clean_completion, reasoning_text = extract_reasoning_and_content(completion or "")
-                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                extracted_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                self._last_reasoning = extracted_reasoning
+                if extracted_reasoning:
+                    emit_event(
+                        self.event_sink,
+                        "agent_reasoning_delta",
+                        {"delta": extracted_reasoning, "reasoning": extracted_reasoning},
+                    )
                 loop.finish(result=clean_completion)
                 break
             if truncated:
@@ -2482,7 +2489,14 @@ class AgentOrchestrator:
                     history.append_user_message(self._truncation_message().content)
                     continue
                 clean_res, reasoning_text = extract_reasoning_and_content(response.text or "")
-                self._last_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                extracted_reasoning = reasoning_text or getattr(response, "reasoning", None)
+                self._last_reasoning = extracted_reasoning
+                if extracted_reasoning:
+                    emit_event(
+                        self.event_sink,
+                        "agent_reasoning_delta",
+                        {"delta": extracted_reasoning, "reasoning": extracted_reasoning},
+                    )
                 history.append_assistant_message(content=clean_res)
                 loop.finish(result=clean_res)
                 break

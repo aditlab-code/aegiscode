@@ -720,6 +720,7 @@ class LLMConfigService:
                             provider_id=new_ag.id,
                             model_name=default_model,
                             enabled=True,
+                            timeout=180,
                         )
                     except Exception:
                         pass
