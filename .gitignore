@@ -49,6 +49,7 @@ projects/*
 data/aether.db
 data/aegis.db
 data/*.db
+data/*.db-*
 data/consultant_sessions.json
 data/settings.json
 data/models/
