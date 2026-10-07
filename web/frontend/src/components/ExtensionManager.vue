@@ -395,29 +395,29 @@ defineExpose({ refresh });
             <div class="ext-cap-summary">{{ capableSummary(ext.capabilities) }}</div>
             <div v-if="String(ext.status).toLowerCase() === 'failed' && ext.error" class="ext-error-line">
               <span class="ext-error-text">{{ ext.error }}</span>
-              <button class="btn-aether btn-ghost-a btn-sm" @click.stop="openFailedDetails(ext)">Details</button>
+              <button class="btn-aegis btn-ghost-a btn-sm" @click.stop="openFailedDetails(ext)">Details</button>
             </div>
           </div>
           <div class="ext-card-chevron">›</div>
         </div>
         <div class="ext-card-actions">
           <template v-if="String(ext.status).toLowerCase() === 'failed'">
-            <button class="btn-aether btn-ghost-a btn-sm" @click="openFailedDetails(ext)">Details</button>
+            <button class="btn-aegis btn-ghost-a btn-sm" @click="openFailedDetails(ext)">Details</button>
           </template>
           <template v-else-if="String(ext.status).toLowerCase() === 'disabled' || ext.enabled === false">
-            <button class="btn-aether btn-primary-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doEnable(ext)">
+            <button class="btn-aegis btn-primary-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doEnable(ext)">
               <span v-if="actionBusy[ext.id]">Enabling…</span><span v-else>Enable</span>
             </button>
           </template>
           <template v-else>
-            <button class="btn-aether btn-ghost-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doDisable(ext)">
+            <button class="btn-aegis btn-ghost-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doDisable(ext)">
               <span v-if="actionBusy[ext.id]">Disabling…</span><span v-else>Disable</span>
             </button>
           </template>
-          <button class="btn-aether btn-ghost-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doUpdate(ext)">
+          <button class="btn-aegis btn-ghost-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="doUpdate(ext)">
             <span v-if="actionBusy[ext.id]">Updating…</span><span v-else>Update</span>
           </button>
-          <button class="btn-aether btn-danger-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="askRemove(ext)">Remove</button>
+          <button class="btn-aegis btn-danger-a btn-sm" :disabled="!!actionBusy[ext.id]" @click="askRemove(ext)">Remove</button>
         </div>
       </div>
     </div>
@@ -477,7 +477,7 @@ defineExpose({ refresh });
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">
               Configuration
-              <button class="btn-aether btn-ghost-a btn-sm" style="margin-left:8px;" @click="toggleConfig">{{ showConfig ? "Hide" : "Show" }}</button>
+              <button class="btn-aegis btn-ghost-a btn-sm" style="margin-left:8px;" @click="toggleConfig">{{ showConfig ? "Hide" : "Show" }}</button>
             </div>
             <div v-if="showConfig" class="ext-config-wrap">
               <div v-if="configError" class="wb-error" style="margin-bottom:8px;">{{ configError }}</div>
@@ -493,14 +493,14 @@ defineExpose({ refresh });
         </div>
         <div class="modal-actions" style="border-top:1px solid var(--border-soft); padding-top:12px;">
           <template v-if="detail && String(detail.status).toLowerCase() === 'disabled'">
-            <button class="btn-aether btn-primary-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doEnable(detail)">Enable</button>
+            <button class="btn-aegis btn-primary-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doEnable(detail)">Enable</button>
           </template>
           <template v-else-if="detail && String(detail.status).toLowerCase() !== 'failed'">
-            <button class="btn-aether btn-ghost-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doDisable(detail)">Disable</button>
+            <button class="btn-aegis btn-ghost-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doDisable(detail)">Disable</button>
           </template>
-          <button class="btn-aether btn-ghost-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doUpdate(detail)">Update</button>
-          <button class="btn-aether btn-danger-a btn-sm" :disabled="!!actionBusy[detailId]" @click="askRemove(detail)">Remove</button>
-          <button class="btn-aether btn-ghost-a btn-sm" @click="closeDetail">Close</button>
+          <button class="btn-aegis btn-ghost-a btn-sm" :disabled="!!actionBusy[detailId]" @click="doUpdate(detail)">Update</button>
+          <button class="btn-aegis btn-danger-a btn-sm" :disabled="!!actionBusy[detailId]" @click="askRemove(detail)">Remove</button>
+          <button class="btn-aegis btn-ghost-a btn-sm" @click="closeDetail">Close</button>
         </div>
       </div>
     </div>
@@ -526,8 +526,8 @@ defineExpose({ refresh });
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn-aether btn-ghost-a" :disabled="installBusy" @click="closeInstall">Cancel</button>
-          <button class="btn-aether btn-primary-a" :disabled="installBusy" @click="doInstall">
+          <button class="btn-aegis btn-ghost-a" :disabled="installBusy" @click="closeInstall">Cancel</button>
+          <button class="btn-aegis btn-primary-a" :disabled="installBusy" @click="doInstall">
             <span v-if="installBusy">Installing…</span><span v-else>Install</span>
           </button>
         </div>
@@ -542,8 +542,8 @@ defineExpose({ refresh });
           Extension package will be removed.<br />Extension configuration and runtime data are preserved.
         </div>
         <div class="modal-actions">
-          <button class="btn-aether btn-ghost-a" @click="cancelRemove">Cancel</button>
-          <button class="btn-aether btn-danger-a" :disabled="!!actionBusy[removeConfirm.id]" @click="confirmRemove">
+          <button class="btn-aegis btn-ghost-a" @click="cancelRemove">Cancel</button>
+          <button class="btn-aegis btn-danger-a" :disabled="!!actionBusy[removeConfirm.id]" @click="confirmRemove">
             <span v-if="actionBusy[removeConfirm.id]">Removing…</span><span v-else>Remove</span>
           </button>
         </div>
@@ -556,7 +556,7 @@ defineExpose({ refresh });
         <div class="modal-title">Extension Error</div>
         <div class="modal-body" style="white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size:12px;">{{ failedDetailText }}</div>
         <div class="modal-actions">
-          <button class="btn-aether btn-ghost-a" @click="failedDetailsOpen = false">Close</button>
+          <button class="btn-aegis btn-ghost-a" @click="failedDetailsOpen = false">Close</button>
         </div>
       </div>
     </div>

@@ -3,9 +3,9 @@
 Membuktikan bahwa dua surface konfigurasi TIDAK PERNAH tercampur dan tetap
 memakai sumber konfigurasi existing masing-masing:
 
-    - Global Settings AETHER  -> `data/settings.json`
+    - Global Settings AegisCode -> `data/settings.json`
       (loader `agent_ai.config.settings`).
-    - Project Settings/Policy -> `<root>/.aether/permissions.json`
+    - Project Settings/Policy   -> `<root>/.aegis/permissions.json`
       (`agent_ai.projects.permissions.ProjectPermissionStore`).
 
 Yang diuji:
@@ -18,7 +18,7 @@ Yang diuji:
 
 Isolasi: `SETTINGS_PATH` diarahkan ke file sementara (`tmp_path`) dan registry
 project memakai `tmp_path` — tidak menyentuh `data/settings.json`,
-`data/aether.db`, maupun project produksi.
+`data/aegis.db`, maupun project produksi.
 """
 
 from __future__ import annotations
@@ -121,10 +121,7 @@ def test_global_settings_still_accepts_global_keys(settings_file):
 # 3. Project Policy tetap project-local & terpisah dari file global
 # --------------------------------------------------------------------------- #
 def _policy_file(root: Path) -> Path:
-    p = root / ".aegis" / PERMISSIONS_FILE_NAME
-    if p.exists():
-        return p
-    return root / ".aether" / PERMISSIONS_FILE_NAME
+    return root / ".aegis" / PERMISSIONS_FILE_NAME
 
 
 def test_project_policy_writes_only_project_file(tmp_path):

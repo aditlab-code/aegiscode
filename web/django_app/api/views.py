@@ -1438,7 +1438,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
     async def sse_event_stream():
         try:
             # Kirim comment frame inisial agar Daphne/reverse proxy langsung flush status HTTP 200 dan headers ke client
-            yield ": connected\n\n"
+            yield ": connected\nretry: 1000\n\n"
             async for chunk in stream:
                 yield chunk
         finally:
@@ -1454,7 +1454,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
         sse_event_stream(),
         content_type="text/event-stream",
     )
-    response["Cache-Control"] = "no-cache"
+    response["Cache-Control"] = "no-cache, no-transform"
     response["X-Accel-Buffering"] = "no"
     return response
 

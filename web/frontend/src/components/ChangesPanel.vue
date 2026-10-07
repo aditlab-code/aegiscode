@@ -104,7 +104,6 @@ function isInternalOrIgnored(path) {
   const last = parts[parts.length - 1];
   if (
     first === ".aegis" ||
-    first === ".aether" ||
     first === ".git" ||
     first === ".gemini" ||
     first === ".continue" ||
@@ -113,9 +112,9 @@ function isInternalOrIgnored(path) {
   ) {
     return true;
   }
-  if (first.startsWith(".aegis") || first.startsWith(".aether")) return true;
-  if (last.startsWith(".aegis_tmp_") || last.startsWith(".aether_tmp_") || last.endsWith(".swp")) return true;
-  if (p === "data/aegis.db" || p === "data/aether.db" || p.startsWith("data/aegis.db-") || p.startsWith("data/aether.db-")) return true;
+  if (first.startsWith(".aegis")) return true;
+  if (last.startsWith(".aegis_tmp_") || last.endsWith(".swp")) return true;
+  if (p === "data/aegis.db" || p.startsWith("data/aegis.db-")) return true;
   return false;
 }
 

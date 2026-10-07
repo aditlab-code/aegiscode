@@ -6,7 +6,7 @@
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { AEGIS_VERSION, AETHER_VERSION } from "./version.js";
+import { AEGIS_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
 import AppFooter from "./components/layout/AppFooter.vue";
@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
 
       <AppFooter
         :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
-        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
+        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
         :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
         @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
       />

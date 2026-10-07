@@ -90,7 +90,9 @@ class EventSubscription:
         self._lock = threading.Lock()
         self._callback = self._on_event
         self._last_delivered_seq = 0
-
+        self._replaying = False
+        self._pending_live: list[ExecutionEvent] = []
+        self._started = False
     def _matches(self, event: ExecutionEvent) -> bool:
         """Cek apakah event lolos filter session/task."""
         if self.session_id is not None and event.session_id != self.session_id:
@@ -104,6 +106,10 @@ class EventSubscription:
         with self._lock:
             if self._closed or not self._matches(event):
                 return
+            if self._replaying:
+                if event.sequence > self._last_delivered_seq:
+                    self._pending_live.append(event)
+                return
             if event.sequence <= self._last_delivered_seq:
                 return
             try:
@@ -112,24 +118,68 @@ class EventSubscription:
             except queue.Full:
                 # Bounded: drop event bila subscriber lambat (anti memory leak).
                 pass
-
     def start(self) -> None:
         """Mulai subscription: daftarkan callback ke store dan replay missed events."""
         with self._lock:
+            if self._started or self._closed:
+                return
+            self._started = True
+
+            # Langkah A: Tentukan _last_delivered_seq awal berdasarkan last_event_id
             if self.last_event_id:
                 events = self.store.get_events()
+                matched = False
                 for e in events:
                     if str(e.event_id) == str(self.last_event_id) or str(e.sequence) == str(self.last_event_id):
                         self._last_delivered_seq = max(self._last_delivered_seq, e.sequence)
+                        matched = True
                         break
+                if not matched:
+                    try:
+                        parsed_seq = int(self.last_event_id)
+                        for e in events:
+                            if e.sequence == parsed_seq:
+                                self._last_delivered_seq = max(self._last_delivered_seq, parsed_seq)
+                                matched = True
+                                break
+                    except (ValueError, TypeError):
+                        pass
 
-            self.store.subscribe(self._callback)
-
-            if self._last_delivered_seq > 0 or self.last_event_id:
-                replay_events = self.store.get_events(
+                if not matched and events:
+                    candidate_events = self.store.get_events(
+                        session_id=self.session_id,
+                        task_id=self.task_id,
+                    )
+                    if candidate_events:
+                        self._last_delivered_seq = max(e.sequence for e in candidate_events)
+                    else:
+                        self._last_delivered_seq = max(e.sequence for e in events)
+            else:
+                events = self.store.get_events(
                     session_id=self.session_id,
                     task_id=self.task_id,
                 )
+                if events:
+                    self._last_delivered_seq = max(e.sequence for e in events)
+
+            # Langkah B: Aktifkan flag self._replaying = True
+            self._replaying = True
+            # Langkah C: Daftarkan subscription callback SEBELUM memproses replay
+            self.store.subscribe(self._callback)
+
+        # Langkah D: Ambil snapshot replay events di luar lock
+        replay_events = self.store.get_events(
+            session_id=self.session_id,
+            task_id=self.task_id,
+        )
+        replay_events = sorted(replay_events, key=lambda e: e.sequence)
+
+        with self._lock:
+            try:
+                if self._closed:
+                    return
+
+                # Langkah E: Masukkan seluruh replay event yang memiliki rev.sequence > self._last_delivered_seq
                 for rev in replay_events:
                     if rev.sequence > self._last_delivered_seq:
                         try:
@@ -138,14 +188,29 @@ class EventSubscription:
                         except queue.Full:
                             break
 
+                # Langkah F: Pindahkan seluruh event dari self._pending_live
+                self._pending_live.sort(key=lambda e: e.sequence)
+                for live in self._pending_live:
+                    if live.sequence > self._last_delivered_seq:
+                        try:
+                            self._queue.put_nowait(live)
+                            self._last_delivered_seq = max(self._last_delivered_seq, live.sequence)
+                        except queue.Full:
+                            break
+            finally:
+                # Langkah G: Kosongkan self._pending_live dan nonaktifkan self._replaying
+                self._pending_live.clear()
+                self._replaying = False
+
     def close(self) -> None:
         """Akhiri subscription (unsubscribe dari store). Idempotent."""
         with self._lock:
             if self._closed:
                 return
             self._closed = True
+            self._replaying = False
+            self._pending_live.clear()
         self.store.unsubscribe(self._callback)
-
     @property
     def closed(self) -> bool:
         return self._closed

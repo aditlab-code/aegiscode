@@ -384,11 +384,13 @@
 }
 
 .app-table thead th.th-actions:not([style*="width"]),
+.aegis-table thead th.th-actions:not([style*="width"]),
 .aether-table thead th.th-actions:not([style*="width"]) {
   width: 96px;
 }
 
 .app-table tbody td.td-actions,
+.aegis-table tbody td.td-actions,
 .aether-table tbody td.td-actions {
   text-align: right;
   white-space: nowrap;
@@ -403,12 +405,14 @@
 }
 
 .app-table,
+.aegis-table,
 .aether-table {
   width: 100%;
   border-collapse: collapse;
 }
 
 .app-table thead th,
+.aegis-table thead th,
 .aether-table thead th {
   text-align: left;
   font-size: 10.5px;
@@ -422,6 +426,7 @@
 }
 
 .app-table tbody td,
+.aegis-table tbody td,
 .aether-table tbody td {
   padding: 8px 14px;
   border-bottom: 1px solid var(--border-soft);
@@ -429,21 +434,25 @@
 }
 
 .app-table tbody tr:last-child td,
+.aegis-table tbody tr:last-child td,
 .aether-table tbody tr:last-child td {
   border-bottom: none;
 }
 
 .app-table tbody tr,
+.aegis-table tbody tr,
 .aether-table tbody tr {
   transition: background 0.12s ease;
 }
 
 .app-table tbody tr:hover,
+.aegis-table tbody tr:hover,
 .aether-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.018);
 }
 
 .app-table tbody tr.clickable,
+.aegis-table tbody tr.clickable,
 .aether-table tbody tr.clickable {
   cursor: pointer;
 }

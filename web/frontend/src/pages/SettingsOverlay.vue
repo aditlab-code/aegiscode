@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
       <!-- Header bar (modal & embedded editor tab) -->
       <header class="settings-overlay-header" :class="{ 'header-embedded': embedded }">
         <div class="settings-header-info">
-          <div class="settings-badge aether-badge">Admin</div>
+          <div class="settings-badge aegis-badge">Admin</div>
           <div>
             <h2 class="settings-title">AEGIS Settings &amp; Administration</h2>
             <p v-if="!embedded" class="settings-subtitle">Configure providers, workspaces, task history, and extensions</p>
@@ -331,10 +331,10 @@ onBeforeUnmount(() => {
                 <span class="settings-nav-label">{{ tab.label }}</span>
                 <span v-if="!embedded" class="settings-nav-desc">{{ tab.description }}</span>
               </div>
-              <span v-if="tab.id === 'projects' && projects.length" class="settings-nav-badge aether-badge">
+              <span v-if="tab.id === 'projects' && projects.length" class="settings-nav-badge aegis-badge">
                 {{ projects.length }}
               </span>
-              <span v-else-if="tab.id === 'history' && taskHistory.length" class="settings-nav-badge aether-badge">
+              <span v-else-if="tab.id === 'history' && taskHistory.length" class="settings-nav-badge aegis-badge">
                 {{ taskHistory.length }}
               </span>
             </button>
@@ -388,7 +388,7 @@ onBeforeUnmount(() => {
               <div v-if="!projects.length" class="panel-body">
                 <div class="wb-empty">No projects yet.</div>
               </div>
-              <table v-else class="aether-table">
+              <table v-else class="aegis-table app-table">
                 <thead>
                   <tr>
                     <th style="width: 34%">Project</th>
@@ -484,7 +484,7 @@ onBeforeUnmount(() => {
                   <div class="hist-group-head">
                     {{ grp.label }} <span class="hist-group-count">({{ grp.items.length }})</span>
                   </div>
-                  <table class="aether-table hist-table">
+                  <table class="aegis-table app-table hist-table">
                     <thead>
                       <tr>
                         <th style="width: 50%">Task</th>

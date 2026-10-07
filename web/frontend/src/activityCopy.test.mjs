@@ -61,7 +61,7 @@ const text = buildAgentActivityCopy({ events, meta });
 
 // Section wajib ada & urutannya benar.
 assert.ok(
-  text.startsWith("AEGIS AGENT ACTIVITY") || text.startsWith("AETHER AGENT ACTIVITY"),
+  text.startsWith("AEGIS AGENT ACTIVITY"),
   "pembuka AEGIS AGENT ACTIVITY"
 );
 const idxAgent = text.indexOf("[AGENT]");

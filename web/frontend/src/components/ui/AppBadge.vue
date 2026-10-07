@@ -22,7 +22,7 @@ defineProps({
 </script>
 
 <template>
-  <span v-if="variant === 'count'" class="aether-badge q-badge"><slot /></span>
+  <span v-if="variant === 'count'" class="aegis-badge aether-badge q-badge"><slot /></span>
   <span v-else-if="variant === 'drawer'" class="drawer-badge"><slot /></span>
   <span v-else-if="variant === 'status'" :class="['status-tag', status ? `status-${status}` : '']">
     <span v-if="dot" class="status-dot">●</span><slot />
@@ -30,5 +30,5 @@ defineProps({
   <span v-else-if="variant === 'chip'" :class="['chip', size === 'sm' ? 'chip-sm' : '', status]">
     <span v-if="dot" class="dot">●</span><slot />
   </span>
-  <span v-else-if="variant === 'seg'" class="seg-badge aether-badge"><slot /></span>
+  <span v-else-if="variant === 'seg'" class="seg-badge aegis-badge aether-badge"><slot /></span>
 </template>

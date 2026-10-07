@@ -12,6 +12,7 @@ save_ui.bat
 __pycache__/
 *.py[cod]
 *$py.class
+*.bak
 *.egg-info/
 .eggs/
 build/
@@ -37,7 +38,7 @@ Thumbs.db
 # Continue local configuration / session data
 .continue/
 
-# Workspace testing terisolasi (BUKAN bagian source AETHER)
+# Workspace testing terisolasi (BUKAN bagian source AegisCode)
 dummy_test/
 
 # User project workspaces

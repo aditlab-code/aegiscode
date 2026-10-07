@@ -744,7 +744,7 @@ export function openEventStream({
       payload = { raw: evt.data };
     }
     if (payload && typeof payload === "object") {
-      if (evt.lastEventId && !payload.lastEventId) {
+      if (evt && evt.lastEventId) {
         payload.lastEventId = evt.lastEventId;
       }
       if (!payload.event_type && evt.type && evt.type !== "message") {

@@ -13,6 +13,7 @@ export function useServerConnection(options = {}) {
   const sseStreamConnected = ref(false);
   const connected = computed(() => gatewayHttpConnected.value && sseStreamConnected.value);
   const lastReceivedEventId = ref("");
+  const lastReceivedSequence = ref(0);
 
   let eventSource = null;
   let stopHealthMonitor = null;
@@ -20,11 +21,16 @@ export function useServerConnection(options = {}) {
   let reconnectAttempt = 0;
   const maxReconnectDelay = 10000;
 
+  function calculateBackoffDelay(attempt) {
+    const baseDelay = Math.min(1000 * Math.pow(2, attempt), maxReconnectDelay);
+    return Math.floor(baseDelay * 0.5 + Math.random() * (baseDelay * 0.5));
+  }
+
   function scheduleReconnect(customOnEvent) {
     if (reconnectTimer) return;
-    // Exponential backoff: 1s, 2s, 4s, 8s, maks 10s
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), maxReconnectDelay);
-    reconnectAttempt += 1;
+    // Exponential backoff dengan blended jitter (50% base + 50% randomized jitter)
+    const delay = calculateBackoffDelay(reconnectAttempt);
+    reconnectAttempt = Math.min(reconnectAttempt + 1, 10);
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       if (gatewayHttpConnected.value && (!eventSource || eventSource.readyState === 2 || !sseStreamConnected.value)) {
@@ -47,13 +53,27 @@ export function useServerConnection(options = {}) {
 
     const onEventHandler = customOnEvent || options.onEvent;
 
+    const handleStreamError = () => {
+      sseStreamConnected.value = false;
+      if (eventSource) {
+        try {
+          eventSource.close();
+        } catch (_) {}
+        eventSource = null;
+      }
+      scheduleReconnect(customOnEvent);
+    };
+
     eventSource = openEventStream({
       lastEventId: lastReceivedEventId.value || null,
       onEvent: (evt) => {
         if (evt && typeof evt === "object") {
-          const evtId = evt.lastEventId || evt.event_id || evt.id;
+          const evtId = evt.lastEventId || evt.event_id || evt.id || (evt.sequence ? String(evt.sequence) : "");
           if (evtId) {
             lastReceivedEventId.value = String(evtId);
+          }
+          if (typeof evt.sequence === "number") {
+            lastReceivedSequence.value = Math.max(lastReceivedSequence.value, evt.sequence);
           }
         }
         if (typeof onEventHandler === "function") {
@@ -64,20 +84,14 @@ export function useServerConnection(options = {}) {
         sseStreamConnected.value = true;
         reconnectAttempt = 0;
       },
-      onError: () => {
-        sseStreamConnected.value = false;
-        scheduleReconnect(customOnEvent);
-      },
+      onError: handleStreamError,
     });
 
     eventSource.onopen = () => {
       sseStreamConnected.value = true;
       reconnectAttempt = 0;
     };
-    eventSource.onerror = () => {
-      sseStreamConnected.value = false;
-      scheduleReconnect(customOnEvent);
-    };
+    eventSource.onerror = handleStreamError;
     return eventSource;
   }
 
@@ -123,8 +137,12 @@ export function useServerConnection(options = {}) {
     sseStreamConnected,
     connected,
     lastReceivedEventId,
+    lastReceivedSequence,
     connectStream,
     startHealthCheck,
     closeConnection,
+    scheduleReconnect,
+    calculateBackoffDelay,
+    getReconnectAttempt: () => reconnectAttempt,
   };
 }

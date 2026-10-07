@@ -34,7 +34,7 @@ from agent_ai.extensions.agent_bridge import (  # noqa: E402
 )
 from agent_ai.tools.registry import build_registry  # noqa: E402
 
-EXT_ID = "aether.playwright"
+EXT_ID = "aegis.playwright"
 PREFIX = EXT_ID + "."
 SAFE_TOOL = EXT_ID + ".session_state_list"
 
@@ -44,7 +44,7 @@ def _loaded():
     assert ensure_agent_extensions_loaded() is True
     manager = get_agent_extension_manager()
     if not manager.registry.exists(EXT_ID):
-        pytest.skip("Extension 'aether.playwright' tidak ter-discover di env ini")
+        pytest.skip("Extension 'aegis.playwright' tidak ter-discover di env ini")
     return manager
 
 

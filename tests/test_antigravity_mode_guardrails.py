@@ -22,7 +22,6 @@ def test_format_antigravity_policy_directive() -> None:
     """Pastikan direktif memuat larangan log dan batas per mode."""
     fast_dir = _format_antigravity_policy_directive("fast")
     assert ".aegis/log/" in fast_dir
-    assert ".aether/log/" in fast_dir
     assert "FAST" in fast_dir
     assert "2-3" in fast_dir
 

@@ -111,7 +111,7 @@ TIMING_LOG = DUMMY_ROOT / "project_map_fresh_timing.jsonl"
 #: Penanda unik di dalam map; TIDAK boleh muncul di context/status LLM.
 MAP_MARKER = "__AETHER_MAP_MARKER_freshness__"
 
-_MAP_DIR = ".aether/map"
+_MAP_DIR = ".aegis/map"
 
 
 def _expect(condition: bool, message: str) -> None:

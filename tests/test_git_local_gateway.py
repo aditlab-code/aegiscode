@@ -66,7 +66,7 @@ def test_git_repository_facade_diff_detail(temp_git_repo):
 
     # 1. Modify hello.py
     hello_file = temp_git_repo / "hello.py"
-    hello_file.write_text("print('hello world')\nprint('welcome to aether')\n", encoding="utf-8")
+    hello_file.write_text("print('hello world')\nprint('welcome to aegis')\n", encoding="utf-8")
 
     # 2. Add an untracked file
     new_file = temp_git_repo / "new_module.py"
@@ -84,9 +84,9 @@ def test_git_repository_facade_diff_detail(temp_git_repo):
     assert diff_hello["path"] == "hello.py"
     assert diff_hello["status"] == "modified"
     assert "print('hello world')" in diff_hello["original"]
-    assert "welcome to aether" not in diff_hello["original"]
-    assert "welcome to aether" in diff_hello["modified"]
-    assert "+print('welcome to aether')" in diff_hello["diff"]
+    assert "welcome to aegis" not in diff_hello["original"]
+    assert "welcome to aegis" in diff_hello["modified"]
+    assert "+print('welcome to aegis')" in diff_hello["diff"]
 
     # diff_detail for untracked file
     diff_new = facade.diff_detail("new_module.py")

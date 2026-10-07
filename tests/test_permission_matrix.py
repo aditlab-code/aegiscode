@@ -268,8 +268,6 @@ def test_new_project_gets_default_matrix_file(tmp_path):
     registry.register(name="New", root=str(root))
 
     path = root / ".aegis" / PERMISSIONS_FILE_NAME
-    if not path.is_file():
-        path = root / ".aether" / PERMISSIONS_FILE_NAME
     assert path.is_file()
     assert json.loads(path.read_text(encoding="utf-8")) == DEFAULT_MATRIX_RULES
 
@@ -291,7 +289,7 @@ def test_existing_project_without_file_uses_default(tmp_path):
 def test_backward_compatible_legacy_mode_scope(tmp_path):
     root = tmp_path / "legacy"
     root.mkdir()
-    path = root / ".aether" / PERMISSIONS_FILE_NAME
+    path = root / ".aegis" / PERMISSIONS_FILE_NAME
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"mode": "deny", "scope": "outside"}), encoding="utf-8")
 

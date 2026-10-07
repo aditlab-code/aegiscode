@@ -1420,15 +1420,46 @@ class AgentRuntime:
             },
         )
 
-        if result.status == RuntimeStatus.COMPLETED:
-            self._emit_event("task_completed", {"result": report_text})
-        elif cancelled:
-            # Event terminal AETHER existing (task_cancelled) supaya Task
-            # History/Agent Activity mengetahui task dihentikan, bukan selesai.
-            self._emit_event("task_cancelled", {"reason": result.error})
-        else:
-            self._emit_event("task_failed", {"error": result.error})
+        task_id = getattr(self, "_current_task_id", None) or (
+            lifecycle.task_id if lifecycle is not None else None
+        )
 
+        has_terminal_event = False
+        if not hasattr(self, "_terminal_emitted_tasks"):
+            self._terminal_emitted_tasks = set()
+
+        if task_id and task_id in self._terminal_emitted_tasks:
+            has_terminal_event = True
+
+        if not has_terminal_event and self.session_store is not None and self.session_id:
+            try:
+                existing_events = self.session_store.get_events(
+                    session_id=self.session_id,
+                    task_id=task_id,
+                )
+                terminal_types = {"task_completed", "task_failed", "task_cancelled"}
+                has_terminal_event = any(
+                    (getattr(e.event_type, "value", str(e.event_type)) in terminal_types)
+                    for e in existing_events
+                )
+            except Exception:
+                has_terminal_event = False
+
+        if not has_terminal_event:
+            if result.status == RuntimeStatus.COMPLETED:
+                self._emit_event("task_completed", {"result": report_text})
+            elif cancelled:
+                # Event terminal AETHER existing (task_cancelled) supaya Task
+                # History/Agent Activity mengetahui task dihentikan, bukan selesai.
+                self._emit_event("task_cancelled", {"reason": result.error})
+            else:
+                error_str = str(result.error or "")
+                is_timeout_err = "timeout" in error_str.lower() or "timed out" in error_str.lower()
+                fail_payload = {"error": result.error}
+                if is_timeout_err:
+                    fail_payload["error_type"] = "timeout"
+                self._emit_event("task_failed", fail_payload)
+                self._terminal_emitted_tasks.add(task_id)
         if lifecycle is None or lifecycle.is_terminal:
             return
         from agent_ai.tasks.models import TaskStatus

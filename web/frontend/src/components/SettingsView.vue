@@ -740,7 +740,7 @@ watch(activeTab, (tab) => {
             >
               Auto
             </button>
-            <button class="btn-aether btn-primary-a" :disabled="busy" @click="submitModel(p)">
+            <button class="btn-aegis btn-primary-a" :disabled="busy" @click="submitModel(p)">
               Add model
             </button>
           </div>

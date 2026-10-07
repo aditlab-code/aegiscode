@@ -40,10 +40,7 @@ def _read(path: Path) -> dict:
 
 
 def _permissions_path(root: Path) -> Path:
-    p = root / ".aegis" / PERMISSIONS_FILE_NAME
-    if p.exists():
-        return p
-    return root / ".aether" / PERMISSIONS_FILE_NAME
+    return root / ".aegis" / PERMISSIONS_FILE_NAME
 
 
 # --------------------------------------------------------------------------- #
@@ -130,7 +127,7 @@ def test_register_new_project_creates_permissions(tmp_path):
     path = _permissions_path(root)
     assert path.is_file(), f"permissions.json harus dibuat di {path}"
     assert _read(path) == DEFAULT_MATRIX_RULES
-    # File berada di root project baru, bukan di workspace AETHER.
+    # File berada di root project baru, bukan di workspace AegisCode.
     assert not (workspace / config.id / PERMISSIONS_FILE_NAME).exists()
 
 

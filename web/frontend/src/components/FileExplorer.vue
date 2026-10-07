@@ -72,13 +72,13 @@ const contextMenu = ref(null);
 const contextOpen = ref(false);
 
 // Nama folder dan berkas internal AegisCode yang disembunyikan dari UI Explorer.
-const HIDDEN_NAMES = new Set([".aegis", ".aether", ".git", ".gemini", ".continue"]);
+const HIDDEN_NAMES = new Set([".aegis", ".git", ".gemini", ".continue"]);
 
 function visibleEntries(list) {
   return (list || []).filter((e) => {
     const name = e?.name || "";
     if (HIDDEN_NAMES.has(name)) return false;
-    if (name.startsWith(".aegis_tmp_") || name.startsWith(".aether_tmp_") || name.endsWith(".swp")) return false;
+    if (name.startsWith(".aegis_tmp_") || name.endsWith(".swp")) return false;
     return true;
   });
 }

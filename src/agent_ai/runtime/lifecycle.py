@@ -97,10 +97,10 @@ class TaskLifecycleManager:
         """Cegah pendaftaran ganda ke scheduler/antrean.
 
         Returns:
-            True jika berhasil di-enqueue untuk pertama kali; False jika sudah pernah di-enqueue.
+            True jika berhasil di-enqueue untuk pertama kali; False jika sudah pernah di-enqueue atau sudah terminal.
         """
         with self._lock:
-            if self._enqueued:
+            if self._enqueued or self._state in TERMINAL_LIFECYCLE_STATES:
                 return False
             self._enqueued = True
             if self._state == TaskLifecycleState.QUEUED.value:

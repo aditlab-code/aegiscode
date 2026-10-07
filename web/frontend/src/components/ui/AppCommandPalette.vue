@@ -138,7 +138,7 @@ onUnmounted(() => {
     <div v-if="modelValue" class="cmd-palette-backdrop" @click.self="close">
       <div class="cmd-palette-modal">
         <div class="cmd-palette-input-wrap">
-          <span class="cmd-palette-mode-pill aether-badge">{{ currentMode === 'files' ? '⌘P Files' : '⌘K Commands' }}</span>
+          <span class="cmd-palette-mode-pill aegis-badge">{{ currentMode === 'files' ? '⌘P Files' : '⌘K Commands' }}</span>
           <input
             ref="inputRef"
             v-model="query"
@@ -172,7 +172,7 @@ onUnmounted(() => {
               </span>
               <span class="cmd-item-title">{{ currentMode === 'files' ? item : item.title }}</span>
             </span>
-            <span v-if="item.shortcut || item.category" class="cmd-item-meta aether-badge">
+            <span v-if="item.shortcut || item.category" class="cmd-item-meta aegis-badge">
               {{ item.shortcut || item.category }}
             </span>
           </li>

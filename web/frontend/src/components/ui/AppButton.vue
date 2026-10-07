@@ -41,7 +41,7 @@ const computedClasses = computed(() => {
   if (props.variant === 'icon') {
     classes.push('icon-btn');
   } else {
-    classes.push('btn-aether');
+    classes.push('btn-aegis', 'btn-aether');
     if (props.variant === 'primary') classes.push('btn-primary', 'btn-primary-a');
     else if (props.variant === 'danger') classes.push('btn-danger', 'btn-danger-a');
     else classes.push('btn-ghost', 'btn-ghost-a');

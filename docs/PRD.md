@@ -69,7 +69,7 @@
 * **On-Device Vector Database**: Menggunakan ekstensi `sqlite-vec` yang tersimpan di direktori kerja (`.aegis/vectors.db`).
 * **Local Embedding Engine**: Ekstraksi embedding otomatis menggunakan `fastembed` tanpa koneksi internet.
 * **Hybrid Search (RRF)**: Menggabungkan hasil pencarian leksikal simbol (`atlas.json`) dan kemiripan vektor kosinus menggunakan algoritma *Reciprocal Rank Fusion*.
-* **Backward-Compatible State Discovery**: Mendeteksi konfigurasi dan basis data dari folder `.aegis/` dan `data/aegis.db`, dengan *fallback* otomatis ke `.aether/` dan `data/aether.db`.
+* **Native State Storage & Auto-Migration**: Menggunakan konfigurasi dan basis data resmi `.aegis/` dan `data/aegis.db`, dilengkapi mekanisme auto-migrasi 1-kali untuk aset legacy.
 
 ### 4.3. Version Control & Human-in-the-Loop (HITL)
 

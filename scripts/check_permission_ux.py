@@ -268,7 +268,7 @@ def _run() -> int:
     root_new = FIX_ROOT / "proj_new"
     root_new.mkdir(parents=True, exist_ok=True)
     proj = service.create_project(name="PolicyUXNew", path=str(root_new))
-    pfile = root_new / ".aether" / "permissions.json"
+    pfile = (root_new / ".aegis" / "permissions.json") if (root_new / ".aegis" / "permissions.json").exists() else (root_new / ".aether" / "permissions.json")
     assert pfile.is_file(), f"permissions.json harus dibuat di {pfile}"
     assert json.loads(pfile.read_text(encoding="utf-8")) == PermissionMatrix.default().to_dict()
     got = client.get(f"/api/projects/{proj['id']}/policy").json()

@@ -86,6 +86,7 @@
 
 /* Badges & Slider Tracks */
 [data-theme="light"] .app-badge,
+[data-theme="light"] .aegis-badge,
 [data-theme="light"] .aether-badge,
 [data-theme="light"] .seg-badge,
 [data-theme="light"] .badge-n,

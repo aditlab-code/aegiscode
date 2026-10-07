@@ -69,7 +69,7 @@ Then: open the printed URL, pick a Project, add a Provider Instance and Model in
 └── data/             # Local settings and SQLite state
 ```
 
-State directory is `.aegis/` with transparent fallback to legacy `.aether/`.
+State directory is canonical `.aegis/` with transparent one-time legacy migration.
 
 ## Roadmap
 

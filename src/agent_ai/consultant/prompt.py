@@ -1,4 +1,4 @@
-"""System prompt AETHER Consultant (provider-agnostic, teks biasa).
+"""System prompt Aegis Consultant (provider-agnostic, teks biasa).
 
 Prompt ini mendefinisikan peran & boundary Consultant. Ia BUKAN planner
 deterministik: LLM tetap bebas menentukan tool, urutan, dan kapan konsultasi
@@ -37,7 +37,7 @@ from agent_ai.consultant.models import (
 def _base_lines() -> List[str]:
     """Bagian prompt yang berlaku untuk SEMUA mode (identitas + boundary)."""
     return [
-        "Anda adalah AETHER Consultant: otak yang MEMAHAMI, MENGINVESTIGASI,",
+        "Anda adalah Aegis Consultant: otak yang MEMAHAMI, MENGINVESTIGASI,",
         "MEMVALIDASI, dan MERENCANAKAN pekerjaan pada sebuah project.",
         "Anda BUKAN Agent eksekutor: Anda TIDAK mengubah source code project.",
         "",

@@ -1967,21 +1967,34 @@ class AgentOrchestrator:
         error_text = _redact_credentials(
             str(last_error) if last_error is not None else ""
         )
+        is_timeout = (
+            isinstance(last_error, (TimeoutError,))
+            or "timeout" in error_type.lower()
+            or "timeout" in error_text.lower()
+            or "timed out" in error_text.lower()
+        )
+        payload = {
+            "provider": provider_name,
+            "model": model_name,
+            "attempts": max_attempts,
+            "error_type": "timeout" if is_timeout else error_type,
+            "error": error_text,
+        }
         emit_event(
             self.event_sink,
             "provider_retry_exhausted",
-            {
-                "provider": provider_name,
-                "model": model_name,
-                "attempts": max_attempts,
-                "error_type": error_type,
-            },
+            payload,
         )
-        loop.fail(
-            f"Provider '{provider_name}' gagal setelah {max_attempts} attempt "
-            f"(1 attempt awal + {max_attempts - 1} retry): "
-            f"{error_type}: {error_text}"
+        fail_msg = (
+            f"Provider '{provider_name}' request timed out after {max_attempts} attempts: {error_type}: {error_text}"
+            if is_timeout
+            else (
+                f"Provider '{provider_name}' gagal setelah {max_attempts} attempt "
+                f"(1 attempt awal + {max_attempts - 1} retry): "
+                f"{error_type}: {error_text}"
+            )
         )
+        loop.fail(fail_msg)
         return None
 
     # ------------------------------------------------------------------ #
@@ -2112,6 +2125,32 @@ class AgentOrchestrator:
                         "agent_reasoning_delta",
                         {"delta": extracted_reasoning, "reasoning": extracted_reasoning},
                     )
+
+                allow_empty = bool(
+                    self.options
+                    and getattr(self.options, "extra", None)
+                    and isinstance(self.options.extra, dict)
+                    and self.options.extra.get("allow_empty_response", False)
+                )
+                if not allow_empty and not (clean_completion or "").strip() and not (extracted_reasoning or "").strip():
+                    provider_name = (
+                        getattr(response, "provider", None)
+                        or getattr(self.provider, "name", "")
+                        or "unknown"
+                    )
+                    emit_event(
+                        self.event_sink,
+                        "provider_malformed_response",
+                        {
+                            "provider": provider_name,
+                            "model": response.model or self._model_name(),
+                            "error": "empty_content_and_tools",
+                            "iteration": loop.iteration,
+                        },
+                    )
+                    loop.fail("Provider menghasilkan respons kosong tanpa konten teks maupun tool call (malformed response).")
+                    break
+
                 loop.finish(result=clean_completion)
                 break
             if truncated:
@@ -2497,6 +2536,32 @@ class AgentOrchestrator:
                         "agent_reasoning_delta",
                         {"delta": extracted_reasoning, "reasoning": extracted_reasoning},
                     )
+
+                allow_empty = bool(
+                    effective_options
+                    and getattr(effective_options, "extra", None)
+                    and isinstance(effective_options.extra, dict)
+                    and effective_options.extra.get("allow_empty_response", False)
+                )
+                if not allow_empty and not (clean_res or "").strip() and not (extracted_reasoning or "").strip():
+                    provider_name = (
+                        getattr(response, "provider", None)
+                        or getattr(self.provider, "name", "")
+                        or "unknown"
+                    )
+                    emit_event(
+                        self.event_sink,
+                        "provider_malformed_response",
+                        {
+                            "provider": provider_name,
+                            "model": response.model or self._model_name(),
+                            "error": "empty_content_and_tools",
+                            "iteration": loop.iteration,
+                        },
+                    )
+                    loop.fail("Provider menghasilkan respons kosong tanpa konten teks maupun tool call (malformed response).")
+                    break
+
                 history.append_assistant_message(content=clean_res)
                 loop.finish(result=clean_res)
                 break

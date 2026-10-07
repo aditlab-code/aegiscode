@@ -141,7 +141,7 @@ def _run(root: Path) -> int:
     print(f"    tool_events: {[ (e['tool'], e['success']) for e in result.tool_events ]}")
 
     # 2) Project Bible updated (store existing, bukan store baru).
-    facts = root / ".aether" / "bible" / "facts.md"
+    facts = (root / ".aegis" / "bible" / "facts.md") if (root / ".aegis" / "bible" / "facts.md").exists() else (root / ".aether" / "bible" / "facts.md")
     assert facts.exists(), "facts.md harus dibuat"
     assert "add(a,b)" in facts.read_text(encoding="utf-8"), "knowledge harus tersimpan di Bible"
     print("[2] Project Bible update OK -> .aether/bible/facts.md")

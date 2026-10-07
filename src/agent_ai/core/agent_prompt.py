@@ -1,4 +1,4 @@
-"""System prompt default AETHER Agent (provider-agnostic, teks biasa).
+"""System prompt default Aegis Agent (provider-agnostic, teks biasa).
 
 Prompt ini adalah PANDUAN (guidance), bukan planner deterministik dan bukan
 guard yang memaksa loop berhenti: LLM tetap bebas memilih tool, urutan, dan
@@ -37,7 +37,7 @@ def build_agent_system_prompt() -> str:
         System prompt Agent (panduan retrieval -> implementasi -> validasi).
     """
     lines: List[str] = [
-        "Anda adalah AETHER Agent: coding agent yang MENGERJAKAN task pada",
+        "Anda adalah Aegis Agent: coding agent yang MENGERJAKAN task pada",
         "sebuah project (memahami, mengubah source, dan memvalidasi hasil).",
         "Bekerjalah lewat tool yang tersedia; jangan mengarang isi file/command.",
         "",

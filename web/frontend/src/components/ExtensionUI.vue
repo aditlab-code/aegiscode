@@ -355,8 +355,8 @@ const panelPlacement = computed(() => {
         <div v-if="formErrors[field.key]" class="ext-ui-err">{{ formErrors[field.key] }}</div>
       </div>
       <div class="ext-ui-actions">
-        <button class="btn-aether btn-primary-a" :disabled="formSubmitting" @click="submitForm">Save</button>
-        <button class="btn-aether btn-ghost-a" @click="emit('close')">Cancel</button>
+        <button class="btn-aegis btn-primary-a" :disabled="formSubmitting" @click="submitForm">Save</button>
+        <button class="btn-aegis btn-ghost-a" @click="emit('close')">Cancel</button>
       </div>
     </div>
 
@@ -459,8 +459,8 @@ const panelPlacement = computed(() => {
             </slot>
           </div>
           <div class="modal-actions">
-            <button class="btn-aether btn-primary-a" @click="emit('action', { id: 'submit' })">Submit</button>
-            <button class="btn-aether btn-ghost-a" @click="closeModal">Close</button>
+            <button class="btn-aegis btn-primary-a" @click="emit('action', { id: 'submit' })">Submit</button>
+            <button class="btn-aegis btn-ghost-a" @click="closeModal">Close</button>
           </div>
         </div>
       </div>
@@ -476,10 +476,10 @@ const panelPlacement = computed(() => {
       </div>
       <div v-else class="wb-empty">Wizard — no steps defined</div>
       <div class="ext-ui-actions">
-        <button class="btn-aether btn-ghost-a" :disabled="wizardStep === 0" @click="wizardPrev">Previous</button>
-        <button v-if="wizardStep < wizardSteps.length - 1" class="btn-aether btn-primary-a" @click="wizardNext">Next</button>
-        <button v-else class="btn-aether btn-primary-a" @click="emit('submit', { wizard: true, step: wizardStep })">Submit</button>
-        <button class="btn-aether btn-ghost-a" @click="emit('close')">Cancel</button>
+        <button class="btn-aegis btn-ghost-a" :disabled="wizardStep === 0" @click="wizardPrev">Previous</button>
+        <button v-if="wizardStep < wizardSteps.length - 1" class="btn-aegis btn-primary-a" @click="wizardNext">Next</button>
+        <button v-else class="btn-aegis btn-primary-a" @click="emit('submit', { wizard: true, step: wizardStep })">Submit</button>
+        <button class="btn-aegis btn-ghost-a" @click="emit('close')">Cancel</button>
       </div>
     </div>
 
@@ -494,7 +494,7 @@ const panelPlacement = computed(() => {
     <!-- ===================== Action (capability reference) ===================== -->
     <div v-else-if="uiType === 'action'" class="ext-ui-action">
       <button
-        class="btn-aether btn-primary-a"
+        class="btn-aegis btn-primary-a"
         @click="emit('action', { id: (contribution && contribution.id) || (effectiveSchema && effectiveSchema.id) || 'action' })"
       >
         {{ title || "Action" }}

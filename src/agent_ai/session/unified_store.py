@@ -1,7 +1,7 @@
 """Penyimpanan persisten SQLite untuk Unified Threaded Session Architecture.
 
 Modul ini mengelola persistensi kanonikal UnifiedSession dan UnifiedTurn
-pada database SQLite global (`data/aegis.db` dengan fallback transparan ke `data/aether.db`).
+pada database SQLite global (`data/aegis.db`).
 Mendukung isolasi per-project, migrasi transparan dari data legacy
 `data/consultant_sessions.json`, dan operasi thread-safe.
 """
@@ -31,7 +31,7 @@ PathLike = Union[str, Path]
 
 
 def default_db_path() -> Path:
-    """Ambil jalur default database global dengan fallback dua arah."""
+    """Ambil jalur default database global AegisCode (data/aegis.db) dengan auto-migrasi legacy 1-kali."""
     try:
         from agent_ai.config.settings import PROJECT_ROOT
 
@@ -42,9 +42,13 @@ def default_db_path() -> Path:
     aegis_db = data_dir / "aegis.db"
     aether_db = data_dir / "aether.db"
     if not aegis_db.exists() and aether_db.exists():
-        return aether_db
+        try:
+            import shutil
+            data_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(aether_db), str(aegis_db))
+        except Exception:
+            return aether_db
     return aegis_db
-
 
 def default_legacy_json_path() -> Path:
     """Ambil jalur file JSON konsultan legacy untuk migrasi."""

@@ -26,7 +26,7 @@ AegisCode decouples decision-making (LLM) from physical action execution (runtim
 
 The LLM remains the autonomous decision-maker. Aegis Agent provides a safe, reproducible, observable execution environment that allows the model to explore codebases, apply edits under strict deterministic guardrails, execute test suites, and self-correct over iterative cycles.
 
-Backward-compatibility notice: For workspace state and intelligence discovery, AegisCode prioritizes `.aegis/` (`.aegis/vectors.db`, `.aegis/bible/`, `.aegis/map/`) and `data/aegis.db`, with automatic fallback to legacy `.aether/` and `data/aether.db`.
+Storage specification: For workspace state and intelligence discovery, AegisCode uses canonical `.aegis/` (`.aegis/vectors.db`, `.aegis/bible/`, `.aegis/map/`) and `data/aegis.db`, with transparent one-time legacy migration for older workspaces.
 
 ## 2. High-Level Subsystems
 
@@ -154,13 +154,13 @@ flowchart TD
     end
 
     subgraph LocalStorage ["Persistent Local Storage"]
-        VEC --> DB[(".aegis/vectors.db / fallback .aether/vectors.db")]
+        VEC --> DB[(".aegis/vectors.db")]
         BF --> DB
     end
 ```
 
 ### 5.2 Storage & Schema Specifications
-The vector database is housed inside `<project_root>/.aegis/vectors.db` (with transparent fallback to `.aether/vectors.db`):
+The vector database is housed inside `<project_root>/.aegis/vectors.db`:
 - **`aegis_chunks`**: Stores code chunk text, structured metadata JSON (file path, symbol name, symbol kind, line span), and raw float32 embedding BLOBs.
 - **`file_fingerprints`**: Tracks `path`, `sha256`, `chunk_count`, and `indexed_at` timestamps for sub-second incremental indexing bypassing unchanged files.
 - **`index_meta`**: Tracks `schema_version` (2.1), active `model_name`, and active `backend` engine. Changing model configuration triggers an automatic full index rebuild.
@@ -209,7 +209,7 @@ graph TD
 
 ## Catatan Tambahan: Discovery State, Eksekusi Task, dan Loop Agent
 
-- **Discovery pengetahuan proyek (3 tingkat)**: Tier 1 `.brain/` (pengetahuan native Antigravity), Tier 2 `.aegis/bible/` (default Aegis), Tier 3 `.aether/bible/` (fallback lama). State workspace memakai `.aegis/` dan `data/aegis.db`, dengan fallback transparan ke `.aether/` dan `data/aether.db`.
+- **Discovery pengetahuan proyek (2 tingkat)**: Tier 1 `.brain/` (pengetahuan native Antigravity), Tier 2 `.aegis/bible/` (standar Aegis). State workspace memakai `.aegis/` dan `data/aegis.db`, dengan auto-migrasi transparan untuk aset legacy.
 - **Mode eksekusi task**: `Queue` menunggu slot serial (FIFO), cocok untuk edit di area yang sama; `Parallel` berjalan langsung berdampingan dengan task lain, cocok untuk area independen. Keduanya tampil di Task Queue global; History adalah arsip log persisten `.aegis/`.
 - **Loop agent**: prompt, task preparation (konteks dan rencana advisory), continuous loop (LLM memutuskan, tool call, observasi), lalu validasi dan laporan. Tidak ada detektor "selesai" heuristik; loop berakhir hanya saat LLM memberi jawaban final tanpa tool call.
 - **Port server**: dibaca dari `data/settings.json` (`port`), fallback `8000`, dan otomatis memakai port bebas berikutnya jika terpakai; dapat ditimpa via `AEGIS_PORT` (atau `AETHER_PORT` lama).

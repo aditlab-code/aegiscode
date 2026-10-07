@@ -67,7 +67,7 @@ def _env_list(key: str, default: list[str]) -> list[str]:
 # ---------------------------------------------------------------------------
 # AEGIS_ENV: "production" | "development" (default development).
 # Production juga dapat ditandai lewat DJANGO_DEBUG=false.
-AEGIS_ENV = (_env("AEGIS_ENV") or "development").lower()
+AEGIS_ENV = (_env("AEGIS_ENV") or _env("AETHER_ENV") or "development").lower()
 IS_PRODUCTION = AEGIS_ENV in ("production", "prod")
 
 # ---------------------------------------------------------------------------

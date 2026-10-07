@@ -1,4 +1,4 @@
-// Versi AETHER untuk tampilan UI — SINGLE SOURCE OF TRUTH `data/version.json`
+// Versi AegisCode untuk tampilan UI — SINGLE SOURCE OF TRUTH `data/version.json`
 // (sumber yang sama dengan footer Workbench di App.vue).
 //
 // Dibaca lewat `import.meta.glob` (Vite), bukan static import, supaya bersifat

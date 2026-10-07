@@ -45,6 +45,7 @@ from agent_ai.projects.registry import (
 from agent_ai.session.store import InMemorySessionStore, SessionStore
 from agent_ai.task.preparation import TaskPreparation
 from agent_ai.tasks.models import new_task_id
+from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
 
 from api.project_store import ProjectStore
 
@@ -2043,14 +2044,25 @@ class GatewayService:
             rec = self._tasks.get(task_id)
             if rec is None:
                 return
+            if task_id in self._cancel_tokens:
+                return
             # Hanya task pending yang dapat dipromosikan; running/done diabaikan.
             if rec.queue_state != "pending":
                 return
             if rec.status in ("completed", "failed", "cancelled"):
                 return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
             rec.queue_state = "running"
+            rec.status = "running"
             token = CancellationToken()
             self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
         run_in_background(lambda: self._execute_task(task_id, token))
 
     # ------------------------------------------------------------------ #
@@ -2067,24 +2079,22 @@ class GatewayService:
             - setelah disable/enable/cancel.
 
         Algoritma (seluruh keputusan di dalam self._lock):
-            1. Bila sudah ada task QUEUE RUNNING -> slot terpakai -> return.
+            1. Bila pumping atau sudah ada task QUEUE RUNNING -> slot terpakai -> return.
             2. Ambil task pending paling awal menurut queue_order (FIFO)
                yang execution_mode == "queue". Task disabled/done/terminal
                otomatis dilewati.
-            3. Tandai slot terpakai (queue_state="running") secara atomic agar
+            3. Tandai slot terpakai (queue_state="running", status="running") secara atomic agar
                task lain tidak bisa mengambil slot yang sama.
             4. Keluar lock, lalu mulai eksekusi (JANGAN tahan lock saat
                TaskExecutor bekerja).
 
-        Re-entrancy dijaga oleh self._pumping; ini hanya mencegah rekursi
-        tak terbatas, bukan sumber kebenaran status slot.
+        Re-entrancy dijaga oleh self._pumping di dalam lock.
         """
-        if self._pumping:
-            return
-
         from api.execution import run_in_background
 
         with self._lock:
+            if self._pumping:
+                return
             # [1] Slot serial HANYA ditempati task QUEUE. Parallel tidak
             #     memblokir slot queue dan tidak dibatasi jumlahnya.
             has_queue_running = any(
@@ -2098,24 +2108,36 @@ class GatewayService:
             if has_queue_running or has_queue_token:
                 return
             # [2] Kandidat: pending QUEUE saja, bukan terminal, queue_order paling awal.
-            candidates = [
-                r
-                for r in self._tasks.values()
-                if r.queue_state == "pending"
-                and r.execution_mode == "queue"
-                and r.status not in ("completed", "failed", "cancelled")
-            ]
+            candidates = []
+            for r in self._tasks.values():
+                if r.queue_state != "pending" or r.execution_mode != "queue":
+                    continue
+                if r.status in ("completed", "failed", "cancelled"):
+                    continue
+                lc = self._task_lifecycles.get(r.task_id)
+                if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                    continue
+                candidates.append(r)
+
             if not candidates:
                 return  # Sistem idle.
             candidate = min(candidates, key=lambda r: (r.queue_order, r.task_id))
             # [3] Ambil slot secara atomic (di dalam lock yang sama).
             candidate.queue_state = "running"
+            candidate.status = "running"
             task_id = candidate.task_id
             # Token cancellation dibuat & didaftarkan SINKRON di sini
             # (sebelum thread jalan) agar Stop selalu menemukan token.
             token = CancellationToken()
             self._cancel_tokens[task_id] = token
             self._pumping = True
+
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and not lc.is_terminal and lc.current_state != TaskLifecycleState.RUNNING.value:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
 
         try:
             # [4] Mulai eksekusi di luar lock.
@@ -2127,6 +2149,7 @@ class GatewayService:
                 rec = self._tasks.get(task_id)
                 if rec is not None and rec.queue_state == "running":
                     rec.queue_state = "pending"
+                    rec.status = "pending"
             raise
         else:
             with self._lock:
@@ -2151,11 +2174,27 @@ class GatewayService:
 
         with self._lock:
             existing = self._tasks.get(task_id)
-            if existing is not None and existing.queue_state == "pending":
-                existing.queue_state = "running"
-        token = CancellationToken()
-        with self._lock:
+            if existing is None:
+                return
+            if task_id in self._cancel_tokens:
+                return
+            if existing.queue_state == "running":
+                return
+            if existing.status in ("completed", "failed", "cancelled"):
+                return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
+            existing.queue_state = "running"
+            existing.status = "running"
+            token = CancellationToken()
             self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
+
         run_in_background(lambda: self._execute_task(task_id, token))
 
     def _execute_task(self, task_id: str, token: CancellationToken) -> None:
@@ -2171,6 +2210,15 @@ class GatewayService:
         AgentRuntime sebagai scheduler: runtime tetap tak tahu soal queue.
         """
         try:
+            with self._lock:
+                rec = self._tasks.get(task_id)
+                lc = self._task_lifecycles.get(task_id)
+                is_terminal = (
+                    (rec is not None and rec.status in ("completed", "failed", "cancelled"))
+                    or (lc is not None and lc.is_terminal)
+                )
+                if token.is_cancelled() or is_terminal:
+                    return
             self._run_task_inner(task_id, token)
         finally:
             # --- Release execution slot (COMPLETED/FAILED/CANCELLED/semua path).
@@ -2183,10 +2231,7 @@ class GatewayService:
                 # Bila runtime crash tanpa pernah mengirim status terminal,
                 # jangan biarkan slot "nyangkut" running selamanya.
                 if rec is not None and rec.queue_state == "running":
-                    if rec.status in ("completed", "failed", "cancelled"):
-                        rec.queue_state = "done"
-                    else:
-                        rec.queue_state = "done"
+                    rec.queue_state = "done"
             # Slot bebas -> scheduler memilih task berikutnya (FIFO).
             self._scheduler_pump()
 
@@ -3280,7 +3325,7 @@ class GatewayService:
 
         # 1) Sinyal kooperatif: Agent loop berhenti di safe boundary.
         if token is not None:
-            token.request("user_requested")
+            token.request("user_cancelled")
         # 1b) Tolak approval PENDING milik task ini agar action tertahan tidak
         #     menggantung (gate menerima DENY -> action dibatalkan segera).
         try:
@@ -3297,23 +3342,28 @@ class GatewayService:
                 manager.cancel_task(reason="user_cancelled")
             except Exception:
                 pass
-        # Pancarkan event terminal kanonik task_cancelled ke session
-        try:
-            self._emit(
-                record.session_id,
-                "task_cancelled",
-                task_id=task_id,
-                payload={"reason": "user_cancelled", "task_id": task_id},
-            )
-        except Exception:
-            pass
-        self._update_task_status(task_id, "cancelled")
-        # Bila task yang dibatalkan BELUM running (tidak ada token), slot tidak
-        # pernah terpakai — tetap pump agar antrian bergerak sesuai urutan.
-        # Bila task sedang running, slot dilepas oleh _execute_task (finally)
-        # setelah cancellation mencapai terminal state.
-        if token is None and self.auto_execute:
-            self._scheduler_pump()
+
+        if token is None:
+            # Task BELUM pernah running (masih antre di queue): pancarkan
+            # event kanonik task_cancelled tepat satu kali dan pump scheduler.
+            try:
+                self._emit(
+                    record.session_id,
+                    "task_cancelled",
+                    task_id=task_id,
+                    payload={"reason": "user_cancelled", "task_id": task_id},
+                )
+            except Exception:
+                pass
+            self._update_task_status(task_id, "cancelled")
+            if self.auto_execute:
+                self._scheduler_pump()
+        else:
+            # Task sedang aktif di background: jangan pancarkan event di sini
+            # agar tidak duplikat dengan event yang dipancarkan saat runtime
+            # mencapai safe boundary. Cukup mutasi status record gateway.
+            self._update_task_status(task_id, "cancelled")
+
         return self.get_task(task_id)
 
     def cancel_all_tasks(self) -> int:

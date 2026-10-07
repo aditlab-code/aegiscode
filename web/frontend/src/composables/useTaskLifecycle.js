@@ -8,7 +8,12 @@
 import { computed, reactive, ref } from "vue";
 import { formatTokens, usageTokens } from "../tokenFormat.js";
 import { isViewedTaskRunning, shouldAdoptSubmittedTask, shouldFollowStartedTask } from "../taskView.js";
-import { isEventForMonitoredTask } from "../services/taskStateReducer.js";
+import {
+  createInitialTaskState,
+  shouldProcessEventIdempotent,
+  resolveSequenceGap,
+  isEventForMonitoredTask,
+} from "../services/taskStateReducer.js";
 import {
   createTask,
   cancelTask,
@@ -43,6 +48,7 @@ export function useTaskLifecycle(options = {}) {
   const llmProviders = options.llmProviders || ref([]);
 
   const task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
+  const taskReducerState = createInitialTaskState();
   const isRunning = computed(() => ["running", "validating", "cancelling"].includes(task.status));
   const stopInProgress = ref(false);
   const runningTaskId = ref("");
@@ -116,6 +122,15 @@ function activateTaskView(info) {
   task.prompt = info.prompt || "";
   task.status = info.status || "idle";
   task.phase = "";
+  taskReducerState.monitoredTaskId = task.id;
+  taskReducerState.lastProcessedSequence = 0;
+  if (taskReducerState.processedEventIds) {
+    taskReducerState.processedEventIds.clear();
+  } else {
+    taskReducerState.processedEventIds = new Set();
+  }
+  taskReducerState.hasSequenceGap = false;
+  taskReducerState.missingSequenceGaps = [];
   runningTaskId.value = info.runningTaskId || (info.status === "running" ? info.id : "");
   activityPhase.value = info.status === "running" ? "planning" : "";
   lifecycleMilestones.value = info.status === "running" ? [0] : [];
@@ -133,8 +148,7 @@ function activateTaskView(info) {
   }
 }
 
-function handleEvent(evt) {
-  if (!evt || !evt.event_type) return;
+function processEventCore(evt) {
   if (evt.event_id) {
     lastReceivedEventId.value = String(evt.event_id);
   } else if (evt.lastEventId) {
@@ -253,6 +267,25 @@ function handleEvent(evt) {
       taskTelemetry.observations += 1;
     }
   }
+}
+
+function handleEvent(evt) {
+  if (!evt || !evt.event_type) return;
+
+  taskReducerState.monitoredTaskId = task.id;
+  if (!shouldProcessEventIdempotent(taskReducerState, evt)) {
+    return;
+  }
+  if (taskReducerState.hasSequenceGap) {
+    console.warn("[TaskLifecycle] SSE sequence gap detected:", taskReducerState.missingSequenceGaps);
+  }
+  processEventCore(evt);
+}
+
+function reconcileSequenceGap(gapEvents) {
+  return resolveSequenceGap(taskReducerState, gapEvents, (gapEvt) => {
+    processEventCore(gapEvt);
+  });
 }
 
   async function syncActiveRunningTask() {
@@ -557,5 +590,7 @@ async function handleOpenReport(taskId) {
     resetTaskState,
     handleViewTask,
     handleOpenReport,
+    taskReducerState,
+    reconcileSequenceGap,
   };
 }

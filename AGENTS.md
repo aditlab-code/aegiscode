@@ -1,7 +1,7 @@
 # AGENTS.md — AegisCode & Asgard Multi-Agent Framework (OMA)
 
 ## 1. Tujuan
-Ekosistem **AegisCode** (Studio & Aegis Agent) dengan orkestrasi **Asgard OMA** untuk Antigravity CLI: Agent Build Hub (6 agen, skills `asgard-*`, hooks RTK), efisiensi token (RTK, Split-Brain < 4.000 token), dan mutu YAGNI (zero-orphan, zero-zombie tree-kill, kompatibilitas `.aegis/` dan `.aether/`).
+Ekosistem **AegisCode** (Studio & Aegis Agent) dengan orkestrasi **Asgard OMA** untuk Antigravity CLI: Agent Build Hub (6 agen, skills `asgard-*`, hooks RTK), efisiensi token (RTK, Split-Brain < 4.000 token), dan mutu YAGNI (zero-orphan, zero-zombie tree-kill, standarisasi murni `.aegis/` dan `data/aegis.db` dengan auto-migrasi legacy).
 
 ## 2. Branch Git (detail: `docs/Gitmaster.md`)
 - `master`: hub pengembangan; satu-satunya tempat `docs/`, `AGENTS.md`, `Roadmap.md`.
@@ -29,7 +29,7 @@ Wajib pakai `rtk`: `rtk rg`, `rtk find`, `rtk read`, `rtk git status/diff/log`, 
 
 ## 5. Pengujian & Stop-Gate
 - Runner: `node:test`/`node:assert` dan `pytest`, tanpa dependensi tambahan.
-- Cakupan wajib: profil `.agents/agents/*/agent.md`, frontmatter `.agents/skills/*/SKILL.md`, validitas `hooks.json` (pemicu `rtk-hook.js`), discovery `.aegis/` dengan fallback `.aether/` (dan `data/aegis.db` / `data/aether.db`), zero-zombie saat sesi ditutup.
+- Cakupan wajib: profil `.agents/agents/*/agent.md`, frontmatter `.agents/skills/*/SKILL.md`, validitas `hooks.json` (pemicu `rtk-hook.js`), integritas runtime `.aegis/` dan `data/aegis.db` (auto-migrasi legacy), zero-zombie saat sesi ditutup.
 - Setiap Stop-Gate penuh atau kegagalan dicatat di `docs/QA/logs/` sesuai `docs/QA/QA_LOGS_RULES.md`.
 - Tugas belum selesai sebelum semua uji lulus (exit code 0); assertion dilarang dimatikan.
 

@@ -159,20 +159,29 @@ class AegisProjectStore:
         self.log_dir = target_dir / LOG_DIR_NAME
         self.response_log_dir = self.log_dir / RESPONSE_LOG_DIR_NAME
 
+        # Auto-migrasi 1-kali dari legacy .aether bila .aegis belum ada
+        self._auto_migrate_legacy_aether()
+
         brain_path = self.root / BRAIN_DIR_NAME
-        aether_path = self.root / ".aether" / BIBLE_DIR_NAME
         aegis_path = target_dir / BIBLE_DIR_NAME
 
         # Layered Discovery untuk Knowledge/Bible:
         # Tier 1 (Antigravity Native / Explicit Brain): <root>/.brain/
         # Tier 2 (Aegis Default): <root>/.aegis/bible/
-        # Tier 3 (Legacy Fallback): <root>/.aether/bible/
         if use_brain or brain_path.exists():
             self.bible_dir = brain_path
-        elif not aegis_path.exists() and aether_path.exists():
-            self.bible_dir = aether_path
         else:
             self.bible_dir = aegis_path
+
+    def _auto_migrate_legacy_aether(self) -> None:
+        """Migrasi otomatis 1-kali jika folder .aether ada namun .aegis belum ada."""
+        legacy_dir = self.root / ".aether"
+        if legacy_dir.exists() and not self.aegis_dir.exists():
+            try:
+                import shutil
+                shutil.copytree(str(legacy_dir), str(self.aegis_dir), dirs_exist_ok=True)
+            except Exception:
+                pass
     def ensure(self) -> bool:
         """Pastikan `.aegis/`, `.aegis/log/`, `.aegis/bible/` ada.
 
@@ -208,7 +217,6 @@ class AegisProjectStore:
         for cand in [
             self.root / BRAIN_DIR_NAME / cat_file,
             self.root / AEGIS_DIR_NAME / BIBLE_DIR_NAME / cat_file,
-            self.root / ".aether" / BIBLE_DIR_NAME / cat_file,
         ]:
             if cand.exists():
                 return cand
@@ -222,7 +230,6 @@ class AegisProjectStore:
         for cand in [
             self.root / BRAIN_DIR_NAME / BIBLE_INDEX_NAME,
             self.root / AEGIS_DIR_NAME / BIBLE_DIR_NAME / BIBLE_INDEX_NAME,
-            self.root / ".aether" / BIBLE_DIR_NAME / BIBLE_INDEX_NAME,
         ]:
             if cand.exists():
                 return cand

@@ -40,7 +40,7 @@ Seluruh agen dan pengembang diwajibkan menggunakan utilitas `rtk` untuk operasi 
 3. **Cakupan Pengujian Wajib**:
    - Integritas berkas metadata agen dan frontmatter YAML skill.
    - Validitas sintaksis skrip bash dan hook JSON.
-   - Deteksi kompatibilitas mundur jalur `.aegis/` dan `.aether/`.
+   - Standarisasi native runtime jalur `.aegis/` dan basis data `data/aegis.db` dengan auto-migrasi legacy 1-kali.
    - Verifikasi kebersihan proses (*zero-zombie process verification*).
 4. **Pencegahan Flakiness & Isolasi State**:
    - Dilarang keras menggunakan `time.sleep()` statis dalam pengujian async/subprocess. Wajib menggunakan predikat *polling assertion* dengan batas waktu (*deadline timeout*).
@@ -63,17 +63,16 @@ Seluruh agen dan pengembang diwajibkan menggunakan utilitas `rtk` untuk operasi 
 
 ---
 
-## 5. Kompatibilitas Mundur & State Discovery
+## 5. Standarisasi Runtime State & Auto-Migrasi Legacy
 
-Repositori menerapkan strategi penemuan status dua arah:
+Repositori menerapkan penyimpanan status kanonikal murni Aegis:
 1. **Penyimpanan State Ruang Kerja**:
-   - Prioritas Utama: `.aegis/` (misal: `.aegis/vectors.db`, `.aegis/map/`).
-   - Fallback Transparan: `.aether/`.
-2. **Database Konfigurasi**:
-   - Prioritas Utama: `data/aegis.db`.
-   - Fallback Transparan: `data/aether.db`.
-3. Seluruh pembacaan konfigurasi harus memeriksa keberadaan berkas `.aegis` terlebih dahulu sebelum mengakses `.aether`.
-
+   - Direktori Kanonikal: `.aegis/` (misal: `.aegis/bible/`, `.aegis/log/`, `.aegis/map/`).
+   - Auto-Migrasi 1-Kali: Bila ditemukan direktori legacy `.aether/` pada root proyek tanpa adanya `.aegis/`, runtime secara otomatis menyalin/memindahkan konten ke `.aegis/`.
+2. **Database Konfigurasi & Sesi**:
+   - Database Kanonikal: `data/aegis.db`.
+   - Auto-Migrasi 1-Kali: Bila ditemukan `data/aether.db` tanpa `data/aegis.db`, runtime menyalin basis data legacy ke `data/aegis.db`.
+3. Seluruh runtime dan pengujian membaca langsung dari jalur kanonikal `.aegis/` dan `data/aegis.db`.
 ---
 
 ## 6. Regulasi Cabang Git (Branch Regulations)

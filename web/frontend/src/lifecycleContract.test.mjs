@@ -109,4 +109,29 @@ test("LIFECYCLE-02: Global event stream isolation across tasks", () => {
   assert.equal(isEventForMonitoredTask(state, systemEvent), true);
 });
 
+test("LIFECYCLE-03: Switching monitored task resets sequence and allows independent numbering", () => {
+  const state = createInitialTaskState();
+  state.monitoredTaskId = "task-alpha";
+
+  const evtA1 = { event_id: "evt-a1", sequence: 1, task_id: "task-alpha", event_type: "task_started" };
+  const evtA2 = { event_id: "evt-a2", sequence: 2, task_id: "task-alpha", event_type: "tool_called" };
+  assert.equal(shouldProcessEventIdempotent(state, evtA1), true);
+  assert.equal(shouldProcessEventIdempotent(state, evtA2), true);
+  assert.equal(state.lastProcessedSequence, 2);
+
+  // Pengguna beralih ke task baru (task-beta): reset sequence dan processedEventIds
+  state.monitoredTaskId = "task-beta";
+  state.lastProcessedSequence = 0;
+  state.processedEventIds.clear();
+  state.hasSequenceGap = false;
+  state.missingSequenceGaps = [];
+
+  // Task baru memulai sequence dari 1 lagi tanpa ditolak sebagai duplikat
+  const evtB1 = { event_id: "evt-b1", sequence: 1, task_id: "task-beta", event_type: "task_started" };
+  assert.equal(shouldProcessEventIdempotent(state, evtB1), true);
+  assert.equal(state.lastProcessedSequence, 1);
+  assert.equal(state.processedEventIds.has("evt-b1"), true);
+  assert.equal(state.processedEventIds.has("evt-a1"), false);
+});
+
 console.log("[OK] Lifecycle & Event Contract tests passed!");

@@ -121,8 +121,8 @@ def _format_antigravity_policy_directive(mode: str) -> str:
 
     rules = [
         "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
-        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
-        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
+        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/' or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
+        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .brain/).",
         "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
         "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
         "5. NO REPETITIVE SEARCH QUERIES: Do NOT repeat identical search queries or list directory calls. If a search yields 0 results, do not repeat with minor variations; adjust your strategy or proceed with implementation.",

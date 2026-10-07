@@ -1,10 +1,10 @@
 <script setup>
-// AETHER Consultant chat.
+// Aegis Consultant chat.
 //
 // Consultant = reasoning layer (Project Intelligence + Investigation +
 // Validation + Recommendation + Task Generator) yang TERPISAH dari Agent.
 // Frontend ini TIPIS: hanya memanggil endpoint Consultant di Gateway; seluruh
-// reasoning/tool/boundary/bible dijalankan backend memakai substem AETHER yang
+// reasoning/tool/boundary/bible dijalankan backend memakai subsistem Aegis yang
 // sudah ada. Task Proposal yang dihasilkan dapat dikirim ke Agent lewat alur
 // task existing (emit "run-task" -> App membuat task).
 import { computed, nextTick, onMounted, ref, watch } from "vue";
@@ -530,7 +530,7 @@ const {
   seedHistory,
   closePopover,
 } = usePromptAutocomplete({
-  storageKey: "aether_consultant_prompt_history",
+  storageKey: "aegis_consultant_prompt_history",
   onUpdateText: (val) => {
     input.value = val;
     nextTick(autoGrow);
@@ -1042,7 +1042,7 @@ onMounted(() => {
               </div>
               <div v-else class="cp-runner-embedded">
                 <span class="badge-dot">●</span>
-                <span class="badge-brand">Aether</span>
+                <span class="badge-brand">Aegis</span>
                 <span v-if="displayModel || displayProvider" class="badge-sep">·</span>
                 <span v-if="displayModel || displayProvider" class="badge-model">{{ displayModel || displayProvider }}</span>
               </div>

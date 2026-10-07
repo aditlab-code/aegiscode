@@ -29,7 +29,7 @@ Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan 
 | :--- | :--- | :---: |
 | Legacy (Phase 0-2.2) | Provider Antigravity, UI Git Facade, Hybrid RAG | Selesai (diarsipkan) |
 | Fase 0 | Baseline dan freeze arsitektur | Selesai |
-| Fase 1 | Lifecycle task dan kontrak event kanonik | Prioritas Utama |
+| Fase 1 | Lifecycle task dan kontrak event kanonik | Selesai |
 | Fase 2 | Modularisasi orchestrator/runtime | Prioritas Lanjutan |
 | Fase 3 | Normalisasi boundary provider | Sedang Berjalan |
 | Fase 4 | Reliability gate dan Triple-Gate QA | Direncanakan |
@@ -67,13 +67,13 @@ Model event minimum: `event_id`, `task_id`, `session_id`, `sequence`, `type` (re
 - [x] Reducer idempotent di backend dan frontend; validasi duplicate dan gap sequence (`taskStateReducer.js` deteksi/resolve missing sequence gap, `store.py` append idempotent).
 - [x] Queue, Activity, History, dan Reasoning view diproyeksikan dari event yang sama; tanpa parsing JSON provider per view.
 - [x] History dibentuk dari state terminal task/session; aksi CRUD in-situ (rename & delete history di sidebar kiri setara Threads) terintegrasi secara persisten (`.aegis/log/`, backend PATCH/DELETE endpoint, in-memory state); queue tidak bergantung polling tidak konsisten.
-- [ ] Task tidak masuk scheduler dua kali; pembatalan berhenti pada safe boundary; timeout, retry, malformed response, dan tool error menghasilkan status terminal jelas.
-- [ ] Ketahanan SSE: exponential backoff, sinkronisasi `last_event_id`, tanpa event hilang atau ganda.
-- [ ] Stabilitas PTY: penutupan socket saat ganti proyek, tanpa deadlock.
-- [ ] Integritas data: `data/aegis.db` dengan fallback `data/aether.db`, idempotensi indexer SHA-256, isolasi cache multi-proyek, `FileWriteLock`.
+- [x] Task tidak masuk scheduler dua kali; pembatalan berhenti pada safe boundary; timeout, retry, malformed response, dan tool error menghasilkan status terminal jelas (atomic scheduler pump guard, deduplikasi cancel token & terminal events, deteksi respons kosong malformed, error_type timeout terstruktur).
+- [x] Ketahanan SSE: exponential backoff dengan blended jitter, sinkronisasi `last_event_id`, frame `retry: 1000`, atomic replay & live buffering tanpa event hilang atau ganda (`streaming.py`, `views.py`, `useServerConnection.js`, `useTaskLifecycle.js`).
+- [x] Stabilitas PTY: penutupan socket saat ganti proyek, tanpa deadlock (idempotensi thread-safe, tree-kill proses anak rekursif, async non-blocking teardown, isolasi socket frontend).
+- [x] Integritas data: standarisasi murni `data/aegis.db` (auto-migrasi legacy `data/aether.db`), idempotensi indexer SHA-256 (`file_fingerprints`), isolasi cache multi-proyek (`workspaceIsolation`), dan `FileWriteLock` thread-safe.
 
-Berkas terkait: `src/agent_ai/runtime/lifecycle.py`, `src/agent_ai/runtime/events/`, `src/agent_ai/terminal/pty_service.py`, `web/frontend/src/composables/useWorkbenchLiveEvents.js`, `web/frontend/src/services/api.js`.
-Pengujian: `tests/test_milestone2_session_events.py`, `tests/test_cancel_task_disk_log.py`, `tests/test_pty_cleanup.py`, `tests/test_aegis_fallback.py`, `web/frontend/src/sseGapAndTelemetry.test.mjs`, `web/frontend/src/workspaceIsolation.test.mjs`.
+Berkas terkait: `src/agent_ai/runtime/lifecycle.py`, `src/agent_ai/core/orchestrator.py`, `web/django_app/api/services.py`, `web/django_app/api/execution.py`, `src/agent_ai/runtime/events/`, `src/agent_ai/terminal/pty_service.py`, `web/frontend/src/composables/useWorkbenchLiveEvents.js`, `web/frontend/src/services/api.js`.
+Pengujian: `tests/test_file_write_lock.py`, `tests/test_sse_gap_recovery.py`, `tests/test_scheduler_lifecycle_boundaries.py`, `tests/test_lifecycle_idempotency.py`, `tests/test_provider_retry_lifecycle.py`, `tests/test_milestone2_session_events.py`, `tests/test_cancel_task_disk_log.py`, `tests/test_pty_cleanup.py`, `tests/test_aegis_fallback.py`, `tests/test_sqlite_vec_store.py`, `web/frontend/src/sseGapAndTelemetry.test.mjs`, `web/frontend/src/workspaceIsolation.test.mjs`.
 
 ## 5. Fase 2: Modularisasi Orchestrator & Runtime
 
