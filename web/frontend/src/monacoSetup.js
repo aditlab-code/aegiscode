@@ -163,6 +163,32 @@ export function getMonaco() {
       });
     }
 
+    if (monaco.languages && monaco.languages.typescript) {
+      const tsDefaults = monaco.languages.typescript.typescriptDefaults;
+      const jsDefaults = monaco.languages.typescript.javascriptDefaults;
+      if (tsDefaults) {
+        tsDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+          noSyntaxValidation: true,
+          noSuggestionDiagnostics: true,
+        });
+        if (tsDefaults.setCompilerOptions) {
+          tsDefaults.setCompilerOptions({
+            jsx: (monaco.languages.typescript.JsxEmit && monaco.languages.typescript.JsxEmit.ReactJSX) || 4,
+            allowNonTsExtensions: true,
+            target: (monaco.languages.typescript.ScriptTarget && monaco.languages.typescript.ScriptTarget.Latest) || 99,
+          });
+        }
+      }
+      if (jsDefaults) {
+        jsDefaults.setDiagnosticsOptions({
+          noSemanticValidation: true,
+          noSyntaxValidation: true,
+          noSuggestionDiagnostics: true,
+        });
+      }
+    }
+
     if (monaco.languages && !monaco.languages.getLanguages().some((l) => l.id === "gitignore")) {
       monaco.languages.register({ id: "gitignore" });
       monaco.languages.setMonarchTokensProvider("gitignore", {

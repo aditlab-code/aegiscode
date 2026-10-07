@@ -487,9 +487,14 @@ const effectiveConsultantProps = computed(() => {
 // 2. Editor Diagnostics & Multi-Tab State (via useWorkbenchTabs)
 const activeEditorMarkers = ref([]);
 const activeEditorSyntaxErrors = ref([]);
+const activeEditorLinterDiagnostics = ref([]);
 
 const activeEditorDiagnostics = computed(() => {
-  const merged = [...activeEditorMarkers.value, ...activeEditorSyntaxErrors.value];
+  const merged = [
+    ...activeEditorMarkers.value,
+    ...activeEditorSyntaxErrors.value,
+    ...activeEditorLinterDiagnostics.value,
+  ];
   const seen = new Set();
   const unique = [];
   for (const d of merged) {
@@ -1031,9 +1036,30 @@ function onSyntaxChange(payload) {
   }
 }
 
+function onDiagnosticsUpdated(payload) {
+  if (payload?.diagnostics) {
+    activeEditorLinterDiagnostics.value = payload.diagnostics.map((d) => ({
+      id: `lint-${d.file}-${d.line}-${d.col}-${Date.now()}`,
+      text: d.message,
+      type: d.severity === "error" ? "error" : (d.severity === "warning" ? "lint" : "info"),
+      severity: d.severity,
+      label: d.severity === "error" ? "Lint Error" : "Lint / Warning",
+      file: d.file,
+      line: d.line,
+      col: d.col,
+      endLine: d.end_line,
+      endCol: d.end_col,
+      source: d.source || "aegis-linter",
+      ruleId: d.rule_id,
+      ts: Date.now(),
+    }));
+  }
+}
+
 watch(activeTabPath, () => {
   activeEditorMarkers.value = [];
   activeEditorSyntaxErrors.value = [];
+  activeEditorLinterDiagnostics.value = [];
 });
 
 async function handleNavigateToLocation(loc) {
@@ -1860,6 +1886,7 @@ defineExpose({
                   v-else-if="pane1ActiveTabPath"
                   ref="activeCodeEditorRef"
                   :path="pane1ActiveTabPath"
+                  :project-id="activeProject?.id || ''"
                   instance-id="primary"
                   embedded
                   @saved="(e) => onEditorSaved(e, 'pane1')"
@@ -1867,6 +1894,7 @@ defineExpose({
                   @cursor-change="onCursorChange"
                   @markers-change="onMarkersChange"
                   @syntax-change="onSyntaxChange"
+                  @diagnostics-updated="onDiagnosticsUpdated"
                   @error="onEditorError"
                   @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
                 />
@@ -2091,6 +2119,7 @@ defineExpose({
                   v-else-if="pane2ActiveTabPath"
                   ref="splitCodeEditorRef"
                   :path="pane2ActiveTabPath"
+                  :project-id="activeProject?.id || ''"
                   instance-id="split"
                   embedded
                   @saved="(e) => onEditorSaved(e, 'pane2')"
@@ -2098,6 +2127,7 @@ defineExpose({
                   @cursor-change="onCursorChange"
                   @markers-change="onMarkersChange"
                   @syntax-change="onSyntaxChange"
+                  @diagnostics-updated="onDiagnosticsUpdated"
                   @error="onEditorError"
                   @close="handleCloseTab(pane2ActiveTabPath, 'pane2')"
                 />
@@ -2129,6 +2159,7 @@ defineExpose({
             v-else-if="pane1ActiveTabPath"
             ref="activeCodeEditorRef"
             :path="pane1ActiveTabPath"
+            :project-id="activeProject?.id || ''"
             instance-id="primary"
             embedded
             @saved="(e) => onEditorSaved(e, 'pane1')"
@@ -2136,6 +2167,7 @@ defineExpose({
             @cursor-change="onCursorChange"
             @markers-change="onMarkersChange"
             @syntax-change="onSyntaxChange"
+            @diagnostics-updated="onDiagnosticsUpdated"
             @error="onEditorError"
             @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
           />
@@ -2169,7 +2201,7 @@ defineExpose({
                         </div>
                         <div class="brand-text-block">
                           <h1 class="brand-title welcome-title">AegisCode Studio</h1>
-                          <span class="version-tag">v0.2.01</span>
+                          <span class="version-tag">v0.2.05</span>
                         </div>
                       </div>
                       <p class="brand-tagline welcome-project">

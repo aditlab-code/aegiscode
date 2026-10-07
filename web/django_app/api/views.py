@@ -510,6 +510,20 @@ def project_git_deinit(
 @csrf_exempt
 @require_http_methods(["POST"])
 @_handle
+def project_lint(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/lint -> jalankan linter workspace."""
+    body = _parse_json_body(request)
+    file_path = body.get("file_path") or body.get("filePath")
+    scope = body.get("scope", "file")
+    return _json_response(service.lint_project(project_id, target_file=file_path, scope=scope))
+
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
 def open_in_explorer(request: HttpRequest, service: GatewayService) -> JsonResponse:
     """POST /api/open-in-explorer -> buka Windows Explorer pada ACTIVE PROJECT.
 

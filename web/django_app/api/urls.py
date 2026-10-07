@@ -123,6 +123,11 @@ urlpatterns = [
         views.project_policy,
         name="project_policy",
     ),
+    path(
+        "projects/<str:project_id>/lint",
+        views.project_lint,
+        name="project_lint",
+    ),
     path("projects/<str:project_id>", views.delete_project, name="delete_project"),
     path("active-project", views.active_project, name="active_project"),
     path("open-in-explorer", views.open_in_explorer, name="open_in_explorer"),

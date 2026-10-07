@@ -1787,6 +1787,21 @@ class GatewayService:
         }
 
     # ------------------------------------------------------------------ #
+    # Universal Linter Service
+    # ------------------------------------------------------------------ #
+    def lint_project(
+        self,
+        project_id: str,
+        target_file: Optional[str] = None,
+        scope: str = "file",
+    ) -> Dict[str, Any]:
+        """Jalankan linter untuk project berdasarkan project_id."""
+        from api.linter import run_project_lint
+
+        root = self._project_root_by_id(project_id)
+        return run_project_lint(str(root), target_file=target_file, scope=scope)
+
+    # ------------------------------------------------------------------ #
     # Tasks
     # ------------------------------------------------------------------ #
     def _prepare_task_image_parts(

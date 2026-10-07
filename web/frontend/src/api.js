@@ -833,3 +833,16 @@ export function postAuthLogout() {
   });
 }
 
+// --- Universal Linter Runner ----------------------------------------------
+export function runProjectLint(projectId, filePath = null, scope = "file") {
+  const payload = { scope };
+  if (filePath) {
+    payload.file_path = filePath;
+  }
+  return request(`/projects/${encodeURIComponent(projectId)}/lint`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+
