@@ -109,22 +109,28 @@ Setiap cabang memiliki gerbang pengujian otomatis yang disesuaikan dengan tujuan
 
 ## 5. Alur Kerja QA & Tata Kelola Multi-Agent
 
-Dalam kerangka orkestrasi multi-agent Oh My Javanese (OMJ), tanggung jawab pengujian dan verifikasi diatur secara tegas:
+Dalam kerangka orkestrasi multi-agent Asgard Multi-Agent Framework (OMA), tanggung jawab pengujian dan verifikasi diatur secara tegas:
 
 ```mermaid
 flowchart TD
-    A["Implementasi Kode (arjuna-coder)"] --> B["Verifikasi Mandiri Lokal (Unit Test)"]
-    B --> C["Serah Terima ke werkudara-tester (Independent QA)"]
-    C --> D{"Gerbang Pengujian Werkudara"}
+    A["Implementasi Kode (brokkr-coder)"] --> B["Verifikasi Mandiri Lokal (Unit Test)"]
+    B --> C["Serah Terima ke thor-tester (Independent QA)"]
+    C --> D{"Gerbang Pengujian Thor"}
     D -- "Gagal / Flaky" --> E["Isolasi Minimal Kasus Uji & Defect Report"]
     E --> A
-    D -- "100% Lolos (Exit Code 0)" --> F["Audit Standar & Bash (widura-auditor)"]
+    D -- "100% Lolos (Exit Code 0)" --> F["Audit Standar & Bash (forseti-auditor)"]
     F --> G{"Audit Lolos?"}
     G -- "Tidak" --> A
-    G -- "Ya" --> H["Validasi Integrasi Selesai (semar-orchestrator)"]
+    G -- "Ya" --> H["Validasi Integrasi Selesai (odin-orchestrator)"]
 ```
 
-### 4 Aturan Baku Stop-Gate Werkudara (Independent QA)
+### 5.1 Mekanisme QA Agen Independen (Zero Self-Grading)
+1. **Isolasi Penuh Eksekutor**: Verifikasi stop-gate wajib didelegasikan ke sub-agent independen `thor-tester` melalui `invoke_subagent`. Agen pengembang (`brokkr-coder`) dilarang keras mengesahkan kodenya sendiri (*zero self-grading*).
+2. **Pemisahan Hak Akses**: `thor-tester` hanya beroperasi dengan hak akses `independent-qa` (`run_command`, `view_file`) dan dilarang memiliki akses manipulasi berkas kode (`write_to_file`, `replace_file_content`).
+3. **Pemisahan Tanggung Jawab Remediasi**: Jika terjadi kegagalan atau galat uji, `thor-tester` dilarang menyunting kode untuk memperbaiki masalah; penguji wajib mencatat log kegagalan di `docs/QA/logs/` dan menolak stop-gate hingga perbaikan dieksekusi oleh `brokkr-coder`.
+4. **Kemandirian Keputusan**: Gerbang pengujian memiliki hak veto mutlak terhadap integrasi commit; tidak ada bypass tanpa hasil eksekusi 100% hijau.
+
+### 4 Aturan Baku Stop-Gate Thor (Independent QA)
 1. **Aturan 1 (Zero Failure Tolerance)**: Seluruh pengujian wajib lulus dengan kode keluar 0 (*exit code 0*).
 2. **Aturan 2 (Larangan Mematikan Uji)**: Dilarang mematikan *assertion*, menambahkan `@pytest.mark.skip`, atau mengabaikan galat tanpa persetujuan arsitek.
 3. **Aturan 3 (Kemampuan Acak / Random Execution)**: Pengujian harus lulus secara konsisten meskipun urutan eksekusinya diacak.

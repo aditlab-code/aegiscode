@@ -1,6 +1,6 @@
 # Pedoman & Aturan Baku Pencatatan Log QA (QA Logs Protocol)
 
-Dokumen ini menetapkan aturan standar pencatatan riwayat pengujian (*QA Logging Rules*) untuk seluruh pengembang dan sub-agent otonom (khususnya `werkudara-tester` dan `semar-orchestrator`) di repositori **AegisCode**.
+Dokumen ini menetapkan aturan standar pencatatan riwayat pengujian (*QA Logging Rules*) untuk seluruh pengembang dan sub-agent otonom (khususnya `thor-tester` dan `odin-orchestrator`) di repositori **AegisCode**.
 
 ---
 
@@ -40,7 +40,7 @@ Setiap berkas log QA **wajib** mengikuti struktur format di bawah ini:
 # QA Test Run Log: [Lingkup Pengujian]
 
 - **Waktu Eksekusi**: YYYY-MM-DD HH:mm:ss (Zona Waktu)
-- **Eksekutor**: [werkudara-tester | semar-orchestrator | Developer]
+- **Eksekutor**: [thor-tester | odin-orchestrator | Developer]
 - **Branch / Commit**: master @ [commit-hash-pendek]
 - **Runner**: [pytest | node:test | vitest | playwright]
 - **Status Akhir**: [PASS (Exit Code 0) | FAIL (Exit Code 1)]
@@ -80,8 +80,8 @@ Jika ada pengujian yang gagal, cantumkan tabel kegagalan secara spesifik:
 
 ## 4. Aturan Penegakan untuk Sub-Agent (Kepatuhan AGENTS.md)
 
-1. **Kewajiban Werkudara (Step 4)**:
-   - Sebelum tugas diserahkan kembali kepada `semar-orchestrator`, `werkudara-tester` wajib membuat atau memperbarui berkas log QA di `docs/QA/logs/` jika terjadi kegagalan atau jika menjalankan verifikasi stop-gate penuh.
+1. **Kewajiban Thor (Step 4)**:
+   - Sebelum tugas diserahkan kembali kepada `odin-orchestrator`, `thor-tester` wajib membuat atau memperbarui berkas log QA di `docs/QA/logs/` jika terjadi kegagalan atau jika menjalankan verifikasi stop-gate penuh.
    - Ringkasan format 4-kotak pada kotak `[Stop-Gate]` **wajib** mencantumkan tautan ke berkas log yang bersangkutan.
 2. **Larangan Emoji & Bahasa Daerah**:
    - Seluruh teks log wajib menggunakan Bahasa Indonesia baku, tanpa emoji, dan tanpa kosakata bahasa Jawa.

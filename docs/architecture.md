@@ -190,11 +190,11 @@ graph TD
         Contract --> Unit
     end
 
-    subgraph Governance ["Independent Stop-Gate Governance (OMJ)"]
-        Arjuna["arjuna-coder (Implementation)"] --> Werkudara["werkudara-tester (Independent Stop-Gate)"]
-        Werkudara -->|"Failure Log"| QALog[("docs/QA/logs/ Registry")]
-        Werkudara -->|"Pass (Exit Code 0)"| Widura["widura-auditor (Bash & Security Audit)"]
-        Widura --> Semar["semar-orchestrator (Merge Approval)"]
+    subgraph Governance ["Independent Stop-Gate Governance (Asgard / OMA)"]
+        Brokkr["brokkr-coder (Implementation)"] --> Thor["thor-tester (Independent Stop-Gate)"]
+        Thor -->|"Failure Log"| QALog[("docs/QA/logs/ Registry")]
+        Thor -->|"Pass (Exit Code 0)"| Forseti["forseti-auditor (Bash & Security Audit)"]
+        Forseti --> Odin["odin-orchestrator (Merge Approval)"]
     end
 ```
 

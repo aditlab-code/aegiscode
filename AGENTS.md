@@ -1,11 +1,11 @@
-# AGENTS.md — AegisCode & Oh My Javanese (OMJ) Operational Guide
+# AGENTS.md — AegisCode & Asgard Multi-Agent Framework (OMA) Operational Guide
 
 ## 1. Project Purpose
 
-Repository ini adalah ekosistem pengembangan **AegisCode** (AegisCode Studio & Aegis Agent) dengan kerangka orkestrasi multi-agent **Oh My Javanese (OMJ)** untuk Google Antigravity CLI dengan tiga tujuan utama:
-- **Agent Build Hub**: Mengelola 6 wayang, skills, rules, dan PreToolUse hooks berbasis RTK.
+Repository ini adalah ekosistem pengembangan **AegisCode** (AegisCode Studio & Aegis Agent) dengan kerangka orkestrasi multi-agent **Asgard Multi-Agent Framework (OMA)** untuk Google Antigravity CLI dengan tiga tujuan utama:
+- **Agent Build Hub**: Mengelola 6 peran agen Asgard (Odin, Heimdall, Mimir, Forseti, Brokkr, Thor), skills (`asgard-*`), rules, dan PreToolUse hooks berbasis RTK.
 - **Efisiensi Token**: Memanfaatkan Rust Token Killer (RTK) dan arsitektur Asymmetric Split-Brain (< 4.000 tokens) untuk meminimalkan beban konteks LLM.
-- **Mutu & YAGNI**: Zero-orphan code, tanpa pustaka berlebih, zero-zombie process tree kill, backward-compatibility `.aegis/` dan `.aether/`, serta pengujian berstandar strict stop-gate.
+- **Mutu & YAGNI**: Zero-orphan code, tanpa pustaka berlebih, zero-zombie process tree kill, backward-compatibility `.aegis/` dan `.aether/`, serta pengujian berstandar strict stop-gate palu Thor.
 ---
 
 ## 2. Strategi dan Regulasi Branch Git (Khusus Branch 'master')
@@ -32,38 +32,38 @@ Repositori ini beroperasi di bawah arsitektur tiga cabang (tri-branch) dengan pe
 ---
 
 ## 3. Framework Multi-Agent
-
-Antigravity bertindak sebagai **`semar-orchestrator`** (Lead Orchestrator), mengendalikan sub-agents via PreToolUse Hooks (`.agents/hooks.json`, `~/.gemini/hooks.json`).
+ 
+Antigravity bertindak sebagai **`odin-orchestrator`** (Lead Orchestrator), mengendalikan sub-agents via PreToolUse Hooks (`.agents/hooks.json`, `~/.gemini/hooks.json`).
 
 ### Alur Kerja 4 Tahap:
 | Step | Agen | Aksi |
 |------|------|------|
-| 1 | `semar-orchestrator` | Terima input, review murni (tanpa edit kode), tentukan mode operasi |
-| 2 | `hanoman-scout`, `kresna-architect`, `widura-auditor` | AST scan, susun TODO/arsitektur, audit & verifikasi bash |
-| 3 | `hanoman-scout`, `arjuna-coder` | Konfirmasi simbol, implementasi kode berdasarkan TODO |
-| 4 | `werkudara-tester` | Stop-gate independen 100% hijau, penegakan 4 aturan QA |
+| 1 | `odin-orchestrator` | Terima input, review murni (tanpa edit kode), tentukan mode operasi |
+| 2 | `heimdall-scout`, `mimir-architect`, `forseti-auditor` | AST scan, susun TODO/arsitektur, audit & verifikasi bash |
+| 3 | `heimdall-scout`, `brokkr-coder` | Konfirmasi simbol, implementasi kode berdasarkan TODO |
+| 4 | `thor-tester` | Stop-gate independen 100% hijau, penegakan 4 aturan QA |
 
-### Roster 6 Kesatria & Hak Akses:
-| Kesatria | Peran (Step) | Hak Akses | Tools Diizinkan |
-|----------|-------------|-----------|-----------------|
-| `semar-orchestrator` | Lead Orchestrator (1) | `review-only` | `invoke_subagent`, `send_message`, `manage_subagents`, `ask_question` |
-| `hanoman-scout` | Fast AST Scout (2 & 3) | `review-only` | `view_file`, `search_web`, `read_url_content`, `codegraph_query`, `codegraph_find_references` |
-| `kresna-architect` | Chief Architect & Planner (2) | `plan-only` | `view_file`, `search_web`, `read_url_content`, `define_subagent` |
-| `widura-auditor` | Hakim Etika & Verifikator Bash (2) | `verification-audit` | `view_file`, `run_command`, `read_verification` |
-| `arjuna-coder` | Lead Artisan Coder (3) | `code-editor` | `write_to_file`, `replace_file_content`, `view_file`, `run_command` |
-| `werkudara-tester` | Independent QA (4) | `independent-qa` | `run_command`, `view_file` |
+### Roster 6 Agen & Hak Akses:
+| Agen | Peran (Step) | Hak Akses | Tools Diizinkan |
+|------|-------------|-----------|-----------------|
+| `odin-orchestrator` | Lead Orchestrator (1) | `review-only` | `invoke_subagent`, `send_message`, `manage_subagents`, `ask_question` |
+| `heimdall-scout` | Fast AST Scout (2 & 3) | `review-only` | `view_file`, `search_web`, `read_url_content`, `codegraph_query`, `codegraph_find_references` |
+| `mimir-architect` | Chief Architect & Planner (2) | `plan-only` | `view_file`, `search_web`, `read_url_content`, `define_subagent` |
+| `forseti-auditor` | Hakim Etika & Verifikator Bash (2) | `verification-audit` | `view_file`, `run_command`, `read_verification` |
+| `brokkr-coder` | Lead Artisan Coder (3) | `code-editor` | `write_to_file`, `replace_file_content`, `view_file`, `run_command` |
+| `thor-tester` | Independent QA (4) | `independent-qa` | `run_command`, `view_file` |
 
-### 4 Mode Operasi (Skills / Paket Kingdom):
+### 4 Mode Operasi (Skills / Paket Asgard):
 | Mode | Skill ID | Alur |
 |------|----------|------|
-| Orkestrator (1-2-3-4) | `javanese-orkestrator` | Semar → Hanoman → Kresna → Widura → Hanoman → Arjuna → Werkudara → Semar |
-| Plan (2) | `javanese-plan` | Hanoman → Kresna → Widura |
-| Eksekutor (3-4) | `javanese-executor` | Hanoman → Arjuna → Werkudara |
-| Independent (4) | `javanese-auditor` | Werkudara |
+| Orkestrator (1-2-3-4) | `asgard-orchestrator` | Odin → Heimdall → Mimir → Forseti → Heimdall → Brokkr → Thor → Odin |
+| Plan (2) | `asgard-plan` | Heimdall → Mimir → Forseti |
+| Eksekutor (3-4) | `asgard-executor` | Heimdall → Brokkr → Thor |
+| Independent (4) | `asgard-auditor` | Thor |
 
 ### Matriks RACI:
-| Fungsi | semar | widura | kresna | hanoman | arjuna | werkudara |
-|--------|-------|--------|--------|---------|--------|-----------|
+| Fungsi | odin | forseti | mimir | heimdall | brokkr | thor |
+|--------|------|---------|-------|----------|--------|------|
 | Dekomposisi Kebutuhan (Step 1) | **A** | C | C | I | I | I |
 | Audit Independen & Etika (Step 2) | C | **R** | I | I | I | C |
 | Desain & Arsitektur (Step 2) | **A** | C | **R** | C | C | I |
@@ -71,7 +71,10 @@ Antigravity bertindak sebagai **`semar-orchestrator`** (Lead Orchestrator), meng
 | Implementasi Kode (Step 3) | **A** | I | C | I | **R** | C |
 | Gerbang Pengujian (Step 4) | **A** | C | I | I | C | **R** |
 
-*A = Accountable, R = Responsible, C = Consulted, I = Informed*
+### Aturan Mutlak Independensi QA (Zero Self-Grading):
+1. **Wajib Agen Terpisah**: Tahap 4 (QA & Stop-Gate) WAJIB didelegasikan ke sub-agent independen `thor-tester` via `invoke_subagent`. Agen pengembang (`brokkr-coder`) dan orchestrator (`odin-orchestrator`) dilarang keras mengesahkan kodenya sendiri tanpa verifikasi independen Thor.
+2. **Isolasi Izin**: `thor-tester` dibatasi murni pada hak akses `independent-qa` (`run_command`, `view_file`) tanpa izin modifikasi berkas (`write_to_file`, `replace_file_content`).
+3. **Larangan Self-Repair**: Jika pengujian gagal, `thor-tester` menolak stop-gate, mencatat log di `docs/QA/logs/`, dan mengembalikan laporan cacat; dilarang memperbaiki kode sendiri.
 
 ---
 
@@ -97,13 +100,12 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
 - **Runner**: Node.js Native (`node:test`, `node:assert`) dan Python (`pytest`) — tanpa dependensi pihak ketiga yang tidak perlu.
 - **Cakupan wajib**:
-  1. Integritas `templates/agents/*.agent.md` (metadata tools valid).
-  2. Kepatuhan `templates/skills/*/SKILL.md` (frontmatter YAML valid).
-  3. Validitas `hooks.json` (JSON valid + pemicu `rtk-hook.js` ada).
-  4. Exit code 0 untuk `oh-my-javanese init|verify|uninstall|render`.
-  5. Dukungan state discovery dua arah: `.aegis/` (primer) dengan fallback transparan ke `.aether/`, serta `data/aegis.db` (primer) dengan fallback ke `data/aether.db`.
-  6. Kebersihan proses sistem: zero-zombie process lifecycle pada penutupan sesi.
-  7. Pencatatan QA Logs: Setiap verifikasi Stop-Gate penuh atau kegagalan uji wajib dicatat pada `docs/QA/logs/` mengikuti standar [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
+  1. Integritas profil entitas di `.agents/agents/*/agent.md` (metadata tools dan role valid).
+  2. Integritas alur kerja di `.agents/skills/*/SKILL.md` (frontmatter YAML valid).
+  3. Validitas `hooks.json` (JSON valid + pemicu `rtk-hook.js` ada jika digunakan).
+  4. Dukungan state discovery dua arah: `.aegis/` (primer) dengan fallback transparan ke `.aether/`, serta `data/aegis.db` (primer) dengan fallback ke `data/aether.db`.
+  5. Kebersihan proses sistem: zero-zombie process lifecycle pada penutupan sesi.
+  6. Pencatatan QA Logs: Setiap verifikasi Stop-Gate penuh atau kegagalan uji wajib dicatat pada `docs/QA/logs/` mengikuti standar [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
 - **Strict Stop-Gate**: Tugas TIDAK boleh dinyatakan selesai sebelum semua pengujian lulus (exit code 0). Assertion dilarang dimatikan.
 ---
 
@@ -133,24 +135,24 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
 
 Untuk menjaga kepatuhan batas kuota konteks LLM (< 4.000 token), pembacaan dokumentasi internal pada folder `docs/` diatur dengan prinsip **Just-in-Time (JIT) dan Terarah**:
 - **Larangan Pemuatan Massal**: Dilarang keras membaca seluruh direktori `docs/` sekaligus ke dalam konteks. Agen hanya diizinkan membaca berkas spesifik yang relevan langsung dengan modul yang sedang dianalisis atau dikerjakan.
-- **Rujukan Operan Wajib**: Saat mengoper tugas antar-agen, `kresna-architect` atau agen pengirim wajib mencantumkan berkas kontrak `docs/` yang menjadi acuan teknis pada kotak `[Kontrak/Diff]`.
+- **Rujukan Operan Wajib**: Saat mengoper tugas antar-agen, `mimir-architect` atau agen pengirim wajib mencantumkan berkas kontrak `docs/` yang menjadi acuan teknis pada kotak `[Kontrak/Diff]`.
 
 ### Matriks Pemetaan Topik Tugas & Tanggung Jawab Konsultasi:
 
 | Topik / Domain Tugas | Berkas Rujukan Wajib di `docs/` | Agen Utama yang Berkonsultasi |
 | :--- | :--- | :--- |
-| **Visi Produk & Batasan Ruang Lingkup** | `docs/PRD.md` | `semar-orchestrator`, `kresna-architect` |
-| **Arsitektur Sistem & Sub-sistem Python** | `docs/architecture.md` | `kresna-architect`, `arjuna-coder` |
-| **Kontrak API, Auth JWT, Git Facade, PTY** | `docs/api.md` | `kresna-architect`, `arjuna-coder` |
-| **Tata Letak UI, Monaco Diff, Komponen Vue** | `docs/ui-design.md` | `arjuna-coder` |
-| **Standar Rekayasa, YAGNI, RTK, Tree-Kill** | `docs/ruleset.md` | `widura-auditor`, `werkudara-tester`, `arjuna-coder` |
-| **Regulasi Git Multi-Remote & Alur Branch** | `docs/Gitmaster.md` | `semar-orchestrator`, `widura-auditor` |
-| **Provider AI (Google Antigravity & LLM)** | `docs/core-features/antigravity_provider.md` | `kresna-architect`, `arjuna-coder` |
-| **Fitur IDE Workbench & Eksekusi Background** | `docs/core-features/workbench_features.md` | `kresna-architect`, `arjuna-coder` |
-| **Runtime Penalaran (CoT) & Replanning** | `docs/core-features/cot_reasoning_runtime.md` | `semar-orchestrator`, `kresna-architect` |
-| **Peta Jalan Masa Depan & RAG Semantik** | `docs/future-roadmap/future_roadmap.md` | `semar-orchestrator`, `kresna-architect` |
-| **Arsitektur & Aturan Pencatatan Log QA** | `docs/QA/QA_PLAN.md` & `docs/QA/QA_LOGS_RULES.md` | `werkudara-tester`, `semar-orchestrator` |
-| **Riwayat Implementasi Selesai** | `docs/history/completed-features.md` | `hanoman-scout`, `widura-auditor` |
+| **Visi Produk & Batasan Ruang Lingkup** | `docs/PRD.md` | `odin-orchestrator`, `mimir-architect` |
+| **Arsitektur Sistem & Sub-sistem Python** | `docs/architecture.md` | `mimir-architect`, `brokkr-coder` |
+| **Kontrak API, Auth JWT, Git Facade, PTY** | `docs/api.md` | `mimir-architect`, `brokkr-coder` |
+| **Tata Letak UI, Monaco Diff, Komponen Vue** | `docs/ui-design.md` | `brokkr-coder` |
+| **Standar Rekayasa, YAGNI, RTK, Tree-Kill** | `docs/ruleset.md` | `forseti-auditor`, `thor-tester`, `brokkr-coder` |
+| **Regulasi Git Multi-Remote & Alur Branch** | `docs/Gitmaster.md` | `odin-orchestrator`, `forseti-auditor` |
+| **Provider AI (Google Antigravity & LLM)** | `docs/core-features/antigravity_provider.md` | `mimir-architect`, `brokkr-coder` |
+| **Fitur IDE Workbench & Eksekusi Background** | `docs/core-features/workbench_features.md` | `mimir-architect`, `brokkr-coder` |
+| **Runtime Penalaran (CoT) & Replanning** | `docs/core-features/cot_reasoning_runtime.md` | `odin-orchestrator`, `mimir-architect` |
+| **Peta Jalan Masa Depan & RAG Semantik** | `docs/future-roadmap/future_roadmap.md` | `odin-orchestrator`, `mimir-architect` |
+| **Arsitektur & Aturan Pencatatan Log QA** | `docs/QA/QA_PLAN.md` & `docs/QA/QA_LOGS_RULES.md` | `thor-tester`, `odin-orchestrator` |
+| **Riwayat Implementasi Selesai** | `docs/history/completed-features.md` | `heimdall-scout`, `forseti-auditor` |
 | **Indeks Navigasi Lengkap Dokumentasi** | `docs/README.md` | Seluruh Agen |
 
 ---
