@@ -28,7 +28,7 @@ Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan 
 | Fase | Fokus | Status |
 | :--- | :--- | :---: |
 | Legacy (Phase 0-2.2) | Provider Antigravity, UI Git Facade, Hybrid RAG | Selesai (diarsipkan) |
-| Fase 0 | Baseline dan freeze arsitektur | Siap Eksekusi |
+| Fase 0 | Baseline dan freeze arsitektur | Selesai |
 | Fase 1 | Lifecycle task dan kontrak event kanonik | Prioritas Utama |
 | Fase 2 | Modularisasi orchestrator/runtime | Prioritas Lanjutan |
 | Fase 3 | Normalisasi boundary provider | Direncanakan |
@@ -51,12 +51,12 @@ graph TD
 
 Output: diagram lifecycle task, daftar state dan event resmi beserta pemiliknya, reproducer bug, baseline test dan latensi.
 
-- [ ] Tetapkan tag baseline dan catat commit.
-- [ ] Jalankan seluruh test provider dan queue yang tersedia.
-- [ ] Simpan log satu task sukses, gagal, timeout, retry, dan cancel.
-- [ ] Reproduksi: loop Antigravity, queue saat agent running, history saat reasoning.
-- [ ] Tandai state yang hanya ada di frontend atau hanya di backend.
-- [ ] Hentikan sementara penambahan fitur pada batas P0.
+- [x] Tetapkan tag baseline dan catat commit (`baseline-p0-phase0` di `2c09da419eaefaf303163d7d24956895242a5ffb`).
+- [x] Jalankan seluruh test provider dan queue yang tersedia.
+- [x] Simpan log satu task sukses, gagal, timeout, retry, dan cancel (`docs/QA/fixtures/phase0_canonical_logs/`).
+- [x] Reproduksi: loop Antigravity, queue saat agent running, history saat reasoning (`scripts/reproduce_p0_defects.py`).
+- [x] Tandai state yang hanya ada di frontend atau hanya di backend (`docs/architecture/task_lifecycle_contracts.md`).
+- [x] Hentikan sementara penambahan fitur pada batas P0 (Freeze arsitektur aktif).
 
 ## 4. Fase 1: Lifecycle & Kontrak Event
 

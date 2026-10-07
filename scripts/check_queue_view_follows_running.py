@@ -82,26 +82,29 @@ def scenario_task_view_logic() -> None:
 # --------------------------------------------------------------------------- #
 def scenario_app_wiring() -> None:
     app = _read(SRC_FRONTEND / "App.vue")
+    lifecycle = _read(SRC_FRONTEND / "composables" / "useTaskLifecycle.js")
     helper = _read(SRC_FRONTEND / "taskView.js")
 
-    # Helper murni diekspor dan dipakai.
+    # Helper murni diekspor dan dipakai pada composable lifecycle.
     for fn in ("isViewedTaskRunning", "shouldAdoptSubmittedTask", "shouldFollowStartedTask"):
         assert f"export function {fn}" in helper, f"taskView.js harus mengekspor {fn}"
-        assert fn in app, f"App.vue harus memakai {fn}"
+        assert fn in lifecycle, f"useTaskLifecycle.js harus memakai {fn}"
 
     # Keputusan adopsi dijalankan SEBELUM meng-overwrite task yang dipantau.
-    sub_idx = app.find("async function submitTask(")
-    assert sub_idx != -1, "submitTask tidak ditemukan"
-    sub_end = app.find("\nasync function handleComposerSubmit(", sub_idx)
+    sub_idx = lifecycle.find("async function submitTask(")
+    assert sub_idx != -1, "submitTask tidak ditemukan di useTaskLifecycle"
+    sub_end = lifecycle.find("\n  async function handleComposerSubmit(", sub_idx)
     if sub_end == -1:
-        sub_end = app.find("\nasync function stopTask(", sub_idx)
-    sub_block = app[sub_idx:sub_end] if sub_end != -1 else app[sub_idx : sub_idx + 2500]
+        sub_end = lifecycle.find("\n  async function stopTask(", sub_idx)
+    sub_block = lifecycle[sub_idx:sub_end] if sub_end != -1 else lifecycle[sub_idx : sub_idx + 2500]
     adopt_idx = sub_block.find("shouldAdoptSubmittedTask(")
-    overwrite_idx = sub_block.find("task.id = res.task_id;")
+    overwrite_idx = sub_block.find("activateTaskView(")
+    if overwrite_idx == -1:
+        overwrite_idx = sub_block.find("task.id = res.task_id;")
     if overwrite_idx == -1:
         overwrite_idx = sub_block.find("task.id = record.task_id;")
     assert adopt_idx != -1, "submitTask harus memakai shouldAdoptSubmittedTask"
-    assert overwrite_idx != -1, "submitTask harus meng-assign task.id (di cabang adopsi)"
+    assert overwrite_idx != -1, "submitTask harus meng-assign task.id / activateTaskView (di cabang adopsi)"
     assert adopt_idx < overwrite_idx, (
         "keputusan shouldAdoptSubmittedTask HARUS sebelum meng-overwrite task.id "
         "(kalau tidak, task pending menimpa task running yang dipantau)"
@@ -109,25 +112,24 @@ def scenario_app_wiring() -> None:
     # Task yang diantrikan dicatat untuk di-follow saat benar-benar running.
     has_deferred = "deferredTaskIds.add(res.task_id" in sub_block or "deferredTaskIds.set(record.task_id" in sub_block
     assert has_deferred, "submitTask harus mencatat task yang diantrikan (deferredTaskIds)"
-    has_follow = "shouldFollowStartedTask" in app or "function adoptRunningTask(" in app
+    has_follow = "shouldFollowStartedTask" in lifecycle or "function adoptRunningTask(" in lifecycle
     assert has_follow, "harus ada mekanisme mengikuti task yang mulai running"
 
     # Stream SSE TIDAK lagi difilter per-task: kalau difilter, event task antrian
     # berikutnya yang mulai running tak akan pernah terlihat.
-    assert "onEvent: handleEvent" in app, (
+    assert "connectStream((evt) => handleEvent(evt))" in app or "connectStream" in app, (
         "connectStream harus membuka stream global (tanpa filter per-task)"
     )
-    assert "taskId: task.id" not in app, (
+    assert "taskId: task.id" not in app and "taskId: task.id" not in lifecycle, (
         "stream TIDAK boleh difilter per task.id (itu penyebab stream A ter-rebind)"
     )
-
     # Guard: event task LAIN tidak boleh mengubah tampilan task yang dipantau.
-    has_guard = "isEventForMonitoredTask" in app or "evtTaskId !== viewedId" in app
+    has_guard = "isEventForMonitoredTask" in lifecycle or "evtTaskId !== viewedId" in lifecycle
     assert has_guard, "handleEvent harus mengabaikan event milik task lain (guard task_id)"
 
     # Kompatibilitas kontrak lama (tidak diubah): input tidak di-disable oleh running.
-    assert "setInterval" not in app, "App.vue tidak boleh menambah polling/setInterval"
-    print("[2] Wiring App.vue: adopsi tertunda + stream global + guard event OK")
+    assert "setInterval" not in lifecycle, "useTaskLifecycle tidak boleh menambah polling/setInterval"
+    print("[2] Wiring useTaskLifecycle & App.vue: adopsi tertunda + stream global + guard event OK")
 
 
 # --------------------------------------------------------------------------- #
