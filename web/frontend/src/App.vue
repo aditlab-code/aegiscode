@@ -210,7 +210,20 @@ async function refreshTaskHistory() {
 }
 async function handleDeleteHistory(t) {
   if (!t?.task_id) return;
-  try { await deleteTaskHistory(t.task_id, activeProject.value?.id || null); await refreshTaskHistory(); } catch (err) { error.value = `Failed to delete task history: ${err.message || err}`; }
+  try {
+    await deleteTaskHistory(t.task_id, activeProject.value?.id || null);
+  } catch (err) {
+    console.warn("Delete task history warning:", err);
+  } finally {
+    if (activeProject.value?.id) {
+      const ctx = loadWorkspaceContext(activeProject.value.id);
+      if (ctx?.task?.viewedTaskId === t.task_id) {
+        saveWorkspaceContext(activeProject.value.id, { task: { viewedTaskId: null } }, true);
+        resetTaskState();
+      }
+    }
+    await refreshTaskHistory();
+  }
 }
 async function handleClearHistory() {
   try { await clearTaskHistory(activeProject.value?.id || null); await refreshTaskHistory(); } catch (err) { error.value = `Failed to clear history: ${err.message || err}`; }
@@ -284,7 +297,14 @@ onMounted(async () => {
   if (activeProject.value?.id && !runningTaskId.value) {
     const ctx = loadWorkspaceContext(activeProject.value.id);
     if (ctx?.task?.viewedTaskId) {
-      await handleViewTask(ctx.task.viewedTaskId);
+      const exists = (taskHistory.value || []).some(
+        (item) => (item.task_id || item.id) === ctx.task.viewedTaskId
+      );
+      if (exists) {
+        await handleViewTask(ctx.task.viewedTaskId);
+      } else {
+        saveWorkspaceContext(activeProject.value.id, { task: { viewedTaskId: null } }, true);
+      }
     }
   }
   initAuth();

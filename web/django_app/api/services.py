@@ -3002,7 +3002,7 @@ class GatewayService:
                 pass
 
         if not had_record and not had_log:
-            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di history.")
+            return {"task_id": task_id, "deleted": True, "already_absent": True}
 
         return {"task_id": task_id, "deleted": True}
 

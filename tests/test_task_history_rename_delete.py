@@ -69,6 +69,10 @@ def test_gateway_service_rename_and_delete_task_history(temp_project):
     assert del_res["task_id"] == task_id
     assert del_res["deleted"] is True
 
+    # Idempotent re-delete does not fail
+    del_res2 = service.delete_task_history(task_id, project_id=str(temp_project))
+    assert del_res2["deleted"] is True
+    assert del_res2.get("already_absent") is True
     # Re-reading or renaming deleted task raises NotFoundError
     with pytest.raises(NotFoundError):
         service.rename_task_history(task_id, "Another Title", project_id=str(temp_project))
