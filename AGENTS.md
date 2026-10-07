@@ -103,6 +103,7 @@ Agen **WAJIB** menggunakan `rtk` untuk semua operasi CLI:
   4. Exit code 0 untuk `oh-my-javanese init|verify|uninstall|render`.
   5. Dukungan state discovery dua arah: `.aegis/` (primer) dengan fallback transparan ke `.aether/`, serta `data/aegis.db` (primer) dengan fallback ke `data/aether.db`.
   6. Kebersihan proses sistem: zero-zombie process lifecycle pada penutupan sesi.
+  7. Pencatatan QA Logs: Setiap verifikasi Stop-Gate penuh atau kegagalan uji wajib dicatat pada `docs/QA/logs/` mengikuti standar [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
 - **Strict Stop-Gate**: Tugas TIDAK boleh dinyatakan selesai sebelum semua pengujian lulus (exit code 0). Assertion dilarang dimatikan.
 ---
 
@@ -148,6 +149,7 @@ Untuk menjaga kepatuhan batas kuota konteks LLM (< 4.000 token), pembacaan dokum
 | **Fitur IDE Workbench & Eksekusi Background** | `docs/core-features/workbench_features.md` | `kresna-architect`, `arjuna-coder` |
 | **Runtime Penalaran (CoT) & Replanning** | `docs/core-features/cot_reasoning_runtime.md` | `semar-orchestrator`, `kresna-architect` |
 | **Peta Jalan Masa Depan & RAG Semantik** | `docs/future-roadmap/future_roadmap.md` | `semar-orchestrator`, `kresna-architect` |
+| **Arsitektur & Aturan Pencatatan Log QA** | `docs/QA/QA_PLAN.md` & `docs/QA/QA_LOGS_RULES.md` | `werkudara-tester`, `semar-orchestrator` |
 | **Riwayat Implementasi Selesai** | `docs/history/completed-features.md` | `hanoman-scout`, `widura-auditor` |
 | **Indeks Navigasi Lengkap Dokumentasi** | `docs/README.md` | Seluruh Agen |
 

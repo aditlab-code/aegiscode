@@ -33,7 +33,19 @@ Dokumentasi detail mengenai kapabilitas dan modul fungsional yang aktif:
 
 ---
 
-## 3. Peta Jalan Masa Depan (`docs/future-roadmap/`)
+## 3. Sistem Jaminan Kualitas & QA Logs (`docs/QA/`)
+
+Dokumentasi strategi pengujian mutu, penanganan uji rapuh (*flaky*), dan catatan log stop-gate:
+
+| Dokumen | Deskripsi |
+| :--- | :--- |
+| **[docs/QA/QA_PLAN.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_PLAN.md)** | Rencana strategis arsitektur QA: penanganan uji rapuh (flaky), roadmap pengujian jangka menengah dan panjang, serta alur stop-gate independen. |
+| **[docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md)** | Pedoman dan protokol baku pencatatan riwayat eksekusi pengujian (QA Logs) untuk auditibilitas dan pelacakan regresi. |
+| **[docs/QA/logs/](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/logs/)** | Direktori penyimpanan berkas log eksekusi uji terstandardisasi (PASS / FAIL) per sesi pengujian. |
+
+---
+
+## 4. Peta Jalan Masa Depan (`docs/future-roadmap/`)
 
 Peta jalan pelaksanaan berorientasi dependensi yang murni memuat fitur yang belum diimplementasikan:
 
@@ -45,7 +57,7 @@ Peta jalan pelaksanaan berorientasi dependensi yang murni memuat fitur yang belu
 
 ---
 
-## 4. Arsip Historis (`docs/history/`)
+## 5. Arsip Historis (`docs/history/`)
 
 Catatan fase yang telah selesai, dokumen migrasi, dan riwayat evolusi basis kode:
 
@@ -57,7 +69,7 @@ Catatan fase yang telah selesai, dokumen migrasi, dan riwayat evolusi basis kode
 
 ---
 
-## 5. Rujukan Tingkat Root
+## 6. Rujukan Tingkat Root
 
 - **[AGENTS.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/AGENTS.md)**: Panduan orkestrasi multi-agent, protokol RTK, dan regulasi tri-branch (`master`, `main`, `release`).
 - **[README.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/README.md)**: Gambaran umum repositori dan panduan awal pengguna.

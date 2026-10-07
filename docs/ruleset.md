@@ -42,6 +42,14 @@ Seluruh agen dan pengembang diwajibkan menggunakan utilitas `rtk` untuk operasi 
    - Validitas sintaksis skrip bash dan hook JSON.
    - Deteksi kompatibilitas mundur jalur `.aegis/` dan `.aether/`.
    - Verifikasi kebersihan proses (*zero-zombie process verification*).
+4. **Pencegahan Flakiness & Isolasi State**:
+   - Dilarang keras menggunakan `time.sleep()` statis dalam pengujian async/subprocess. Wajib menggunakan predikat *polling assertion* dengan batas waktu (*deadline timeout*).
+   - Seluruh tes yang mengakses disk `.aegis/`, workspace, atau database SQLite wajib menggunakan fixture isolasi sementara (`tmp_path` pytest).
+   - Status singleton memori wajib di-reset secara atomik pada blok teardown pengujian.
+5. **Pengujian Kontrak Lintas-Sistem (Contract Testing)**:
+   - Setiap payload event stream SSE dan endpoint REST Django Gateway wajib divalidasi terhadap skema JSON kanonikal bersama frontend.
+6. **Kewajiban Pencatatan Log QA**:
+   - Setiap verifikasi Stop-Gate lengkap atau deteksi kegagalan uji wajib dicatat pada `docs/QA/logs/` mengikuti standar format [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
 
 ---
 
@@ -102,6 +110,7 @@ Repositori menerapkan strategi penemuan status dua arah:
    - Kontrak API: `docs/api.md`
    - Antarmuka & Tata Letak UI: `docs/ui-design.md`
    - Standar Rekayasa & Ruleset: `docs/ruleset.md`
+   - Jaminan Kualitas & Log QA: `docs/QA/QA_PLAN.md` & `docs/QA/QA_LOGS_RULES.md`
    - Regulasi Git Multi-Remote: `docs/Gitmaster.md`
    - Fitur Inti & Provider: `docs/core-features/`
    - Rencana Masa Depan: `docs/future-roadmap/`

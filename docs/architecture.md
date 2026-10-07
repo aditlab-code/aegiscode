@@ -172,3 +172,35 @@ Code chunking operates on semantic unit boundaries:
 - **Size Bounds:** Chunks exceeding ~450 tokens (~1,800 characters) are partitioned using LangChain's `RecursiveCharacterTextSplitter.from_language` while preserving line number mapping.
 - **Context Header:** Every chunk prepends a structured symbol header (`# path: <path> | symbol: <symbol> | kind: <kind>\n<code>`) to maximize embedding retrieval precision.
 
+---
+
+## 6. Quality Assurance & Independent Testing Subsystem
+
+To ensure deterministic stability and independent verification across development and production releases, AegisCode implements a dedicated multi-tiered QA architecture:
+
+```mermaid
+graph TD
+    subgraph TestPyramid ["Testing Architecture Pyramid"]
+        E2E["E2E Smoke Tests (Playwright)<br/>Critical IDE User Journeys"]
+        Comp["Component Tests (Vue Test Utils & Vitest)<br/>Reactive UI, Monaco & Panel States"]
+        Contract["Contract Validation Layer<br/>JSON Schema for Django Gateway SSE & REST"]
+        Unit["Unit Tests (Python pytest & Node:test)<br/>Isolated Pure Reducers, Parsers, & Logic"]
+        E2E --> Comp
+        Comp --> Contract
+        Contract --> Unit
+    end
+
+    subgraph Governance ["Independent Stop-Gate Governance (OMJ)"]
+        Arjuna["arjuna-coder (Implementation)"] --> Werkudara["werkudara-tester (Independent Stop-Gate)"]
+        Werkudara -->|"Failure Log"| QALog[("docs/QA/logs/ Registry")]
+        Werkudara -->|"Pass (Exit Code 0)"| Widura["widura-auditor (Bash & Security Audit)"]
+        Widura --> Semar["semar-orchestrator (Merge Approval)"]
+    end
+```
+
+### 6.1 Testing Architecture Principles
+1. **Zero-Flakiness Polling**: Elimination of static `time.sleep` calls across subprocesses and PTY tests in favor of deadline-driven polling assertions.
+2. **Complete State Isolation**: Dynamic filesystem isolation via `tmp_path` fixtures for `.aegis/`, workspace directories, and SQLite databases to prevent cross-test contamination.
+3. **Contract-First Synchronization**: Canonical JSON Schemas governing Server-Sent Events (SSE) and REST payloads to prevent breaking changes between Django Gateway and the Vue frontend.
+4. **Audit Log Persistence**: Mandatory test run tracking recorded in `docs/QA/logs/` adhering to [docs/QA/QA_LOGS_RULES.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/QA_LOGS_RULES.md).
+
