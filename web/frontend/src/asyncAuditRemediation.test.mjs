@@ -11,6 +11,11 @@ import { usageTokens } from "./tokenFormat.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const readSrc = (relPath) => fs.readFileSync(path.join(__dirname, relPath), "utf8");
+const readTaskLifecycleSrc = () => {
+  const p = path.join(__dirname, "composables/useTaskLifecycle.js");
+  if (fs.existsSync(p)) return fs.readFileSync(p, "utf8");
+  return readSrc("App.vue");
+};
 const between = (s, a, b) => s.slice(s.indexOf(a), s.indexOf(b, s.indexOf(a)));
 
 // ── T01: ASYNC-01 ─────────────────────────────────────────────────────────────
@@ -47,7 +52,7 @@ test("T01_ASYNC01: KNOWN_SSE_EVENTS dan EVENT_DESCRIBERS memuat warning & reason
 
 // ── T02: ASYNC-02 ─────────────────────────────────────────────────────────────
 test("T02_ASYNC02: cancelTaskById membatalkan task spesifik tanpa menghentikan task aktif lain", async () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const cancelSrc = between(
     appCode,
     "async function cancelTaskById(targetId) {",
@@ -93,7 +98,7 @@ test("T02_ASYNC02: cancelTaskById membatalkan task spesifik tanpa menghentikan t
 
 // ── T03: ASYNC-03 ─────────────────────────────────────────────────────────────
 test("T03_ASYNC03: cancelTaskById menghormati status backend dan guard task ID yang berubah", async () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const cancelSrc = between(
     appCode,
     "async function cancelTaskById(targetId) {",
@@ -139,7 +144,7 @@ test("T03_ASYNC03: cancelTaskById menghormati status backend dan guard task ID y
 
 // ── T04: ASYNC-04 ─────────────────────────────────────────────────────────────
 test("T04_ASYNC04: submitTask mengadopsi status terminal jika backend langsung mengembalikan completed", async () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const submitSrc = between(
     appCode,
     "async function submitTask(text,",
@@ -230,7 +235,7 @@ test("T04_ASYNC04: submitTask mengadopsi status terminal jika backend langsung m
 
 // ── T05: ASYNC-05 ─────────────────────────────────────────────────────────────
 test("T05_ASYNC05: activateTaskView membersihkan prompt, tokens, dan state saat beralih task", () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const activateSrc = between(
     appCode,
     "function activateTaskView(info) {",
@@ -284,7 +289,7 @@ test("T05_ASYNC05: activateTaskView membersihkan prompt, tokens, dan state saat 
 
 // ── T06: ASYNC-06 ─────────────────────────────────────────────────────────────
 test("T06_ASYNC06: submitTask guard generasi workspace menolak adopsi jika project berpindah saat in-flight", async () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const submitSrc = between(
     appCode,
     "async function submitTask(text,",
@@ -486,7 +491,7 @@ test("T10_ASYNC10: EVENT_DESCRIBERS merender kegagalan provider_response error d
 
 // ── T11: ASYNC-11 ─────────────────────────────────────────────────────────────
 test("T11_ASYNC11: handleViewTask guard viewTaskSeq mengabaikan respons activity out-of-order", async () => {
-  const appCode = readSrc("App.vue");
+  const appCode = readTaskLifecycleSrc();
   const viewSrc = between(
     appCode,
     "let viewTaskSeq = 0;",

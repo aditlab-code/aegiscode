@@ -18,7 +18,7 @@ The LLM remains the decision-maker. Aegis Agent provides the hands: filesystem t
 
 AegisCode is an autonomous AI coding agent runtime (**Aegis Agent**) paired with a protective, developer-first IDE workbench (**AegisCode Studio**). You describe a task in natural language; AegisCode prepares context, streams the agent's reasoning, executes tools under strict deterministic guardrails, and reports results.
 
-Backward-compatibility notice: For workspace state and intelligence discovery, AegisCode prioritizes the `.aegis/` configuration directory and `data/aegis.db` SQLite database, while seamlessly falling back to legacy `.aether/` and `data/aether.db` paths.
+Backward-compatibility notice: For workspace state and intelligence discovery, AegisCode prioritizes the `.aegis/` configuration directory and `data/aegis.db` SQLite database, while seamlessly falling back to legacy `.aether/` and `data/aether.db` paths. Project knowledge uses 3-tier discovery: Tier 1 `.brain/` (native Antigravity knowledge), Tier 2 `.aegis/bible/` (Aegis default), and Tier 3 `.aether/bible/` (legacy fallback).
 
 ```
 User prompt
@@ -158,12 +158,13 @@ Skills are guidance/context, not a permission grant and not an auto-loaded conte
 
 Provider and model are configured independently.
 
-- Provider types are registered in `agent_ai.providers.registry` (`ollama`, `deepseek`, `openrouter`, `openai`, `opencode`, `9router`, `custom` / OpenAI-compatible). Adding a provider means registering a class with a unique `name` — core never imports a concrete provider.
+- Provider types are registered in `agent_ai.providers.registry` (`ollama`, `deepseek`, `openrouter`, `openai_compatible`, `opencode`, `9router`, `custom`, and `antigravity`). Adding a provider means registering a class with a unique `name` — core never imports a concrete provider.
 - **Configuration is stored in SQLite** (`data/aegis.db`, with automatic fallback to `data/aether.db`) via `agent_ai.llm_config.LLMConfigService`. The same database is used by the gateway launcher. Tables: `llm_provider_instances` and `llm_models`.
 - Each **Provider Instance** points to an env-var name (`api_key_env`, e.g. `OPENROUTER_API_KEY`), not the secret value. The secret stays in `.env`; the DB stores only the variable name, base URL, and metadata.
 - Each instance can have multiple **Models**. Selection is `Provider Instance → Model` (one instance, many models).
-- **OpenAI-compatible / custom provider** is a first-class entry (`CustomOpenAIProvider`). Any base URL + API key + model string can be wired through it, including self-hosted OpenAI-compatible endpoints.
+- **Google Antigravity Provider** (`AntigravityProvider`) — first-class provider connecting to Google Antigravity via native `agy` CLI bridge or HTTP endpoint with automatic local OAuth credentials discovery (`~/.gemini/oauth_creds.json`) and stateless signed JWT OAuth. Supports frontier reasoning models (`gemini-3.8-flash`, `gemini-3.7-flash`, `claude-sonnet-4-6`, `claude-opus-4-6-thinking`, `gpt-oss-120b-medium`) with streamed thought/reasoning blocks (`AppThinkingBlock.vue`).
 - **OpenCode Zen provider** (`OpenCodeProvider`) — built-in provider for [opencode.ai/zen](https://opencode.ai/docs/providers/#opencode-zen). Endpoint: `https://opencode.ai/zen/v1`. Supports Claude, GPT, Gemini, DeepSeek, and free model variants.
+- **OpenAI-compatible / custom provider** is a first-class entry (`CustomOpenAIProvider`). Any base URL + API key + model string can be wired through it, including self-hosted OpenAI-compatible endpoints.
 - Resolution at runtime uses `agent_ai.providers.factory.build_provider_from_config` — the same path for Agent and Consultant.
 - No hard-coded "recommended" model list in the README; the architecture is provider-agnostic and the UI reads available providers/models from the service.
 
@@ -264,17 +265,18 @@ Vue 3 + Vite frontend (`web/frontend`) and a thin Django gateway (`web/django_ap
 
 **Other workbench features:**
 
-- **Task input** — Task Composer modal (task text + Provider Instance + Model + Execution mode + retrieval profile).
+- **Task input & Prompt Assistance** — Task Composer modal with quick `@file` mention autocomplete (safe 64KB per-file cap) and standardized `/slash` commands (`/fix`, `/test`, `/audit`, `/refactor`) via `PromptAutocompletePopover.vue`.
+- **Integrated Git Version Control** — Source control panel (`ChangesPanel.vue`), real-time file status indicators (`M`, `U`, `D`, `A`) in file tree, and side-by-side / inline Monaco Diff Viewer (`MonacoDiffEditor.vue`) backed by `GitRepositoryFacade` REST endpoints (`/api/git/status`, `diff`, `commits`, `branches`, `discard`).
 - **Multi-tab editor** — `EditorTabsService`: open multiple files simultaneously, tab lifecycle (open/close/activate/dirty state).
 - **Editor settings** — `EditorSettingsPanel`: Monaco live code preview, auto-save, per-project settings with VS Code-style gear menu.
 - **Light / Dark theme** — `ThemeService`: full light theme (`theme-light.css`) + wallpaper support (`Aegis-dark.jpeg`, `Aegis-light.jpeg`).
-- **Agent Workbench** — Latest Task card, lifecycle progress (Planning → Completed), duration ticker, and unified Agent Activity timeline (tool calls, observations, phase changes) with compact vertical layout.
+- **Agent Workbench** — Latest Task card, lifecycle progress (Planning → Completed), duration ticker, and unified Agent Activity timeline (tool calls, observations, phase changes) with compact vertical layout and streamed reasoning thinking blocks (`AppThinkingBlock.vue`).
+- **Background Execution Retention** — Persistent agent execution across view switches using DOM retention (`v-show`), navbar activity pulse indicator (`.nav-assistant-pill`), and completion toast alerts (`.wb-bg-toast`).
 - **Consultant** — chat modal with quick/investigate mode, image attachments, and Task Proposal → Run with the same Provider/Model selectors.
 - **Task History & Queue** — History reads from `.aegis/log/` (fallback: `.aether/log/`, persistent); Queue reflects `GET /api/tasks/queue` (pending/running/disabled). Both are the same global queue the backend uses.
 - **Changes & Explorer** — live filesystem changes (diff, additions/deletions) and a file tree bound to the active project root. Editor is Monaco.
 - **Task status** — `prepared` / `running` / `queued` / `validating` / `completed` / `failed` / `cancelled`.
 - **Stop confirmation** — cooperative cancellation via confirmation dialog.
-
 ### Interactive PTY Terminal
 
 The Bottom Dock hosts a fully interactive non-blocking PTY terminal powered by `@xterm/xterm` and backend PTY lifecycle management (`TerminalView`):
@@ -501,7 +503,7 @@ PreparedTask → AgentRuntime → AgentOrchestrator.run_continuous_loop
 │   ├── rig.json
 │   ├── atlas.meta.json
 │   └── rig.meta.json
-├── vectors.db                  # Local sqlite-vec semantic index
+├── vectors.db                  # optional — on-demand local semantic vector index (sqlite-vec / fastembed)
 ├── log/
 │   └── <task_id>.log
 ├── mcp.json                    # optional — MCP server config
@@ -623,12 +625,12 @@ User:
   "Fix authentication bug — login redirect drops session after OAuth callback"
 
 Aegis Agent:
-  → reads Project Bible / Map / Vector index
-  → searches and inspects auth code
-  → requests edits under FileWriteLock
-  → checks Supervised Mode Diff Modal (if enabled)
-  → runs validation / tests
-  → reports the result with a diff summary
+  → reads Project Bible / Map / Mentioned file context
+  → searches and inspects auth code (search_code / read_file)
+  → requests edits under FileWriteLock (edit_file / write_file)
+  → inspects changes and unified diff via Git facade / Monaco Diff
+  → runs validation / tests (run_command)
+  → reports the result with an execution and diff summary
 
 Parallel:
 
@@ -710,13 +712,19 @@ Implemented
 ├── Aegis Agent (continuous Native Tool Calling loop)
 ├── Consultant (quick / investigate, read-only, Task Proposals)
 ├── Project Intelligence (Bible / Atlas / RIG / Maps with freshness)
+│   └── 3-tier knowledge discovery (.brain/ -> .aegis/bible/ -> .aether/bible/)
 ├── Skill System (catalog → load_skill → load_skill_reference, Agent lifecycle)
 ├── Provider & Model architecture (instances + models in SQLite)
-│   └── OpenCode Zen provider (opencode.ai/zen, OpenAI-compatible)
+│   ├── Phase 0: Google Antigravity Provider (agy CLI bridge, local OAuth creds discovery,
+│   │   stateless signed JWT OAuth, frontier reasoning models & streaming thoughts)
+│   ├── OpenCode Zen provider (opencode.ai/zen, OpenAI-compatible)
+│   └── OpenAI-compatible / Custom Provider
 ├── Queue (serial FIFO) + Parallel Agent (concurrent, File Write Lock)
 ├── Modern IDE Workbench - AegisCode Studio (VS Code-style layout, Activity Bar, Left Sidebar,
 │   Right AI Drawer, Bottom Dock, Command Palette, Editor Tabs)
-├── Interactive PTY Terminal (shell input, command history, SSE streaming, Ctrl+C abort)
+│   └── Phase 1: Git Local Facade (/api/git/*) & Monaco Diff Editor (ChangesPanel, side-by-side /
+│       inline diff, status badges, @file mentions, /slash commands, background execution retention)
+├── Interactive PTY Terminal (shell input, command history, SSE streaming, Ctrl+C abort, process tree cleanup)
 ├── Light / Dark Theme + Wallpaper system
 ├── Telemetry (provider/model/round/tool calls/tokens/duration/status)
 ├── Permission & workspace boundary
@@ -728,15 +736,16 @@ Implemented
 └── MCP — Model Context Protocol (client interface + adapter + transport layer)
 ```
 
-### Future
+### Future (PRD Aligned)
 
 ```
 Future (PRD Aligned)
-├── Phase 0: Google Antigravity Provider & Stateless Signed JWT OAuth
-├── Phase 1: Git Local Stage/Commit/Diff & Monaco Diff Integration
-├── Phase 2: Hybrid Asymmetric Split-Brain Engine (fastembed + sqlite-vec + RRF, < 4k context)
-├── Phase 3: Deterministic Guardrails & HITL (DiffModal.vue, Supervised Mode, 1-Click Rollback)
-└── Phase 4: Native Desktop Packaging (Tauri v2 + zero-zombie process tree kill)
+├── Phase 2: Local Embeddings & Vector DB + Asymmetric Split-Brain Engine
+│   └── fastembed + sqlite-vec on-device di .aegis/vectors.db, AST chunking, RRF hybrid search, < 4k cloud context
+├── Phase 3: Security & Human-in-the-Loop Guardrails
+│   └── Interactive diff approval (DiffModal.vue, Supervised Gating), automated checkpoints, 1-click rollback
+└── Phase 4: Native Desktop Packaging
+    └── Tauri v2 local bundle (.dmg macOS pada branch release), Rust sidecar supervisor, OS tree-kill process lifecycle
 ```
 
 ---

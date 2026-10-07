@@ -223,8 +223,10 @@ def test_antigravity_stream_json_result_event_breaks_cleanly(tmp_path: Path):
 
     assert res.text == "Selesai menyunting berkas presentasi."
     assert "Perubahan slide berhasil diterapkan." in (res.reasoning or "")
-    # Pastikan event provider_response dengan token usage dipancarkan
+    # Sesuai kontrak ASYNC-08: AntigravityProvider tidak memancarkan provider_response manual
+    # ke event_sink (pencegahan duplikasi token di UI). Data usage disimpan di res.raw
+    # dan dipancarkan oleh Orchestrator secara terpusat.
     usage_events = [p for name, p in captured_events if name == "provider_response"]
-    assert len(usage_events) == 1
-    assert usage_events[0]["usage"]["total_tokens"] == 160
+    assert len(usage_events) == 0
+    assert res.raw.get("usage", {}).get("total_tokens") == 160
 

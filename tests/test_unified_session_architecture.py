@@ -365,3 +365,61 @@ def test_sse_event_context_type_isolation():
     evt_agent = service.emit_event(sid, "tool_called", task_id="task_xyz", payload={"tool": "edit"})
     assert evt_agent["payload"]["context_type"] == "agent"
     assert evt_agent["payload"]["mode"] == "agent"
+
+
+def test_task_creation_without_session_id_does_not_create_ghost_session():
+    """Memastikan pembuatan task queue mandiri tanpa session_id tidak mencemari database dengan sesi hantu."""
+    client = Client()
+    service = get_service()
+
+    sessions_before = service.unified_session_store.list_sessions()
+    count_before = len(sessions_before)
+
+    resp = client.post(
+        "/api/tasks",
+        data=json.dumps({"task": "Task antrian mandiri tanpa session"}),
+        content_type="application/json",
+    )
+    assert resp.status_code == 201
+    tdata = resp.json()
+    assert tdata["task_id"]
+
+    sessions_after = service.unified_session_store.list_sessions()
+    assert len(sessions_after) == count_before
+
+
+def test_send_turn_message_agent_mode_creates_exactly_one_pair_of_turns():
+    """Memastikan eksekusi turn mode agent hanya menghasilkan tepat 1 user turn dan 1 assistant turn (tidak duplikat)."""
+    client = Client()
+
+    sess_resp = client.post(
+        "/api/sessions",
+        data=json.dumps({"title": "Sesi Tes Giliran Tunggal"}),
+        content_type="application/json",
+    )
+    assert sess_resp.status_code == 201
+    sid = sess_resp.json()["session_id"]
+
+    turn_resp = client.post(
+        f"/api/sessions/{sid}/turns",
+        data=json.dumps({
+            "content": "Jalankan refactor modular",
+            "mode": "agent",
+        }),
+        content_type="application/json",
+    )
+    assert turn_resp.status_code == 201
+    res_data = turn_resp.json()
+    assert "user_turn" in res_data
+    assert "assistant_turn" in res_data
+
+    detail_resp = client.get(f"/api/sessions/{sid}")
+    assert detail_resp.status_code == 200
+    turns = detail_resp.json()["turns"]
+
+    assert len(turns) == 2
+    assert turns[0]["role"] == "user"
+    assert turns[0]["mode"] == "agent"
+    assert turns[1]["role"] == "assistant"
+    assert turns[1]["mode"] == "agent"
+

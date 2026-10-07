@@ -10,7 +10,6 @@ import {
   createSession,
   renameSession,
   deleteSession,
-  listConsultantSessions,
 } from "../../api.js";
 
 const props = defineProps({
@@ -148,20 +147,9 @@ async function loadThreads() {
   try {
     const projId = props.selectedProjectId || props.activeProject?.id || null;
     const res = await listSessions(projId);
-    if (res?.sessions && res.sessions.length > 0) {
-      sessions.value = res.sessions;
-    } else {
-      const legacyRes = await listConsultantSessions(projId);
-      sessions.value = legacyRes?.sessions || [];
-    }
+    sessions.value = res?.sessions || [];
   } catch (err) {
-    try {
-      const projId = props.selectedProjectId || props.activeProject?.id || null;
-      const legacyRes = await listConsultantSessions(projId);
-      sessions.value = legacyRes?.sessions || [];
-    } catch (e) {
-      sessions.value = [];
-    }
+    sessions.value = [];
   } finally {
     sessionsLoading.value = false;
   }

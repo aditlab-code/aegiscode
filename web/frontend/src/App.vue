@@ -5,7 +5,7 @@
  * SettingsOverlay, and modal dialogs.
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { AEGIS_VERSION, AETHER_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
@@ -18,71 +18,49 @@ import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
 import AppButton from "./components/ui/AppButton.vue";
 import LoginOverlay from "./components/LoginOverlay.vue";
-import { formatTokens, usageTokens } from "./tokenFormat.js";
-import { isViewedTaskRunning, shouldAdoptSubmittedTask, shouldFollowStartedTask } from "./taskView.js";
-import { isEventForMonitoredTask } from "./services/taskStateReducer.js";
-import { useAuth } from "./services/authService.js"; import { startServerHealthMonitor } from "./services/serverService.js";
+import { useAuth } from "./services/authService.js";
 import {
-  openEventStream, getProjects, createProject, deleteProject, getActiveProject, setActiveProject, closeActiveProject, pickFolder,
-  createTask, cancelTask, listTaskHistory, clearTaskHistory, deleteTaskHistory, getTaskReport, getConfig, getTaskActivity, getLLMProviders,
-  getProjectGitBranches, listTaskQueue,
+  listTaskHistory,
+  clearTaskHistory,
+  deleteTaskHistory,
+  getConfig,
+  getLLMProviders,
 } from "./api.js";
-import { playStatusSound } from "./audioRegistry.js";
-import { createDurationTicker, eventTimeMs, formatDuration } from "./timeUtils.js";
 import { createResponsiveState } from "./services/responsiveService.js";
 import { createThemeState } from "./services/themeService.js";
 import { getDefaultCommands, matchesShortcut } from "./services/commandPaletteService.js";
-import { statusTagClass, computeTaskTelemetry } from "./services/taskService.js";
-import { buildLifecycleStates, activityPhaseIndex, addMilestone, VALIDATING_STEP } from "./lifecycle.js";
 import { useWorkspaceFiles } from "./services/fileCacheService.js";
-import {
-  loadWorkspaceContext,
-  saveWorkspaceContext,
-  saveGlobalActiveProjectId,
-  getGlobalActiveProjectId,
-  clearWorkspaceContext,
-} from "./services/workspaceContextService.js";
+import { saveWorkspaceContext, loadWorkspaceContext } from "./services/workspaceContextService.js";
+import { useProjectContext } from "./composables/useProjectContext.js";
+import { useServerConnection } from "./composables/useServerConnection.js";
+import { useTaskLifecycle } from "./composables/useTaskLifecycle.js";
 
 // Layout & Navigation State
 const themeState = createThemeState(), responsive = createResponsiveState();
 const activeNav = ref("explorer"), settingsOpen = ref(false), settingsTab = ref("providers");
 const commandPaletteOpen = ref(false), commandPaletteMode = ref("commands");
 const closeConfirmOpen = ref(false), stopConfirmOpen = ref(false), policyProject = ref(null);
-const reportTaskId = ref(""), currentReport = ref(""), workbenchRef = ref(null);
+const workbenchRef = ref(null);
 const notice = ref(""), error = ref(""), cursorPos = ref({ ln: 1, col: 1 }), activeLanguage = ref("Vue 3");
-const activeProject = ref(null), projects = ref([]), lastProject = ref(null), launcherBusy = ref(false);// Antigravity & Google OAuth State (docs/Oauth-Google.md, Phase 0)
+const workspaceGen = ref(0);
+const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
+const activeSessionId = ref("");
+
+// Antigravity & Google OAuth State (docs/Oauth-Google.md, Phase 0)
 const {
   currentUser, authLoading, authLoadingMessage, authError, authChecking,
   isAuthenticated, handleLogout, initAuth,
 } = useAuth();
 
-// Task & Agent State
-const gatewayHttpConnected = ref(false), sseStreamConnected = ref(false);
-const connected = computed(() => gatewayHttpConnected.value && sseStreamConnected.value);
-const task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
-const activeSessionId = ref("");
-const lastReceivedEventId = ref("");
-const isRunning = computed(() => ["running", "validating", "cancelling"].includes(task.status));
-const stopInProgress = ref(false), runningTaskId = ref(""), terminalTaskId = ref("");
-const cancellingTaskIds = ref(new Set());
-const workspaceGen = ref(0);
-const isSubmittingTask = ref(false);
+// Workspace Files Cache
 const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache, setWorkspaceProject } = useWorkspaceFiles();
-const activityEvents = ref([]), activityPhase = ref(""), lifecycleMilestones = ref([]), changes = ref([]);
-const validation = reactive({ state: "pending" }), liveFsChange = ref(null);
-const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
+
+// Provider & Execution Mode Config
 const savedExecutionMode = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_execution_mode")) || "";
 const savedProviderInstanceId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_provider_instance_id")) || "";
 const savedModelId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_model_id")) || "";
 const llmProviders = ref([]), selectedProviderInstanceId = ref(savedProviderInstanceId), selectedModelId = ref(savedModelId), selectedMode = ref(savedExecutionMode || "balanced"), selectedExecutionMode = ref("queue");
-const tokenCount = ref(null);
-const taskTokensLabel = computed(() => formatTokens(tokenCount.value));
-const taskTokensTooltip = computed(() =>
-  tokenCount.value != null
-    ? `${tokenCount.value.toLocaleString()} tokens`
-    : "Token usage not reported"
-);
-const deferredTaskIds = reactive(new Set());
+
 watch(selectedMode, (val) => {
   if (typeof localStorage !== "undefined" && val) {
     try { localStorage.setItem("aegis_execution_mode", val); } catch (_) {}
@@ -98,45 +76,123 @@ watch(selectedModelId, (val) => {
     try { localStorage.setItem("aegis_model_id", val); } catch (_) {}
   }
 });
+
+// Composable 1: Project Context
+const {
+  activeProject,
+  projects,
+  lastProject,
+  launcherBusy,
+  gitBranchInfo,
+  loadProjects,
+  loadActiveProject,
+  refreshGitBranchInfo,
+  handleOpenProject,
+  handleCreateProject,
+  handleDeleteProject,
+  handleCloseProject,
+  handleOpenFolder,
+} = useProjectContext({
+  error,
+  workspaceGen,
+  activeNav,
+  closeConfirmOpen,
+  workbenchRef,
+  setWorkspaceProject,
+  fetchWorkspaceFiles,
+  invalidateFileCache,
+  resetTaskState: () => resetTaskState(),
+  refreshAllConfig: () => refreshAllConfig(),
+  refreshTaskHistory: () => refreshTaskHistory(),
+  syncActiveRunningTask: () => syncActiveRunningTask(),
+  handleViewTask: (id) => handleViewTask(id),
+  runningTaskId: computed(() => runningTaskId.value),
+});
+
 watch(activeNav, (newNav) => {
   if (activeProject.value?.id && newNav) {
     saveWorkspaceContext(activeProject.value.id, { activeNav: newNav });
   }
 });
+
+// Composable 2: Server Connection
+const {
+  gatewayHttpConnected,
+  sseStreamConnected,
+  connected,
+  lastReceivedEventId,
+  connectStream,
+  startHealthCheck,
+  closeConnection,
+} = useServerConnection({
+  onEvent: (evt) => handleEvent(evt),
+});
+
+// Composable 3: Task Lifecycle
+// Penyelarasan sesi: submitTask menyertakan meta.session_id = activeSessionId.value melalui useTaskLifecycle
+const {
+  task,
+  isRunning,
+  stopInProgress,
+  runningTaskId,
+  terminalTaskId,
+  cancellingTaskIds,
+  isSubmittingTask,
+  activityEvents,
+  activityPhase,
+  lifecycleMilestones,
+  changes,
+  validation,
+  liveFsChange,
+  tokenCount,
+  taskTokensLabel,
+  taskTokensTooltip,
+  deferredTaskIds,
+  taskTelemetry,
+  taskStartedAt,
+  taskEndedAt,
+  durationNow,
+  durationTicker,
+  taskDurationLabel,
+  lifecycleSteps,
+  lifecyclePct,
+  agentStatus,
+  taskTag,
+  reportTaskId,
+  currentReport,
+  activateTaskView,
+  handleEvent,
+  syncActiveRunningTask,
+  submitTask,
+  handleComposerSubmit,
+  cancelTaskById,
+  requestStop,
+  handleStopTask,
+  resetTaskState,
+  handleViewTask,
+  handleOpenReport,
+} = useTaskLifecycle({
+  activeProject,
+  workspaceGen,
+  taskHistory,
+  queueRefresh,
+  explorerRefresh,
+  error,
+  stopConfirmOpen,
+  refreshTaskHistory: () => refreshTaskHistory(),
+  selectedProviderInstanceId,
+  selectedModelId,
+  selectedMode,
+  selectedExecutionMode,
+  activeSessionId,
+  lastReceivedEventId,
+  settingsOpen,
+});
+
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
 const activeProviderLabel = computed(() => activeProvider.value?.name || config.value.provider || "");
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
-const taskTelemetry = reactive({ rounds: 0, toolCalls: 0, observations: 0 });
-const taskStartedAt = ref(null), taskEndedAt = ref(null), durationNow = ref(Date.now());
-let eventSource = null, liveFsChangeSeq = 0, stopHealthMonitor = null;
 const gatewayAddress = computed(() => (typeof window !== "undefined" ? window.location.host : ""));
-
-const durationTicker = createDurationTicker(() => { durationNow.value = Date.now(); });
-const taskDurationLabel = computed(() => {
-  if (!taskStartedAt.value) return "";
-  return formatDuration((taskEndedAt.value || durationNow.value) - taskStartedAt.value);
-});
-
-const LIFECYCLE_STEP_LABELS = ["Planning", "Inspecting", "Editing", "Running", "Validating", "Completed"];
-const lifecycleSteps = computed(() => {
-  const states = buildLifecycleStates({
-    hasTask: Boolean(task.id), status: task.status,
-    currentPhase: activityPhase.value, milestones: lifecycleMilestones.value,
-  });
-  return LIFECYCLE_STEP_LABELS.map((label, idx) => ({ label, state: states[idx] || "" }));
-});
-
-const lifecyclePct = computed(() => {
-  if (task.status === "completed") return 100;
-  if (!task.id) return 0;
-  const activeIdx = lifecycleSteps.value.findIndex((s) => s.state === "active");
-  const count = lifecycleSteps.value.filter((s) => s.state === "done").length;
-  const effective = activeIdx >= 0 ? Math.max(count, activeIdx) : count;
-  return Math.min(100, Math.round((effective / (LIFECYCLE_STEP_LABELS.length - 1)) * 100));
-});
-
-const agentStatus = computed(() => ({ label: task.status || "idle", cls: statusTagClass(task.status || "idle") }));
-const taskTag = computed(() => ({ label: task.status || "idle", cls: statusTagClass(task.status) }));
 
 const defaultCommands = computed(() => getDefaultCommands({
   quickOpen: () => { commandPaletteMode.value = "files"; commandPaletteOpen.value = true; },
@@ -148,516 +204,7 @@ const defaultCommands = computed(() => getDefaultCommands({
   toggleWallpaper: () => themeState.toggleWallpaper(),
   openSettings: () => workbenchRef.value?.openSettings?.("providers"),
 }));
-function activateTaskView(info) {
-  task.id = info.id || "";
-  task.prompt = info.prompt || "";
-  task.status = info.status || "idle";
-  task.phase = "";
-  runningTaskId.value = info.runningTaskId || (info.status === "running" ? info.id : "");
-  activityPhase.value = info.status === "running" ? "planning" : "";
-  lifecycleMilestones.value = info.status === "running" ? [0] : [];
-  activityEvents.value = info.events ? [...info.events] : [];
-  changes.value = [];
-  tokenCount.value = info.tokenCount !== undefined ? info.tokenCount : null;
-  taskTelemetry.rounds = 0;
-  taskTelemetry.toolCalls = 0;
-  taskTelemetry.observations = 0;
-  taskStartedAt.value = info.taskStartedAt || null;
-  taskEndedAt.value = info.taskEndedAt || null;
-  validation.state = "pending";
-  if (info.status !== "running") {
-    durationTicker.stop();
-  }
-}
 
-function handleEvent(evt) {
-  if (!evt || !evt.event_type) return;
-  if (evt.event_id) {
-    lastReceivedEventId.value = String(evt.event_id);
-  } else if (evt.lastEventId) {
-    lastReceivedEventId.value = String(evt.lastEventId);
-  }
-  const evtTaskId = evt.task_id || "";
-  const isForMonitored = isEventForMonitoredTask({ monitoredTaskId: task.id }, evt);
-  const p = evt.payload || {};
-
-  if (evt.event_type === "provider_response" && isForMonitored) {
-    const u = usageTokens(p);
-    if (u != null) {
-      tokenCount.value = (tokenCount.value || 0) + u;
-    }
-  }
-
-  switch (evt.event_type) {
-    case "task_started": {
-      const startedId = evt.task_id || task.id;
-      const wasViewingThisPending = task.id === startedId && task.status === "pending";
-      const shouldFollow = shouldFollowStartedTask({
-        startedTaskId: startedId,
-        viewedTaskId: task.id,
-        isViewingRunning: isRunning.value,
-        viewingHistory: Boolean(reportTaskId.value),
-        deferredTaskIds,
-      });
-
-      if (wasViewingThisPending || shouldFollow) {
-        const existingTaskInQueue = (taskHistory.value || []).find((t) => (t.task_id || t.id) === startedId);
-        const startedPrompt = p.prompt || p.task || existingTaskInQueue?.prompt || existingTaskInQueue?.task || "";
-        activateTaskView({
-          id: startedId,
-          prompt: startedPrompt || (wasViewingThisPending ? task.prompt : ""),
-          status: "running",
-          runningTaskId: startedId,
-          taskStartedAt: eventTimeMs(evt),
-        });
-        activityEvents.value.push(evt);
-        durationTicker.start();
-        playStatusSound("running");
-      }
-      deferredTaskIds.delete(startedId);
-      queueRefresh.value += 1;
-      refreshTaskHistory();
-      break;
-    }
-    case "phase_changed": {
-      if (!isForMonitored) break;
-      const idx = activityPhaseIndex(p.phase);
-      if (idx >= 0) {
-        activityPhase.value = String(p.phase).trim().toLowerCase();
-        lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, idx);
-      }
-      queueRefresh.value += 1;
-      break;
-    }
-    case "tool_called":
-      if (!isForMonitored) break;
-      if (p.tool) activityPhase.value = "running";
-      break;
-    case "tool_completed":
-    case "observation_received":
-    case "recovery_started":
-    case "recovery_completed":
-      break;
-    case "validation_started":
-      if (!isForMonitored) break;
-      validation.state = "running";
-      task.status = "validating";
-      activityPhase.value = "validating";
-      lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, VALIDATING_STEP);
-      break;
-    case "validation_completed":
-      if (!isForMonitored) break;
-      validation.state = p.success === false ? "err" : "ok";
-      break;
-    case "change_detected":
-      if (p.path && !p.path.includes(".aegis/")) {
-        if (isForMonitored) {
-          const idx = changes.value.findIndex((c) => c.path === p.path);
-          const item = { kind: p.kind || "change", path: p.path, diff: p.diff };
-          if (idx >= 0) changes.value[idx] = item;
-          else changes.value.push(item);
-        }
-        liveFsChange.value = { seq: ++liveFsChangeSeq, path: p.path, kind: p.kind || "change" };
-      }
-      break;
-    case "task_completed":
-    case "task_failed":
-    case "task_cancelled": {
-      const termId = evt.task_id || task.id;
-      if (runningTaskId.value === termId) {
-        runningTaskId.value = "";
-      }
-      if (isForMonitored) {
-        task.status = evt.event_type.replace("task_", "");
-        durationTicker.stop();
-        taskEndedAt.value = eventTimeMs(evt);
-        terminalTaskId.value = termId;
-        if (evt.event_type === "task_completed") explorerRefresh.value += 1;
-        playStatusSound(task.status);
-      }
-      queueRefresh.value += 1;
-      refreshTaskHistory();
-      break;
-    }
-  }
-
-  const isForMonitoredNow = isEventForMonitoredTask({ monitoredTaskId: task.id }, evt);
-  if (isForMonitoredNow && evt.event_type !== "task_started") {
-    activityEvents.value.push(evt);
-    if (activityEvents.value.length > 500) activityEvents.value.shift();
-    if (evt.event_type === "provider_request") {
-      taskTelemetry.rounds += 1;
-    } else if (evt.event_type === "tool_called") {
-      taskTelemetry.toolCalls += 1;
-    } else if (evt.event_type === "observation_received") {
-      taskTelemetry.observations += 1;
-    }
-  }
-}
-
-function connectStream() {
-  if (eventSource) {
-    try { eventSource.close(); } catch (_) {}
-    eventSource = null;
-  }
-  eventSource = openEventStream({
-    lastEventId: lastReceivedEventId.value || null,
-    onEvent: handleEvent,
-    onOpen: () => { sseStreamConnected.value = true; },
-    onError: () => { sseStreamConnected.value = false; },
-  });
-  eventSource.onopen = () => { sseStreamConnected.value = true; };
-  eventSource.onerror = () => { sseStreamConnected.value = false; };
-}
-async function syncActiveRunningTask() {
-  try {
-    const res = await listTaskQueue(activeProject.value?.id || null);
-    const active = (res?.tasks || []).find((t) => ["running", "validating", "cancelling"].includes(t.status));
-    if (active && (!task.id || task.status === "idle")) {
-      task.id = active.task_id || active.id; task.prompt = active.prompt || active.task || ""; task.status = active.status;
-      runningTaskId.value = task.id; if (!taskStartedAt.value) taskStartedAt.value = Date.now(); durationTicker.start();
-    }
-  } catch (_) {}
-}
-
-async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null) {
-  if (!text || !text.trim()) return;
-  error.value = "";
-  const targetProjectId = activeProject.value?.id || null;
-  const startGen = workspaceGen.value;
-  isSubmittingTask.value = true;
-  try {
-    const pId = providerId || selectedProviderInstanceId.value || null;
-    const mId = modelId || selectedModelId.value || null;
-    const eMode = execMode || selectedExecutionMode.value || "queue";
-    const meta = {};
-    if (pId) meta.provider_instance_id = pId;
-    if (mId) meta.model_id = mId;
-    if (selectedMode.value) meta.mode = selectedMode.value;
-    try {
-      if (typeof activeSessionId !== "undefined" && activeSessionId?.value) {
-        meta.session_id = activeSessionId.value;
-      }
-    } catch (_) {}
-    const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
-    try {
-      if (typeof activeSessionId !== "undefined" && res?.session_id && !activeSessionId.value) {
-        activeSessionId.value = res.session_id;
-      }
-    } catch (_) {}
-
-    if (workspaceGen.value !== startGen || (activeProject.value?.id || null) !== targetProjectId) {
-      queueRefresh.value += 1;
-      return;
-    }
-
-    if (res && res.task_id) {
-      const actualStatus = String(res.status || "").toLowerCase();
-      const qState = String(res.queue_state || (isRunning.value ? "pending" : "running")).toLowerCase();
-      const isTerminal = ["completed", "failed", "cancelled"].includes(actualStatus);
-      const isViewingRunning = isViewedTaskRunning(task.id, runningTaskId.value);
-      const shouldAdopt = shouldAdoptSubmittedTask({
-        queueState: isTerminal ? actualStatus : qState,
-        isViewingRunning,
-      });
-
-      if (isTerminal) {
-        if (shouldAdopt) {
-          activateTaskView({
-            id: res.task_id,
-            prompt: text.trim(),
-            status: actualStatus,
-            taskEndedAt: Date.now(),
-          });
-          terminalTaskId.value = res.task_id;
-          playStatusSound(actualStatus);
-        } else {
-          deferredTaskIds.add(res.task_id);
-        }
-      } else if (qState === "pending") {
-        deferredTaskIds.add(res.task_id);
-        if (shouldAdopt) {
-          activateTaskView({
-            id: res.task_id,
-            prompt: text.trim(),
-            status: "pending",
-          });
-        }
-      } else {
-        if (shouldAdopt) {
-          activateTaskView({
-            id: res.task_id,
-            prompt: text.trim(),
-            status: "running",
-            runningTaskId: res.task_id,
-            taskStartedAt: Date.now(),
-          });
-          durationTicker.start();
-          playStatusSound("running");
-        } else {
-          deferredTaskIds.add(res.task_id);
-        }
-      }
-      queueRefresh.value += 1;
-      refreshTaskHistory();
-    }
-  } catch (err) {
-    error.value = `Failed to create task: ${err.message || err}`;
-  } finally {
-    isSubmittingTask.value = false;
-  }
-}
-
-async function handleComposerSubmit(payload) {
-  const text = typeof payload === "string" ? payload : payload?.text;
-  if (!text) return;
-  await submitTask(text, payload?.providerInstanceId || null, payload?.modelId || null, payload?.executionMode || null, payload?.images || null);
-}
-
-async function cancelTaskById(targetId) {
-  if (!targetId || typeof targetId !== "string") return;
-  if (cancellingTaskIds.value.has(targetId)) return;
-
-  cancellingTaskIds.value.add(targetId);
-  stopInProgress.value = true;
-
-  const isTargetMonitored = task.id === targetId;
-  const previousStatus = isTargetMonitored ? task.status : "";
-  if (isTargetMonitored) {
-    task.status = "cancelling";
-  }
-
-  try {
-    const res = await cancelTask(targetId);
-    const backendStatus = res?.status || "cancelled";
-
-    // HANYA perbarui task yang sedang dipantau jika targetId masih cocok
-    if (task.id === targetId) {
-      task.status = backendStatus;
-      if (["cancelled", "completed", "failed"].includes(backendStatus)) {
-        durationTicker.stop();
-      }
-    }
-
-    // Bersihkan runningTaskId hanya jika task yang dibatalkan adalah yang tercatat running
-    if (runningTaskId.value === targetId) {
-      runningTaskId.value = "";
-    }
-  } catch (err) {
-    console.warn("Cancel task notice:", err);
-    const errMsg = String(err?.message || err);
-    if (errMsg.includes("tidak ditemukan")) {
-      if (task.id === targetId) {
-        task.status = "cancelled";
-        durationTicker.stop();
-      }
-      if (runningTaskId.value === targetId) {
-        runningTaskId.value = "";
-      }
-    } else {
-      error.value = `Failed to cancel task: ${errMsg}`;
-      // Pulihkan status hanya bila task yang dipantau masih sama
-      if (task.id === targetId && previousStatus) {
-        task.status = previousStatus;
-      }
-    }
-  } finally {
-    cancellingTaskIds.value.delete(targetId);
-    stopInProgress.value = cancellingTaskIds.value.size > 0;
-    stopConfirmOpen.value = false;
-    queueRefresh.value += 1;
-    refreshTaskHistory();
-  }
-}
-
-async function requestStop(explicitId = null) {
-  const targetId = (typeof explicitId === "string" && explicitId) ? explicitId : (runningTaskId.value || task.id);
-  await cancelTaskById(targetId);
-}
-
-function handleStopTask(taskId) {
-  if (taskId && typeof taskId === "string") {
-    cancelTaskById(taskId);
-  }
-}
-
-async function loadProjects() {
-  launcherBusy.value = true;
-  try { projects.value = (await getProjects())?.projects || []; }
-  catch (err) { error.value = `Failed to load projects: ${err.message || err}`; }
-  finally { launcherBusy.value = false; }
-}
-
-async function loadActiveProject() {
-  try {
-    const r = await getActiveProject();
-    let p = r?.active_project || r?.project || null;
-    if (!p) {
-      const savedPid = getGlobalActiveProjectId();
-      if (savedPid) {
-        try {
-          const res = await setActiveProject(savedPid);
-          p = res?.active_project || res?.project || null;
-        } catch (_) {}
-      }
-    }
-    if (p) {
-      activeProject.value = lastProject.value = p;
-      saveGlobalActiveProjectId(p.id);
-      setWorkspaceProject(p.id);
-      fetchWorkspaceFiles(true);
-      const ctx = loadWorkspaceContext(p.id);
-      if (ctx?.activeNav) {
-        activeNav.value = ctx.activeNav;
-      }
-    }
-  } catch (_) {}
-}
-
-// Git Branch Awareness State & Synchronization
-const gitBranchInfo = ref(null);
-async function refreshGitBranchInfo() {
-  const pId = activeProject.value?.id;
-  if (!pId) { gitBranchInfo.value = null; return; }
-  try { const data = await getProjectGitBranches(pId); gitBranchInfo.value = data?.branch_info || null; } catch { gitBranchInfo.value = null; }
-}
-watch(() => activeProject.value?.id, () => { refreshGitBranchInfo(); }, { immediate: true });
-
-async function handleOpenProject(target) {
-  if (!target) return;
-  const id = typeof target === "string" ? target : target.id;
-  if (!id) return;
-  workspaceGen.value += 1;
-  launcherBusy.value = true; error.value = "";
-  try {
-    const res = await setActiveProject(id);
-    activeProject.value = res?.active_project || (typeof target === "object" ? target : null) || projects.value.find((p) => p.id === id) || null;
-    lastProject.value = activeProject.value;
-    saveGlobalActiveProjectId(id);
-    setWorkspaceProject(id);
-    resetTaskState();
-    workbenchRef.value?.clearAllTabs?.();
-    invalidateFileCache(id);
-    const ctx = loadWorkspaceContext(id);
-    if (ctx?.activeNav) {
-      activeNav.value = ctx.activeNav;
-    }
-    await refreshAllConfig();
-    await refreshTaskHistory();
-    await syncActiveRunningTask();
-    if (!runningTaskId.value && ctx?.task?.viewedTaskId) {
-      await handleViewTask(ctx.task.viewedTaskId);
-    }
-    fetchWorkspaceFiles(true);
-  } catch (err) { error.value = `Failed to open project: ${err.message || err}`; }
-  finally { launcherBusy.value = false; }
-}
-
-async function handleCreateProject(name, path) {
-  launcherBusy.value = true;
-  try { const res = await createProject(name, path); const p = res?.project || res; if (p) { await loadProjects(); await handleOpenProject(p); } }
-  catch (err) { error.value = `Failed to create project: ${err.message || err}`; }
-  finally { launcherBusy.value = false; }
-}
-
-async function handleDeleteProject(id) {
-  try { await deleteProject(id); if (activeProject.value?.id === id) await handleCloseProject(); await loadProjects(); }
-  catch (err) { error.value = `Failed to delete project: ${err.message || err}`; }
-}
-
-async function handleCloseProject() {
-  workspaceGen.value += 1;
-  try {
-    await closeActiveProject();
-    activeProject.value = null;
-    saveGlobalActiveProjectId(null);
-    closeConfirmOpen.value = false;
-    setWorkspaceProject(null);
-    resetTaskState();
-    await loadProjects();
-    workbenchRef.value?.clearAllTabs?.();
-    invalidateFileCache();
-  } catch (err) { error.value = `Failed to close project: ${err.message || err}`; }
-}
-
-async function handleOpenFolder() {
-  launcherBusy.value = true; error.value = "";
-  try {
-    const res = await pickFolder();
-    if (!res || !res.ok || !res.path) { if (res && res.reason !== "cancelled" && res.message) error.value = res.message; return; }
-    const p = res.path, exist = projects.value.find((x) => x.path === p || x.root === p);
-    if (exist) { await handleOpenProject(exist.id); return; }
-    const segs = String(p).split(/[\\/]+/).filter(Boolean), n = segs.length ? segs[segs.length - 1] : "workspace";
-    const cr = await createProject(n, p); const np = cr?.project || cr; await loadProjects();
-    if (np?.id) await handleOpenProject(np.id);
-  } catch (err) { error.value = `Failed to open folder: ${err.message || err}`; }
-  finally { launcherBusy.value = false; }
-}
-
-function resetTaskState() {
-  activateTaskView({ id: "", prompt: "", status: "idle" });
-  terminalTaskId.value = "";
-}
-
-let viewTaskSeq = 0;
-async function handleViewTask(t) {
-  if (!t) return;
-  const taskId = typeof t === "string" ? t : (t.task_id || t.id);
-  if (!taskId) return;
-  const currentSeq = ++viewTaskSeq;
-  const currentProjectId = activeProject.value?.id || null;
-  if (activeProject.value?.id) {
-    saveWorkspaceContext(activeProject.value.id, {
-      task: { viewedTaskId: taskId }
-    });
-  }
-  let targetObj = typeof t === "object" ? t : null;
-  if (!targetObj && Array.isArray(taskHistory.value)) {
-    targetObj = taskHistory.value.find((item) => (item.task_id || item.id) === taskId) || null;
-  }
-  const prompt = targetObj ? (targetObj.prompt || targetObj.task || "") : "";
-  const isActuallyRunning = runningTaskId.value === taskId || (targetObj && ["running", "validating", "cancelling"].includes(targetObj.status));
-  const status = targetObj?.status || (isActuallyRunning ? "running" : "completed");
-  task.id = taskId;
-  task.prompt = prompt;
-  task.status = status;
-  runningTaskId.value = isActuallyRunning ? taskId : "";
-  try {
-    const res = await getTaskActivity(taskId, currentProjectId);
-    if (currentSeq !== viewTaskSeq || task.id !== taskId || (activeProject.value?.id || null) !== currentProjectId) return;
-    const allEvents = res.events || [];
-    activityEvents.value = allEvents.slice(-500);
-    const tel = computeTaskTelemetry(allEvents);
-    taskTelemetry.rounds = tel.rounds;
-    taskTelemetry.toolCalls = tel.toolCalls;
-    taskTelemetry.observations = tel.observations;
-    const lastEvent = allEvents[allEvents.length - 1];
-    if (isActuallyRunning && lastEvent && ["task_started", "tool_called", "observation_received"].includes(lastEvent.event_type)) {
-      if (!allEvents.some((e) => ["task_completed", "task_failed", "task_cancelled"].includes(e.event_type))) {
-        task.status = "running";
-        runningTaskId.value = taskId;
-      }
-    } else if (!isActuallyRunning) {
-      if (!allEvents.some((e) => ["task_completed", "task_failed", "task_cancelled"].includes(e.event_type))) {
-        task.status = targetObj?.status === "incomplete" ? "incomplete" : (targetObj?.status || "failed");
-        runningTaskId.value = "";
-      }
-    }
-  } catch (_) {
-    if (currentSeq !== viewTaskSeq || task.id !== taskId || (activeProject.value?.id || null) !== currentProjectId) return;
-    activityEvents.value = [];
-    taskTelemetry.rounds = 0;
-    taskTelemetry.toolCalls = 0;
-    taskTelemetry.observations = 0;
-  }
-  if (settingsOpen.value) settingsOpen.value = false;
-}
-
-async function handleOpenReport(taskId) {
-  reportTaskId.value = taskId;
-  try { currentReport.value = (await getTaskReport(taskId, activeProject.value?.id || null))?.report || ""; }
-  catch (err) { currentReport.value = `Failed to load report: ${err.message || err}`; }
-}
 async function refreshTaskHistory() {
   try { taskHistory.value = (await listTaskHistory(activeProject.value?.id || null))?.tasks || []; } catch (_) { taskHistory.value = []; }
 }
@@ -689,7 +236,8 @@ async function refreshLLMProviders() {
   if (!ms.some((m) => m.id === selectedModelId.value)) selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
 }
 async function refreshAllConfig() { await loadConfig(); await refreshLLMProviders(); }
-function toggleSidebarAction(f) { responsive.toggleSidebar(f); } function toggleAssistantAction(f) { responsive.toggleRightDrawer(f); }
+function toggleSidebarAction(f) { responsive.toggleSidebar(f); }
+function toggleAssistantAction(f) { responsive.toggleRightDrawer(f); }
 
 function onKeyDown(e) {
   if (matchesShortcut(e, "Cmd+P") || matchesShortcut(e, "Ctrl+P")) {
@@ -713,18 +261,11 @@ function onKeyDown(e) {
 onMounted(async () => {
   responsive.bindResizeListener();
   if (typeof window !== "undefined") window.addEventListener("keydown", onKeyDown);
-  connectStream();
-  stopHealthMonitor = startServerHealthMonitor((ok) => {
-    gatewayHttpConnected.value = Boolean(ok);
-    if (ok) {
-      if (!eventSource || eventSource.readyState === 2 || !sseStreamConnected.value) {
-        connectStream();
-      }
-    } else {
-      sseStreamConnected.value = false;
-    }
-  }, 5000);
-  await loadActiveProject(); await loadProjects(); await refreshAllConfig();
+  connectStream((evt) => handleEvent(evt));
+  startHealthCheck(5000, (evt) => handleEvent(evt));
+  await loadActiveProject();
+  await loadProjects();
+  await refreshAllConfig();
   if (activeProject.value) await refreshTaskHistory();
   await syncActiveRunningTask();
   if (activeProject.value?.id && !runningTaskId.value) {
@@ -735,11 +276,11 @@ onMounted(async () => {
   }
   initAuth();
 });
+
 onBeforeUnmount(() => {
   responsive.unbindResizeListener();
   if (typeof window !== "undefined") window.removeEventListener("keydown", onKeyDown);
-  if (stopHealthMonitor) { stopHealthMonitor(); stopHealthMonitor = null; }
-  if (eventSource) { eventSource.close(); eventSource = null; }
+  closeConnection();
   durationTicker.stop();
 });
 </script>

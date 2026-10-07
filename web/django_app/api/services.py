@@ -522,6 +522,7 @@ class GatewayService:
                 "provider_instance_id": provider_instance_id,
                 "model_id": model_id,
                 "requested_mode": requested_mode,
+                "skip_turn_sync": True,
             }
             task_rec = self.create_task(
                 task=content,
@@ -1901,17 +1902,6 @@ class GatewayService:
         task_meta = dict(metadata or {})
         # Penyelarasan ID Sesi: gunakan session_id dari metadata bila ada
         unified_sid = task_meta.get("session_id")
-        if not unified_sid:
-            try:
-                title_cand = (task or "").strip().split("\n", 1)[0]
-                implicit_sess = self.unified_session_store.create_session(
-                    project_id=project_id,
-                    title=title_cand[:40] if title_cand else "Task Session",
-                )
-                unified_sid = implicit_sess.session_id
-                task_meta["session_id"] = unified_sid
-            except Exception:
-                unified_sid = None
 
         # Session Aegis untuk event streaming (#51).
         # Gunakan session_id unified bila memungkinkan agar sinkron dengan database
@@ -1950,7 +1940,7 @@ class GatewayService:
                 self._task_attachments[task_id] = image_parts
 
             # Sinkronkan task ke unified_session_store jika belum ada turn untuk task_id ini
-            if unified_sid:
+            if unified_sid and not task_meta.get("skip_turn_sync"):
                 try:
                     u_sess = self.unified_session_store.get_session(unified_sid)
                     if u_sess:
