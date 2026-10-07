@@ -186,6 +186,11 @@ urlpatterns = [
         name="consultant_session_detail",
     ),
     path("consultant/consult", views.consultant_consult, name="consultant_consult"),
+    # Unified Session API (Unified Threaded Session Architecture)
+    path("sessions", views.sessions_view, name="sessions_view"),
+    path("sessions/<str:session_id>", views.session_detail_view, name="session_detail_view"),
+    path("sessions/<str:session_id>/turns", views.session_turns_view, name="session_turns_view"),
+    path("sessions/<str:session_id>/cancel", views.session_cancel_view, name="session_cancel_view"),
     # Extension Management (Task 07) - generic management API (thin facade over ExtensionManager)
     path("extensions", views.extensions_list, name="extensions_list"),
     path("extensions/install", views.extensions_install, name="extensions_install"),

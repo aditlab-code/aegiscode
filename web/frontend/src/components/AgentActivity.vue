@@ -420,6 +420,45 @@ const EVENT_DESCRIBERS = {
       detailText: text,
     };
   },
+  warning: (d, base, index) => {
+    const msg = String(d.message || d.text || d.warning || "").trim();
+    if (!msg) return null;
+    return {
+      ...base,
+      key: `warn-${index}`,
+      kind: "notice",
+      icon: "warn",
+      title: "Warning",
+      scope: d.target || d.tool || "",
+      detailText: msg,
+    };
+  },
+  agent_reasoning_delta: (d, base, index) => {
+    const delta = String(d.delta || "").trim();
+    if (!delta) return null;
+    return {
+      ...base,
+      key: `reasoning-delta-${index}`,
+      kind: "reasoning",
+      icon: "brain",
+      title: "Reasoning",
+      detailText: delta,
+    };
+  },
+  provider_response: (d, base, index) => {
+    if (!d.error) return null;
+    const pName = d.provider ? (d.provider.charAt(0).toUpperCase() + d.provider.slice(1)) : "Provider";
+    return {
+      ...base,
+      key: `prov-err-${index}`,
+      kind: "notice",
+      icon: "x",
+      title: `${pName} error`,
+      scope: d.model || "",
+      error: String(d.error),
+      detailText: `[PROVIDER ERROR]\nProvider: ${d.provider || "Unknown"}\nModel: ${d.model || "-"}\nError: ${d.error}`,
+    };
+  },
   task_started: (d, base, index) => ({
     ...base,
     key: `status-${index}`,
@@ -439,13 +478,18 @@ const EVENT_DESCRIBERS = {
       reportHtml: report ? renderMarkdown(report) : "",
     };
   },
-  task_failed: (d, base, index) => ({
-    ...base,
-    key: `status-${index}`,
-    kind: "status",
-    icon: "x",
-    title: "Task failed",
-  }),
+  task_failed: (d, base, index) => {
+    const errText = String(d.error || d.reason || d.message || "").trim();
+    return {
+      ...base,
+      key: `status-${index}`,
+      kind: "status",
+      icon: "x",
+      title: "Task failed",
+      error: errText || null,
+      detailText: errText ? `[FAILURE]\n${errText}` : null,
+    };
+  },
   task_cancelled: (d, base, index) => ({
     ...base,
     key: `status-${index}`,
@@ -547,6 +591,21 @@ const timeline = computed(() => {
 
   items.sort((a, b) => a.at - b.at);
 
+  const mergedItems = [];
+  for (const item of items) {
+    const prev = mergedItems[mergedItems.length - 1];
+    if (
+      prev &&
+      prev.kind === "reasoning" &&
+      item.kind === "reasoning" &&
+      item.key?.startsWith("reasoning-delta-") &&
+      prev.key?.startsWith("reasoning-delta-")
+    ) {
+      prev.detailText += item.detailText;
+    } else {
+      mergedItems.push({ ...item });
+    }
+  }
   // Inject lifecycle milestones: done steps first, active just before events,
   // pending steps trail at the end.
   const steps = props.lifecycleSteps || [];
@@ -584,10 +643,10 @@ const timeline = computed(() => {
       });
     });
 
-    return [...items, ...milestones].sort((a, b) => a.at - b.at);
+    return [...mergedItems, ...milestones].sort((a, b) => a.at - b.at);
   }
 
-  return items;
+  return mergedItems;
 });
 
 const empty = computed(() => !timeline.value.length);

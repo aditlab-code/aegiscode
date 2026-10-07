@@ -193,6 +193,77 @@
   letter-spacing: 0.02em;
 }
 
+/* Execution Box for Agent turns in conversation */
+.consultant-execution-box {
+  margin: 6px 0 10px 0;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+.cmsg-exec-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cmsg-exec-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft, rgba(45, 125, 78, 0.25));
+  color: var(--accent, #5ebd87);
+  letter-spacing: 0.3px;
+}
+
+.cmsg-exec-badge.failed {
+  background: rgba(224, 108, 117, 0.2);
+  color: var(--error, #e06c75);
+}
+
+.cmsg-exec-badge.running {
+  background: rgba(97, 175, 239, 0.2);
+  color: #61afef;
+}
+
+.cmsg-exec-badge.cancelled {
+  background: rgba(171, 178, 191, 0.2);
+  color: var(--text-faint);
+}
+
+.cmsg-exec-id {
+  font-size: 10.5px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-faint);
+}
+
+.cmsg-exec-changes {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+
+.cmsg-changes-label {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.cmsg-change-chip {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--text);
+}
+
 .consultant-foot {
   display: flex;
   flex-direction: column;
@@ -447,4 +518,10 @@ select.input-a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.consultant-session-item.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
 }

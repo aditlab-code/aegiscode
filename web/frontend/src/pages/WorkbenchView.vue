@@ -206,6 +206,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isSubmitting: {
+    type: Boolean,
+    default: false,
+  },
   error: {
     type: String,
     default: "",
@@ -312,6 +316,7 @@ const emit = defineEmits([
   "refresh-history",
   "open-history-task",
   "open-consultant-session",
+  "open-session",
   "open-folder",
   "delete-project",
   "open-path",
@@ -341,6 +346,7 @@ function handleOpenConsultantSession(sessionId) {
     toggleAssistant(true);
   }
   activeConsultantSessionId.value = sessionId || "";
+  emit("open-session", sessionId);
   emit("open-consultant-session", sessionId);
 }
 
@@ -1397,6 +1403,7 @@ defineExpose({
           @view-task="emit('view-task', $event)"
           @open-history-task="emit('open-history-task', $event)"
           @refresh-history="emit('refresh-history')"
+          @open-session="handleOpenConsultantSession"
           @open-consultant-session="handleOpenConsultantSession"
           @open-folder="emit('open-folder')"
           @select-tab="(path, pane) => handleSelectTab(path, pane)"
@@ -2381,6 +2388,7 @@ defineExpose({
           :show-reasoning="showReasoning"
           :activity-copied="activityCopied"
           :is-running="isRunning"
+          :is-submitting="isSubmitting"
           :stop-in-progress="stopInProgress"
           :error="error"
           :consultant-props="effectiveConsultantProps"

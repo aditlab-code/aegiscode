@@ -904,6 +904,73 @@
   margin-top: 2px;
 }
 
+.side-sess-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.side-sess-running-tag {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--accent-soft, rgba(45, 125, 78, 0.25));
+  color: var(--accent, #5ebd87);
+  letter-spacing: 0.3px;
+}
+
+.side-sess-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.side-sess-item:hover .side-sess-actions,
+.side-sess-item:focus-within .side-sess-actions {
+  opacity: 1;
+}
+
+.side-sess-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.side-sess-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.side-sess-delete-btn:hover {
+  color: var(--error, #e06c75);
+}
+
+.side-sess-rename-input {
+  width: 100%;
+  font-size: 11.5px;
+  padding: 2px 5px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  color: var(--text);
+  outline: none;
+}
+
 /* ============================================================
    VTL — Vertical Timeline (AgentActivity redesign)
    ============================================================ */

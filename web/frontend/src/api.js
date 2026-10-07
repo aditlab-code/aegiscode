@@ -566,6 +566,56 @@ export function deleteConsultantSession(sessionId, projectId = null) {
   });
 }
 
+// --- Unified Threaded Session API (Unified Threaded Session Architecture) ---
+export function listSessions(projectId = null) {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  return request(`/sessions${qs}`);
+}
+
+export function getSession(sessionId, projectId = null) {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  return request(`/sessions/${encodeURIComponent(sessionId)}${qs}`);
+}
+
+export function createSession({ projectId = null, title = null } = {}) {
+  const body = {};
+  if (projectId) body.project_id = projectId;
+  if (title) body.title = title;
+  return request("/sessions", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function renameSession(sessionId, title, projectId = null) {
+  const body = { title };
+  if (projectId) body.project_id = projectId;
+  return request(`/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteSession(sessionId, projectId = null) {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  return request(`/sessions/${encodeURIComponent(sessionId)}${qs}`, {
+    method: "DELETE",
+  });
+}
+
+export function sendSessionPrompt(sessionId, payload = {}) {
+  return request(`/sessions/${encodeURIComponent(sessionId)}/turns`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function cancelSessionRun(sessionId) {
+  return request(`/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+    method: "POST",
+  });
+}
+
 // --- Extension Management (Task 07) - generic management API (thin over ExtensionManager) ---
 export function listExtensions() {
   return request("/extensions");
@@ -650,6 +700,8 @@ export const KNOWN_SSE_EVENTS = Object.freeze([
   "task_completed",
   "task_failed",
   "task_cancelled",
+  "warning",
+  "agent_reasoning_delta",
 ]);
 
 // Membuka EventSource ke /api/events (opsional filter session_id/task_id/last_event_id).

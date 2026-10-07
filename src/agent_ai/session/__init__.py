@@ -34,6 +34,14 @@ from agent_ai.session.models import (
 )
 from agent_ai.session.store import InMemorySessionStore, SessionStore
 
+from agent_ai.session.unified_models import (
+    TurnExecutionData,
+    UnifiedSession,
+    UnifiedTurn,
+    new_turn_id,
+)
+from agent_ai.session.unified_store import UnifiedSessionStore
+
 __all__ = [
     "Session",
     "SessionStatus",
@@ -46,5 +54,9 @@ __all__ = [
     "event_from_lifecycle_snapshot",
     "SessionStore",
     "InMemorySessionStore",
+    "UnifiedSession",
+    "UnifiedTurn",
+    "TurnExecutionData",
+    "UnifiedSessionStore",
+    "new_turn_id",
 ]
-
