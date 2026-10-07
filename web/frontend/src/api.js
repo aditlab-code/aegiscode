@@ -466,6 +466,15 @@ export function getTaskHistory(taskId, projectId = null) {
   return request(`/tasks/history/${encodeURIComponent(taskId)}${qs}`);
 }
 
+// PATCH /api/tasks/history/<task_id> -> ubah judul/prompt task history.
+export function renameTaskHistory(taskId, title, projectId = null) {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";
+  return request(`/tasks/history/${encodeURIComponent(taskId)}${qs}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
 // DELETE /api/tasks/history/<task_id> -> hapus satu task history (.log, response, state).
 export function deleteTaskHistory(taskId, projectId = null) {
   const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : "";

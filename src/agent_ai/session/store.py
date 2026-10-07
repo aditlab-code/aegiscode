@@ -209,6 +209,7 @@ class InMemorySessionStore(SessionStore):
                 timestamp=event.timestamp,
                 payload=dict(event.payload),
                 sequence=sequence,
+                status=event.status or (event.payload.get("status") if isinstance(event.payload, dict) else None),
             )
             self._events.append(stored)
         # Notifikasi subscriber (live streaming). Kegagalan satu subscriber

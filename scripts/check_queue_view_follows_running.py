@@ -93,7 +93,9 @@ def scenario_app_wiring() -> None:
     # Keputusan adopsi dijalankan SEBELUM meng-overwrite task yang dipantau.
     sub_idx = lifecycle.find("async function submitTask(")
     assert sub_idx != -1, "submitTask tidak ditemukan di useTaskLifecycle"
-    sub_end = lifecycle.find("\n  async function handleComposerSubmit(", sub_idx)
+    sub_end = lifecycle.find("\nasync function handleComposerSubmit(", sub_idx)
+    if sub_end == -1:
+        sub_end = lifecycle.find("\n  async function handleComposerSubmit(", sub_idx)
     if sub_end == -1:
         sub_end = lifecycle.find("\n  async function stopTask(", sub_idx)
     sub_block = lifecycle[sub_idx:sub_end] if sub_end != -1 else lifecycle[sub_idx : sub_idx + 2500]

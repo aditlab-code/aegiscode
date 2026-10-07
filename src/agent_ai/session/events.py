@@ -75,6 +75,7 @@ class ExecutionEvent:
         timestamp: waktu event (epoch detik).
         payload: data operasional event (hasil/metadata yang diperlukan).
         sequence: nomor urut deterministik (diisi oleh store saat append).
+        status: status lifecycle terkait (opsional, diselaraskan dengan task/lifecycle).
     """
 
     event_id: str
@@ -84,7 +85,7 @@ class ExecutionEvent:
     timestamp: float = field(default_factory=time.time)
     payload: Dict[str, Any] = field(default_factory=dict)
     sequence: int = 0
-
+    status: Optional[str] = None
     def to_dict(self) -> Dict[str, Any]:
         return {
             "event_id": self.event_id,
@@ -94,6 +95,7 @@ class ExecutionEvent:
             "timestamp": self.timestamp,
             "payload": self.payload,
             "sequence": self.sequence,
+            "status": self.status,
         }
 
 
@@ -109,6 +111,8 @@ def make_event(
     task_id: Optional[str] = None,
     payload: Optional[Dict[str, Any]] = None,
     timestamp: Optional[float] = None,
+    status: Optional[str] = None,
+    sequence: int = 0,
 ) -> ExecutionEvent:
     """Bangun ExecutionEvent baru (event_id dibuat otomatis)."""
     return ExecutionEvent(
@@ -118,6 +122,8 @@ def make_event(
         event_type=event_type,
         timestamp=timestamp if timestamp is not None else time.time(),
         payload=dict(payload or {}),
+        sequence=sequence,
+        status=status,
     )
 
 

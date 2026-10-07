@@ -3,13 +3,14 @@ import { computed, ref, watch } from "vue";
 import FileExplorer from "../FileExplorer.vue";
 import ChangesPanel from "../ChangesPanel.vue";
 import GithubBackupPanel from "../GithubBackupPanel.vue";
-import QueuePanel from "../QueuePanel.vue";
 import { formatProjectOption } from "../../services/projectService.js";
 import {
   listSessions,
   createSession,
   renameSession,
   deleteSession,
+  renameTaskHistory,
+  deleteTaskHistory,
 } from "../../api.js";
 
 const props = defineProps({
@@ -104,6 +105,7 @@ const emit = defineEmits([
   "view-task",
   "open-history-task",
   "refresh-history",
+  "delete-history",
   "open-consultant-session",
   "open-session",
   "select-tab",
@@ -134,13 +136,14 @@ function handleOpenDiff(file) {
   emit("open-diff", file);
 }
 
-// Task/Thread view subtab: Threads | Queue | History
+// Task/Thread view subtab: Threads | History (Copilot Workspace model)
 const taskSubTab = ref("threads");
 const sessions = ref([]);
 const sessionsLoading = ref(false);
 const renamingSessionId = ref("");
 const renameTitleInput = ref("");
-
+const renamingTaskId = ref("");
+const renameTaskPromptInput = ref("");
 async function loadThreads() {
   if (sessionsLoading.value) return;
   sessionsLoading.value = true;
@@ -209,6 +212,44 @@ async function handleDeleteSession(s, event) {
     await loadThreads();
   } catch (err) {
     console.error("Gagal menghapus sesi:", err);
+  }
+}
+
+function startRenameTask(t, event) {
+  event?.stopPropagation?.();
+  renamingTaskId.value = t.task_id;
+  renameTaskPromptInput.value = t.task || "";
+}
+
+async function saveRenameTask(t, event) {
+  event?.stopPropagation?.();
+  const nextTitle = renameTaskPromptInput.value.trim();
+  if (!nextTitle) {
+    renamingTaskId.value = "";
+    return;
+  }
+  try {
+    const projId = props.selectedProjectId || props.activeProject?.id || null;
+    await renameTaskHistory(t.task_id, nextTitle, projId);
+    emit("refresh-history");
+  } catch (err) {
+    console.error("Gagal mengubah judul task history:", err);
+  } finally {
+    renamingTaskId.value = "";
+  }
+}
+
+async function handleDeleteTask(t, event) {
+  event?.stopPropagation?.();
+  const label = t.task ? (t.task.length > 30 ? t.task.slice(0, 30) + "…" : t.task) : t.task_id;
+  if (!confirm(`Hapus riwayat task "${label}"?`)) return;
+  try {
+    const projId = props.selectedProjectId || props.activeProject?.id || null;
+    await deleteTaskHistory(t.task_id, projId);
+    emit("delete-history", t);
+    emit("refresh-history");
+  } catch (err) {
+    console.error("Gagal menghapus task history:", err);
   }
 }
 
@@ -398,7 +439,7 @@ function statusTagClass(st) {
         </div>
       </section>
 
-      <!-- 3. Task Queue / History / Threads Section -->
+      <!-- 3. Threads / History Section -->
       <section v-else-if="activeNav === 'queue'" class="sidebar-panel queue-panel task-multitab-panel">
         <div class="task-subtabs-bar" role="tablist" aria-label="Task Subtabs">
           <button
@@ -411,16 +452,6 @@ function statusTagClass(st) {
           >
             Threads
             <span v-if="sessions.length" class="subtab-count">{{ sessions.length }}</span>
-          </button>
-          <button
-            type="button"
-            class="task-subtab-pill"
-            :class="{ active: taskSubTab === 'queue' }"
-            role="tab"
-            :aria-selected="taskSubTab === 'queue'"
-            @click="taskSubTab = 'queue'"
-          >
-            Queue
           </button>
           <button
             type="button"
@@ -539,18 +570,7 @@ function statusTagClass(st) {
             </div>
           </div>
 
-          <!-- Subtab 2: Queue -->
-          <div v-show="taskSubTab === 'queue'" class="task-subpane">
-            <QueuePanel
-              :hide-header="true"
-              :project-id="selectedProjectId || (activeProject ? activeProject.id : null)"
-              :refresh-key="queueRefresh"
-              @stop-task="emit('stop-task', $event)"
-              @view-task="emit('view-task', $event)"
-            />
-          </div>
-
-          <!-- Subtab 3: Task History -->
+          <!-- Subtab 2: Task History -->
           <div v-if="taskSubTab === 'history'" class="task-subpane sidebar-history-pane">
             <div v-if="!taskHistory.length" class="side-task-empty">
               <span>No recorded task history</span>
@@ -566,12 +586,65 @@ function statusTagClass(st) {
                 @click="emit('open-history-task', t)"
                 @keydown.enter="emit('open-history-task', t)"
               >
-                <div class="side-hist-top">
-                  <span class="status-tag" :class="statusTagClass(t.status)">{{ t.status }}</span>
-                  <span class="side-hist-time">{{ formatTaskTime(t.last_timestamp) }}</span>
+                <div class="side-hist-main">
+                  <div class="side-hist-top">
+                    <span class="status-tag" :class="statusTagClass(t.status)">{{ t.status }}</span>
+                    <span class="side-hist-time">{{ formatTaskTime(t.last_timestamp) }}</span>
+                  </div>
+                  <template v-if="renamingTaskId === t.task_id">
+                    <input
+                      v-model="renameTaskPromptInput"
+                      type="text"
+                      class="side-sess-rename-input"
+                      @click.stop
+                      @keydown.enter.stop="saveRenameTask(t, $event)"
+                      @keydown.esc.stop="renamingTaskId = ''"
+                    />
+                  </template>
+                  <template v-else>
+                    <div class="side-hist-prompt" :title="t.task || '(no prompt)'">
+                      {{ t.task || "(no prompt)" }}
+                    </div>
+                  </template>
                 </div>
-                <div class="side-hist-prompt" :title="t.task || '(no prompt)'">
-                  {{ t.task || "(no prompt)" }}
+
+                <div class="side-sess-actions" @click.stop>
+                  <template v-if="renamingTaskId === t.task_id">
+                    <button
+                      type="button"
+                      class="side-sess-action-btn"
+                      title="Simpan"
+                      @click="saveRenameTask(t, $event)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="side-sess-action-btn"
+                      title="Batal"
+                      @click="renamingTaskId = ''"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </template>
+                  <template v-else>
+                    <button
+                      type="button"
+                      class="side-sess-action-btn"
+                      title="Ubah judul"
+                      @click="startRenameTask(t, $event)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="side-sess-action-btn side-sess-delete-btn"
+                      title="Hapus history"
+                      @click="handleDeleteTask(t, $event)"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                  </template>
                 </div>
               </div>
             </div>

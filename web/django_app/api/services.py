@@ -300,6 +300,8 @@ class GatewayService:
         # boundary. Token dihapus saat eksekusi selesai.
         self._cancel_tokens: Dict[str, "CancellationToken"] = {}
         # Monotonic counter untuk urutan antrian (di belakang self._lock).
+        # Task Lifecycle Managers untuk memelihara idempotensi transisi dan enqueue_guard
+        self._task_lifecycles: Dict[str, Any] = {}
         self._queue_seq = 0
         # Scheduler serial GLOBAL (1 execution slot). `_pumping` hanya penjaga
         # re-entrancy agar pump tidak rekursif; keputusan "slot bebas" SELALU
@@ -2005,6 +2007,11 @@ class GatewayService:
             task_id=task_id,
             payload={"task": record.task, "project_id": project_id},
         )
+        # Inisialisasi lifecycle manager untuk task ini
+        from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
+        manager = TaskLifecycleManager(task_id=task_id, session_id=session.session_id)
+        with self._lock:
+            self._task_lifecycles[task_id] = manager
 
         # Dispatch berdasarkan execution_mode (Task 02):
         # - queue: lewat scheduler serial GLOBAL (1 slot, FIFO) — perilaku
@@ -2012,9 +2019,12 @@ class GatewayService:
         # - parallel: langsung running tanpa menunggu slot queue (tanpa batas).
         if self.auto_execute:
             if execution_mode_norm == "parallel":
+                manager.enqueue_guard()
                 self._start_parallel_execution(task_id)
             else:
-                self._scheduler_pump()
+                # Enqueue guard memastikan task tidak terdaftar ganda ke queue
+                if manager.enqueue_guard():
+                    self._scheduler_pump()
 
         return record.to_dict()
 
@@ -2421,6 +2431,15 @@ class GatewayService:
                 record.queue_state = "running"
             elif status in ("completed", "failed", "cancelled"):
                 record.queue_state = "done"
+            manager = self._task_lifecycles.get(task_id)
+            if manager is not None:
+                try:
+                    manager.transition_to(
+                        status,
+                        payload={"result": result, "error": error},
+                    )
+                except Exception:
+                    pass
 
             # Sinkronisasi ke UnifiedSessionStore bila task terkait unified session.
             unified_sid = (record.metadata or {}).get("session_id")
@@ -2855,6 +2874,50 @@ class GatewayService:
             }
         return info
 
+    def rename_task_history(
+        self,
+        task_id: str,
+        new_title: str,
+        project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Ubah judul/prompt ringkasan satu task history.
+
+        Memperbarui atribut `task` pada record in-memory bila ada, serta
+        menambahkan event `task_renamed` ke file log task di `.aegis/log/`.
+
+        Raises:
+            ValidationError: bila new_title kosong.
+            NotFoundError: bila task tidak ditemukan di in-memory maupun log.
+        """
+        from api.services import ValidationError as _ValidationError
+        from agent_ai.projects.aegis_store import TaskLog
+
+        clean_title = str(new_title or "").strip()
+        if not clean_title:
+            raise _ValidationError("Judul task baru tidak boleh kosong.")
+
+        had_record = False
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is not None:
+                record.task = clean_title
+                had_record = True
+
+        target_root = self._resolve_project_root(project_id) if project_id else None
+        log_path = self._find_log_file(task_id, root=target_root, project_id=project_id)
+        had_log = False
+        if log_path is not None and log_path.is_file():
+            had_log = True
+            # log_path adalah <project_root>/.aegis/log/<task_id>.log
+            project_root = log_path.parent.parent.parent
+            task_log = TaskLog(project_root, task_id=log_path.stem)
+            task_log.append("task_renamed", {"title": clean_title, "prompt": clean_title})
+
+        if not had_record and not had_log:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di history.")
+
+        return {"task_id": task_id, "task": clean_title, "renamed": True}
+
     def delete_task_history(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Hapus satu task history (file log + response log + state in-memory).
 
@@ -3227,6 +3290,23 @@ class GatewayService:
         # 2) Status record gateway langsung CANCELLED (UI/HTTP responsif).
         #    Ini juga menyetel queue_state="done" (via _update_task_status),
         #    sehingga task keluar dari antrian aktif.
+        with self._lock:
+            manager = self._task_lifecycles.get(task_id)
+        if manager is not None:
+            try:
+                manager.cancel_task(reason="user_cancelled")
+            except Exception:
+                pass
+        # Pancarkan event terminal kanonik task_cancelled ke session
+        try:
+            self._emit(
+                record.session_id,
+                "task_cancelled",
+                task_id=task_id,
+                payload={"reason": "user_cancelled", "task_id": task_id},
+            )
+        except Exception:
+            pass
         self._update_task_status(task_id, "cancelled")
         # Bila task yang dibatalkan BELUM running (tidak ada token), slot tidak
         # pernah terpakai — tetap pump agar antrian bergerak sesuai urutan.

@@ -16,8 +16,28 @@ export function useServerConnection(options = {}) {
 
   let eventSource = null;
   let stopHealthMonitor = null;
+  let reconnectTimer = null;
+  let reconnectAttempt = 0;
+  const maxReconnectDelay = 10000;
+
+  function scheduleReconnect(customOnEvent) {
+    if (reconnectTimer) return;
+    // Exponential backoff: 1s, 2s, 4s, 8s, maks 10s
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), maxReconnectDelay);
+    reconnectAttempt += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (gatewayHttpConnected.value && (!eventSource || eventSource.readyState === 2 || !sseStreamConnected.value)) {
+        connectStream(customOnEvent);
+      }
+    }, delay);
+  }
 
   function connectStream(customOnEvent) {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     if (eventSource) {
       try {
         eventSource.close();
@@ -30,23 +50,33 @@ export function useServerConnection(options = {}) {
     eventSource = openEventStream({
       lastEventId: lastReceivedEventId.value || null,
       onEvent: (evt) => {
+        if (evt && typeof evt === "object") {
+          const evtId = evt.lastEventId || evt.event_id || evt.id;
+          if (evtId) {
+            lastReceivedEventId.value = String(evtId);
+          }
+        }
         if (typeof onEventHandler === "function") {
           onEventHandler(evt);
         }
       },
       onOpen: () => {
         sseStreamConnected.value = true;
+        reconnectAttempt = 0;
       },
       onError: () => {
         sseStreamConnected.value = false;
+        scheduleReconnect(customOnEvent);
       },
     });
 
     eventSource.onopen = () => {
       sseStreamConnected.value = true;
+      reconnectAttempt = 0;
     };
     eventSource.onerror = () => {
       sseStreamConnected.value = false;
+      scheduleReconnect(customOnEvent);
     };
     return eventSource;
   }
@@ -70,6 +100,10 @@ export function useServerConnection(options = {}) {
   }
 
   function closeConnection() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
     if (stopHealthMonitor) {
       stopHealthMonitor();
       stopHealthMonitor = null;
@@ -81,6 +115,7 @@ export function useServerConnection(options = {}) {
       eventSource = null;
     }
     sseStreamConnected.value = false;
+    reconnectAttempt = 0;
   }
 
   return {

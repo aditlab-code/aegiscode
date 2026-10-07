@@ -66,7 +66,7 @@ Model event minimum: `event_id`, `task_id`, `session_id`, `sequence`, `type` (re
 
 - [ ] Reducer idempotent di backend dan frontend; validasi duplicate dan gap sequence.
 - [ ] Queue, Activity, History, dan Reasoning view diproyeksikan dari event yang sama; tanpa parsing JSON provider per view.
-- [ ] History dibentuk dari state terminal task/session; queue tidak bergantung polling tidak konsisten.
+- [x] History dibentuk dari state terminal task/session; aksi CRUD in-situ (rename & delete history di sidebar kiri setara Threads) terintegrasi secara persisten (`.aegis/log/`, backend PATCH/DELETE endpoint, in-memory state); queue tidak bergantung polling tidak konsisten.
 - [ ] Task tidak masuk scheduler dua kali; pembatalan berhenti pada safe boundary; timeout, retry, malformed response, dan tool error menghasilkan status terminal jelas.
 - [ ] Ketahanan SSE: exponential backoff, sinkronisasi `last_event_id`, tanpa event hilang atau ganda.
 - [ ] Stabilitas PTY: penutupan socket saat ganti proyek, tanpa deadlock.
@@ -152,3 +152,4 @@ Angka dikalibrasi ulang setelah baseline Fase 0 tersedia.
 2. Orkestrasi multi-agent swarm terdistribusi.
 3. Penyimpanan vektor cloud pihak ketiga.
 4. Butir RAG yang dilepas (adapter runner lokal, dedup konteks, telemetri hardware): hanya dibuka kembali lewat keputusan baru setelah Fase 4 lulus.
+5. Remote IDE & Mobile Companion (Headless Gateway + Thin Client): Akses jarak jauh via Web/PWA/Mobile untuk remote task steering, CoT streaming, dan persetujuan diff (HITL) saat bepergian (pola VS Code Remote / JetBrains Gateway).

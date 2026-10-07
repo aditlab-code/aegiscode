@@ -134,13 +134,13 @@ onBeforeUnmount(() => {
         </AppBadge>
       </button>
 
-      <!-- Global Task Queue -->
+      <!-- Threads & History (Copilot Workspace Model) -->
       <button
         type="button"
         class="act-btn"
         :class="{ active: sidebarOpen && activeNav === 'queue' }"
-        title="Task Queue"
-        aria-label="Task Queue"
+        title="Threads & History"
+        aria-label="Threads & History"
         @click="selectNav('queue')"
       >
         <svg

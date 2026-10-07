@@ -40,6 +40,7 @@ export function useTaskLifecycle(options = {}) {
   const activeSessionId = options.activeSessionId || ref("");
   const lastReceivedEventId = options.lastReceivedEventId || ref("");
   const settingsOpen = options.settingsOpen || ref(false);
+  const llmProviders = options.llmProviders || ref([]);
 
   const task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
   const isRunning = computed(() => ["running", "validating", "cancelling"].includes(task.status));
@@ -278,8 +279,23 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
   const startGen = workspaceGen.value;
   isSubmittingTask.value = true;
   try {
-    const pId = providerId || selectedProviderInstanceId.value || null;
-    const mId = modelId || selectedModelId.value || null;
+    let pId = providerId || selectedProviderInstanceId.value || null;
+    let mId = modelId || selectedModelId.value || null;
+
+    // Fallback otomatis jika pId atau mId belum terpilih namun llmProviders tersedia
+    const providersList = (typeof llmProviders !== "undefined" && llmProviders?.value) ? llmProviders.value : [];
+    if ((!pId || !mId) && Array.isArray(providersList) && providersList.length) {
+      const enabledProv = providersList.filter((p) => p.enabled !== false);
+      const defaultInst = enabledProv.find((p) => (p.models || []).some((m) => m.enabled !== false)) || enabledProv[0];
+      if (defaultInst) {
+        if (!pId) pId = defaultInst.id;
+        if (!mId) {
+          const activeModels = (defaultInst.models || []).filter((m) => m.enabled !== false);
+          if (activeModels.length) mId = activeModels[0].id;
+        }
+      }
+    }
+
     const eMode = execMode || selectedExecutionMode.value || "queue";
     const meta = {};
     if (pId) meta.provider_instance_id = pId;
@@ -361,7 +377,6 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
 
 async function handleComposerSubmit(payload) {
   const text = typeof payload === "string" ? payload : payload?.text;
-  if (!text) return;
   await submitTask(
     text,
     payload?.providerInstanceId || null,

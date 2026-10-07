@@ -22,6 +22,8 @@ export function createInitialTaskState() {
     tokenCount: null,
     taskStartedAt: null,
     taskEndedAt: null,
+    lastProcessedSequence: 0,
+    processedEventIds: new Set(),
   };
 }
 
@@ -38,6 +40,50 @@ export function isEventForMonitoredTask(state, event) {
   const evtTaskId = event.task_id || event.taskId;
   if (!evtTaskId) return true; // Event global sistem
   return evtTaskId === state.monitoredTaskId;
+}
+
+/**
+ * Periksa apakah event merupakan duplikat berdasarkan sequence atau event_id (idempotent guard).
+ * Mengembalikan true jika event valid untuk diproses, false jika harus diabaikan.
+ *
+ * @param {object} state
+ * @param {object} event
+ * @returns {boolean}
+ */
+export function shouldProcessEventIdempotent(state, event) {
+  if (!event || typeof event !== "object") return false;
+
+  const eventId = event.event_id || event.eventId || event.id;
+  if (eventId) {
+    if (!state.processedEventIds) {
+      state.processedEventIds = new Set();
+    }
+    if (state.processedEventIds.has(eventId)) {
+      return false; // Duplikat berdasarkan event_id
+    }
+  }
+
+  const seq = typeof event.sequence === "number" ? event.sequence : null;
+  if (seq !== null && seq > 0) {
+    const lastSeq = state.lastProcessedSequence || 0;
+    if (seq <= lastSeq) {
+      return false; // Duplikat / out-of-order sequence yang sudah pernah diproses
+    }
+    state.lastProcessedSequence = seq;
+  }
+
+  if (eventId) {
+    state.processedEventIds.add(eventId);
+    // Batasi memori processedEventIds agar tidak membengkak tak terhingga
+    if (state.processedEventIds.size > 2000) {
+      const oldest = Array.from(state.processedEventIds).slice(0, 500);
+      for (const id of oldest) {
+        state.processedEventIds.delete(id);
+      }
+    }
+  }
+
+  return true;
 }
 
 /**

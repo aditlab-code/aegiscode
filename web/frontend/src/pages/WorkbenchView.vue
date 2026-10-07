@@ -1429,6 +1429,7 @@ defineExpose({
           @view-task="emit('view-task', $event)"
           @open-history-task="emit('open-history-task', $event)"
           @refresh-history="emit('refresh-history')"
+          @delete-history="emit('delete-history', $event)"
           @open-session="handleOpenConsultantSession"
           @open-consultant-session="handleOpenConsultantSession"
           @open-folder="emit('open-folder')"

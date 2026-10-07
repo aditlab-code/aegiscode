@@ -187,8 +187,8 @@ const {
   activeSessionId,
   lastReceivedEventId,
   settingsOpen,
+  llmProviders,
 });
-
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
 const activeProviderLabel = computed(() => activeProvider.value?.name || config.value.provider || "");
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
@@ -224,16 +224,29 @@ async function loadConfig() {
   } catch (_) { config.value = {}; }
 }
 async function refreshLLMProviders() {
-  try { const d = await getLLMProviders(); llmProviders.value = d?.providers || []; } catch { llmProviders.value = []; }
-  const en = llmProviders.value.filter((p) => p.enabled !== false), cfgPid = config.value.provider_instance_id, cfgMid = config.value.model_id;
+  try {
+    const d = await getLLMProviders();
+    llmProviders.value = d?.providers || [];
+  } catch {
+    llmProviders.value = [];
+  }
+  const en = llmProviders.value.filter((p) => p.enabled !== false);
+  const cfgPid = config.value.provider_instance_id;
+  const cfgMid = config.value.model_id;
+
   if (!en.some((p) => p.id === selectedProviderInstanceId.value)) {
     const withM = en.filter((p) => (p.models || []).some((m) => m.enabled !== false));
-    selectedProviderInstanceId.value = (en.find((p) => p.id === cfgPid) || withM[0] || en[0])?.id || "";
-    selectedModelId.value = "";
+    const chosen = en.find((p) => p.id === cfgPid) || withM[0] || en[0];
+    selectedProviderInstanceId.value = chosen?.id || "";
+    const ms = chosen ? (chosen.models || []).filter((m) => m.enabled !== false) : [];
+    selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
+  } else {
+    const inst = en.find((p) => p.id === selectedProviderInstanceId.value);
+    const ms = inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
+    if (!ms.some((m) => m.id === selectedModelId.value)) {
+      selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
+    }
   }
-  const inst = en.find((p) => p.id === selectedProviderInstanceId.value);
-  const ms = inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
-  if (!ms.some((m) => m.id === selectedModelId.value)) selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
 }
 async function refreshAllConfig() { await loadConfig(); await refreshLLMProviders(); }
 function toggleSidebarAction(f) { responsive.toggleSidebar(f); }

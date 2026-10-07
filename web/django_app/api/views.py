@@ -844,13 +844,23 @@ def task_history_clear(request: HttpRequest, service: GatewayService) -> JsonRes
 
 
 @csrf_exempt
-@require_http_methods(["GET", "DELETE"])
+@require_http_methods(["GET", "PATCH", "DELETE"])
 @_handle
 def task_history_detail(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
     """GET /api/tasks/history/<task_id> -> ringkasan task dari .aegis/log/.
+    PATCH /api/tasks/history/<task_id> -> ubah judul/prompt task history.
     DELETE /api/tasks/history/<task_id> -> hapus log dan history task.
     """
     project_id = request.GET.get("project_id") or None
+    if request.method == "PATCH":
+        body = _parse_json_body(request)
+        title = body.get("title") or body.get("task")
+        if not title or not str(title).strip():
+            from api.services import ValidationError
+            raise ValidationError("Field 'title' wajib diisi.")
+        return _json_response(
+            service.rename_task_history(task_id, str(title).strip(), project_id=project_id)
+        )
     if request.method == "DELETE":
         return _json_response(service.delete_task_history(task_id, project_id=project_id))
     return _json_response(service.get_task_history(task_id, project_id=project_id))

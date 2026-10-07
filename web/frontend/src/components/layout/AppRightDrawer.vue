@@ -160,11 +160,15 @@ const emit = defineEmits([
 
 const isAgentsTab = computed(() => props.activeTab === "agents" || props.activeTab === "activity");
 const isAskTab = computed(() => props.activeTab === "ask" || props.activeTab === "consultant");
+const canStop = computed(() => {
+  if (props.isRunning) return true;
+  const st = String(props.task?.status || "").toLowerCase();
+  return ["pending", "created", "queued", "preparing"].includes(st);
+});
 
 const providerOptions = computed(() =>
   (props.providers || []).filter((p) => p.enabled !== false)
 );
-
 const modelOptions = computed(() => {
   const inst = providerOptions.value.find((p) => p.id === props.providerInstanceId);
   return inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
@@ -594,10 +598,10 @@ defineExpose({
             </div>
             <div class="chat-card-actions-right">
               <button
-                v-if="isRunning"
+                v-if="canStop"
                 type="button"
                 class="chat-stop-btn"
-                title="Stop running task"
+                :title="isRunning ? 'Stop running task' : 'Cancel queued task'"
                 :disabled="stopInProgress"
                 @click="emit('request-stop')"
               >
@@ -633,6 +637,7 @@ defineExpose({
           v-bind="consultantProps"
           @close="emit('close')"
           @run-task="emit('run-consultant-task', $event)"
+          @stop-task="emit('request-stop', $event)"
           @consultant-event="emit('consultant-event', $event)"
           @apply-to-editor="emit('apply-to-editor', $event)"
           @open-settings="emit('open-settings', $event)"

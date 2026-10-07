@@ -68,8 +68,11 @@ const props = defineProps({
 const emit = defineEmits([
   "close",
   "update:providerInstanceId",
+  "update:provider-instance-id",
   "update:modelId",
+  "update:model-id",
   "update:activeSessionId",
+  "update:active-session-id",
   "run-task",
   "stop-task",
   "view-task",
@@ -77,7 +80,6 @@ const emit = defineEmits([
   "open-settings",
   "consultant-event",
 ]);
-
 const messages = ref([]);
 const activeSideTab = ref("sessions");
 const input = ref("");
@@ -366,11 +368,16 @@ const displayModel = computed(() => {
 function onProviderChange(e) {
   const nextId = String(e.target.value || "");
   emit("update:providerInstanceId", nextId);
+  emit("update:provider-instance-id", nextId);
   const models = modelsFor(nextId);
-  emit("update:modelId", models[0] ? models[0].id : "");
+  const firstMid = models[0] ? models[0].id : "";
+  emit("update:modelId", firstMid);
+  emit("update:model-id", firstMid);
 }
 function onModelChange(e) {
-  emit("update:modelId", String(e.target.value || ""));
+  const mid = String(e.target.value || "");
+  emit("update:modelId", mid);
+  emit("update:model-id", mid);
 }
 
 // Jaga konsistensi: bila model terpilih tidak ada pada provider aktif (mis.
@@ -383,10 +390,10 @@ watch(
     if (!models.length) return;
     if (!models.some((m) => m.id === props.modelId)) {
       emit("update:modelId", models[0].id);
+      emit("update:model-id", models[0].id);
     }
   }
 );
-
 // --- Runner Task Proposal (provider/model untuk MENJALANKAN task) -----------
 // TERPISAH dari pilihan header (yang mengontrol CHAT). Default mengikuti
 // pilihan header; setelah user menyentuhnya sendiri, ia INDEPENDEN (perubahan

@@ -692,7 +692,8 @@ class TaskLogReader:
             data = ev.get("data", {}) or {}
             if evt == "task_requested":
                 prompt = data.get("prompt", "")
-            elif evt in ("task_started", "tool_called", "observation_received", "phase_changed", "provider_request", "agent_commentary"):
+            elif evt == "task_renamed":
+                prompt = data.get("title") or data.get("prompt") or prompt
                 has_active_work = True
             elif evt == "task_completed":
                 status = "completed"
