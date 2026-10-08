@@ -13,8 +13,8 @@
 import { computed, ref } from "vue";
 // Versi AETHER dari SINGLE SOURCE OF TRUTH `data/version.json` (sama dengan
 // footer Workbench). TIDAK ada version hardcoded di launcher ini.
-import { AEGIS_VERSION } from "../version.js";
-import { pickFolder } from "../api.js";
+import { AEGIS_VERSION } from "../../version.js";
+import { pickFolder } from "../../api.js";
 
 const props = defineProps({
   projects: { type: Array, default: () => [] },

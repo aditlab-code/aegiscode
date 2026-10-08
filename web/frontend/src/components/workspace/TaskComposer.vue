@@ -8,8 +8,8 @@
 // TIDAK ada execution engine di frontend: hanya memanggil API #50.
 import { computed, onMounted, ref, watch } from "vue";
 import PromptAutocompletePopover from "../ui/PromptAutocompletePopover.vue";
-import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
-import { useAttachmentPipeline } from "../composables/useAttachmentPipeline.js";
+import { usePromptAutocomplete } from "../../services/promptSuggestionService.js";
+import { useAttachmentPipeline } from "../../composables/useAttachmentPipeline.js";
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },

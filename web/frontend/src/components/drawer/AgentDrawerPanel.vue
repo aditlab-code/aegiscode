@@ -2,9 +2,9 @@
 import { ref, computed, watch, nextTick } from "vue";
 import AgentActivity from "./AgentActivity.vue";
 import PromptAutocompletePopover from "../ui/PromptAutocompletePopover.vue";
-import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
-import { getTaskReport } from "../api.js";
-import { renderMarkdown } from "../markdown.js";
+import { usePromptAutocomplete } from "../../services/promptSuggestionService.js";
+import { getTaskReport } from "../../api.js";
+import { renderMarkdown } from "../../markdown.js";
 
 const props = defineProps({
   task: {

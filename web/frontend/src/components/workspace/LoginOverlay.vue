@@ -6,7 +6,7 @@
  * handles user redirect to Google OAuth, and displays authentication errors.
  */
 import { ref } from "vue";
-import { fetchGoogleLoginUrl, devLogin } from "../services/authService.js";
+import { fetchGoogleLoginUrl, devLogin } from "../../services/authService.js";
 
 const props = defineProps({
   loading: {

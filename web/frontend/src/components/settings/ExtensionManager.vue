@@ -13,7 +13,7 @@ import {
   disableExtension,
   updateExtension,
   uninstallExtension,
-} from "../api.js";
+} from "../../api.js";
 import ExtensionUI from "../extensions/ExtensionUI.vue";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
@@ -295,7 +295,7 @@ async function toggleConfig() {
   configError.value = "";
   configSchema.value = null;
   try {
-    const mod = await import("../api.js");
+    const mod = await import("../../api.js");
     const res = await mod.getExtensionConfigSchema(detail.value.id);
     configSchema.value = res.schema || res;
     showConfig.value = true;
@@ -311,7 +311,7 @@ async function onConfigSubmit(payload) {
   const id = detail.value.id;
   configError.value = "";
   try {
-    const mod = await import("../api.js");
+    const mod = await import("../../api.js");
     for (const [key, value] of Object.entries(payload || {})) {
       if (value === "" || value == null) continue;
       await mod.setExtensionConfigValue(id, key, value);

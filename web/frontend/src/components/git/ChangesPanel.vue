@@ -6,7 +6,7 @@ import {
   getProjectGitDiff,
   stageProjectGitChanges,
   unstageProjectGitChanges,
-} from "../api.js";
+} from "../../api.js";
 
 const props = defineProps({
   changes: { type: Array, default: () => [] },

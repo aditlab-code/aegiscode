@@ -12,13 +12,13 @@ import {
   getProjectGitDiff,
   stageProjectGitChanges,
   unstageProjectGitChanges,
-} from "../api.js";
-import { languageForFile, languageLabel } from "../editorLanguages.js";
+} from "../../api.js";
+import { languageForFile, languageLabel } from "../../editorLanguages.js";
 import {
   getStoredEditorSettings,
   toMonacoOptions,
   EDITOR_SETTINGS_EVENT,
-} from "../services/editorSettingsService.js";
+} from "../../services/editorSettingsService.js";
 
 const props = defineProps({
   path: { type: String, required: true },
@@ -68,7 +68,7 @@ let disposed = false;
 let monacoModulePromise = null;
 function loadMonacoModule() {
   if (!monacoModulePromise) {
-    monacoModulePromise = import("../monacoSetup.js");
+    monacoModulePromise = import("../../monacoSetup.js");
   }
   return monacoModulePromise;
 }

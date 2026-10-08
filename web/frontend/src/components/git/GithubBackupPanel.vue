@@ -17,8 +17,8 @@ import {
   restoreGithubCheckpoint,
   saveGithubConfig,
   testGithubConnection,
-} from "../api";
-import { computeGitGraph } from "../services/gitGraphLayout";
+} from "../../api";
+import { computeGitGraph } from "../../services/gitGraphLayout";
 
 const props = defineProps({
   // Project (dari daftar launcher / active project): { id, name, root|path }.

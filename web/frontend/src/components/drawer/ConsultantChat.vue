@@ -15,19 +15,19 @@ import {
   createConsultantSession,
   renameConsultantSession,
   deleteConsultantSession,
-} from "../api.js";
-import { renderMarkdown } from "../markdown.js";
+} from "../../api.js";
+import { renderMarkdown } from "../../markdown.js";
 import QueuePanel from "../queue/QueuePanel.vue";
 import PromptAutocompletePopover from "../ui/PromptAutocompletePopover.vue";
 import AppThinkingBlock from "../ui/AppThinkingBlock.vue";
-import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
-import { useAttachmentPipeline } from "../composables/useAttachmentPipeline.js";
+import { usePromptAutocomplete } from "../../services/promptSuggestionService.js";
+import { useAttachmentPipeline } from "../../composables/useAttachmentPipeline.js";
 import {
   stripTaskProposal,
   assistantText,
   extractFirstCodeBlock,
   extractTaskProposalText,
-} from "../services/consultantProposalService.js";
+} from "../../services/consultantProposalService.js";
 const props = defineProps({
   embedded: { type: Boolean, default: true },
   providers: { type: Array, default: () => [] },

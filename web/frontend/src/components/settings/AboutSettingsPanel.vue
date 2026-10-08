@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import { AEGIS_VERSION } from "../version.js";
+import { AEGIS_VERSION } from "../../version.js";
 import AppCard from "../ui/AppCard.vue";
 
 const props = defineProps({
@@ -148,7 +148,7 @@ async function copyLicense() {
         <div class="panel-body">
           <div class="arch-section">
             <div class="arch-title">1. Hybrid Asymmetric Split-Brain Model</div>
-            <div class="arch-box mono">LLM (Brain) — Cloud Orchestrator:
+            <div class="arch-box mono">LLM (Brain) — Cloud Coordinator:
   • Autonomous Reasoning &amp; Diff Synthesis
   • Tool Selection &amp; Argument Construction
   • Budgeted Context Window (&lt; 4,000 tokens)

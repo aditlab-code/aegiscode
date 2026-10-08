@@ -8,21 +8,21 @@
 //   - Pergantian tab di pane yang sama menggunakan editor.setModel(model) sehingga
 //     DOM Monaco tidak dihancurkan ulang dan riwayat undo/redo tetap persisten.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { readFileContent, writeFileContent, runProjectLint } from "../api.js";
-import { languageForFile, languageLabel } from "../editorLanguages.js";
+import { readFileContent, writeFileContent, runProjectLint } from "../../api.js";
+import { languageForFile, languageLabel } from "../../editorLanguages.js";
 import {
   getStoredEditorSettings,
   toMonacoOptions,
   EDITOR_SETTINGS_EVENT,
-} from "../services/editorSettingsService.js";
-import { validateCodeSyntax } from "../services/diagnosticService.js";
+} from "../../services/editorSettingsService.js";
+import { validateCodeSyntax } from "../../services/diagnosticService.js";
 import {
   getOrCreateModel,
   getEntry,
   releaseModel,
   markSaved,
   isShared,
-} from "../services/monacoModelRegistry.js";
+} from "../../services/monacoModelRegistry.js";
 
 const props = defineProps({
   // Path relatif terhadap root project.
@@ -82,7 +82,7 @@ let disposed = false;
 let monacoModulePromise = null;
 function loadMonacoModule() {
   if (!monacoModulePromise) {
-    monacoModulePromise = import("../monacoSetup.js");
+    monacoModulePromise = import("../../monacoSetup.js");
   }
   return monacoModulePromise;
 }

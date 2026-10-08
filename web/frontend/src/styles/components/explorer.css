@@ -7,6 +7,10 @@
   overflow: hidden;
 }
 
+.ws-body {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .ex-head {
   display: flex;
   align-items: center;

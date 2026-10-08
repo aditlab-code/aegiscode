@@ -7,7 +7,7 @@ import {
   deleteSession,
   renameTaskHistory,
   deleteTaskHistory,
-} from "../api.js";
+} from "../../api.js";
 
 const props = defineProps({
   selectedProjectId: {

@@ -9,7 +9,7 @@ import {
   revealInExplorer,
   deleteEntry,
   renameEntry,
-} from "../api.js";
+} from "../../api.js";
 // Node tree RECURSIVE (menggantikan rendering 2-level hard-coded). Komponen ini
 // merender satu baris lalu memanggil dirinya sendiri untuk anak-anaknya, jadi
 // kedalaman folder tidak lagi dibatasi di template.

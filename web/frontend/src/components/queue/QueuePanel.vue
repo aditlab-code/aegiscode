@@ -16,7 +16,7 @@ import {
   listTaskQueue,
   moveQueueTask,
   removeQueueTask,
-} from "../api.js";
+} from "../../api.js";
 
 const props = defineProps({
   // Penanda refresh dari parent (mis. setelah Run Task / event terminal).

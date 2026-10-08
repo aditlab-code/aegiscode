@@ -6,7 +6,7 @@ import {
   getStoredEditorSettings,
   saveEditorSettings,
   toMonacoOptions,
-} from "../services/editorSettingsService.js";
+} from "../../services/editorSettingsService.js";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
 
@@ -94,7 +94,7 @@ let disposed = false;
 async function mountPreviewEditor() {
   if (typeof window === "undefined" || !previewContainer.value) return;
   try {
-    const mod = await import("../monacoSetup.js");
+    const mod = await import("../../monacoSetup.js");
     if (disposed || !previewContainer.value) return;
     monaco = mod.getMonaco();
     const uri = monaco.Uri.parse("inmemory://aegis/preview/sampleTask.ts");

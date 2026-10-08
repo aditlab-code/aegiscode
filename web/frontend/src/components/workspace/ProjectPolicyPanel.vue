@@ -12,7 +12,7 @@
 // Perubahan policy di sini HANYA berlaku untuk project ini (isolasi project):
 // project lain tidak terpengaruh, dan Default Project Policy tidak berubah.
 import { ref, watch } from "vue";
-import { getProjectPolicy, saveProjectPolicy } from "../api";
+import { getProjectPolicy, saveProjectPolicy } from "../../api";
 import AppButton from "../ui/AppButton.vue";
 
 const props = defineProps({

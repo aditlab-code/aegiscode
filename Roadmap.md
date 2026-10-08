@@ -145,6 +145,7 @@ Syarat tambahan:
 
 - **5.1 HITL**: integrasi `SupervisedModePolicy` ke permission gateway; `DiffModal.vue` untuk `write_file`, `delete_file`, dan perintah destruktif; checkpoint Git otomatis dan rollback 1-klik. Berkas: `src/agent_ai/permission/`, `src/agent_ai/runtime/policy.py`, `src/agent_ai/git/checkpoint.py`, `web/frontend/src/components/DiffModal.vue`. Tes: `tests/test_supervised_policy.py`, `tests/test_checkpoint_rollback.py`.
 - **5.2 UI Studio**: onboarding provider sederhana, preset local/BYOK/safe production, task timeline teraudit, diff review jelas. Layout mengikuti [docs/ui-design.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ui-design.md).
+  - [x] **UI-phase (Workbench Thin Coordinator & Facade Decomposition)**: Dekomposisi `WorkbenchView.vue` (2.844 baris -> 448 baris, reduksi >84%) menjadi *Thin Layout Coordinator* dengan pemisahan 3 facade domain (`useWorkbenchEditorFacade.js`, `useWorkbenchAssistantFacade.js`, `useWorkbenchDockFacade.js`), ekstraksi 3 komponen presentasional (`EditorTabBar.vue`, `EditorBreadcrumbs.vue`, `EditorConfirmCloseModal.vue`), penyelarasan impor relatif 2-tingkat, dan *Async DOM Guard* Monaco (`requestAnimationFrame`). Seluruh 119 unit test dan 12 checks `check_workbench.py` lulus 100%.
 - **5.3 Desktop Tauri v2**: shell `src-tauri/`, pengawas sidecar Python, tree-kill native OS, dialog dan notifikasi native, installer `.dmg` macOS pada branch `release`. Tes: `tests/test_sidecar_lifecycle.rs`, `.github/workflows/verify_packaging.yml`.
 
 ---

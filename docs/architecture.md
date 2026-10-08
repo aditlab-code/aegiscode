@@ -124,10 +124,20 @@ The loop runs without heuristic "done" detectors:
 
 ## 4. AegisCode Studio Workbench & System Integration
 
-AegisCode features a developer-first IDE workbench (**AegisCode Studio**):
+AegisCode features a developer-first IDE workbench (**AegisCode Studio**) engineered with a high-performance, reactive front-end architecture:
 - **Backend Gateway:** Django application (`web/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
-- **Frontend:** Modern Vue 3 + Vite single-page application (`web/frontend/`) featuring a VS Code-style 3-column layout (Monaco Editor, Monaco Diff Editor, interactive PTY terminal via `@xterm/xterm`, HITL DiffModal, and Git Source Control drawer).
-
+- **Frontend Architecture:** Modern Vue 3 + Vite single-page application (`web/frontend/`) featuring a VS Code-style 3-column layout governed by a **Thin Layout Coordinator Pattern** and domain-driven **Facade Subsystems**:
+  - **Thin Layout Coordinator (`WorkbenchView.vue` < 450 lines):** Acts strictly as the root orchestrator connecting layout splitters, keyboard shortcuts, and lifecycle events, delegating all domain state and business logic to dedicated facades.
+  - **Layout & Editor Facades (`src/composables/workbench/`):**
+    - `useWorkbenchEditorFacade.js`: Manages Monaco editor lifecycle, single & multi-pane split editors (horizontal/vertical), model registry synchronization, external modification conflict resolution (Keep Mine / Accept Agent / Review Diff), diagnostic marker tracking, and workspace context serialization (`localStorage`).
+    - `useWorkbenchAssistantFacade.js`: Coordinates AI Agent Drawer and Consultant Chat subsystems, session lifecycles, task proposal delegation, floating background completion toasts, and dynamic provider/model resolution.
+    - `useWorkbenchDockFacade.js`: Manages bottom dock tabs (Terminal, Output, Problems), consumes rolling SSE event buffers (`useWorkbenchLiveEvents`), and automatically reveals dock upon problem detection.
+    - `useWorkbenchLayout.js`: Handles column sizing, responsive breakpoint constraints, and visibility toggles for sidebar, assistant, and bottom dock.
+  - **Extracted Presentational Components (`src/components/editor/`):**
+    - `EditorTabBar.vue`: Reusable tab strip supporting single and dual split panes, dirty indicators (`●`), conflict popovers, and inline save/split/orientation controls (eliminating template duplication and DOM bloat).
+    - `EditorBreadcrumbs.vue`: Context-aware interactive breadcrumb navigation supporting standard paths, diff tabs, settings, and welcome views.
+    - `EditorConfirmCloseModal.vue`: Modal dialog safeguarding against accidental loss of unsaved changes when closing dirty files or collapsing split panes.
+  - **Async DOM Guard & Monaco Integrity:** Monaco editor `layout()` invocations are shielded with `requestAnimationFrame` guards to prevent layout crashes during rapid split-pane resizing and unmounted DOM transitions.
 ---
 
 ## 5. Local Semantic Index & Vector Database (Phase 2.1)

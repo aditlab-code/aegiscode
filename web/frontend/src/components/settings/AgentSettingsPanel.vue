@@ -16,7 +16,7 @@
 import { computed, onMounted, ref } from "vue";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
-import { getGlobalSettings, updateGlobalSettings } from "../api";
+import { getGlobalSettings, updateGlobalSettings } from "../../api";
 
 const loading = ref(false);
 const busy = ref(false);

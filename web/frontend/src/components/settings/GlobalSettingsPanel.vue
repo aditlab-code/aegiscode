@@ -12,8 +12,8 @@
 // Settings dipisah per SECTION (Server / Conversation / Logging / API Retry)
 // agar tidak menjadi satu halaman panjang, dengan label + deskripsi jelas.
 import { computed, onMounted, reactive, ref } from "vue";
-import { getGlobalSettings, updateGlobalSettings } from "../api";
-import { terminateServer, isTerminating, serverTerminated } from "../services/serverService.js";
+import { getGlobalSettings, updateGlobalSettings } from "../../api";
+import { terminateServer, isTerminating, serverTerminated } from "../../services/serverService.js";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
 

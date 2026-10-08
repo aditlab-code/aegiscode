@@ -29,9 +29,9 @@
 // tombol Copy kecil (pojok kiri bawah area report) yang memakai pola
 // .cmsg-actions/.copy-btn yang sama dengan Consultant Chat.
 import { computed, nextTick, ref, watch } from "vue";
-import { renderMarkdown } from "../markdown.js";
+import { renderMarkdown } from "../../markdown.js";
 import AppThinkingBlock from "../ui/AppThinkingBlock.vue";
-import { buildAgentActivityCopy } from "../activityCopy.js";
+import { buildAgentActivityCopy } from "../../activityCopy.js";
 const props = defineProps({
   events: { type: Array, default: () => [] },
   status: { type: String, default: "idle" },

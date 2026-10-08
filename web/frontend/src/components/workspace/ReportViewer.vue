@@ -10,7 +10,7 @@
 // inline). Renderer kecil ini self-contained (tanpa dependency baru) karena
 // project belum memiliki Markdown renderer.
 import { computed } from "vue";
-import { renderMarkdown } from "../markdown.js";
+import { renderMarkdown } from "../../markdown.js";
 
 const props = defineProps({
   taskId: { type: String, default: "" },

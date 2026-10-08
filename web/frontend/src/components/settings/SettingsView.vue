@@ -20,7 +20,7 @@ import {
   deleteLLMCredential,
   testLLMProvider,
   updateGlobalSettings,
-} from "../api";
+} from "../../api";
 import GlobalSettingsPanel from "./GlobalSettingsPanel.vue";
 import AgentSettingsPanel from "./AgentSettingsPanel.vue";
 import AppButton from "../ui/AppButton.vue";

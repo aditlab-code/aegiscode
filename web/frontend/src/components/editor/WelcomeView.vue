@@ -6,7 +6,7 @@
  * Strictly uses native inline Vue SVG icons (zero emoticons).
  */
 import { computed } from "vue";
-import { AEGIS_VERSION } from "../version.js";
+import { AEGIS_VERSION } from "../../version.js";
 
 const props = defineProps({
   projects: {
