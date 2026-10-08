@@ -127,6 +127,7 @@ class AgentRuntime:
         cancel_token: Optional[CancellationToken] = None,
         policy_resolver: Optional[ExecutionPolicyResolver] = None,
         requested_mode: Optional[str] = None,
+        codegraph_service: Optional[Any] = None,
     ) -> None:
         if provider is None:
             raise ValueError("AgentRuntime butuh provider (BaseProvider).")
@@ -155,6 +156,7 @@ class AgentRuntime:
         # aktif. Default None = tidak ada logging (perilaku sekarang).
         self._response_log: Optional[Any] = None
         self._brain: Optional[Any] = None
+        self.codegraph_service = codegraph_service
         # Environment Context project-local (`<project_root>/.aegis/ENVIRONMENT.md`).
         # Dibuat/dimuat SEKALI per session (instance runtime); hasilnya di-cache
         # di `_environment_text` dan hanya disuntikkan pada task pertama.
@@ -457,6 +459,9 @@ class AgentRuntime:
         # Project-local storage (Task 5): Task Log + AI Project Bible.
         # Best-effort: kegagalan di sini TIDAK boleh menggagalkan eksekusi.
         self._setup_project_storage(prepared)
+
+        # CodeGraph Relational Intelligence: pastikan graf kode termutakhir (best-effort).
+        self._ensure_codegraph_fresh()
 
         # Agent Execution Policy: resolve requested_mode -> effective_mode.
         # Murni informasi/strategi (bukan hard limit, bukan penggerak loop):
@@ -968,6 +973,27 @@ class AgentRuntime:
             log.append(event_type, dict(payload or {}))
         except Exception:  # noqa: BLE001 - log tidak boleh crash
             return
+
+    def _ensure_codegraph_fresh(self) -> None:
+        """Pastikan CodeGraph termutakhir sebelum task berjalan (best-effort guardrail)."""
+        try:
+            service = self.codegraph_service
+            if service is None and self.project_root:
+                from agent_ai.codegraph.service import CodeGraphService
+
+                service = CodeGraphService(project_root=self.project_root)
+                self.codegraph_service = service
+            elif service is None and hasattr(self.executor, "registry") and self.executor.registry:
+                for tool in self.executor.registry._tools.values():
+                    if hasattr(tool, "service") and getattr(tool, "name", "").startswith("codegraph_"):
+                        service = tool.service
+                        self.codegraph_service = service
+                        break
+
+            if service is not None:
+                service.ensure_graph_fresh(max_stale_seconds=2.0)
+        except Exception as exc:  # noqa: BLE001 - defensive guardrail
+            logger.warning("CodeGraph ensure_graph_fresh guardrail non-fatal failure: %s", exc)
 
     def _make_orchestrator(self, provider: BaseProvider) -> AgentOrchestrator:
         """Bangun AgentOrchestrator dengan Project Brain (context-only).

@@ -172,6 +172,11 @@ Code chunking operates on semantic unit boundaries:
 - **Size Bounds:** Chunks exceeding ~450 tokens (~1,800 characters) are partitioned using LangChain's `RecursiveCharacterTextSplitter.from_language` while preserving line number mapping.
 - **Context Header:** Every chunk prepends a structured symbol header (`# path: <path> | symbol: <symbol> | kind: <kind>\n<code>`) to maximize embedding retrieval precision.
 
+### 5.4 Transisi & Deprekasi Vektor Menuju CodeGraph Deterministik (Fase 2.5)
+Sebagai bagian dari evolusi arsitektur menuju *zero-bloat* dan pemenuhan batas *Asymmetric Split-Brain* (< 4.000 token), pipeline semantic vector (`fastembed`, `onnxruntime`, `sqlite-vec`, `chunker.py`) dideprekasi dan digantikan oleh CodeGraph deterministik berbasis SQLite standard library (`.aegis/codegraph.db`).
+
+Spesifikasi lengkap, skema relasi B-Tree, traversal recursive CTE, kebijakan auto-migrasi transparan, dan spesifikasi 4 tools kanonik (`codegraph_find_callers`, `codegraph_find_callees`, `codegraph_find_references`, `codegraph_impact_analysis`) diatur secara penuh dalam dokumen [docs/architecture/codegraph_migration_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/codegraph_migration_plan.md).
+
 ---
 
 ## 6. Quality Assurance & Independent Testing Subsystem

@@ -33,9 +33,10 @@ PathLike = Union[str, Path]
 def default_db_path() -> Path:
     """Ambil jalur default database global AegisCode (data/aegis.db) dengan auto-migrasi legacy 1-kali."""
     try:
-        from agent_ai.config.settings import PROJECT_ROOT
+        from agent_ai.config import settings
 
-        data_dir = Path(PROJECT_ROOT) / "data"
+        project_root = getattr(settings, "PROJECT_ROOT", None)
+        data_dir = (Path(project_root) if project_root else Path(__file__).resolve().parents[3]) / "data"
     except Exception:
         data_dir = Path(__file__).resolve().parents[3] / "data"
 

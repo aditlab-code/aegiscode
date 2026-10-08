@@ -287,6 +287,12 @@ def build_registry(
         ):
             reg.register(tool)
 
+    # CodeGraph Relational Intelligence (Fase 2.5):
+    from agent_ai.tools.codegraph import build_codegraph_tools
+
+    for tool in build_codegraph_tools(root=resolved):
+        reg.register(tool)
+
     # Skill System (Agent): SATU mekanisme Skill yang sama — catalog + progressive
     # loading di atas SkillStore existing. Thin adapter, tidak ada heuristic.
     # Task 05: lifecycle (create/update/delete) hanya tersedia pada Agent,

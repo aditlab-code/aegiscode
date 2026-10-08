@@ -16,6 +16,8 @@ Dokumen di bawah ini merupakan fondasi spesifikasi teknis repositori:
 | **[docs/ui-design.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ui-design.md)** | Spesifikasi tata letak workbench AegisCode Studio: Monaco Editor, Monaco Diff Editor, Changes Panel, Drawer Persisten, dan Sistem Desain. |
 | **[docs/ruleset.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ruleset.md)** | Standar rekayasa perangkat lunak: prinsip YAGNI, protokol RTK, pengujian dual-stack, zero-zombie process lifecycle, dan aturan branch Git. |
 | **[docs/Gitmaster.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/Gitmaster.md)** | Panduan arsitektur Git multi-remote, isolasi kerahasiaan branch privat (master & release), dan alur rilis komunitas (main). |
+| **[docs/architecture/codegraph_migration_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/codegraph_migration_plan.md)** | Rencana migrasi deterministik dari pipeline vektor ke CodeGraph SQLite (`.aegis/codegraph.db`), skema relasi AST, dan 4 tools kanonik. |
+| **[docs/architecture/phase2_mvp_modularization_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/phase2_mvp_modularization_plan.md)** | Rencana restrukturisasi MVP Fase 2 (Modularisasi Orchestrator) menjadi 3 PR mandiri tanpa siklus ulang. |
 
 ---
 

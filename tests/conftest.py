@@ -44,7 +44,7 @@ def _isolate_extension_process_state():
         _reset_extension_process_state()
 
 @pytest.fixture(autouse=True)
-def _isolate_data_and_sessions(tmp_path, monkeypatch):
+def _isolate_data_and_sessions(tmp_path, monkeypatch, request):
     """Isolasi penuh data/aegis.db dan data/consultant_sessions.json selama pytest."""
     fake_data = tmp_path / "data"
     fake_data.mkdir(parents=True, exist_ok=True)
@@ -67,8 +67,9 @@ def _isolate_data_and_sessions(tmp_path, monkeypatch):
 
     try:
         from agent_ai.session import unified_store as unified_store_mod
-        monkeypatch.setattr(unified_store_mod, "default_db_path", lambda: fake_db)
-        monkeypatch.setattr(unified_store_mod, "default_legacy_json_path", lambda: fake_json)
+        if request.node.name != "test_unified_store_auto_migrates_legacy_aether_db":
+            monkeypatch.setattr(unified_store_mod, "default_db_path", lambda: fake_db)
+            monkeypatch.setattr(unified_store_mod, "default_legacy_json_path", lambda: fake_json)
     except Exception:
         pass
 

@@ -446,6 +446,13 @@ def build_consultant_registry(
         ):
             registry.register(tool)
 
+    # CodeGraph Relational Intelligence (Fase 2.5):
+    from agent_ai.tools.codegraph import build_codegraph_tools as _build_codegraph_tools
+
+    for tool in _build_codegraph_tools(root=resolved):
+        registry.register(tool)
+
+
 
 
     if normalized == MODE_INVESTIGATE:

@@ -30,7 +30,8 @@ Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan 
 | Legacy (Phase 0-2.2) | Provider Antigravity, UI Git Facade, Hybrid RAG | Selesai (diarsipkan) |
 | Fase 0 | Baseline dan freeze arsitektur | Selesai |
 | Fase 1 | Lifecycle task dan kontrak event kanonik | Selesai |
-| Fase 2 | Modularisasi orchestrator/runtime | Prioritas Lanjutan |
+| Fase 2 | Modularisasi orchestrator/runtime | Selesai |
+| Fase 2.5 | Migrasi CodeGraph & Relational Intelligence | Selesai |
 | Fase 3 | Normalisasi boundary provider | Sedang Berjalan |
 | Fase 4 | Reliability gate dan Triple-Gate QA | Direncanakan |
 | Fase 5 | HITL guardrails, UI Studio, Tauri v2 | Pasca-Stabilisasi |
@@ -40,8 +41,9 @@ graph TD
     L["Legacy: Phase 0-2 (arsip)"] --> F0["Fase 0: Baseline"]
     F0 --> F1["Fase 1: Lifecycle & Kontrak Event"]
     F1 --> F2["Fase 2: Modularisasi Orchestrator"]
-    F2 --> F3["Fase 3: Normalisasi Provider"]
-    F1 & F2 & F3 --> F4["Fase 4: Reliability Gate & Strict QA"]
+    F2 --> F2_5["Fase 2.5: Migrasi CodeGraph"]
+    F2_5 --> F3["Fase 3: Normalisasi Provider"]
+    F1 & F2 & F2_5 & F3 --> F4["Fase 4: Reliability Gate & Strict QA"]
     F4 --> F5["Fase 5: HITL, UI Studio, Desktop Tauri v2"]
 ```
 
@@ -75,30 +77,48 @@ Model event minimum: `event_id`, `task_id`, `session_id`, `sequence`, `type` (re
 Berkas terkait: `src/agent_ai/runtime/lifecycle.py`, `src/agent_ai/core/orchestrator.py`, `web/django_app/api/services.py`, `web/django_app/api/execution.py`, `src/agent_ai/runtime/events/`, `src/agent_ai/terminal/pty_service.py`, `web/frontend/src/composables/useWorkbenchLiveEvents.js`, `web/frontend/src/services/api.js`.
 Pengujian: `tests/test_file_write_lock.py`, `tests/test_sse_gap_recovery.py`, `tests/test_scheduler_lifecycle_boundaries.py`, `tests/test_lifecycle_idempotency.py`, `tests/test_provider_retry_lifecycle.py`, `tests/test_milestone2_session_events.py`, `tests/test_cancel_task_disk_log.py`, `tests/test_pty_cleanup.py`, `tests/test_aegis_fallback.py`, `tests/test_sqlite_vec_store.py`, `web/frontend/src/sseGapAndTelemetry.test.mjs`, `web/frontend/src/workspaceIsolation.test.mjs`.
 
-## 5. Fase 2: Modularisasi Orchestrator & Runtime
+## 5. Fase 2: Modularisasi Orchestrator & Runtime (SELESAI — 100%)
 
-`src/agent_ai/core/orchestrator.py` (sekitar 2.831 baris pada audit) menjadi facade kompatibel; tambahkan sub-paket `core/orchestration/` dengan modul: `contracts`, `context_pipeline`, `retrieval_state`, `provider_runner`, `event_reporting`, `tool_results`, `continuous_runner`, `legacy_runner`.
+`src/agent_ai/core/orchestrator.py` (~2.911 baris) telah berhasil didekomposisi menjadi thin facade 100% backward compatible (kini 917 baris); seluruh sub-modul beroperasi di sub-paket `core/orchestration/`: `contracts`, `continuous_runner`, `provider_runner`, `context_pipeline`, `retrieval_state`, `tool_results`, `event_reporting`, `legacy_runner`. Spesifikasi lengkap: [docs/architecture/phase2_mvp_modularization_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/phase2_mvp_modularization_plan.md). Log QA pengesahan: [docs/QA/logs/2026-10-08_orchestrator_modularization_PASS.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/QA/logs/2026-10-08_orchestrator_modularization_PASS.md).
 
-Aturan desain:
+Aturan desain yang ditegakkan:
 - Alur dependensi satu arah: facade, runner, lalu context/provider/tool/reporting; tanpa import cycle.
 - Provider tidak mengatur lifecycle task; UI tidak menebak status dari teks; orchestrator tidak membuat JSON spesifik provider.
 - Satu cancellation token lintas runtime, provider, executor; safety abort dipisah dari semantic completion.
 - Setiap loop punya batas iterasi, batas waktu, dan kondisi terminal eksplisit.
 - Perubahan perilaku (retry cancel-aware, policy) dipisah dari PR pemindahan kode.
 
-| Tahap | Perubahan | Gate wajib |
-|---|---|---|
-| PR-0 | Baseline: inventaris pemanggil, fixture provider normal/error/retry/cancel, trace event | Jejak baseline terdokumentasi; test existing lulus |
-| PR-1 | Kontrak data per-run dan helper reporting | Import lama jalan; urutan event dan usage sama; secret tersanitasi |
-| PR-2 | Context pipeline dan retrieval state | Snapshot messages, budget, cache invalidation sama dengan baseline |
-| PR-3 | Provider runner (invocation, normalisasi, retry) | Attempt count dan error retryable/permanen sama dengan baseline |
-| PR-4 | Tool result dan continuous runner | Hasil per `tool_call_id`; cancel tidak memulai tool baru |
-| PR-5 | Legacy runner dan penipisan facade | Continuous dan legacy lulus terpisah; learning tidak ganda |
-| PR-6 | Bugfix integrasi (event Antigravity, usage, race UI, replay) | Regression ASYNC dan USR-01 lulus |
+- [x] **PR-MVP-1**: Core Continuous Execution & Contracts: sub-paket `core/orchestration/`, kontrak `contracts.py`, `tool_results.py`, dan modern `continuous_runner.py` (ekstraksi loop produksi `run_continuous_loop`). Continuous loop berjalan via runner baru; seluruh unit test continuous & compaction lulus 100%.
+- [x] **PR-MVP-2**: Provider Runner & Resilience: ekstraksi `provider_runner.py` (retry backoff, sanitasi respons, klasifikasi error) dan `event_reporting.py`. 43 unit test retry/error lulus; event sequence dan usage telemetri identik dengan baseline.
+- [x] **PR-MVP-3**: Context Pipeline, Retrieval State & Facade Thinning: ekstraksi `context_pipeline.py`, `retrieval_state.py`, isolasi `legacy_runner.py`, dan penipisan `orchestrator.py` (dari 2.059/2.911 baris menjadi 917 baris). Seluruh 191+ pengujian regresi lulus 100%; dependensi satu arah tanpa import cycle; siap menyambut Fase 2.5 CodeGraph.
 
-Definition of done: facade kompatibel, dependensi satu arah, state task terisolasi, tidak ada duplikasi eksekusi/usage/finalisasi. Rollback per PR melalui facade yang API-nya tidak berubah.
+| Tahap | Perubahan | Gate wajib | Status |
+|---|---|---|:---:|
+| PR-MVP-1 | Core Continuous Execution & Contracts: sub-paket `core/orchestration/`, kontrak `contracts.py`, `tool_results.py`, dan modern `continuous_runner.py` (ekstraksi loop produksi `run_continuous_loop`) | Continuous loop berjalan via runner baru; seluruh unit test continuous & compaction lulus 100% | [x] Selesai |
+| PR-MVP-2 | Provider Runner & Resilience: ekstraksi `provider_runner.py` (retry backoff, sanitasi respons, klasifikasi error) dan `event_reporting.py` | 43 unit test retry/error lulus; event sequence dan usage telemetri identik dengan baseline | [x] Selesai |
+| PR-MVP-3 | Context Pipeline, Retrieval State & Facade Thinning: ekstraksi `context_pipeline.py`, `retrieval_state.py`, isolasi `legacy_runner.py`, dan penipisan `orchestrator.py` (< 1.000 baris, kini 917 baris) | Seluruh 191+ pengujian regresi lulus; dependensi satu arah tanpa import cycle; siap menyambut Fase 2.5 CodeGraph | [x] Selesai |
 
-## 6. Fase 3: Normalisasi Boundary Provider
+Definition of done: facade kompatibel, dependensi satu arah, state task terisolasi, tidak ada duplikasi eksekusi/usage/finalisasi. Stop-Gate terverifikasi 100% oleh Thor (Exit Code 0).
+
+## 6. Fase 2.5: Migrasi CodeGraph & Relational Intelligence
+
+Fase ini mengeksekusi dekomisi penuh terhadap pipeline semantic vector berat (`fastembed`, `onnxruntime`, `sqlite-vec`, `chunker.py`) dan menggantikannya dengan CodeGraph deterministik berbasis SQLite standard library (`.aegis/codegraph.db`), selaras dengan PR-2 Fase 2 (Context pipeline dan retrieval state). Dokumen spesifikasi lengkap: [docs/architecture/codegraph_migration_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/codegraph_migration_plan.md).
+
+Tujuan:
+1. Menghilangkan ketergantungan binary extension C/C++ dan model ONNX berat (zero-bloat).
+2. Memaksimalkan efisiensi token prompt context (< 500 token per respons tool, menjaga Asymmetric Split-Brain < 4.000 token).
+3. Menyediakan navigasi struktural kode multi-hop presisi tinggi via SQLite Recursive Common Table Expression (CTE).
+
+| Tahap | Perubahan | Gate wajib | Status |
+|---|---|---|:---:|
+| PR-CG-1 | Skema SQLite `.aegis/codegraph.db` (`symbols`, `symbol_relations`) dan AST extractor berbasis `ast` stdlib | Indexing simbol dan relasi Python selesai dalam < 1 detik; idempotensi fingerprint SHA-256 teruji | [x] Selesai |
+| PR-CG-2 | 4 Tools kanonik: `codegraph_find_callers`, `codegraph_find_callees`, `codegraph_find_references`, `codegraph_impact_analysis` (Recursive CTE) | Unit test tool lulus; payload per panggilan terkompresi < 500 token; terintegrasi ke `ToolRegistry` | [x] Selesai |
+| PR-CG-3 | Auto-migrasi transparan: deteksi dan penghapusan aman `.aegis/vectors.db` (zero-orphan), pencatatan audit log di `.aegis/log/` | Uji migrasi workspace legacy sukses; zero-orphan file; pembersihan modul `repointel/semantic/` tanpa merusak fallback | [x] Selesai |
+
+Definition of done: Seluruh kebutuhan pencarian kode struktural ditangani deterministik oleh `.aegis/codegraph.db`, dependensi vektor dihapus, suite pengujian lulus 100% hijau, dan hak akses terbuka untuk `heimdall-scout`, `mimir-architect`, `brokkr-coder`, serta Studio Runtime. Stop-Gate terverifikasi 100% oleh Thor (Exit Code 0).
+
+
+## 7. Fase 3: Normalisasi Boundary Provider
 
 - [ ] Skema kanonik `ProviderRequest` (model, messages, tools, generation_options, runtime_context), `ProviderEvent` (text, reasoning, tool_call, usage, error, done), `ProviderError` (kategori, retryable, provider, raw_reference).
 - [x] Wire JSON hanya di adapter; kanonisasi dialek tool terpusat di orkestrator (`normalize_canonical_tool_name`), adapter provider mendelegasikan ke orkestrator, payload `tool_called` memuat `canonical_tool`, dan frontend bersih dari hardcode mapping.
@@ -106,7 +126,7 @@ Definition of done: facade kompatibel, dependensi satu arah, state task terisola
 - [x] Retry hanya untuk error retryable; idle activity timeout & max execution cap pada streaming/reasoning (Antigravity Provider) mencegah task stuck `running`.
 - [ ] Fallback provider tidak menggandakan tool call; capability provider tercatat eksplisit.
 
-## 7. Fase 4: Reliability Gate & Strict QA
+## 8. Fase 4: Reliability Gate & Strict QA
 
 Stop-gate sebelum Fase 5:
 1. Gate 1: seluruh `pytest` lulus (exit code 0).
@@ -121,7 +141,7 @@ Syarat tambahan:
 - [ ] Tidak ada kredensial pada log atau payload event; workspace luar proyek tidak berubah tanpa approval.
 - [ ] Dokumentasi instalasi berhasil diikuti dari mesin bersih.
 
-## 8. Fase 5: HITL, UI Studio, Desktop Native
+## 9. Fase 5: HITL, UI Studio, Desktop Native
 
 - **5.1 HITL**: integrasi `SupervisedModePolicy` ke permission gateway; `DiffModal.vue` untuk `write_file`, `delete_file`, dan perintah destruktif; checkpoint Git otomatis dan rollback 1-klik. Berkas: `src/agent_ai/permission/`, `src/agent_ai/runtime/policy.py`, `src/agent_ai/git/checkpoint.py`, `web/frontend/src/components/DiffModal.vue`. Tes: `tests/test_supervised_policy.py`, `tests/test_checkpoint_rollback.py`.
 - **5.2 UI Studio**: onboarding provider sederhana, preset local/BYOK/safe production, task timeline teraudit, diff review jelas. Layout mengikuti [docs/ui-design.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/ui-design.md).
@@ -129,7 +149,7 @@ Syarat tambahan:
 
 ---
 
-## 9. Definition of Done & Metrik
+## 10. Definition of Done & Metrik
 
 - Task queued berjalan tepat satu kali; running memiliki heartbeat; completed/failed/cancelled selalu terminal; cancel tidak merusak task lain.
 - Queue menampilkan task saat `running`; history muncul setelah terminal; reasoning tampil tanpa menunggu selesai; refresh dan SSE ganda tidak menggandakan item UI.
@@ -146,10 +166,8 @@ Syarat tambahan:
 
 Angka dikalibrasi ulang setelah baseline Fase 0 tersedia.
 
-## 10. Backlog Pasca-MVP (YAGNI)
+## 11. Backlog Pasca-MVP (YAGNI)
 
 1. Fine-tuning LoRA otonom pada riwayat commit.
-2. Orkestrasi multi-agent swarm terdistribusi.
-3. Penyimpanan vektor cloud pihak ketiga.
-4. Butir RAG yang dilepas (adapter runner lokal, dedup konteks, telemetri hardware): hanya dibuka kembali lewat keputusan baru setelah Fase 4 lulus.
-5. Remote IDE & Mobile Companion (Headless Gateway + Thin Client): Akses jarak jauh via Web/PWA/Mobile untuk remote task steering, CoT streaming, dan persetujuan diff (HITL) saat bepergian (pola VS Code Remote / JetBrains Gateway).
+2. Butir RAG yang dilepas (adapter runner lokal, dedup konteks, telemetri hardware): hanya dibuka kembali lewat keputusan baru setelah Fase 4 lulus.
+3. Remote IDE & Mobile Companion (Headless Gateway + Thin Client): Akses jarak jauh via Web/PWA/Mobile untuk remote task steering, CoT streaming, dan persetujuan diff (HITL) saat bepergian (pola VS Code Remote / JetBrains Gateway).

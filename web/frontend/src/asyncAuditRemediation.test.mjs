@@ -255,17 +255,27 @@ test("T05_ASYNC05: activateTaskView membersihkan prompt, tokens, dan state saat 
   const validation = { state: "ok" };
   let tickerStopped = false;
   const durationTicker = { stop: () => { tickerStopped = true; } };
+  const taskReducerState = {
+    monitoredTaskId: "",
+    lastProcessedSequence: 0,
+    processedEventIds: new Set(),
+    hasSequenceGap: false,
+    missingSequenceGaps: [],
+  };
 
   const activateTaskView = new Function(
     "task", "runningTaskId", "activityPhase", "lifecycleMilestones",
     "activityEvents", "changes", "tokenCount", "taskTelemetry",
     "taskStartedAt", "taskEndedAt", "validation", "durationTicker",
+    "taskReducerState",
     `${activateSrc}\nreturn activateTaskView;`
   )(
     task, runningTaskId, activityPhase, lifecycleMilestones,
     activityEvents, changes, tokenCount, taskTelemetry,
-    taskStartedAt, taskEndedAt, validation, durationTicker
+    taskStartedAt, taskEndedAt, validation, durationTicker,
+    taskReducerState
   );
+
 
   // Adopsi task baru yang masih pending
   activateTaskView({
