@@ -49,6 +49,7 @@
   --border-soft:    rgba(73, 64, 97, 0.08);
   --border-subtle:  rgba(73, 64, 97, 0.05);
   --border-hover:   rgba(130, 97, 187, 0.35);
+  --btn-outline-muted: rgba(85, 81, 104, 0.28);
 
   /* Typography */
   --text-dim:       #555168;

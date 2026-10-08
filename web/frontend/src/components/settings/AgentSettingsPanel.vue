@@ -113,9 +113,7 @@ onMounted(load);
 <template>
   <AppCard variant="panel" class="settings-panel as-panel">
     <template #header>
-      <div class="panel-head">
-        <div class="title">Agent Instructions</div>
-      </div>
+      <span class="title">Agent Instructions</span>
     </template>
 
     <div class="panel-body">

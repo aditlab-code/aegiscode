@@ -146,29 +146,12 @@ onMounted(load);
 <template>
   <AppCard variant="panel" class="settings-panel gs-panel">
     <template #header>
-      <div class="panel-head">
-        <div class="title">Global Settings</div>
-      </div>
+      <span class="title">Global Settings</span>
     </template>
 
     <div class="panel-body">
       <div v-if="error" class="gs-alert err">{{ error }}</div>
       <div v-if="notice" class="gs-alert ok">{{ notice }}</div>
-
-      <!-- Scope Badge -->
-      <div class="gs-scope">
-        <span class="gs-scope-badge">Global AegisCode Settings</span>
-        <span class="gs-scope-note">
-          Berlaku untuk seluruh AegisCode (semua project).
-          <span class="mono">data/settings.json</span>
-        </span>
-        <span class="gs-scope-hint">
-          Untuk konfigurasi &amp; policy per project, buka
-          <span class="mono">Sidebar -&gt; Projects -&gt; Project Settings / Policy</span>.
-        </span>
-      </div>
-
-      <div class="gs-sub-divider"></div>
 
       <!-- Section: Server -->
       <div class="gs-sub-section">
@@ -373,39 +356,6 @@ onMounted(load);
 </template>
 
 <style scoped>
-.gs-scope {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.gs-scope-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  color: var(--accent-muted);
-  background: rgba(45, 125, 78, 0.18);
-  border: 1px solid rgba(45, 125, 78, 0.35);
-}
-.gs-scope-note {
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.gs-scope-note .mono,
-.gs-scope-hint .mono {
-  font-family: var(--mono);
-}
-.gs-scope-hint {
-  width: 100%;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--text-faint);
-}
 
 .gs-alert {
   padding: 10px 12px;

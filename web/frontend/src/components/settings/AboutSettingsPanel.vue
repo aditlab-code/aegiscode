@@ -1,13 +1,14 @@
 <script setup>
 import { ref } from "vue";
 import { AEGIS_VERSION } from "../../version.js";
+import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
 
 const props = defineProps({
   section: {
     type: String,
     default: "overview",
-    validator: (v) => ["overview", "architecture", "license"].includes(v),
+    validator: (v) => ["overview", "license"].includes(v),
   },
 });
 
@@ -56,7 +57,7 @@ async function copyLicense() {
   <div class="about-settings-root">
     <!-- 1. OVERVIEW SECTION -->
     <div v-if="section === 'overview'" class="about-pane">
-      <div class="panel settings-panel">
+      <AppCard variant="panel" class="settings-panel">
         <div class="about-hero">
           <div class="hero-brand">
             <div class="hero-logo">
@@ -76,22 +77,10 @@ async function copyLicense() {
 
         <div class="panel-body">
           <p class="about-summary">
-            AegisCode is a dual-stack autonomous coding agent engine combining an agentic Python runtime with a high-performance modern web workbench. It provides end-to-end task execution, intelligent codebase exploration, test-driven validation, and resilient error recovery.
+            AegisCode is a local-first autonomous AI coding workbench combining an agentic runtime with a high-performance studio workbench. It enforces deterministic guardrails, asymmetric token efficiency (&lt; 4,000 tokens), non-blocking interactive terminal workflows, and zero-loss code integrity.
           </p>
 
           <div class="about-grid">
-            <AppCard variant="card" class="about-card">
-              <div class="card-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M12 2a4 4 0 0 0-4 4v1H6a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2v2a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h2v1a4 4 0 0 0 8 0v-1h2a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2v-2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/>
-                </svg>
-              </div>
-              <div class="about-card-title">Hybrid 5-Stage CoT Protocol</div>
-              <div class="card-text">
-                Enforces systematic reasoning: Intent Assessment &rarr; Architectural Analysis (YAGNI Check) &rarr; Step Action Planning &rarr; Execution Reflection Loop &rarr; Independent Verification.
-              </div>
-            </AppCard>
-
             <AppCard variant="card" class="about-card">
               <div class="card-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -100,21 +89,9 @@ async function copyLicense() {
                   <line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
               </div>
-              <div class="about-card-title">Hybrid Asymmetric Split-Brain</div>
+              <div class="about-card-title">Hybrid Asymmetric Split-Brain (&lt; 4k Tokens)</div>
               <div class="card-text">
-                Decouples cloud LLM reasoning with a strict context budget (&lt; 4,000 tokens) from deterministic local execution (AST parsing, PTY terminal, and FileWriteLock).
-              </div>
-            </AppCard>
-
-            <AppCard variant="card" class="about-card">
-              <div class="card-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                </svg>
-              </div>
-              <div class="about-card-title">Dual-Stack Verification</div>
-              <div class="card-text">
-                Guarantees zero regressions across both Python backend (Pytest / Django REST API) and modern frontend (Vite / Vue 3 / Monaco Editor / Vitest).
+                Decouples cloud LLM reasoning with a strict context budget (&lt; 4,000 tokens) from deterministic local execution (AST parsing, CodeGraph, and FileWriteLock).
               </div>
             </AppCard>
 
@@ -125,142 +102,63 @@ async function copyLicense() {
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </div>
-              <div class="about-card-title">Strict Security &amp; Policy</div>
+              <div class="about-card-title">Deterministic Guardrails &amp; HITL (Zero Code Destruction)</div>
               <div class="card-text">
-                Read-before-write invariant, workspace sandbox boundaries, environment variable secret masking, and real-time state synchronization via RTK Protocol.
+                Human-in-the-Loop visual Monaco diff approval, FileWriteLock race prevention, read-before-write invariant, and instant 1-click snapshot rollback.
+              </div>
+            </AppCard>
+
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="4 17 10 11 4 5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+              </div>
+              <div class="about-card-title">Interactive Pseudo-Terminal (PTY Zero-Zombie)</div>
+              <div class="card-text">
+                Interactive shell sessions powered by non-blocking PTY kernel (@xterm/xterm), responsive Ctrl+C interrupts, and clean tree-kill with 0% orphan process lifecycle.
+              </div>
+            </AppCard>
+
+            <AppCard variant="card" class="about-card">
+              <div class="card-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                  <polyline points="2 17 12 22 22 17"/>
+                  <polyline points="2 12 12 17 22 12"/>
+                </svg>
+              </div>
+              <div class="about-card-title">Local-First Code Intelligence &amp; RTK Protocol</div>
+              <div class="card-text">
+                Canonical <span class="mono">.aegis/</span> workspace memory, deterministic SQLite CodeGraph AST traversal, and real-time state synchronization via RTK Protocol.
               </div>
             </AppCard>
           </div>
         </div>
-      </div>
-    </div>
-
-    <!-- 2. ARCHITECTURE SECTION -->
-    <div v-else-if="section === 'architecture'" class="about-pane">
-      <div class="panel settings-panel">
-        <div class="panel-head">
-          <div>
-            <div class="title">System Architecture &amp; Execution Model</div>
-            <div class="desc">Detailed architectural pipeline of the AegisCode autonomous platform based on docs/architecture.md.</div>
-          </div>
-        </div>
-
-        <div class="panel-body">
-          <div class="arch-section">
-            <div class="arch-title">1. Hybrid Asymmetric Split-Brain Model</div>
-            <div class="arch-box mono">LLM (Brain) — Cloud Coordinator:
-  • Autonomous Reasoning &amp; Diff Synthesis
-  • Tool Selection &amp; Argument Construction
-  • Budgeted Context Window (&lt; 4,000 tokens)
-                  ▲
-                  │ JSON-RPC / API
-                  ▼
-Aegis Agent (Hands) — Local Worker:
-  • AST Parsing, Semantic Vector Discovery &amp; FastEmbed
-  • Interactive PTY Terminal (@xterm/xterm, zero-zombie)
-  • FileWriteLock &amp; HITL Diff Approval (Supervised)
-  • Context Budget Compaction, RRF Ranking &amp; Rollback Stash</div>
-          </div>
-
-          <div class="arch-section">
-            <div class="arch-title">2. Aegis Agent Core Subsystems (src/agent_ai/)</div>
-            <div class="arch-subsystems-grid">
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">runtime/</span>
-                <span class="subsys-desc">Core execution loop, turn controller, working state</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">planning/</span>
-                <span class="subsys-desc">Task decomposition, milestone tracking, replanning</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">contextbuilder/</span>
-                <span class="subsys-desc">Repo context compilation, system prompts, @file mentions</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">contextbudget/</span>
-                <span class="subsys-desc">Sliding window compaction, tool pruning (&lt; 4,000 tokens)</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">tools/</span>
-                <span class="subsys-desc">Filesystem, interactive terminal, source symbols, MCP</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">providers/</span>
-                <span class="subsys-desc">Unified LLM abstraction (Antigravity, Anthropic, OpenAI, Ollama)</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">repointel/</span>
-                <span class="subsys-desc">AST parsing, symbol indexing, repository graph</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">permission/</span>
-                <span class="subsys-desc">Policy gateway, path whitelists, command safety sandbox</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">validation/</span>
-                <span class="subsys-desc">Verification guards, syntax check, checkpoint recovery</span>
-              </div>
-              <div class="arch-subsystem-card">
-                <span class="subsys-name">recovery/</span>
-                <span class="subsys-desc">Loop breaker detection, backoff, and runtime self-healing</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="arch-section">
-            <div class="arch-title">3. 4-Phase Execution Lifecycle</div>
-            <div class="arch-steps">
-              <div class="arch-step">
-                <span class="step-num">1</span>
-                <div>
-                  <div class="step-name">Task Preparation</div>
-                  <div class="step-desc">Sanitization, repointel symbol map discovery, sandbox initialization.</div>
-                </div>
-              </div>
-              <div class="arch-step">
-                <span class="step-num">2</span>
-                <div>
-                  <div class="step-name">Context &amp; Budget</div>
-                  <div class="step-desc">Assembly of prompts, contextbudget sliding compaction (&lt; 4,000 tokens).</div>
-                </div>
-              </div>
-              <div class="arch-step">
-                <span class="step-num">3</span>
-                <div>
-                  <div class="step-name">Continuous Execution Loop</div>
-                  <div class="step-desc">Streaming CoT reasoning, structured tool execution, observation feedback, replanner.</div>
-                </div>
-              </div>
-              <div class="arch-step">
-                <span class="step-num">4</span>
-                <div>
-                  <div class="step-name">Termination &amp; Validation</div>
-                  <div class="step-desc">Deterministic completion, syntax/test sanity validation, final report streaming.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      </AppCard>
     </div>
 
     <!-- 3. LICENSE SECTION -->
     <div v-else-if="section === 'license'" class="about-pane">
-      <div class="panel settings-panel">
-        <div class="panel-head">
+      <AppCard variant="panel" class="settings-panel">
+        <template #header>
           <div>
             <div class="title">Open Source License</div>
             <div class="desc">AegisCode is open source software released under the terms of the MIT License.</div>
           </div>
-          <button type="button" class="btn-aegis btn-ghost-a" @click="copyLicense">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
-            <span>{{ copied ? "Copied!" : "Copy License" }}</span>
-          </button>
-        </div>
+          <div class="panel-actions">
+            <AppButton variant="ghost" size="sm" @click="copyLicense">
+              <template #icon>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </template>
+              <span>{{ copied ? "Copied!" : "Copy License" }}</span>
+            </AppButton>
+          </div>
+        </template>
 
         <div class="panel-body">
           <div class="license-card">
@@ -289,7 +187,7 @@ Aegis Agent (Hands) — Local Worker:
             </div>
           </div>
         </div>
-      </div>
+      </AppCard>
     </div>
   </div>
 </template>
@@ -355,7 +253,7 @@ Aegis Agent (Hands) — Local Worker:
   padding: 14px 16px !important;
   border-radius: 8px !important;
   background: var(--inset, rgba(0, 0, 0, 0.25)) !important;
-  border: 1px solid var(--line, #1e1e2c) !important;
+  border: 1px solid var(--line, var(--border-soft)) !important;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -369,13 +267,13 @@ Aegis Agent (Hands) — Local Worker:
 }
 
 .about-card:hover {
-  border-color: var(--accent, #a78bfa) !important;
+  border-color: var(--accent, var(--edge)) !important;
   box-shadow: none !important;
   transform: none !important;
 }
 
 .card-icon {
-  color: var(--accent, #a78bfa);
+  color: var(--accent);
   margin-bottom: 2px;
   display: flex;
   align-items: center;
@@ -392,110 +290,6 @@ Aegis Agent (Hands) — Local Worker:
   font-size: 11.5px;
   color: var(--text-faint);
   line-height: 1.45;
-}
-
-.arch-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.arch-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.arch-box {
-  padding: 12px 14px;
-  background: var(--inset, rgba(0, 0, 0, 0.25));
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 11.5px;
-  color: var(--text-dim);
-  white-space: pre-wrap;
-  line-height: 1.5;
-}
-
-[data-theme="light"] .arch-box {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
-}
-
-.arch-subsystems-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 8px;
-}
-
-.arch-subsystem-card {
-  padding: 8px 12px;
-  background: var(--inset, rgba(0, 0, 0, 0.25));
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-[data-theme="light"] .arch-subsystem-card {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
-}
-
-.subsys-name {
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
-.subsys-desc {
-  font-size: 10.5px;
-  color: var(--text-faint);
-  line-height: 1.35;
-}
-
-.arch-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.arch-step {
-  display: flex;
-  gap: 10px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-}
-
-.step-num {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 700;
-  flex: 0 0 auto;
-}
-
-.step-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.step-desc {
-  font-size: 10.5px;
-  color: var(--text-faint);
-  line-height: 1.35;
-  margin-top: 2px;
 }
 
 .license-card {

@@ -270,6 +270,26 @@
   padding: 10px 16px !important;
   margin-bottom: 0 !important;
   border-bottom: 1px solid var(--line, var(--border-soft)) !important;
+  background: transparent !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+/* Pertahanan jika ada komponen legacy dengan nested .panel-head */
+.settings-content .panel-head > .panel-head {
+  border-bottom: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+  width: 100% !important;
+  min-height: auto !important;
+}
+
+.settings-content .panel-actions,
+.settings-content .sv-config-head-actions,
+.settings-content .hist-head-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .settings-content .panel-head .title,
@@ -278,6 +298,87 @@
   font-weight: 650 !important;
   color: var(--text) !important;
   line-height: 1.2 !important;
+}
+
+/* Universal Settings Button Outline & Styling */
+.settings-content button.btn-aegis,
+.settings-content .btn-ghost,
+.settings-content .btn-ghost-a,
+.settings-content .panel-head button:not(.icon-btn),
+.settings-content .panel-actions button:not(.icon-btn),
+.settings-overlay button.btn-aegis,
+.settings-overlay .btn-ghost,
+.settings-overlay .btn-ghost-a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-sm, 6px);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  padding: 5px 12px;
+  line-height: 1.3;
+  background: var(--inset, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--btn-outline-muted, var(--line, var(--border-soft)));
+  color: var(--text-dim, var(--secondary));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.settings-content button.btn-aegis:hover:not(:disabled),
+.settings-content .btn-ghost:hover:not(:disabled),
+.settings-content .btn-ghost-a:hover:not(:disabled),
+.settings-content .panel-head button:not(.icon-btn):hover:not(:disabled),
+.settings-content .panel-actions button:not(.icon-btn):hover:not(:disabled),
+.settings-overlay button.btn-aegis:hover:not(:disabled),
+.settings-overlay .btn-ghost:hover:not(:disabled),
+.settings-overlay .btn-ghost-a:hover:not(:disabled) {
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--secondary, var(--edge));
+  color: var(--text);
+}
+
+.settings-content button.btn-aegis:disabled,
+.settings-content .btn-ghost:disabled,
+.settings-content .btn-ghost-a:disabled,
+.settings-content .panel-head button:disabled,
+.settings-content .panel-actions button:disabled,
+.settings-overlay button.btn-aegis:disabled,
+.settings-overlay .btn-ghost:disabled,
+.settings-overlay .btn-ghost-a:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Pengecualian varian spesifik agar tetap konsisten dengan perannya */
+.settings-content .btn-primary,
+.settings-content .btn-primary-a,
+.settings-overlay .btn-primary,
+.settings-overlay .btn-primary-a {
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  color: #ffffff !important;
+}
+.settings-content .btn-primary:hover:not(:disabled),
+.settings-content .btn-primary-a:hover:not(:disabled),
+.settings-overlay .btn-primary:hover:not(:disabled),
+.settings-overlay .btn-primary-a:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.settings-content .btn-danger,
+.settings-content .btn-danger-a,
+.settings-overlay .btn-danger,
+.settings-overlay .btn-danger-a {
+  background: var(--alert-err-bg, rgba(247, 118, 142, 0.14)) !important;
+  border: 1px solid var(--alert-err-border, rgba(247, 118, 142, 0.45)) !important;
+  color: var(--err, #f7768e) !important;
+}
+.settings-content .btn-danger:hover:not(:disabled),
+.settings-content .btn-danger-a:hover:not(:disabled),
+.settings-overlay .btn-danger:hover:not(:disabled),
+.settings-overlay .btn-danger-a:hover:not(:disabled) {
+  border-color: var(--err, #f7768e) !important;
 }
 
 .settings-content .gs-row {

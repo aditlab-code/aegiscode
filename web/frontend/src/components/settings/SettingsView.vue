@@ -512,10 +512,10 @@ watch(activeTab, (tab) => {
   <template v-else>
   <!-- Runtime aktif (read-only summary dari AETHER). -->
   <!-- Runtime aktif (Configuration: Provider, model, credential, mode). -->
-  <section class="panel">
-    <div class="panel-head">
-      <div class="title">Configuration</div>
-      <div class="sv-config-head-actions">
+  <AppCard variant="panel" class="settings-panel">
+    <template #header>
+      <span class="title">Configuration</span>
+      <div class="panel-actions sv-config-head-actions">
         <AppButton
           variant="ghost"
           size="sm"
@@ -528,7 +528,7 @@ watch(activeTab, (tab) => {
           <span v-else>Test Connection</span>
         </AppButton>
       </div>
-    </div>
+    </template>
     <div class="panel-body">
       <div v-if="error" class="sv-alert err">{{ error }}</div>
       <div v-if="notice" class="sv-alert ok">{{ notice }}</div>
@@ -650,13 +650,13 @@ watch(activeTab, (tab) => {
 
       </div>
     </div>
-  </section>
+  </AppCard>
 
   <!-- Provider instance + model (relasi Provider -> Model). -->
-  <section class="panel">
-    <div class="panel-head">
-      <div class="title">Providers &amp; Models</div>
-    </div>
+  <AppCard variant="panel" class="settings-panel">
+    <template #header>
+      <span class="title">Providers &amp; Models</span>
+    </template>
     <div class="panel-body">
       <div v-if="!providers.length" class="wb-empty">Belum ada provider instance.</div>
 
@@ -796,16 +796,16 @@ watch(activeTab, (tab) => {
         </div>
       </div>
     </div>
-  </section>
+  </AppCard>
 
   <!-- Credential (.env API key) — hanya versi masked yang ditampilkan. -->
-  <section class="panel">
-    <div class="panel-head">
+  <AppCard variant="panel" class="settings-panel">
+    <template #header>
       <div>
         <div class="title">API Credentials</div>
         <div class="desc">Disimpan di .env AegisCode. Nilai secret tidak pernah ditampilkan.</div>
       </div>
-    </div>
+    </template>
     <div class="panel-body">
       <div v-if="!credentials.length" class="wb-empty">Belum ada credential.</div>
 
@@ -852,7 +852,7 @@ watch(activeTab, (tab) => {
         </div>
       </div>
     </div>
-  </section>
+  </AppCard>
   </template>
 
   <!-- Quick Set Key Modal -->

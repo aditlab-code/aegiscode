@@ -110,12 +110,6 @@ const NAV_TABS = [
     icon: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z",
   },
   {
-    id: "architecture",
-    label: "Architecture",
-    description: "System model and core subsystems",
-    icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
-  },
-  {
     id: "overview",
     label: "Overview",
     description: "Project summary and runtime status",
@@ -381,9 +375,7 @@ onBeforeUnmount(() => {
           <section v-else-if="currentTab === 'projects'" class="settings-tab-pane">
             <AppCard variant="panel" class="settings-panel">
               <template #header>
-                <div class="panel-head">
-                  <div class="title">Project Registry</div>
-                </div>
+                <span class="title">Project Registry</span>
               </template>
               <div v-if="!projects.length" class="panel-body">
                 <div class="wb-empty">No projects yet.</div>
@@ -458,24 +450,21 @@ onBeforeUnmount(() => {
           <section v-else-if="currentTab === 'history'" class="settings-tab-pane">
             <AppCard variant="panel" class="settings-panel">
               <template #header>
-                <div class="panel-head">
-                  <div class="title">Task History</div>
+                <span class="title">Task History</span>
+                <div class="panel-actions hist-head-actions">
+                  <span v-if="taskHistory.length" class="meta">{{ taskHistory.length }} recorded</span>
+                  <AppButton
+                    v-if="taskHistory.length"
+                    variant="danger"
+                    size="sm"
+                    class="hist-clear-btn"
+                    :disabled="historyActionBusy"
+                    @click="emit('clear-history')"
+                  >
+                    Clear History
+                  </AppButton>
                 </div>
               </template>
-
-              <div v-if="taskHistory.length" class="hist-toolbar">
-                <span class="meta">{{ taskHistory.length }} recorded task(s)</span>
-                <AppButton
-                  variant="danger"
-                  size="sm"
-                  class="hist-clear-btn"
-                  :disabled="historyActionBusy"
-                  @click="emit('clear-history')"
-                >
-                  Clear History
-                </AppButton>
-              </div>
-
               <div v-if="!taskHistory.length" class="panel-body">
                 <div class="wb-empty">No task history yet.</div>
               </div>
@@ -629,10 +618,6 @@ onBeforeUnmount(() => {
             <AboutSettingsPanel section="overview" />
           </section>
 
-          <!-- Tab 9: Architecture -->
-          <section v-else-if="currentTab === 'architecture'" class="settings-tab-pane">
-            <AboutSettingsPanel section="architecture" />
-          </section>
 
           <!-- Tab 10: License -->
           <section v-else-if="currentTab === 'license'" class="settings-tab-pane">

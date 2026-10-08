@@ -217,16 +217,6 @@ onBeforeUnmount(() => {
             </svg>
             <span>Overview</span>
           </button>
-
-          <button type="button" class="act-menu-item" role="menuitem" @click="selectSettingItem('architecture')">
-            <svg class="act-menu-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-              <polyline points="2 17 12 22 22 17"/>
-              <polyline points="2 12 12 17 22 12"/>
-            </svg>
-            <span>Architecture</span>
-          </button>
-
           <button type="button" class="act-menu-item" role="menuitem" @click="selectSettingItem('license')">
             <svg class="act-menu-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>

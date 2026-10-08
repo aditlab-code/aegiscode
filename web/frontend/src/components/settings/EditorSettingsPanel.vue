@@ -212,8 +212,8 @@ function resetDefaults() {
     <!-- Header panel -->
     <AppCard variant="panel" class="settings-panel">
       <template #header>
-        <div class="panel-head">
-          <div class="title">Text Editor Settings</div>
+        <span class="title">Text Editor Settings</span>
+        <div class="panel-actions">
           <AppButton variant="ghost" size="sm" @click="resetDefaults">
             Reset to Defaults
           </AppButton>

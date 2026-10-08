@@ -341,8 +341,8 @@ defineExpose({ refresh });
   <div class="ext-mgmt">
     <AppCard variant="panel" class="settings-panel">
       <template #header>
-        <div class="panel-head">
-          <div class="title">Extensions</div>
+        <span class="title">Extensions</span>
+        <div class="panel-actions">
           <AppButton variant="primary" size="sm" :disabled="installBusy" @click="openInstall">
             Install Extension
           </AppButton>
