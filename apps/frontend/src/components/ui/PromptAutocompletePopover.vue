@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 
 const props = defineProps({
   visible: {
@@ -27,6 +27,57 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["select", "close"]);
+
+const listRef = ref(null);
+
+function scrollToSelected() {
+  nextTick(() => {
+    if (!listRef.value) return;
+    const container = listRef.value;
+    const items = container.querySelectorAll(".popover-item");
+    const activeEl = items[props.selectedIndex];
+    if (!activeEl) return;
+
+    if (
+      typeof activeEl.getBoundingClientRect === "function" &&
+      typeof container.getBoundingClientRect === "function"
+    ) {
+      const activeRect = activeEl.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      if (activeRect.top < containerRect.top) {
+        container.scrollTop -= (containerRect.top - activeRect.top);
+      } else if (activeRect.bottom > containerRect.bottom) {
+        container.scrollTop += (activeRect.bottom - containerRect.bottom);
+      }
+    } else if (typeof activeEl.scrollIntoView === "function") {
+      activeEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
+
+watch(
+  () => props.selectedIndex,
+  () => {
+    scrollToSelected();
+  }
+);
+
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) {
+      scrollToSelected();
+    }
+  }
+);
+
+watch(
+  () => props.items,
+  () => {
+    scrollToSelected();
+  }
+);
 
 function selectItem(item) {
   emit("select", item);
@@ -73,7 +124,7 @@ function dirName(path) {
       <span class="popover-count" v-if="items.length">{{ items.length }} suggestion{{ items.length > 1 ? 's' : '' }}</span>
     </div>
 
-    <div v-if="items.length" class="popover-list">
+    <div v-if="items.length" ref="listRef" class="popover-list">
       <div
         v-for="(item, idx) in items"
         :key="typeof item === 'string' ? item : item.id || idx"
@@ -125,7 +176,7 @@ function dirName(path) {
   position: absolute;
   left: 0;
   right: 0;
-  max-height: 200px;
+  max-height: 250px;
   background: var(--panel-bg, #1e1e1e);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
@@ -180,8 +231,10 @@ function dirName(path) {
 .popover-list {
   flex: 1;
   overflow-y: auto;
-  max-height: 135px;
+  max-height: 175px;
   padding: 4px;
+  position: relative;
+  scroll-behavior: auto;
 }
 
 .popover-item {
