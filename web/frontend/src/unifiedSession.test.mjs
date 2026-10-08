@@ -21,7 +21,7 @@ test("UNIFY-01: api.js mengekspor fungsi Unified Session API lengkap", async () 
 
 test("UNIFY-02: AppLeftSidebar mengintegrasikan subtab Threads & History (tanpa subtab Queue redundan) dengan operasi CRUD in-situ via ThreadsHistoryPanel", () => {
   const sidebarCode = readSrc("components/layout/AppLeftSidebar.vue");
-  const panelCode = readSrc("components/ThreadsHistoryPanel.vue");
+  const panelCode = readSrc("components/sidebar/ThreadsHistoryPanel.vue");
 
   assert.ok(sidebarCode.includes("ThreadsHistoryPanel"), "AppLeftSidebar harus menyematkan ThreadsHistoryPanel");
   assert.ok(sidebarCode.includes("open-session"), "AppLeftSidebar harus memancarkan event open-session");
@@ -87,7 +87,7 @@ test("UNIFY-04: Isolasi Aliran Event SSE: parser membedakan context_type consult
 });
 
 test("UNIFY-05: ConsultantChat merender kartu eksekusi agen secara terpadu dalam feed percakapan", () => {
-  const chatCode = readSrc("components/ConsultantChat.vue");
+  const chatCode = readSrc("components/drawer/ConsultantChat.vue");
 
   assert.ok(
     chatCode.includes("consultant-execution-box"),

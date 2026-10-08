@@ -1,8 +1,8 @@
 <script setup>
 import { computed } from "vue";
-import ExplorerSidebarPanel from "../ExplorerSidebarPanel.vue";
-import GitSidebarPanel from "../GitSidebarPanel.vue";
-import ThreadsHistoryPanel from "../ThreadsHistoryPanel.vue";
+import ExplorerSidebarPanel from "../sidebar/ExplorerSidebarPanel.vue";
+import GitSidebarPanel from "../sidebar/GitSidebarPanel.vue";
+import ThreadsHistoryPanel from "../sidebar/ThreadsHistoryPanel.vue";
 import { formatProjectOption } from "../../services/projectService.js";
 
 const props = defineProps({
@@ -116,6 +116,13 @@ const projectOptions = computed(() => {
   return props.projects.map((p) => formatProjectOption(p));
 });
 
+const navDisplayLabel = computed(() => ({
+  explorer: 'EXPLORER',
+  git: 'SOURCE CONTROL',
+  queue: 'THREADS & HISTORY',
+  settings: 'SETTINGS',
+}[props.activeNav] ?? props.activeNav.toUpperCase()));
+
 function onProjectChange(event) {
   const newId = event.target.value;
   if (newId) {
@@ -129,7 +136,7 @@ function onProjectChange(event) {
     <!-- Header: Section Title & Project Switcher -->
     <div class="sidebar-header">
       <div class="sidebar-section-title-row">
-        <span class="sidebar-section-title">{{ activeNav.toUpperCase() }}</span>
+        <span class="sidebar-section-title">{{ navDisplayLabel }}</span>
         <div class="sidebar-header-actions">
           <button
             type="button"

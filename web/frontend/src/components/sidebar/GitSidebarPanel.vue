@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from "vue";
-import ChangesPanel from "./ChangesPanel.vue";
-import GithubBackupPanel from "./GithubBackupPanel.vue";
+import ChangesPanel from "../git/ChangesPanel.vue";
+import GithubBackupPanel from "../git/GithubBackupPanel.vue";
 
 const props = defineProps({
   activeProject: {

@@ -6,7 +6,7 @@
  *   1. 3-column resizable IDE surface with AppSplitter dividers.
  *   2. File opening from Left Sidebar into center Monaco tabs via editorTabsService.
  *   3. Monaco editor tab strip with dirty indicator and AppBreadcrumbs hierarchy.
- *   4. Collapsible and resizable AppBottomDock (Terminal, Output, Problems).
+ *   4. Collapsible and resizable AppBottomDrawer (Terminal, Output, Problems).
  *   5. Task composition & stop controls in AppRightDrawer.
  *   6. 1-click "Apply to Editor" from ConsultantChat into Monaco editor.
  *   7. Responsive layout tiers (desktop, compact, mobile) with overlay backdrop.
@@ -23,11 +23,11 @@ import AppSplitter from "../components/ui/AppSplitter.vue";
 import AppBreadcrumbs from "../components/ui/AppBreadcrumbs.vue";
 import AppLeftSidebar from "../components/layout/AppLeftSidebar.vue";
 import AppRightDrawer from "../components/layout/AppRightDrawer.vue";
-import AppBottomDock from "../components/layout/AppBottomDock.vue";
-import CodeEditor from "../components/CodeEditor.vue";
-import MonacoDiffEditor from "../components/MonacoDiffEditor.vue";
+import AppBottomDrawer from "../components/layout/AppBottomDrawer.vue";
+import CodeEditor from "../components/editor/CodeEditor.vue";
+import MonacoDiffEditor from "../components/editor/MonacoDiffEditor.vue";
 import SettingsOverlay from "./SettingsOverlay.vue";
-import WelcomeView from "../components/WelcomeView.vue";
+import WelcomeView from "../components/editor/WelcomeView.vue";
 import AppModal from "../components/ui/AppModal.vue";
 import { discardProjectGitChanges, readFileContent, writeFileContent } from "../api.js";
 import {
@@ -2397,7 +2397,7 @@ defineExpose({
         />
 
         <!-- Collapsible Bottom Dock -->
-        <AppBottomDock
+        <AppBottomDrawer
           :open="bottomDockOpen"
           :height="dockHeight"
           :active-tab="dockActiveTab"

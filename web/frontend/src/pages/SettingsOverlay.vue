@@ -13,13 +13,13 @@
  * Strict SSR safe, zero forbidden tokens, compliant with check_workbench.py and check_ui_refactor.py.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import SettingsView from "../components/SettingsView.vue";
-import GlobalSettingsPanel from "../components/GlobalSettingsPanel.vue";
-import AgentSettingsPanel from "../components/AgentSettingsPanel.vue";
-import ExtensionManager from "../components/ExtensionManager.vue";
-import EditorSettingsPanel from "../components/EditorSettingsPanel.vue";
-import AboutSettingsPanel from "../components/AboutSettingsPanel.vue";
-import ProjectPolicyPanel from "../components/ProjectPolicyPanel.vue";
+import SettingsView from "../components/settings/SettingsView.vue";
+import GlobalSettingsPanel from "../components/settings/GlobalSettingsPanel.vue";
+import AgentSettingsPanel from "../components/settings/AgentSettingsPanel.vue";
+import ExtensionManager from "../components/settings/ExtensionManager.vue";
+import EditorSettingsPanel from "../components/settings/EditorSettingsPanel.vue";
+import AboutSettingsPanel from "../components/settings/AboutSettingsPanel.vue";
+import ProjectPolicyPanel from "../components/workspace/ProjectPolicyPanel.vue";
 import AppButton from "../components/ui/AppButton.vue";
 import AppCard from "../components/ui/AppCard.vue";
 import {

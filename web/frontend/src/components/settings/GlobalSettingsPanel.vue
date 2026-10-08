@@ -14,8 +14,8 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 import { terminateServer, isTerminating, serverTerminated } from "../services/serverService.js";
-import AppButton from "./ui/AppButton.vue";
-import AppCard from "./ui/AppCard.vue";
+import AppButton from "../ui/AppButton.vue";
+import AppCard from "../ui/AppCard.vue";
 
 const loading = ref(false);
 const busy = ref(false);

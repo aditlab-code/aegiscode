@@ -13,7 +13,7 @@
 // project lain tidak terpengaruh, dan Default Project Policy tidak berubah.
 import { ref, watch } from "vue";
 import { getProjectPolicy, saveProjectPolicy } from "../api";
-import AppButton from "./ui/AppButton.vue";
+import AppButton from "../ui/AppButton.vue";
 
 const props = defineProps({
   // Project (dari daftar launcher / active project): { id, name, root|path }.

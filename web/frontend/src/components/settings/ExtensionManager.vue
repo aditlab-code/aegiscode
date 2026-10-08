@@ -14,9 +14,9 @@ import {
   updateExtension,
   uninstallExtension,
 } from "../api.js";
-import ExtensionUI from "./ExtensionUI.vue";
-import AppButton from "./ui/AppButton.vue";
-import AppCard from "./ui/AppCard.vue";
+import ExtensionUI from "../extensions/ExtensionUI.vue";
+import AppButton from "../ui/AppButton.vue";
+import AppCard from "../ui/AppCard.vue";
 
 const emit = defineEmits(["error"]);
 

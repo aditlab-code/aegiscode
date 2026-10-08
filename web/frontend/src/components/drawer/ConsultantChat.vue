@@ -17,9 +17,9 @@ import {
   deleteConsultantSession,
 } from "../api.js";
 import { renderMarkdown } from "../markdown.js";
-import QueuePanel from "./QueuePanel.vue";
-import PromptAutocompletePopover from "./ui/PromptAutocompletePopover.vue";
-import AppThinkingBlock from "./ui/AppThinkingBlock.vue";
+import QueuePanel from "../queue/QueuePanel.vue";
+import PromptAutocompletePopover from "../ui/PromptAutocompletePopover.vue";
+import AppThinkingBlock from "../ui/AppThinkingBlock.vue";
 import { usePromptAutocomplete } from "../services/promptSuggestionService.js";
 import { useAttachmentPipeline } from "../composables/useAttachmentPipeline.js";
 import {

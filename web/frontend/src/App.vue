@@ -1,7 +1,7 @@
 <script setup>
 /**
  * App.vue - Root Application Coordinator.
- * Coordinates AppNavbar, AppActivityBar, WorkbenchView, AppFooter,
+ * Coordinates AppNavbar, AppActivityBar, WorkbenchView, AppStatusBar,
  * SettingsOverlay, and modal dialogs.
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
@@ -9,15 +9,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { AEGIS_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
-import AppFooter from "./components/layout/AppFooter.vue";
+import AppStatusBar from "./components/layout/AppStatusBar.vue";
 import WorkbenchView from "./pages/WorkbenchView.vue";
-import ProjectLauncher from "./components/ProjectLauncher.vue";
-import ReportViewer from "./components/ReportViewer.vue";
-import ProjectPolicyPanel from "./components/ProjectPolicyPanel.vue";
+import ProjectLauncher from "./components/workspace/ProjectLauncher.vue";
+import ReportViewer from "./components/workspace/ReportViewer.vue";
+import ProjectPolicyPanel from "./components/workspace/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
 import AppButton from "./components/ui/AppButton.vue";
-import LoginOverlay from "./components/LoginOverlay.vue";
+import LoginOverlay from "./components/workspace/LoginOverlay.vue";
 import { useAuth } from "./services/authService.js";
 import {
   listTaskHistory,
@@ -381,7 +381,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <AppFooter
+      <AppStatusBar
         :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
         :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
         :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"

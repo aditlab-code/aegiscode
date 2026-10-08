@@ -30,7 +30,7 @@
 // .cmsg-actions/.copy-btn yang sama dengan Consultant Chat.
 import { computed, nextTick, ref, watch } from "vue";
 import { renderMarkdown } from "../markdown.js";
-import AppThinkingBlock from "./ui/AppThinkingBlock.vue";
+import AppThinkingBlock from "../ui/AppThinkingBlock.vue";
 import { buildAgentActivityCopy } from "../activityCopy.js";
 const props = defineProps({
   events: { type: Array, default: () => [] },

@@ -14,8 +14,8 @@
 // oleh backend runtime AETHER seperti sebelumnya — frontend TIDAK menjalankan
 // logic agent apa pun di sini.
 import { computed, onMounted, ref } from "vue";
-import AppButton from "./ui/AppButton.vue";
-import AppCard from "./ui/AppCard.vue";
+import AppButton from "../ui/AppButton.vue";
+import AppCard from "../ui/AppCard.vue";
 import { getGlobalSettings, updateGlobalSettings } from "../api";
 
 const loading = ref(false);

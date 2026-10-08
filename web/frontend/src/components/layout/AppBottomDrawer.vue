@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
-import TerminalView from "../TerminalView.vue";
+import TerminalView from "../terminal/TerminalView.vue";
 import AppBadge from "../ui/AppBadge.vue";
 import { classifyDiagnostic, summarizeDiagnostics } from "../../services/diagnosticService.js";
 

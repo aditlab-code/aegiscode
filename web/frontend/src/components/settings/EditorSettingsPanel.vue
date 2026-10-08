@@ -7,8 +7,8 @@ import {
   saveEditorSettings,
   toMonacoOptions,
 } from "../services/editorSettingsService.js";
-import AppButton from "./ui/AppButton.vue";
-import AppCard from "./ui/AppCard.vue";
+import AppButton from "../ui/AppButton.vue";
+import AppCard from "../ui/AppCard.vue";
 
 const initial = getStoredEditorSettings();
 

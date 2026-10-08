@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import { AEGIS_VERSION } from "../version.js";
-import AppCard from "./ui/AppCard.vue";
+import AppCard from "../ui/AppCard.vue";
 
 const props = defineProps({
   section: {

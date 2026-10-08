@@ -23,8 +23,8 @@ import {
 } from "../api";
 import GlobalSettingsPanel from "./GlobalSettingsPanel.vue";
 import AgentSettingsPanel from "./AgentSettingsPanel.vue";
-import AppButton from "./ui/AppButton.vue";
-import AppCard from "./ui/AppCard.vue";
+import AppButton from "../ui/AppButton.vue";
+import AppCard from "../ui/AppCard.vue";
 
 const props = defineProps({
   // Konfigurasi runtime aktif dari AETHER (provider/model/mode + instance).

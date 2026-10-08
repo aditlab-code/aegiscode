@@ -1,5 +1,5 @@
 <script setup>
-import FileExplorer from "./FileExplorer.vue";
+import FileExplorer from "../explorer/FileExplorer.vue";
 
 const props = defineProps({
   activeProject: {

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
-import AgentDrawerPanel from "../AgentDrawerPanel.vue";
-import ConsultantChat from "../ConsultantChat.vue";
+import AgentDrawerPanel from "../drawer/AgentDrawerPanel.vue";
+import ConsultantChat from "../drawer/ConsultantChat.vue";
 
 const props = defineProps({
   activeTab: {
