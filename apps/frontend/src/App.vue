@@ -230,6 +230,11 @@ function handleRootEvent(evt) {
     if (typeof modeVal === "string" && ["ask", "agents"].includes(modeVal.toLowerCase())) {
       operationalMode.value = modeVal.toLowerCase();
     }
+  } else if (evt.event_type === "task_started" || evt.event_type === "task_created") {
+    if (workbenchRef.value) {
+      workbenchRef.value.assistantVisible = true;
+      workbenchRef.value.assistantTab = "agents";
+    }
   }
   handleEvent(evt);
 }

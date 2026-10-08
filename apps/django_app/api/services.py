@@ -643,6 +643,9 @@ class GatewayService:
             sid = active_sess.get("session_id") or active_sess.get("id")
 
         eff_mode = mode or self.get_operational_mode() or "ask"
+        # Normalisasi: create_unified_turn hanya menerima "agent" (bukan "agents")
+        if str(eff_mode).strip().lower() == "agents":
+            eff_mode = "agent"
         active_provider = self.get_active_provider()
         active_model = self.get_active_model()
         active_skill = skill_name or self.get_active_skill()
@@ -677,6 +680,12 @@ class GatewayService:
             raise NotFoundError(f"Session '{session_id}' tidak ditemukan.")
 
         pid = project_id or sess.project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception as exc:
+                logger.warning("Gagal membaca active project ID untuk delegasi: %s", exc)
+                pid = None
         turns = sess.turns or []
 
         # Ekstrak intisari instruksi dari giliran sebelumnya
@@ -3164,8 +3173,19 @@ class GatewayService:
                 if spec is not None and not spec.requires_model:
                     return
             if model_id:
-                model = self.llm_config_service.get_model(model_id)
-                if instance_id and model.provider_id != instance_id:
+                # Coba lookup by ID dulu; jika gagal (model_id adalah nama), cari by name
+                model = None
+                try:
+                    model = self.llm_config_service.get_model(model_id)
+                except LLMConfigError:
+                    # model_id mungkin adalah nama model (bukan UUID) — cari by name
+                    for m in self.llm_config_service.list_models():
+                        if getattr(m, "model_name", None) == model_id or getattr(m, "name", None) == model_id:
+                            model = m
+                            break
+                    if model is None:
+                        raise LLMConfigError(f"Model '{model_id}' tidak ditemukan.")
+                if instance_id and getattr(model, "provider_id", None) != instance_id:
                     raise ValidationError(
                         f"Model '{model_id}' bukan milik provider instance "
                         f"'{instance_id}'."

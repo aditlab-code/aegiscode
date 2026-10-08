@@ -394,16 +394,12 @@ class TelegramUpdateHandler:
                 clean_instruction = parts[1].strip() if len(parts) > 1 else ""
 
             if clean_instruction and self.on_steer_command:
-                self.on_steer_command(clean_instruction)
-                self.bot_client.send_message(
-                    chat_id=chat_id,
-                    text="🎯 <b>Instruksi diterima</b> dan diteruskan ke Agen.",
-                )
+                try:
+                    self.on_steer_command(clean_instruction, chat_id=chat_id)
+                except TypeError:
+                    self.on_steer_command(clean_instruction)
             elif clean_instruction:
-                self.bot_client.send_message(
-                    chat_id=chat_id,
-                    text=f"🎯 <b>Instruksi diterima:</b> <i>{clean_instruction}</i>\nDiteruskan ke Agen.",
-                )
+                logger.warning("on_steer_command tidak terkonfigurasi pada handler.")
             else:
                 self.bot_client.send_message(
                     chat_id=chat_id,

@@ -1,56 +1,54 @@
-# Implementation Plan: Telegram Remote Skill Delegation Bridge to IDE Agents
+# Implementation Plan: IDE Real-Time Synchronization for Remote Task Delegation
 
 ## Context & Objectives
-- **Masalah Saat Ini**:
-  1. Interaksi di Telegram saat ini hanya berfungsi sebagai percakapan chat/Q&A biasa dan belum memiliki mekanisme pendelegasian langsung ke agen-agen di IDE.
-  2. Ketika sesi wawancara `interview-me` selesai dan kebutuhan disepakati di Telegram, pengguna harus membuka IDE secara manual untuk membuat task implementasi.
-  3. Dibutuhkan tombol aksi remote `[🚀 Delegasikan ke Agen IDE]` di Telegram yang secara otomatis memicu pembuatan dan eksekusi `Task` di backend IDE (mode `agents`), lalu memantau progres dan melaporkan diff/ringkasan berkas kembali ke Telegram.
-  4. Seluruh pengujian harus dibuat di berkas tes baru yang terisolasi (`test_delegation_bridge.py`) tanpa redundansi dengan tes lama.
+Membangun sinkronisasi seketika antara pendelegasian tugas dari Telegram (`[🚀 Delegasikan ke Agen IDE]`) dengan antarmuka IDE workstation. Task yang didelegasikan otomatis mengikat project aktif, memperbarui daftar threads, membuka right drawer jika tertutup, dan mengalihkan tab ke 'Agents' dengan status live-update. Mengikuti spesifikasi [`docs/specs/spec-ide-delegation-synchronization.md`](../docs/specs/spec-ide-delegation-synchronization.md).
 
 ---
 
-## Architecture & Dependency Graph
+## Dependency Graph & Architecture
 
 ```
-Telegram Companion (interview-me Q&A)
+Telegram Delegation Button Click
     │
-    ├── 1. Finalize with Delegation Button (src/agent_ai/runtime/telegram/stream_relay.py)
-    │       │ - Menambahkan method `finalize_with_delegation(final_text, session_id)`
-    │       │ - Menyertakan inline button `[🚀 Delegasikan ke Agen IDE]` (callback: `agent:delegate:<session_id>`)
+    ├── 1. Active Project Auto-Binding (apps/django_app/api/services.py)
+    │       │ - `delegate_session_to_agent_task`: jika `sess.project_id` kosong,
+    │       │   otomatis tautkan ke `project_store.get_active_project_id()`
     │       ▼
-    ├── 2. Delegation Callback Router (src/agent_ai/runtime/telegram/handler.py)
-    │       │ - Menangkap callback `agent:delegate:<session_id>`
-    │       │ - Mengarahkan ke listener `on_agent_delegate(session_id, chat_id)`
+    ├── 2. Frontend SSE Event Reactivity (apps/frontend/src/composables/useTaskLifecycle.js)
+    │       │ - Menambahkan penanganan `case "task_created"` pada `processEventCore`
+    │       │ - Memperbarui `queueRefresh` dan memicu `refreshTaskHistory()`
     │       ▼
-    ├── 3. Delegation Service Handler (apps/django_app/api/services.py)
-    │       │ - Method `delegate_session_to_agent_task(session_id, project_id)`
-    │       │ - Mengonversi percakapan sesi menjadi `create_task()` mode `agents`
-    │       │ - Menetapkan subagen yang relevan di IDE
+    ├── 3. Threads Panel & Drawer Auto-Focus (apps/frontend/src/components/sidebar/ThreadsHistoryPanel.vue & WorkbenchView.vue)
+    │       │ - `ThreadsHistoryPanel.vue`: `loadThreads()` terpanggil saat `queueRefresh` naik
+    │       │ - `WorkbenchView.vue`: saat remote task running terdeteksi, buka drawer dan set `assistantTab = 'agents'`
     │       ▼
-    ├── 4. Async Delegation Worker & Monitor (src/agent_ai/runtime/telegram/companion.py)
-    │       │ - Eksekusi delegasi di background daemon thread
-    │       │ - Relay streaming: `⚡ Mendelegasikan ke Agen IDE...` -> `⚡ Menjalankan task <task_id>...`
-    │       │ - Polling task sampai selesai dan mengirimkan diff/summary ke Telegram
+    ├── 4. Dedicated Backend Test Suite (tests/test_telegram_companion/test_delegation_ide_sync.py)
+    │       │ - Validasi auto-binding project ID
+    │       │ - Validasi event `task_created` menyertakan `project_id` yang valid
     │       ▼
-    └── 5. Dedicated Verification Suite (tests/test_telegram_companion/test_delegation_bridge.py)
-            │ - Unit tests tombol delegasi di stream relay
-            │ - Unit tests callback router handler
-            │ - Unit tests delegasi pembuatan task di backend
-            │ - Zero redundancy dengan berkas tes lama
+    └── 5. Regression Testing & Verification
+            │ - Verifikasi seluruh test suite (`rtk pytest tests/test_telegram_companion/`)
+            │ - Restart daemon companion
 ```
 
 ---
 
 ## Detailed Task Breakdown
-- **Task 1: Delegation Button in `TelegramStreamRelay`** (`src/agent_ai/runtime/telegram/stream_relay.py`)
-  - Tambahkan `finalize_with_delegation(text, session_id)` yang merender tombol `[🚀 Delegasikan ke Agen IDE]` dengan callback `agent:delegate:<session_id>`.
-- **Task 2: Delegation Callback Router in `TelegramUpdateHandler`** (`src/agent_ai/runtime/telegram/handler.py`)
-  - Tambahkan `on_agent_delegate` callback parameter dan route callback data `agent:delegate:<session_id>`.
-- **Task 3: Backend Delegation Service in `GatewayService`** (`apps/django_app/api/services.py`)
-  - Implementasikan `delegate_session_to_agent_task(session_id)` yang mengekstrak intisari sesi dan memanggil `create_task()` dengan mode `agents`.
-- **Task 4: Async Delegation Execution & Observability in `TelegramCompanion`** (`src/agent_ai/runtime/telegram/companion.py`)
-  - Implementasikan `handle_agent_delegate()` yang memanggil service delegasi di thread terpisah, memantau task hingga selesai, dan melaporkan laporan ke Telegram.
-- **Task 5: Dedicated Test Suite** (`tests/test_telegram_companion/test_delegation_bridge.py`)
-  - Buat berkas tes baru yang menguji seluruh alur delegasi secara terisolasi tanpa redundansi.
-- **Task 6: Daemon Restart & Live Verification**
-  - Restart daemon companion dan pastikan bot siap menerima interaksi delegasi.
+
+### Task 1: Auto-Bind Active Project in `delegate_session_to_agent_task`
+- Di `apps/django_app/api/services.py`, saat mengekstrak `pid`, jika `pid` bernilai None/kosong, baca fallback dari `self.project_store.get_active_project_id()`.
+- Pastikan task yang dibuat terdaftar di bawah ID project aktif.
+
+### Task 2: Frontend SSE Event Reactivity in `useTaskLifecycle.js`
+- Di `apps/frontend/src/composables/useTaskLifecycle.js`, tambahkan `case "task_created"` pada `processEventCore(evt)` agar `queueRefresh.value += 1` dan `refreshTaskHistory()` terpanggil secara reaktif saat ada task baru dari remote.
+
+### Task 3: Threads Panel Refresh & Drawer Focus
+- Di `apps/frontend/src/components/sidebar/ThreadsHistoryPanel.vue`, pastikan `props.queueRefresh` memicu `loadThreads()`.
+- Di `apps/frontend/src/pages/WorkbenchView.vue`, saat `isRunning` bernilai true atau ada remote task baru yang terdeteksi, buka right drawer (`assistantVisible.value = true`) dan arahkan `assistantTab.value = 'agents'`.
+
+### Task 4: Dedicated Backend Test Suite
+- Buat file tes baru `tests/test_telegram_companion/test_delegation_ide_sync.py` untuk menguji auto-binding active project ID pada delegasi task.
+
+### Task 5: Verification & Daemon Restart
+- Jalankan `rtk pytest tests/test_telegram_companion/` (memastikan seluruh 78+ tes lulus).
+- Restart daemon Telegram Companion.

@@ -2,6 +2,8 @@
 
 Mengelola pembaruan pesan progresif (streaming) ke Telegram dengan throttling
 adaptif (~800ms) untuk mencegah pembatasan rate limit Telegram API (HTTP 429).
+
+TIDAK ada silent exception swallowing — setiap error dilog di level yang sesuai.
 """
 
 from __future__ import annotations
@@ -18,11 +20,7 @@ def sanitize_telegram_html(text: str) -> str:
     """Sanitasi teks polos ke format HTML aman untuk Telegram."""
     if not text:
         return ""
-    # Escape karakter HTML spesial
-    escaped = html.escape(text)
-    # Kembalikan tag formatting dasar bila ada representasi markdown sederhana
-    # Misalnya backtick code
-    return escaped
+    return html.escape(text)
 
 
 class TelegramStreamRelay:
@@ -54,8 +52,9 @@ class TelegramStreamRelay:
                 )
                 if isinstance(res, dict) and res.get("result"):
                     self.message_id = res["result"].get("message_id")
+                    logger.debug("StreamRelay: pesan awal terkirim, message_id=%s", self.message_id)
             except Exception as e:
-                logger.warning("Gagal mengirim pesan awal stream relay: %s", str(e))
+                logger.error("StreamRelay: GAGAL mengirim pesan awal ke chat_id=%s: %s", self.chat_id, e)
 
     def set_status(self, icon: str, label: str) -> None:
         """Perbarui status ikon (misal 💭 -> ⚡)."""
@@ -117,10 +116,15 @@ class TelegramStreamRelay:
                 text=rendered_text,
             )
         except Exception as e:
-            # Seringkali Telegram membalas "message is not modified", abaikan
             err_str = str(e).lower()
-            if "not modified" not in err_str:
-                logger.debug("Error edit_message_text pada stream relay: %s", str(e))
+            if "not modified" in err_str:
+                # Telegram menolak edit karena isi sama — bukan error nyata
+                logger.debug("StreamRelay _flush: pesan tidak berubah, skip (chat_id=%s)", self.chat_id)
+            else:
+                logger.warning(
+                    "StreamRelay _flush: edit_message_text gagal (chat_id=%s, message_id=%s): %s",
+                    self.chat_id, self.message_id, e,
+                )
 
     def finalize(self, final_text: Optional[str] = None, success: bool = True) -> None:
         """Selesaikan stream dan kirim hasil final."""
@@ -172,7 +176,10 @@ class TelegramStreamRelay:
                     reply_markup=reply_markup,
                 )
             except Exception as e:
-                logger.debug("Error edit_message_text pada finalize_with_delegation: %s", str(e))
+                logger.error(
+                    "StreamRelay finalize_with_delegation: GAGAL mengedit pesan (chat_id=%s): %s",
+                    self.chat_id, e,
+                )
 
     def error(self, error_message: str) -> None:
         """Laporkan error pada stream."""
@@ -189,7 +196,10 @@ class TelegramStreamRelay:
                     text=rendered,
                 )
             except Exception as e:
-                logger.warning("Gagal mengirim error ke stream relay: %s", str(e))
+                logger.error(
+                    "StreamRelay error: GAGAL mengirim pesan error ke chat_id=%s: %s",
+                    self.chat_id, e,
+                )
 
     def error_with_retry(
         self,
@@ -226,4 +236,7 @@ class TelegramStreamRelay:
                     reply_markup=reply_markup,
                 )
             except Exception as e:
-                logger.warning("Gagal mengirim error_with_retry ke stream relay: %s", str(e))
+                logger.error(
+                    "StreamRelay error_with_retry: GAGAL mengedit pesan (chat_id=%s): %s",
+                    self.chat_id, e,
+                )

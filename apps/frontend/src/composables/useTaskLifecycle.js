@@ -184,6 +184,11 @@ function processEventCore(evt) {
   }
 
   switch (evt.event_type) {
+    case "task_created": {
+      queueRefresh.value += 1;
+      refreshTaskHistory();
+      break;
+    }
     case "task_started": {
       const startedId = evt.task_id || task.id;
       const wasViewingThisPending = task.id === startedId && task.status === "pending";

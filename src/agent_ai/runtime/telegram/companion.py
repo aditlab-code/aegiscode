@@ -39,12 +39,14 @@ def _get_gateway_service():
     try:
         import django
         django.setup()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.error("Gagal memuat GatewayService (django.setup): %s", exc, exc_info=True)
+        return None
     try:
         from api.services import get_service
         return get_service()
-    except Exception:
+    except Exception as exc:
+        logger.error("Gagal memuat GatewayService (get_service): %s", exc, exc_info=True)
         return None
 
 
@@ -122,8 +124,8 @@ class TelegramCompanion:
         if svc:
             try:
                 return svc.get_active_repository_info()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error get_active_repository_info: %s", exc)
         return {
             "name": "AegisCode",
             "root": "-",
@@ -141,8 +143,8 @@ class TelegramCompanion:
         if svc:
             try:
                 return svc.get_operational_mode()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error get_operational_mode: %s", exc)
         return "ask"
 
     def set_mode(self, mode: str) -> str:
@@ -152,8 +154,8 @@ class TelegramCompanion:
         if svc:
             try:
                 return svc.set_operational_mode(mode)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error set_operational_mode: %s", exc)
         return mode
 
     def get_agents(self) -> List[Dict[str, Any]]:
@@ -163,8 +165,8 @@ class TelegramCompanion:
         if svc:
             try:
                 return svc.get_subagents_fleet()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error get_subagents_fleet: %s", exc)
         return []
 
     def get_providers(self) -> List[Dict[str, Any]]:
@@ -176,8 +178,8 @@ class TelegramCompanion:
                 res = svc.get_providers_status()
                 if res:
                     return res
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error get_providers_status: %s", exc)
         return [
             {
                 "id": "c34bd3e5098e4cf08a716d0a8a44c714",
@@ -217,8 +219,8 @@ class TelegramCompanion:
         if svc:
             try:
                 svc.set_active_provider(provider_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error set_active_provider: %s", exc)
 
     def test_provider(self) -> Dict[str, Any]:
         if self._custom_test_provider:
@@ -296,8 +298,8 @@ class TelegramCompanion:
         if svc:
             try:
                 return svc.get_active_skill()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Error get_active_skill: %s", exc)
         return None
 
     def attach_coordinator(self, coordinator: ApprovalCoordinator) -> None:
@@ -470,16 +472,26 @@ class TelegramCompanion:
                 relay.set_status("⚡", "Membuat Task otonom di IDE...")
                 res = svc.delegate_session_to_agent_task(session_id=session_id)
                 task_info = res.get("task") or {}
-                task_id = task_info.get("task_id") or "unknown"
+                task_id = task_info.get("task_id")
 
-                relay.set_status("⚡", f"Menjalankan task {task_id} di IDE...")
+                if not task_id:
+                    err_msg = "Gagal mendelegasikan tugas ke IDE: task ID tidak ditemukan dalam respons backend."
+                    logger.error("[DELEGATE-THREAD] %s: keys=%s", err_msg, list(res.keys()))
+                    relay.error(err_msg)
+                    return
 
-                # Pantau status task
-                max_wait = 180
+                relay.set_status("⚡", f"Menjalankan task <code>{task_id[:8]}</code> di IDE...")
+
+                # Pantau status task dengan status update berkala
+                max_wait = 300  # 5 menit max
                 t0 = time.time()
-                final_status = "completed"
+                final_status = "running"
+                last_status_update = t0
+                status_interval = 15  # Update status setiap 15 detik
+
                 while time.time() - t0 < max_wait:
-                    time.sleep(2)
+                    time.sleep(3)
+                    elapsed = int(time.time() - t0)
                     try:
                         curr_task = svc.get_task(task_id)
                         st = curr_task.get("status", "running")
@@ -489,18 +501,32 @@ class TelegramCompanion:
                         elif st in ("failed", "error", "cancelled"):
                             final_status = st
                             break
-                    except Exception:
-                        pass
+                    except Exception as poll_err:
+                        logger.warning("[DELEGATE-THREAD] Gagal membaca status task %s: %s", task_id, poll_err)
+
+                    # Kirim status update berkala agar pengguna di Telegram mengetahui progres
+                    if time.time() - last_status_update >= status_interval:
+                        relay.set_status("⏳", f"Agen IDE sedang memproses task... ({elapsed}s)")
+                        last_status_update = time.time()
+
+                if final_status == "running":
+                    final_status = "timeout"
 
                 report_text = ""
                 try:
                     report_res = svc.get_task_report(task_id)
                     report_text = report_res.get("summary") or report_res.get("report") or ""
-                except Exception:
-                    pass
+                except Exception as rpt_err:
+                    logger.warning("[DELEGATE-THREAD] Gagal membaca task report %s: %s", task_id, rpt_err)
 
                 if not report_text:
-                    report_text = f"Tugas <code>{task_id}</code> selesai dieksekusi oleh Agen IDE dengan status: <b>{final_status}</b>."
+                    if final_status == "timeout":
+                        report_text = (
+                            f"⏰ Task <code>{task_id[:12]}</code> masih berjalan setelah {max_wait}s. "
+                            f"Silakan periksa progresnya di workstation IDE."
+                        )
+                    else:
+                        report_text = f"Tugas <code>{task_id[:12]}</code> selesai dieksekusi oleh Agen IDE dengan status: <b>{final_status}</b>."
 
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.info(
@@ -513,7 +539,7 @@ class TelegramCompanion:
                 relay.finalize(report_text, success=(final_status == "completed"))
             except Exception as ex:
                 duration_ms = int((time.time() - start_time) * 1000)
-                logger.error("[DELEGATE-THREAD] [ERROR] Delegation %s failed in %d ms: %s", turn_id, duration_ms, ex)
+                logger.error("[DELEGATE-THREAD] [ERROR] Delegation %s failed in %d ms: %s", turn_id, duration_ms, ex, exc_info=True)
                 relay.error(f"Gagal mendelegasikan tugas: {ex}")
 
         t = threading.Thread(target=_worker, name=f"DelegateThread-{turn_id}", daemon=True)
@@ -527,12 +553,6 @@ class TelegramCompanion:
         turn_id = f"TURN-{uuid.uuid4().hex[:8]}"
         start_time = time.time()
 
-        relay = TelegramStreamRelay(
-            bot_client=self.bot_client,
-            chat_id=chat_id,
-            initial_status="💭 <i>Agen sedang menganalisis instruksi...</i>",
-        )
-
         def _worker():
             mode = self.get_mode().lower()
             logger.info("[TURN-THREAD] [START] Turn %s started for chat_id=%s (mode=%s)", turn_id, chat_id, mode)
@@ -541,37 +561,109 @@ class TelegramCompanion:
             if not svc:
                 duration_ms = int((time.time() - start_time) * 1000)
                 logger.error("[TURN-THREAD] [ERROR] Turn %s failed in %d ms: GatewayService unavailable", turn_id, duration_ms)
-                relay.error("Layanan Gateway Aegis tidak tersedia.")
+                self.bot_client.send_message(chat_id=chat_id, text="❌ <b>Layanan Gateway Aegis tidak tersedia.</b>")
                 return
 
-            try:
-                if mode == "agents":
-                    relay.set_status("⚡", "Mengeksekusi tugas otonom...")
+            stop_typing = threading.Event()
+            typing_thread = None
 
-                res = svc.dispatch_remote_turn(content=instruction, mode=mode)
+            if mode == "ask":
+                # Mulai pulsa indikator native Telegram typing setiap 4 detik
+                def _typing_worker():
+                    while not stop_typing.is_set():
+                        if hasattr(self.bot_client, "send_chat_action"):
+                            self.bot_client.send_chat_action(chat_id=chat_id, action="typing")
+                        stop_typing.wait(4.0)
+
+                typing_thread = threading.Thread(target=_typing_worker, daemon=True)
+                typing_thread.start()
+                relay = None
+            else:
+                relay = TelegramStreamRelay(
+                    bot_client=self.bot_client,
+                    chat_id=chat_id,
+                    initial_status="⚡ <i>Menyiapkan eksekusi tugas otonom di IDE...</i>",
+                )
+
+            try:
+                # Normalisasi mode: 'agents' → 'agent' agar dikenali create_unified_turn
+                dispatch_mode = "agent" if mode == "agents" else mode
+                res = svc.dispatch_remote_turn(content=instruction, mode=dispatch_mode)
 
                 if mode == "ask":
+                    stop_typing.set()
+                    if typing_thread and typing_thread.is_alive():
+                        typing_thread.join(timeout=0.5)
+
                     consult_res = res.get("consultant_result") or {}
                     asst_turn = res.get("assistant_turn") or {}
                     reply = consult_res.get("reply") or asst_turn.get("content") or "Respons selesai diterima dari agen."
                     duration_ms = int((time.time() - start_time) * 1000)
                     logger.info("[TURN-THREAD] [FINISH] Turn %s completed in %d ms (status=success)", turn_id, duration_ms)
+
+                    from agent_ai.runtime.telegram.stream_relay import sanitize_telegram_html
+                    rendered_text = f"🤖 <b>Aegis Agent:</b>\n\n{sanitize_telegram_html(reply)}"
+                    if len(rendered_text) > 4000:
+                        rendered_text = rendered_text[:3980] + "\n\n<i>...(dipotong)</i>"
+
+                    reply_markup = None
                     session_id = res.get("session_id")
                     if session_id and self._should_offer_delegation(reply):
-                        relay.finalize_with_delegation(reply, session_id=session_id)
-                    else:
-                        relay.finalize(reply, success=True)
+                        reply_markup = {
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "🚀 Delegasikan ke Agen IDE",
+                                        "callback_data": f"agent:delegate:{session_id}",
+                                    }
+                                ]
+                            ]
+                        }
+
+                    self.bot_client.send_message(
+                        chat_id=chat_id,
+                        text=rendered_text,
+                        reply_markup=reply_markup,
+                    )
                 else:
                     task_info = res.get("task") or {}
-                    task_id = task_info.get("task_id") or "unknown"
-                    relay.set_status("⚡", f"Menjalankan task {task_id}...")
+                    task_id = task_info.get("task_id")
 
-                    # Pantau status task
-                    max_wait = 180
+                    # Jika task_id tidak ada, task creation gagal — fallback ke respons LLM langsung
+                    if not task_id:
+                        logger.warning(
+                            "[TURN-THREAD] [WARN] Turn %s: task_id not found in response (keys=%s), falling back to ask-style reply",
+                            turn_id,
+                            list(res.keys()),
+                        )
+                        consult_res = res.get("consultant_result") or {}
+                        asst_turn = res.get("assistant_turn") or {}
+                        reply = (
+                            consult_res.get("reply")
+                            or asst_turn.get("content")
+                            or "Tugas diterima, namun task ID tidak tersedia. Silakan coba lagi."
+                        )
+                        duration_ms = int((time.time() - start_time) * 1000)
+                        logger.info(
+                            "[TURN-THREAD] [FINISH] Turn %s completed in %d ms (fallback ask, no task_id)",
+                            turn_id,
+                            duration_ms,
+                        )
+                        relay.finalize(reply, success=True)
+                        return
+
+                    relay.set_status("⚡", f"Menjalankan task <code>{task_id[:8]}</code>...")
+
+                    # Pantau status task dengan status update berkala
+                    max_wait = 300  # 5 menit max
                     t0 = time.time()
-                    final_status = "completed"
+                    final_status = "running"
+                    last_status_update = t0
+                    status_interval = 15  # Update status setiap 15 detik
+
                     while time.time() - t0 < max_wait:
-                        time.sleep(2)
+                        time.sleep(3)
+                        elapsed = int(time.time() - t0)
                         try:
                             curr_task = svc.get_task(task_id)
                             st = curr_task.get("status", "running")
@@ -581,18 +673,32 @@ class TelegramCompanion:
                             elif st in ("failed", "error", "cancelled"):
                                 final_status = st
                                 break
-                        except Exception:
-                            pass
+                        except Exception as poll_err:
+                            logger.debug("[TURN-THREAD] poll error for task %s: %s", task_id, poll_err)
+
+                        # Kirim status update berkala agar user tahu progress
+                        if time.time() - last_status_update >= status_interval:
+                            relay.set_status("⏳", f"Agen sedang mengerjakan task... ({elapsed}s)")
+                            last_status_update = time.time()
+
+                    if final_status == "running":
+                        final_status = "timeout"
 
                     report_text = ""
                     try:
                         report_res = svc.get_task_report(task_id)
                         report_text = report_res.get("summary") or report_res.get("report") or ""
-                    except Exception:
-                        pass
+                    except Exception as rpt_err:
+                        logger.warning("[TURN-THREAD] Gagal membaca task report %s: %s", task_id, rpt_err)
 
                     if not report_text:
-                        report_text = f"Tugas <code>{task_id}</code> selesai dieksekusi dengan status: <b>{final_status}</b>."
+                        if final_status == "timeout":
+                            report_text = (
+                                f"⏰ Task <code>{task_id[:12]}</code> masih berjalan setelah {max_wait}s. "
+                                f"Pantau progress di IDE."
+                            )
+                        else:
+                            report_text = f"Task <code>{task_id[:12]}</code> selesai dengan status: <b>{final_status}</b>."
 
                     duration_ms = int((time.time() - start_time) * 1000)
                     logger.info(
@@ -621,10 +727,27 @@ class TelegramCompanion:
                     "error": str(ex),
                 }
 
-                relay.error_with_retry(
-                    error_message=str(ex),
-                    retry_callback_data=f"prompt:retry:{cache_id}",
-                )
+                if relay:
+                    relay.error_with_retry(
+                        error_message=str(ex),
+                        retry_callback_data=f"prompt:retry:{cache_id}",
+                    )
+                else:
+                    from agent_ai.runtime.telegram.stream_relay import sanitize_telegram_html
+                    rendered_err = (
+                        f"⚠️ <b>Gagal Menghubungi LLM</b>\n\n"
+                        f"<b>Detail:</b> <code>{sanitize_telegram_html(str(ex))}</code>\n\n"
+                        f"<i>Silakan periksa koneksi atau klik tombol di bawah untuk mencoba kembali.</i>"
+                    )
+                    self.bot_client.send_message(
+                        chat_id=chat_id,
+                        text=rendered_err,
+                        reply_markup={
+                            "inline_keyboard": [
+                                [{"text": "🔄 Coba Lagi", "callback_data": f"prompt:retry:{cache_id}"}]
+                            ]
+                        },
+                    )
 
         t = threading.Thread(target=_worker, name=f"TurnThread-{turn_id}", daemon=True)
         t.start()

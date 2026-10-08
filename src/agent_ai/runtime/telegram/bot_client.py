@@ -107,6 +107,17 @@ class TelegramBotClient:
         if show_alert:
             payload["show_alert"] = True
         res = self._post("answerCallbackQuery", payload, request_timeout=10)
+    def send_chat_action(
+        self,
+        chat_id: int | str,
+        action: str = "typing",
+    ) -> bool:
+        """Kirim indikator status chat action (misal: 'typing', 'upload_document')."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "action": action,
+        }
+        res = self._post("sendChatAction", payload, request_timeout=10)
         return bool(res.get("ok", False))
 
     def set_my_commands(self, commands: Optional[List[Dict[str, str]]] = None) -> bool:
