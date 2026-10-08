@@ -395,13 +395,14 @@ defineExpose({ loadGitChanges });
 
 <template>
   <div class="sc-changes-container">
-    <!-- 1. STAGED CHANGES SECTION (tampil bila ada berkas staged) -->
-    <section v-if="stagedChanges.length > 0" class="sc-changes-section changes-block staged-block" :class="{ collapsed: stagedCollapsed }">
+    <!-- 1. STAGED CHANGES SECTION (tampil bila repositori aktif atau ada berkas staged) -->
+    <section v-if="isRepository || stagedChanges.length > 0" class="sc-changes-section changes-block staged-block" :class="{ collapsed: stagedCollapsed }">
       <div class="drawer-sec-head sc-sec-head" @click="toggleStagedCollapse">
         <span class="sec-caret sc-caret" aria-hidden="true">{{ stagedCollapsed ? "▸" : "▾" }}</span>
         <span class="drawer-sec-title sc-sec-title">STAGED CHANGES</span>
         <div class="sc-header-actions-row" @click.stop>
           <button
+            v-if="stagedChanges.length > 0"
             type="button"
             class="sc-action-icon-btn unstage-all"
             :disabled="unstageAllBusy"
@@ -418,7 +419,8 @@ defineExpose({ loadGitChanges });
       </div>
 
       <div v-show="!stagedCollapsed" class="sc-changes-body changes-body">
-        <div class="changes-list">
+        <div v-if="!stagedChanges.length" class="sc-empty-hint">No staged changes yet. Use + to stage changes.</div>
+        <div v-else class="changes-list">
           <template v-for="c in stagedChanges" :key="'staged-' + (c.path || c.detail)">
             <div class="file-row" :class="{ open: expandedPath === (c.path || c.detail) }" @click="onRowClick(c)">
               <span class="file-caret" aria-hidden="true" title="Toggle inline preview" @click.stop="toggleRow(c)">
@@ -431,24 +433,26 @@ defineExpose({ loadGitChanges });
                 <span v-if="c.deletions != null" class="st-del">-{{ c.deletions }}</span>
               </span>
 
-              <button
-                class="file-unstage-btn"
-                type="button"
-                :disabled="unstagingFile === c.path"
-                title="Unstage changes"
-                aria-label="Unstage changes"
-                @click.stop="handleUnstage(c.path)"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </button>
-              <button class="file-diff-btn" type="button" title="Open Monaco Diff" @click.stop="emit('open-diff', c)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg>
-              </button>
-              <button class="file-edit" type="button" title="Edit" @click.stop="emit('open-file', c)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
-              </button>
+              <div class="file-row-actions" @click.stop>
+                <button
+                  class="file-unstage-btn"
+                  type="button"
+                  :disabled="unstagingFile === c.path"
+                  title="Unstage changes"
+                  aria-label="Unstage changes"
+                  @click="handleUnstage(c.path)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                </button>
+                <button class="file-diff-btn" type="button" title="Open Monaco Diff" @click="emit('open-diff', c)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg>
+                </button>
+                <button class="file-edit" type="button" title="Edit" @click="emit('open-file', c)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                </button>
+              </div>
             </div>
 
             <div v-if="expandedPath === (c.path || c.detail)" class="file-diff">
@@ -558,38 +562,38 @@ defineExpose({ loadGitChanges });
                     ✕
                   </button>
                 </div>
-                <template v-else>
+                <div v-else class="file-row-actions" @click.stop>
                   <button
                     class="file-stage-btn"
                     type="button"
                     :disabled="stagingFile === c.path"
                     title="Stage changes (Approve)"
                     aria-label="Stage changes (Approve)"
-                    @click.stop="handleStage(c.path)"
+                    @click="handleStage(c.path)"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <line x1="12" y1="5" x2="12" y2="19"/>
                       <line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
                   </button>
-                  <button class="file-diff-btn" type="button" title="Open Monaco Diff" @click.stop="emit('open-diff', c)">
+                  <button class="file-diff-btn" type="button" title="Open Monaco Diff" @click="emit('open-diff', c)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/></svg>
                   </button>
-                  <button class="file-edit" type="button" title="Edit" @click.stop="emit('open-file', c)">
+                  <button class="file-edit" type="button" title="Edit" @click="emit('open-file', c)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                   </button>
                   <button
                     class="file-discard-btn"
                     type="button"
                     title="Discard changes to this file"
-                    @click.stop="requestDiscardFile(c.path)"
+                    @click="requestDiscardFile(c.path)"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                       <path d="M3 3v5h5"/>
                     </svg>
                   </button>
-                </template>
+                </div>
               </div>
 
               <div v-if="expandedPath === (c.path || c.detail)" class="file-diff">

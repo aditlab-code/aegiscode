@@ -167,6 +167,14 @@
   color: var(--err);
 }
 
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
 .file-edit,
 .file-diff-btn,
 .file-discard-btn,
