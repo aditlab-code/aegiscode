@@ -303,7 +303,7 @@ function reconcileSequenceGap(gapEvents) {
     } catch (_) {}
   }
 
-async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null) {
+async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null, activeFile = null) {
   if (!text || !text.trim()) return;
   error.value = "";
   const targetProjectId = activeProject.value?.id || null;
@@ -337,7 +337,7 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
         meta.session_id = activeSessionId.value;
       }
     } catch (_) {}
-    const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
+    const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images, activeFile || null);
     try {
       if (typeof activeSessionId !== "undefined" && res?.session_id && !activeSessionId.value) {
         activeSessionId.value = res.session_id;
@@ -408,12 +408,14 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
 
 async function handleComposerSubmit(payload) {
   const text = typeof payload === "string" ? payload : payload?.text;
+  const activeFile = typeof payload === "object" ? payload?.activeFile : null;
   await submitTask(
     text,
     payload?.providerInstanceId || null,
     payload?.modelId || null,
     payload?.executionMode || null,
-    payload?.images || null
+    payload?.images || null,
+    activeFile || null
   );
 }
 

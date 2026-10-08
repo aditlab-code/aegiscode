@@ -326,14 +326,17 @@ function resetComposer() {
 // - quick       : Analisis ringkas berbasis Project Bible & konteks proyek.
 // - investigate : Investigasi mendalam dengan akses pembacaan & penelusuran kode proyek.
 // Mengganti mode TIDAK mereset sesi/konteks percakapan.
-const mode = ref("quick");
+const mode = ref("balanced");
 const MODES = [
-  { id: "quick", label: "Quick" },
-  { id: "investigate", label: "Deep" },
+  { id: "fast", label: "Fast" },
+  { id: "balanced", label: "Balanced" },
+  { id: "deep", label: "Deep" },
 ];
 function setMode(id) {
-  if (id === "quick" || id === "investigate" || id === "deep") {
-    mode.value = id === "deep" ? "investigate" : id;
+  if (id === "quick") mode.value = "fast";
+  else if (id === "investigate") mode.value = "deep";
+  else if (["fast", "balanced", "deep"].includes(id)) {
+    mode.value = id;
   }
 }
 
@@ -837,46 +840,14 @@ onMounted(() => {
             class="mode-btn"
             :class="{ active: mode === m.id }"
             :aria-pressed="mode === m.id ? 'true' : 'false'"
-            :title="m.id === 'quick' ? 'Quick: Ringkas (analisis konteks)' : 'Deep: Mendalam (investigasi kode)'"
+            :title="`${m.label} mode`"
             :disabled="sending"
             @click="setMode(m.id)"
           >
-            <span class="mb-icon" aria-hidden="true">
-              <svg
-                v-if="m.id === 'quick'"
-                class="mb-svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              <svg
-                v-else-if="m.id === 'investigate'"
-                class="mb-svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                <circle cx="11" cy="11" r="2.5" />
-              </svg>
-            </span>
             <span class="mb-label">{{ m.label }}</span>
           </button>
           <span class="cm-hint">
-            {{ mode === "quick" ? "Ringkas: konteks proyek" : "Mendalam: inspeksi kode" }}
+            {{ mode === "fast" ? "Fast: simbol & referensi" : (mode === "deep" ? "Deep: audit arsitektur penuh" : "Balanced: callers/callees & investigasi") }}
           </span>
         </div>
       </template>
@@ -1190,8 +1161,9 @@ onMounted(() => {
               aria-label="AEGIS Mode"
               :disabled="sending"
             >
-              <option value="quick">Quick</option>
-              <option value="investigate">Deep</option>
+              <option value="fast">Fast</option>
+              <option value="balanced">Balanced</option>
+              <option value="deep">Deep</option>
             </select>
           </div>
 

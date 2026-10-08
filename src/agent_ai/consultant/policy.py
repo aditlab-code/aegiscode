@@ -33,6 +33,9 @@ from dataclasses import dataclass
 from typing import Dict, Optional
 
 from agent_ai.consultant.models import (
+    MODE_FAST,
+    MODE_BALANCED,
+    MODE_DEEP,
     MODE_INVESTIGATE,
     MODE_QUICK,
     normalize_consultant_mode,
@@ -120,7 +123,10 @@ INVESTIGATION_RETRIEVAL_BUDGET = ConsultantRetrievalBudget(
 
 #: Peta mode -> preset budget (satu sumber kebenaran).
 _RETRIEVAL_BUDGETS: Dict[str, ConsultantRetrievalBudget] = {
+    MODE_FAST: QUICK_RETRIEVAL_BUDGET,
     MODE_QUICK: QUICK_RETRIEVAL_BUDGET,
+    MODE_BALANCED: INVESTIGATION_RETRIEVAL_BUDGET,
+    MODE_DEEP: INVESTIGATION_RETRIEVAL_BUDGET,
     MODE_INVESTIGATE: INVESTIGATION_RETRIEVAL_BUDGET,
 }
 

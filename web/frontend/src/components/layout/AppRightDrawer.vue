@@ -138,6 +138,14 @@ const props = defineProps({
     type: String,
     default: "balanced",
   },
+  activeTabPath: {
+    type: String,
+    default: "",
+  },
+  activeFile: {
+    type: Object,
+    default: () => null,
+  },
 });
 
 const emit = defineEmits([
@@ -282,7 +290,15 @@ function handleSubmit() {
   const text = promptText.value.trim();
   if (!text || props.isSubmitting) return;
   pushHistory(text);
-  emit("submit-task", text);
+  const activeFileObj = props.activeFile || (props.activeTabPath ? { path: props.activeTabPath } : null);
+  if (activeFileObj) {
+    emit("submit-task", {
+      text,
+      activeFile: activeFileObj,
+    });
+  } else {
+    emit("submit-task", text);
+  }
   promptText.value = "";
 }
 
@@ -569,6 +585,13 @@ defineExpose({
             </button>
           </div>
           <div class="chat-card-body">
+            <div v-if="activeTabPath" class="chat-active-file-chip" :title="`Berkas aktif: ${activeTabPath}`">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                <polyline points="13 2 13 9 20 9"></polyline>
+              </svg>
+              <span class="active-file-chip-label">Active: {{ activeTabPath }}</span>
+            </div>
             <textarea
               ref="promptTextarea"
               v-model="promptText"

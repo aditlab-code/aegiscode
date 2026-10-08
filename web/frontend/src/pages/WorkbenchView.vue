@@ -541,6 +541,11 @@ const {
   activeTabPath,
 } = useWorkbenchTabs(props);
 
+const activeFile = computed(() => {
+  const cur = activeTab.value;
+  return cur ? { path: cur.path, content: cur.content || null } : null;
+});
+
 // 3. Live Buffers & SSE Event Handling (via useWorkbenchLiveEvents)
 const {
   localOutputLines,
@@ -2429,6 +2434,8 @@ defineExpose({
           :provider-instance-id="effectiveProviderInstanceId"
           :model-id="effectiveModelId"
           :mode="props.mode || props.config?.mode || 'balanced'"
+          :active-tab-path="activeTabPath"
+          :active-file="activeFile"
           @close="toggleAssistant(false)"
           @open-composer="handleOpenAgentComposer"
           @request-stop="emit('request-stop')"

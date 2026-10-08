@@ -1,46 +1,31 @@
-"""Tool yang tersedia untuk AETHER Consultant.
+"""Tool yang tersedia untuk AegisCode Consultant (Aegis Reasoning Layer).
 
 Boundary Consultant: READ-ONLY terhadap CODE PROJECT, READ+UPDATE terhadap
-Project Bible. Karena itu registry Consultant DIKURASI dan bergantung MODE:
+Project Bible. Registry Consultant DIKURASI secara struktural sesuai 3 Mode Kanonik:
 
-    mode "quick"       -> atlas_query, rig_query, project_map_status
-                          (Project Map READ-ONLY: paham struktur project lewat
-                          peta) + update_project_bible
-                          + Skill System (skill_catalog, load_skill,
-                            load_skill_reference) — procedural guidance.
-                          Bible read lewat konteks; TANPA tool source/runtime
-                          (tidak ada read_file/search_code/list_files/
-                          run_command).
-    mode "investigate" -> atlas_query, rig_query, project_map_status,
-                          list_files, read_file, search_code, run_command
-                          (READ-ONLY terhadap source/project) +
-                          update_project_bible + Skill System.
+    mode "fast"     (alias: "quick")
+        -> Percakapan cepat berbasis Project Bible, Project Map (atlas_query,
+           rig_query, project_map_status), dan simbol CodeGraph READ-ONLY
+           (codegraph_*).
+           TANPA tool pembacaan berkas source penuh (read_file/search_code/list_files)
+           dan TANPA run_command.
+    mode "balanced" (default standard)
+        -> Investigasi terarah: Project Map + CodeGraph Relational Intelligence
+           + pembacaan berkas source terarah (read_file, search_code, list_files)
+           dengan deduplikasi retrieval cache. TANPA tool eksekusi command.
+    mode "deep"     (alias: "investigate")
+        -> Audit arsitektur penuh: Project Map + CodeGraph suite lengkap
+           (impact analysis, trace API, orphan detection, callers/callees)
+           + inspeksi berkas source + diagnostik read-only run_command
+           (git status/diff, pytest, npm test).
 
-Skill System memakai SATU mekanisme yang sama (SkillStore) dengan Agent:
-catalog ringan + progressive loading via SkillStore existing. Tidak ada
-storage/loader baru, tidak ada heuristic/selector otomatis.
+Skill System memakai mekanisme yang sama (SkillStore) dengan Agent:
+catalog ringan + progressive loading via SkillStore existing.
 
-Tool tulis/hapus/pindah (`write_file`, `edit_file`, `delete_file`,
-`move_file`) SENGAJA tidak pernah didaftarkan, sehingga Consultant tidak dapat
-memodifikasi source lewat mekanisme tool. Demikian pula
-`refresh_project_map` (regenerate/menulis file map) TIDAK pernah didaftarkan:
-Consultant tetap read-only terhadap Project Map (boleh query map, tidak boleh
-mengubah/meregenerasi map). Skill tools bersifat READ-ONLY (hanya procedural
-knowledge, bukan permission grant).
-
-Perbedaan utama Quick vs Investigate:
-    Quick       -> Bible + Map (atlas_query/rig_query/project_map_status) + Skill.
-                   TIDAK membaca source/runtime.
-    Investigate -> Bible + Map + Source + Runtime (read-only) + Skill.
-
-Modul ini TIDAK membuat subsystem baru:
-    - read/search tools  : memakai tools filesystem existing.
-    - Project Map        : memakai capability existing (tools/project_map.py),
-                           hanya versi READ-ONLY (tanpa refresh).
-    - run_command        : memakai RunCommandTool existing (Windows-aware).
-    - Bible              : memakai BibleStore / IntelligenceLearner existing.
-    - Skill              : memakai SkillStore existing via tools/skills.py
-                           (thin adapter).
+Tool tulis/hapus/pindah (`write_file`, `edit_file`, `delete_file`, `move_file`)
+SENGAJA tidak pernah didaftarkan agar Consultant tidak memodifikasi source code.
+Demikian pula `refresh_project_map` TIDAK pernah didaftarkan: Consultant tetap
+read-only terhadap Project Map (hanya query, tanpa modifikasi disk).
 """
 
 from __future__ import annotations
@@ -50,7 +35,11 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from agent_ai.consultant.models import (
     DEFAULT_CONSULTANT_MODE,
+    MODE_FAST,
+    MODE_BALANCED,
+    MODE_DEEP,
     MODE_INVESTIGATE,
+    MODE_QUICK,
     normalize_consultant_mode,
 )
 from agent_ai.tools.base import BaseTool, ToolValidationError
@@ -375,27 +364,21 @@ def build_consultant_registry(
             ke root tersebut. Bila None, tool memakai default root-nya.
         provider/options: tidak dipakai saat ini (disediakan untuk ekstensi),
             dipertahankan agar signature stabil.
-        mode: "quick" | "investigate" (nilai tak dikenal -> default quick).
-            - quick       : capability Project Map READ-ONLY (atlas_query,
-                            rig_query, project_map_status) + Skill System
-                            (skill_catalog, load_skill, load_skill_reference)
-                            + update_project_bible
-                            (Bible read via konteks + Bible update via tool).
-                            TANPA tool source/runtime (read_file/search_code/
-                            list_files/run_command) dan TANPA refresh_project_map.
-            - investigate : tool Consultant existing (list_files, read_file,
-                            search_code, run_command) + capability Project Map
-                            READ-ONLY (atlas_query, rig_query,
-                            project_map_status) + Skill System +
-                            update_project_bible.
-                            TANPA refresh_project_map.
+        mode: mode kanonik ("fast" | "balanced" | "deep") atau alias lama ("quick" | "investigate").
+            - fast       : Project Map READ-ONLY + CodeGraph symbols + Skill System
+                           + update_project_bible. TANPA pembacaan berkas source penuh
+                           atau run_command.
+            - balanced   : capability Fast + inspeksi berkas source (read_file, search_code,
+                           list_files) dengan deduplikasi per giliran. TANPA run_command.
+            - deep       : capability Balanced + full CodeGraph relational intelligence
+                           (impact analysis, trace API, orphan detection) + run_command
+                           diagnostik proyek (git read, pytest, build check).
         guard: bound retrieval opsional (ConsultantRetrievalGuard). Bila diisi,
             tool PENCARIAN map (atlas_query/rig_query) DAN tool investigasi
             (read_file/search_code/list_files/run_command) dibungkus
             `ConsultantBoundedMapTool` sehingga tool yang melewati batas jumlah
             pemanggilan diblokir. Bila None, perilaku identik dengan sebelumnya
             (backward compatible).
-
     Returns:
         ToolRegistry berisi tool yang AMAN untuk Consultant (tanpa tool tulis).
     """
@@ -446,16 +429,14 @@ def build_consultant_registry(
         ):
             registry.register(tool)
 
-    # CodeGraph Relational Intelligence (Fase 2.5):
+    # CodeGraph Relational Intelligence (Fase 2.5 & Triad Harmonization):
+    # Seluruh 6 tool CodeGraph bersifat READ-ONLY dan aman untuk Consultant.
     from agent_ai.tools.codegraph import build_codegraph_tools as _build_codegraph_tools
 
     for tool in _build_codegraph_tools(root=resolved):
         registry.register(tool)
-
-
-
-
-    if normalized == MODE_INVESTIGATE:
+    # Source inspection tools:
+    if normalized in (MODE_BALANCED, "standard", MODE_DEEP, MODE_INVESTIGATE):
         from agent_ai.tools.filesystem import (
             ListFilesTool,
             ReadFileTool,
@@ -463,30 +444,20 @@ def build_consultant_registry(
         )
         from agent_ai.tools.read_cache import ToolReadCache
 
-        # Cache retrieval per giliran konsultasi (build_consultant_registry
-        # dipanggil per consult() oleh ConsultantService): dedup read_file/
-        # search_code TER-scope satu turn, BUKAN lintas task/sesi. Ini mencegah
-        # Consultant membaca sumber yang sama berulang kali dalam satu giliran.
-        # Arsitektur/boundary Consultant (loop/policy/guard) TIDAK berubah.
         read_cache = ToolReadCache()
-
-        # Daftar tool investigasi (read-only source/runtime). Setiap tool yang
-        # di-bound oleh guard dibungkus ConsultantBoundedMapTool agar setelah
-        # batas tercapai, tool tidak lagi dieksekusi (dikembalikan ToolResult
-        # "bound" yang jelas) dan bound provider melepasnya dari penawaran ke
-        # LLM -> LLM berhenti investigasi dan menyusun jawaban final.
         _investigation_tools = [
             ListFilesTool(root=resolved),
             ReadFileTool(root=resolved, read_cache=read_cache),
             SearchCodeTool(root=resolved, read_cache=read_cache),
-            ConsultantRunCommandTool(root=resolved),
         ]
+        if normalized in (MODE_DEEP, MODE_INVESTIGATE):
+            _investigation_tools.append(ConsultantRunCommandTool(root=resolved))
+
         for tool in _investigation_tools:
             if guard is not None and guard.is_map_query_tool(tool.name):
                 registry.register(ConsultantBoundedMapTool(tool, guard))
             else:
                 registry.register(tool)
-
     # Project Bible update tersedia di SEMUA mode (satu-satunya jalur tulis
     # Consultant). Project Bible READ dilakukan via konteks system message.
     registry.register(ConsultantBibleTool(root=resolved))
