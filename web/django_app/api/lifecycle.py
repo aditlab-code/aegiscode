@@ -93,6 +93,14 @@ class ServerLifecycleManager:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Gagal membatalkan task aktif: %s", exc)
 
+        # 3. Bersihkan ephemeral token file (.aegis/run/gateway.token) (zero-orphan)
+        try:
+            from api.auth import cleanup_ephemeral_token
+
+            cleanup_ephemeral_token()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Gagal membersihkan ephemeral token: %s", exc)
+
         logger.info(
             "Terminasi sub-proses selesai: %d PTY, %d task dibatalkan.",
             terminated_ptys,

@@ -17,10 +17,10 @@ from api import views
 
 urlpatterns = [
     path("health", views.health, name="health"),
-    # Google OAuth & Identity Gateway (docs/Oauth-Google.md, Phase 0)
-    path("auth/google/url", views.google_auth_url, name="google_auth_url"),
-    path("auth/google/callback", views.google_auth_callback, name="google_auth_callback"),
-    path("auth/dev-login", views.auth_dev_login, name="auth_dev_login"),
+    # Sovereign Local PIN & Identity Gateway
+    path("auth/status", views.auth_status, name="auth_status"),
+    path("auth/pin", views.auth_pin_login, name="auth_pin_login"),
+    path("auth/pin/setup", views.auth_pin_setup, name="auth_pin_setup"),
     path("auth/me", views.auth_me, name="auth_me"),
     path("auth/logout", views.auth_logout, name="auth_logout"),
     path("config", views.config, name="config"),

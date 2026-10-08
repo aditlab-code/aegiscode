@@ -1,17 +1,24 @@
 /**
- * authService.js - Antigravity / Google OAuth Authentication Service.
+ * authService.js - Sovereign Local PIN Authentication Service.
  *
- * Manages stateless session tokens, user identity retention in localStorage,
- * server-to-server OAuth callback exchange, and authentication state events.
+ * Manages local PIN authentication, session tokens (localStorage: aegis_auth_token),
+ * cached user profile, and reactive auth composables for AegisCode Web UI.
  */
 
 import { ref, computed } from "vue";
-import { request } from "../api.js";
+import {
+  getAuthStatus,
+  postPinLogin,
+  postPinSetup,
+  getAuthMe,
+  postAuthLogout,
+} from "../api.js";
 
 const TOKEN_STORAGE_KEY = "aegis_auth_token";
 const USER_STORAGE_KEY = "aegis_auth_user";
 
 export function getAuthToken() {
+  if (typeof localStorage === "undefined") return "";
   try {
     return localStorage.getItem(TOKEN_STORAGE_KEY) || "";
   } catch {
@@ -20,19 +27,21 @@ export function getAuthToken() {
 }
 
 export function setAuthToken(token) {
+  if (typeof localStorage === "undefined") return;
   try {
     if (token) {
       localStorage.setItem(TOKEN_STORAGE_KEY, token);
     } else {
       localStorage.removeItem(TOKEN_STORAGE_KEY);
     }
+    dispatchAuthChange();
   } catch (err) {
-    console.warn("Failed to persist auth token:", err);
+    console.warn("Gagal menyimpan auth token di localStorage:", err);
   }
-  dispatchAuthChange();
 }
 
 export function getStoredUser() {
+  if (typeof localStorage === "undefined") return null;
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
@@ -42,37 +51,26 @@ export function getStoredUser() {
 }
 
 export function setStoredUser(user) {
+  if (typeof localStorage === "undefined") return;
   try {
     if (user) {
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
     } else {
       localStorage.removeItem(USER_STORAGE_KEY);
     }
+    dispatchAuthChange();
   } catch (err) {
-    console.warn("Failed to persist user profile:", err);
+    console.warn("Gagal menyimpan user di localStorage:", err);
   }
-  dispatchAuthChange();
 }
 
 export function clearAuthSession() {
-  try {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-  } catch {
-    // Ignore storage errors during cleanup
-  }
-  dispatchAuthChange();
+  setAuthToken("");
+  setStoredUser(null);
 }
 
 export function isAuthenticated() {
   return Boolean(getAuthToken());
-}
-
-export function getRedirectUri() {
-  if (typeof window !== "undefined" && window.location) {
-    return `${window.location.origin}/auth/callback`;
-  }
-  return "http://localhost:8478/auth/callback";
 }
 
 function dispatchAuthChange() {
@@ -89,35 +87,62 @@ function dispatchAuthChange() {
 }
 
 /**
- * Fetch Google OAuth authorization URL from Django backend.
+ * Resolve bootstrap handshake token from URL query, meta tag, or dev define.
  */
-export async function fetchGoogleLoginUrl(redirectUri = null) {
-  const uri = encodeURIComponent(redirectUri || getRedirectUri());
-  return request(`/auth/google/url?redirect_uri=${uri}`);
+export function resolveBootstrapToken() {
+  if (typeof window === "undefined") return "";
+  try {
+    const urlParams = new URLSearchParams(window.location.search || "");
+    const tokenFromUrl = urlParams.get("token");
+    if (tokenFromUrl) return tokenFromUrl.trim();
+  } catch (_) {}
+
+  if (typeof document !== "undefined") {
+    try {
+      const meta = document.querySelector('meta[name="aegis-ephemeral-token"]');
+      const content = meta?.getAttribute("content");
+      if (content) return content.trim();
+    } catch (_) {}
+  }
+
+  if (typeof __AEGIS_DEV_TOKEN__ !== "undefined" && __AEGIS_DEV_TOKEN__) {
+    return String(__AEGIS_DEV_TOKEN__).trim();
+  }
+  return "";
 }
 
 /**
- * Exchange authorization code and anti-CSRF state token for Aegis session.
+ * Fetch local PIN authentication status from backend.
  */
-export async function exchangeOAuthCallback(code, state, redirectUri = null) {
-  const payload = {
-    code,
-    state,
-    redirect_uri: redirectUri || getRedirectUri(),
-  };
+export async function fetchAuthStatus() {
+  return getAuthStatus();
+}
 
-  const data = await request("/auth/google/callback", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
+/**
+ * Submit PIN to log in and store session JWT.
+ */
+export async function loginWithPin(pin) {
+  const data = await postPinLogin(pin);
   if (data?.token) {
     setAuthToken(data.token);
     if (data.user) {
       setStoredUser(data.user);
     }
   }
+  return data;
+}
 
+/**
+ * Setup initial PIN and store session JWT.
+ */
+export async function setupInitialPin(pin, confirmPin) {
+  const data = await postPinSetup(pin, confirmPin);
+  if (data?.token) {
+    setAuthToken(data.token);
+    if (data.user) {
+      setStoredUser(data.user);
+    }
+  }
   return data;
 }
 
@@ -129,7 +154,7 @@ export async function verifyCurrentSession() {
   if (!token) return null;
 
   try {
-    const data = await request("/auth/me");
+    const data = await getAuthMe();
     if (data?.authenticated && data?.user) {
       setStoredUser(data.user);
       return data.user;
@@ -142,7 +167,6 @@ export async function verifyCurrentSession() {
       return null;
     }
     console.warn("Session verification network failure:", err);
-    // If backend is temporarily unreachable, preserve cached user in dev
     return getStoredUser();
   }
 }
@@ -156,9 +180,7 @@ export async function logoutUser() {
 
   try {
     if (token) {
-      await request("/auth/logout", {
-        method: "POST",
-      });
+      await postAuthLogout();
     }
   } catch {
     // Ignore network error during logout
@@ -170,8 +192,9 @@ export async function logoutUser() {
  */
 export function useAuth() {
   const currentUser = ref(getStoredUser());
+  const authStatus = ref(null);
   const authLoading = ref(false);
-  const authLoadingMessage = ref("Authenticating with Antigravity...");
+  const authLoadingMessage = ref("Memeriksa autentikasi...");
   const authError = ref("");
   const authChecking = ref(true);
   const isAuthenticated = computed(() => Boolean(currentUser.value && getAuthToken()));
@@ -186,6 +209,52 @@ export function useAuth() {
   async function handleLogout() {
     await logoutUser();
     currentUser.value = null;
+    await refreshAuthStatus();
+  }
+
+  async function refreshAuthStatus() {
+    try {
+      const status = await fetchAuthStatus();
+      authStatus.value = status;
+      return status;
+    } catch (err) {
+      console.warn("Gagal mengambil status autentikasi:", err);
+      return null;
+    }
+  }
+
+  async function handlePinLogin(pin) {
+    authLoading.value = true;
+    authLoadingMessage.value = "Memverifikasi PIN...";
+    authError.value = "";
+    try {
+      const res = await loginWithPin(pin);
+      currentUser.value = res.user;
+      await refreshAuthStatus();
+      return res;
+    } catch (err) {
+      authError.value = err.message || "PIN yang dimasukkan salah.";
+      throw err;
+    } finally {
+      authLoading.value = false;
+    }
+  }
+
+  async function handlePinSetup(pin, confirmPin) {
+    authLoading.value = true;
+    authLoadingMessage.value = "Menyimpan PIN baru...";
+    authError.value = "";
+    try {
+      const res = await setupInitialPin(pin, confirmPin);
+      currentUser.value = res.user;
+      await refreshAuthStatus();
+      return res;
+    } catch (err) {
+      authError.value = err.message || "Gagal mengatur PIN.";
+      throw err;
+    } finally {
+      authLoading.value = false;
+    }
   }
 
   async function initAuth() {
@@ -200,29 +269,18 @@ export function useAuth() {
     });
 
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
-    const state = urlParams.get("state");
-    const oauthError = urlParams.get("error");
-
-    if (oauthError) {
-      authError.value = `Google authorization error: ${oauthError}`;
+    const tokenFromUrl = urlParams.get("token");
+    if (tokenFromUrl) {
+      setAuthToken(tokenFromUrl);
       cleanUrlQuery();
-    } else if (code && state) {
-      authLoading.value = true;
-      authLoadingMessage.value = "Verifying Google credentials & initializing Antigravity session...";
-      try {
-        const result = await exchangeOAuthCallback(code, state);
-        currentUser.value = result.user;
-        cleanUrlQuery();
-      } catch (err) {
-        authError.value = err.message || "OAuth exchange failed";
-        clearAuthSession();
-        currentUser.value = null;
-        cleanUrlQuery();
-      } finally {
-        authLoading.value = false;
+    } else if (!getAuthToken()) {
+      const bootstrapToken = resolveBootstrapToken();
+      if (bootstrapToken) {
+        setAuthToken(bootstrapToken);
       }
-    } else if (getAuthToken()) {
+    }
+
+    if (getAuthToken()) {
       try {
         const user = await verifyCurrentSession();
         currentUser.value = user;
@@ -230,25 +288,14 @@ export function useAuth() {
         currentUser.value = null;
       }
     }
-    authChecking.value = false;
-  }
 
-  async function handleDevLogin(email, name) {
-    authLoading.value = true;
-    authLoadingMessage.value = "Authenticating with local dev credentials...";
-    try {
-      const res = await devLogin(email, name);
-      currentUser.value = res.user;
-      authError.value = "";
-    } catch (err) {
-      authError.value = err.message || "Dev login failed.";
-    } finally {
-      authLoading.value = false;
-    }
+    await refreshAuthStatus();
+    authChecking.value = false;
   }
 
   return {
     currentUser,
+    authStatus,
     authLoading,
     authLoadingMessage,
     authError,
@@ -256,26 +303,9 @@ export function useAuth() {
     isAuthenticated,
     cleanUrlQuery,
     handleLogout,
-    handleDevLogin,
+    loginWithPin: handlePinLogin,
+    setupInitialPin: handlePinSetup,
+    refreshAuthStatus,
     initAuth,
   };
 }
-
-/**
- * Dev-only login bypass for local manual testing.
- */
-export async function devLogin(email = "aditwicaksono34@gmail.com", name = "Adit Wicaksono") {
-  const data = await request("/auth/dev-login", {
-    method: "POST",
-    body: JSON.stringify({ email, name }),
-  });
-  if (data?.token) {
-    setAuthToken(data.token);
-    if (data.user) {
-      setStoredUser(data.user);
-    }
-  }
-  return data;
-}
-
-

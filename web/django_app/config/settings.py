@@ -193,15 +193,23 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if IS_PRODUCTION e
 AEGIS_GATEWAY_MAX_BODY_BYTES = int(_env("AEGIS_GATEWAY_MAX_BODY_BYTES") or "1000000")
 
 # ---------------------------------------------------------------------------
-# Google OAuth & Identity Gateway (docs/Oauth-Google.md, Phase 0)
+# Sovereign Local PIN & Identity Gateway
 # ---------------------------------------------------------------------------
-GOOGLE_OAUTH_CLIENT_ID = _env("GOOGLE_OAUTH_CLIENT_ID")
-GOOGLE_OAUTH_CLIENT_SECRET = _env("GOOGLE_OAUTH_CLIENT_SECRET")
-GOOGLE_OAUTH_REDIRECT_URI = _env("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback")
+AEGIS_PIN = _env("AEGIS_PIN", "")
 AEGIS_AUTH_TOKEN_EXPIRY = int(_env("AEGIS_AUTH_TOKEN_EXPIRY") or "604800")  # 7 days in seconds
 
 # ---------------------------------------------------------------------------
 # Authentication Boundary Guard (AEG-08)
 # ---------------------------------------------------------------------------
 AEGIS_AUTH_REQUIRED = _env_bool("AEGIS_AUTH_REQUIRED", default=IS_PRODUCTION)
+
+# ---------------------------------------------------------------------------
+# Ephemeral Handshake Token (PR-SEC-1)
+# ---------------------------------------------------------------------------
+try:
+    from api.auth import init_ephemeral_token
+
+    init_ephemeral_token()
+except Exception:
+    pass
 

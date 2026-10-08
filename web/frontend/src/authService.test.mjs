@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 // Mock global localStorage
 const storage = new Map();
 globalThis.localStorage = {
-  getItem: (k) => (storage.has(k) ? storage.get(k) : null),
+  getItem: (k) => storage.get(k) || null,
   setItem: (k, v) => storage.set(k, String(v)),
   removeItem: (k) => storage.delete(k),
   clear: () => storage.clear(),
@@ -12,9 +12,9 @@ globalThis.localStorage = {
 
 // Mock global window and CustomEvent
 class MockCustomEvent {
-  constructor(type, eventInitDict) {
+  constructor(type, options = {}) {
     this.type = type;
-    this.detail = eventInitDict?.detail;
+    this.detail = options.detail || null;
   }
 }
 globalThis.CustomEvent = MockCustomEvent;
@@ -23,7 +23,11 @@ const eventListeners = new Map();
 globalThis.window = {
   location: {
     origin: "http://localhost:5173",
-    pathname: "/workbench",
+    pathname: "/",
+    search: "",
+  },
+  history: {
+    replaceState: () => {},
   },
   addEventListener: (event, handler) => {
     if (!eventListeners.has(event)) eventListeners.set(event, []);
@@ -31,15 +35,13 @@ globalThis.window = {
   },
   removeEventListener: (event, handler) => {
     if (eventListeners.has(event)) {
-      eventListeners.set(
-        event,
-        eventListeners.get(event).filter((h) => h !== handler)
-      );
+      const arr = eventListeners.get(event).filter((h) => h !== handler);
+      eventListeners.set(event, arr);
     }
   },
-  dispatchEvent: (evt) => {
-    const list = eventListeners.get(evt.type) || [];
-    for (const handler of list) handler(evt);
+  dispatchEvent: (event) => {
+    const list = eventListeners.get(event.type) || [];
+    list.forEach((fn) => fn(event));
     return true;
   },
 };
@@ -51,26 +53,27 @@ const {
   setStoredUser,
   clearAuthSession,
   isAuthenticated,
-  getRedirectUri,
-  fetchGoogleLoginUrl,
-  exchangeOAuthCallback,
+  fetchAuthStatus,
+  loginWithPin,
+  setupInitialPin,
   verifyCurrentSession,
   logoutUser,
+  resolveBootstrapToken,
 } = await import("./services/authService.js");
 
 test("authService: stores and retrieves token and user profile in storage", () => {
   clearAuthSession();
   assert.equal(getAuthToken(), "");
-  assert.equal(isAuthenticated(), false);
   assert.equal(getStoredUser(), null);
+  assert.equal(isAuthenticated(), false);
 
-  setAuthToken("sample.jwt.token");
-  assert.equal(getAuthToken(), "sample.jwt.token");
+  setAuthToken("test_token_123");
+  assert.equal(getAuthToken(), "test_token_123");
   assert.equal(isAuthenticated(), true);
 
-  const sampleUser = { sub: "123", email: "adit@example.com", name: "Adit" };
-  setStoredUser(sampleUser);
-  assert.deepEqual(getStoredUser(), sampleUser);
+  const mockUser = { sub: "sub_1", email: "user@example.com", name: "User 1" };
+  setStoredUser(mockUser);
+  assert.deepEqual(getStoredUser(), mockUser);
 
   clearAuthSession();
   assert.equal(getAuthToken(), "");
@@ -78,17 +81,14 @@ test("authService: stores and retrieves token and user profile in storage", () =
   assert.equal(isAuthenticated(), false);
 });
 
-test("authService: computes redirect URI based on window.location", () => {
-  const uri = getRedirectUri();
-  assert.equal(uri, "http://localhost:5173/auth/callback");
-});
-
-test("authService: fetchGoogleLoginUrl calls /api/auth/google/url", async () => {
+test("authService: fetchAuthStatus calls /api/auth/status", async () => {
   globalThis.fetch = async (url) => {
-    assert.match(url, /\/api\/auth\/google\/url\?redirect_uri=/);
+    assert.equal(url, "/api/auth/status");
     const payload = {
-      auth_url: "https://accounts.google.com/o/oauth2/v2/auth?state=xyz",
-      state: "xyz",
+      configured: true,
+      has_pin: true,
+      authenticated: false,
+      user: null,
     };
     return {
       ok: true,
@@ -97,24 +97,24 @@ test("authService: fetchGoogleLoginUrl calls /api/auth/google/url", async () => 
     };
   };
 
-  const data = await fetchGoogleLoginUrl();
-  assert.equal(data.state, "xyz");
-  assert.match(data.auth_url, /accounts\.google\.com/);
+  const status = await fetchAuthStatus();
+  assert.equal(status.configured, true);
+  assert.equal(status.has_pin, true);
+  assert.equal(status.authenticated, false);
 });
 
-test("authService: exchangeOAuthCallback saves token and user on success", async () => {
+test("authService: loginWithPin saves token and user on success", async () => {
   clearAuthSession();
 
   globalThis.fetch = async (url, options) => {
-    assert.equal(url, "/api/auth/google/callback");
+    assert.equal(url, "/api/auth/pin");
     assert.equal(options.method, "POST");
     const body = JSON.parse(options.body);
-    assert.equal(body.code, "google_auth_code_123");
-    assert.equal(body.state, "signed_state_token");
+    assert.equal(body.pin, "123456");
 
     const payload = {
-      token: "minted.aegis.jwt",
-      user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
+      token: "minted.pin.session.jwt",
+      user: { sub: "local-operator", email: "operator@aegis.local", name: "Local Operator" },
     };
     return {
       ok: true,
@@ -123,11 +123,42 @@ test("authService: exchangeOAuthCallback saves token and user on success", async
     };
   };
 
-  const result = await exchangeOAuthCallback("google_auth_code_123", "signed_state_token");
-  assert.equal(result.token, "minted.aegis.jwt");
-  assert.equal(getAuthToken(), "minted.aegis.jwt");
+  const result = await loginWithPin("123456");
+  assert.equal(result.token, "minted.pin.session.jwt");
+  assert.equal(getAuthToken(), "minted.pin.session.jwt");
   assert.equal(isAuthenticated(), true);
+  assert.equal(getStoredUser().sub, "local-operator");
   assert.equal(getStoredUser().email, "operator@aegis.local");
+});
+
+test("authService: setupInitialPin saves token and user on success", async () => {
+  clearAuthSession();
+
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "/api/auth/pin/setup");
+    assert.equal(options.method, "POST");
+    const body = JSON.parse(options.body);
+    assert.equal(body.pin, "654321");
+    assert.equal(body.confirm_pin, "654321");
+
+    const payload = {
+      token: "minted.setup.session.jwt",
+      user: { sub: "local-operator", email: "operator@aegis.local", name: "Local Operator" },
+      success: true,
+    };
+    return {
+      ok: true,
+      text: async () => JSON.stringify(payload),
+      json: async () => payload,
+    };
+  };
+
+  const result = await setupInitialPin("654321", "654321");
+  assert.equal(result.token, "minted.setup.session.jwt");
+  assert.equal(result.success, true);
+  assert.equal(getAuthToken(), "minted.setup.session.jwt");
+  assert.equal(isAuthenticated(), true);
+  assert.equal(getStoredUser().sub, "local-operator");
 });
 
 test("authService: verifyCurrentSession validates existing token", async () => {
@@ -139,7 +170,7 @@ test("authService: verifyCurrentSession validates existing token", async () => {
 
     const payload = {
       authenticated: true,
-      user: { sub: "sub_1", email: "operator@aegis.local", name: "Operator" },
+      user: { sub: "local-operator", email: "operator@aegis.local", name: "Local Operator" },
     };
     return {
       ok: true,
@@ -154,7 +185,7 @@ test("authService: verifyCurrentSession validates existing token", async () => {
 
 test("authService: logoutUser clears local storage and notifies server", async () => {
   setAuthToken("token_to_logout");
-  setStoredUser({ email: "test@example.com" });
+  setStoredUser({ email: "operator@aegis.local" });
   assert.equal(isAuthenticated(), true);
 
   let serverLogoutCalled = false;
@@ -171,4 +202,31 @@ test("authService: logoutUser clears local storage and notifies server", async (
   assert.equal(getAuthToken(), "");
   assert.equal(getStoredUser(), null);
   assert.equal(serverLogoutCalled, true);
+});
+
+test("authService: resolveBootstrapToken extracts token from URL, meta tag, or dev define", () => {
+  // 1. URL search param
+  globalThis.window.location.search = "?token=handshake_from_url_123";
+  assert.equal(resolveBootstrapToken(), "handshake_from_url_123");
+
+  // 2. Meta tag
+  globalThis.window.location.search = "";
+  globalThis.document = {
+    querySelector: (selector) => {
+      if (selector === 'meta[name="aegis-ephemeral-token"]') {
+        return { getAttribute: () => "meta_token_abc" };
+      }
+      return null;
+    },
+  };
+  assert.equal(resolveBootstrapToken(), "meta_token_abc");
+
+  // 3. Dev define global
+  delete globalThis.document;
+  globalThis.__AEGIS_DEV_TOKEN__ = "dev_token_xyz";
+  assert.equal(resolveBootstrapToken(), "dev_token_xyz");
+  delete globalThis.__AEGIS_DEV_TOKEN__;
+
+  // 4. Fallback empty
+  assert.equal(resolveBootstrapToken(), "");
 });

@@ -877,6 +877,10 @@ export function openEventStream({
   if (sessionId) params.set("session_id", sessionId);
   if (taskId) params.set("task_id", taskId);
   if (lastEventId) params.set("last_event_id", lastEventId);
+  try {
+    const token = localStorage.getItem("aegis_auth_token") || "";
+    if (token) params.set("token", token);
+  } catch (_) {}
   const qs = params.toString();
   const url = `${BASE}/events${qs ? `?${qs}` : ""}`;
 
@@ -969,16 +973,22 @@ export async function streamTerminalCommand(projectId, command, onChunk, signal 
   }
 }
 
-// --- Google OAuth & Identity Gateway (docs/Oauth-Google.md, Phase 0) -------
-export function getGoogleAuthUrl(redirectUri = "") {
-  const query = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : "";
-  return request(`/auth/google/url${query}`);
+// --- Sovereign Local PIN & Identity Gateway --------------------------------
+export function getAuthStatus() {
+  return request("/auth/status");
 }
 
-export function postGoogleAuthCallback(payload) {
-  return request("/auth/google/callback", {
+export function postPinLogin(pin) {
+  return request("/auth/pin", {
     method: "POST",
-    body: JSON.stringify(payload || {}),
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export function postPinSetup(pin, confirmPin) {
+  return request("/auth/pin/setup", {
+    method: "POST",
+    body: JSON.stringify({ pin, confirm_pin: confirmPin }),
   });
 }
 

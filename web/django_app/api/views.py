@@ -1815,147 +1815,115 @@ def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
 
 
 # ---------------------------------------------------------------------------
-# Google OAuth & Identity Views (docs/Oauth-Google.md, Phase 0)
+# Sovereign Local PIN & Identity Gateway
 # ---------------------------------------------------------------------------
 @require_http_methods(["GET"])
-def google_auth_url(request: HttpRequest) -> JsonResponse:
-    """Generate Google OAuth consent URL with signed anti-CSRF state token."""
-    from urllib.parse import urlencode
-    from api.auth import generate_signed_state
+def auth_status(request: HttpRequest) -> JsonResponse:
+    """Return local PIN configuration and authentication status."""
+    from api.auth import get_authenticated_user, has_configured_pin
 
-    client_id = getattr(settings, "GOOGLE_OAUTH_CLIENT_ID", "")
-    if not client_id:
-        return _json_response(
-            {
-                "error": {
-                    "code": "GOOGLE_OAUTH_NOT_CONFIGURED",
-                    "message": "GOOGLE_OAUTH_CLIENT_ID is not configured in .env. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET or use Quick Dev Login.",
-                },
-                "configured": False,
-            },
-            status=400,
-        )
-
-    redirect_uri = request.GET.get("redirect_uri") or getattr(
-        settings, "GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback"
+    current_user = get_authenticated_user(request)
+    return _json_response(
+        {
+            "configured": True,
+            "has_pin": has_configured_pin(),
+            "authenticated": bool(current_user),
+            "user": current_user,
+        }
     )
-
-    state = generate_signed_state(redirect_uri=redirect_uri)
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": "openid email profile",
-        "access_type": "offline",
-        "state": state,
-        "prompt": "select_account",
-    }
-    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-    return _json_response({"auth_url": auth_url, "state": state, "client_id": client_id, "configured": True})
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def auth_dev_login(request: HttpRequest) -> JsonResponse:
-    """Dev-only login bypass for local manual testing when Google credentials are not yet configured."""
-    if not getattr(settings, "DEBUG", False):
-        return _json_response(
-            {"error": {"code": "dev_login_disabled", "message": "dev-login hanya diizinkan saat DEBUG=True"}},
-            status=403,
-        )
-    from api.auth import create_aegis_session_token
-
-    try:
-        body = _parse_json_body(request)
-    except Exception:
-        body = {}
-
-    email = body.get("email") or "developer@aegis.local"
-    name = body.get("name") or "Local Developer"
-
-    user_info = {
-        "sub": "dev-user-001",
-        "email": email,
-        "name": name,
-        "picture": "",
-    }
-    token = create_aegis_session_token(user_info)
-    return _json_response({"token": token, "user": user_info})
-
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def google_auth_callback(request: HttpRequest) -> JsonResponse:
-    """Handle authorization code exchange and issue AegisCode session token."""
-    from api.auth import (
-        create_aegis_session_token,
-        exchange_google_code,
-        verify_google_id_token,
-        verify_signed_state,
-    )
+def auth_pin_login(request: HttpRequest) -> JsonResponse:
+    """Verify submitted local PIN and issue AegisCode session token."""
+    from api.auth import create_aegis_session_token, verify_pin
 
     try:
         body = _parse_json_body(request)
     except Exception as exc:
         return _json_response({"error": {"code": "INVALID_BODY", "message": str(exc)}}, status=400)
 
-    code = body.get("code")
-    state = body.get("state")
-    redirect_uri = body.get("redirect_uri") or getattr(
-        settings, "GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:8478/auth/callback"
+    pin = body.get("pin")
+    if not pin or not isinstance(pin, str):
+        return _json_response(
+            {"error": {"code": "MISSING_PIN", "message": "PIN harus diisi."}},
+            status=400,
+        )
+
+    if not verify_pin(pin):
+        return _json_response(
+            {"error": {"code": "INVALID_PIN", "message": "PIN yang dimasukkan salah."}},
+            status=401,
+        )
+
+    user_info = {
+        "sub": "local-operator",
+        "name": "Local Operator",
+        "email": "operator@aegis.local",
+    }
+    token = create_aegis_session_token(user_info)
+    return _json_response({"token": token, "user": user_info})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def auth_pin_setup(request: HttpRequest) -> JsonResponse:
+    """Setup initial PIN on first-run and issue AegisCode session token."""
+    from api.auth import (
+        create_aegis_session_token,
+        get_authenticated_user,
+        has_configured_pin,
+        set_pin,
     )
 
-    if not code or not state:
+    current_user = get_authenticated_user(request)
+    if has_configured_pin() and not current_user:
         return _json_response(
-            {"error": {"code": "MISSING_PARAM", "message": "'code' and 'state' are required"}},
-            status=400,
+            {"error": {"code": "PIN_ALREADY_CONFIGURED", "message": "PIN sudah terkonfigurasi."}},
+            status=403,
         )
 
-    # Validate state signature and expiration
-    verified_state = verify_signed_state(state)
-    if not verified_state:
-        return _json_response(
-            {"error": {"code": "INVALID_STATE", "message": "OAuth state is invalid or expired (>5 mins)"}},
-            status=400,
-        )
-
-    # Server-to-server code exchange with Google Token API
     try:
-        token_data = exchange_google_code(code, redirect_uri)
+        body = _parse_json_body(request)
+    except Exception as exc:
+        return _json_response({"error": {"code": "INVALID_BODY", "message": str(exc)}}, status=400)
+
+    pin = body.get("pin")
+    confirm_pin = body.get("confirm_pin") or body.get("confirmPin")
+    if not pin or not confirm_pin or not isinstance(pin, str) or not isinstance(confirm_pin, str):
+        return _json_response(
+            {"error": {"code": "MISSING_PIN", "message": "PIN dan konfirmasi PIN wajib diisi."}},
+            status=400,
+        )
+
+    if pin != confirm_pin:
+        return _json_response(
+            {"error": {"code": "PIN_MISMATCH", "message": "PIN dan konfirmasi PIN tidak cocok."}},
+            status=400,
+        )
+
+    if not (4 <= len(pin) <= 12):
+        return _json_response(
+            {"error": {"code": "INVALID_PIN_LENGTH", "message": "PIN harus memiliki panjang antara 4 hingga 12 karakter."}},
+            status=400,
+        )
+
+    try:
+        set_pin(pin)
     except Exception as exc:
         return _json_response(
-            {"error": {"code": "TOKEN_EXCHANGE_FAILED", "message": str(exc)}},
-            status=400,
+            {"error": {"code": "PIN_SAVE_FAILED", "message": f"Gagal menyimpan PIN: {exc}"}},
+            status=500,
         )
 
-    id_token_str = token_data.get("id_token")
-    if not id_token_str:
-        return _json_response(
-            {"error": {"code": "NO_ID_TOKEN", "message": "Google did not return an id_token"}},
-            status=400,
-        )
-
-    # Verify ID token cryptographic signature
-    try:
-        user_info = verify_google_id_token(id_token_str)
-    except Exception as exc:
-        return _json_response(
-            {"error": {"code": "INVALID_ID_TOKEN", "message": f"Google id_token verification failed: {exc}"}},
-            status=400,
-        )
-
-    # Issue AegisCode session JWT
-    session_token = create_aegis_session_token(user_info)
-    user_profile = {
-        "sub": user_info.get("sub"),
-        "email": user_info.get("email"),
-        "name": user_info.get("name"),
-        "picture": user_info.get("picture", ""),
+    user_info = {
+        "sub": "local-operator",
+        "name": "Local Operator",
+        "email": "operator@aegis.local",
     }
-
-    return _json_response({"token": session_token, "user": user_profile})
-
+    token = create_aegis_session_token(user_info)
+    return _json_response({"token": token, "user": user_info, "success": True})
 
 @require_http_methods(["GET"])
 def auth_me(request: HttpRequest) -> JsonResponse:

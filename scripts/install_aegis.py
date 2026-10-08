@@ -561,9 +561,17 @@ def launch(root: Path, python: Path, host: str, port: int | None = None, open_br
     info(f"URL: {url}")
     info("Tekan Ctrl+C di jendela ini untuk menghentikan AegisCode.")
 
-    if open_browser:
-        _open_browser_later(url)
+    token_file = root / ".aegis" / "run" / "gateway.token"
+    token = ""
+    if token_file.is_file():
+        try:
+            token = token_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
 
+    browser_url = f"{url}?token={token}" if token else url
+    if open_browser:
+        _open_browser_later(browser_url)
     argv = [str(python), "manage.py", "runserver", f"{host}:{actual_port}"]
 
     popen_kwargs: dict[str, Any] = {

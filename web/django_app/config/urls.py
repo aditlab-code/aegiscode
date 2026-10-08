@@ -9,17 +9,28 @@ from django.views.static import serve
 def serve_frontend(request, path, document_root=None) -> HttpResponseBase:
     """Sajikan file frontend production build + header cache yang benar.
 
-    Akar masalah "UI Settings lama setelah npm run build": `static.serve`
-    TIDAK mengirim `Cache-Control`, sehingga browser menyimpan `index.html`
-    (yang menunjuk bundle lama) via heuristic caching dan terus menampilkan UI
-    lama walau bundle baru sudah ada di disk. Server sendiri sudah menyajikan
-    file terbaru; yang stale adalah cache browser.
-
-    Aturan:
-        - `index.html` (entry point) -> JANGAN di-cache: selalu revalidate agar
-          selalu menunjuk bundle (hash) terbaru hasil build.
-        - `assets/**` (nama ber-hash, immutable) -> boleh di-cache lama.
+    PR-SEC-1: Injeksi ephemeral handshake token ke index.html untuk seamless
+    developer authentication tanpa credential login manual.
     """
+    clean_path = (path or "").strip()
+    if clean_path in ("", "index.html"):
+        from pathlib import Path
+        from django.http import HttpResponse
+        from api.auth import get_ephemeral_token
+
+        index_file = Path(document_root) / "index.html" if document_root else None
+        if index_file and index_file.is_file():
+            html_text = index_file.read_text(encoding="utf-8")
+            token = get_ephemeral_token()
+            if token and "</head>" in html_text:
+                meta_tag = f'<meta name="aegis-ephemeral-token" content="{token}">\n</head>'
+                html_text = html_text.replace("</head>", meta_tag, 1)
+            response = HttpResponse(html_text, content_type="text/html; charset=utf-8")
+            response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response["Pragma"] = "no-cache"
+            response["Expires"] = "0"
+            return response
+
     response = serve(request, path, document_root=document_root)
     if (path or "").startswith("assets/") or (path or "").startswith("backgrounds/"):
         response["Cache-Control"] = "public, max-age=31536000, immutable"

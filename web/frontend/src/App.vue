@@ -46,12 +46,29 @@ const workspaceGen = ref(0);
 const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
 const activeSessionId = ref("");
 
-// Antigravity & Google OAuth State (docs/Oauth-Google.md, Phase 0)
+// Sovereign Local PIN Authentication (PR-SEC-2)
 const {
-  currentUser, authLoading, authLoadingMessage, authError, authChecking,
-  isAuthenticated, handleLogout, initAuth,
+  currentUser, authStatus, authLoading, authLoadingMessage, authError, authChecking,
+  isAuthenticated, handleLogout, loginWithPin, setupInitialPin, initAuth,
 } = useAuth();
 
+async function handlePinSubmit(pin) {
+  try {
+    await loginWithPin(pin);
+    await refreshAllConfig();
+  } catch (_) {
+    // Error dikelola reaktif di authError
+  }
+}
+
+async function handlePinSetup({ pin, confirmPin }) {
+  try {
+    await setupInitialPin(pin, confirmPin);
+    await refreshAllConfig();
+  } catch (_) {
+    // Error dikelola reaktif di authError
+  }
+}
 // Workspace Files Cache
 const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache, setWorkspaceProject } = useWorkspaceFiles();
 
@@ -411,10 +428,13 @@ onBeforeUnmount(() => {
       </div>
     </AppModal>
     <LoginOverlay
-      v-if="!isAuthenticated && config?.auth_required"
+      v-if="!isAuthenticated && !authChecking"
+      :has-pin="authStatus?.has_pin ?? true"
       :loading="authLoading"
       :loading-message="authLoadingMessage"
       :error="authError"
+      @submit-pin="handlePinSubmit"
+      @setup-pin="handlePinSetup"
       @clear-error="authError = ''"
     />
   </div>

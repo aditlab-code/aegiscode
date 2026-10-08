@@ -1,21 +1,25 @@
 <script setup>
 /**
- * LoginOverlay.vue - Mandatory Antigravity Google OAuth Gatekeeper.
+ * LoginOverlay.vue - Sovereign Local PIN Authentication Gatekeeper.
  *
- * Displays a modal gateway overlay when no valid session token exists,
- * handles user redirect to Google OAuth, and displays authentication errors.
+ * Menampilkan numpad lokal minimalis atau antarmuka setup PIN pertama kali
+ * untuk mengamankan sesi operator studio tanpa koneksi ke domain eksternal.
  */
-import { ref } from "vue";
-import { fetchGoogleLoginUrl, devLogin } from "../../services/authService.js";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import AppButton from "../ui/AppButton.vue";
 
 const props = defineProps({
+  hasPin: {
+    type: Boolean,
+    default: true,
+  },
   loading: {
     type: Boolean,
     default: false,
   },
   loadingMessage: {
     type: String,
-    default: "Authenticating with Antigravity...",
+    default: "Memeriksa PIN...",
   },
   error: {
     type: String,
@@ -23,40 +27,103 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["retry", "clear-error"]);
+const emit = defineEmits(["submit-pin", "setup-pin", "clear-error"]);
 
-const redirecting = ref(false);
+const mode = ref(props.hasPin ? "entry" : "setup");
+const pinInput = ref("");
+const newPin = ref("");
+const confirmPin = ref("");
 const localError = ref("");
 
-async function handleGoogleLogin() {
-  localError.value = "";
-  emit("clear-error");
-  redirecting.value = true;
-  try {
-    const data = await fetchGoogleLoginUrl();
-    if (data?.auth_url) {
-      window.location.href = data.auth_url;
-    } else {
-      throw new Error("No authorization URL returned by backend gateway.");
-    }
-  } catch (err) {
-    redirecting.value = false;
-    localError.value = err.message || "Failed to initialize Google login.";
+watch(
+  () => props.hasPin,
+  (val) => {
+    mode.value = val ? "entry" : "setup";
+    localError.value = "";
+    pinInput.value = "";
+  }
+);
+
+const displayError = computed(() => props.error || localError.value);
+
+function handleDigit(d) {
+  if (pinInput.value.length < 12) {
+    pinInput.value += String(d);
+    clearErrors();
   }
 }
 
-async function handleDevClick() {
-  localError.value = "";
-  emit("clear-error");
-  redirecting.value = true;
-  try {
-    await devLogin("aditwicaksono34@gmail.com", "Adit Wicaksono");
-  } catch (err) {
-    localError.value = err.message || "Failed to sign in via Dev Login.";
-  } finally {
-    redirecting.value = false;
+function handleBackspace() {
+  if (pinInput.value.length > 0) {
+    pinInput.value = pinInput.value.slice(0, -1);
+    clearErrors();
   }
 }
+
+function handleClear() {
+  pinInput.value = "";
+  clearErrors();
+}
+
+function clearErrors() {
+  localError.value = "";
+  emit("clear-error");
+}
+
+function submitPin() {
+  if (pinInput.value.length < 4) {
+    localError.value = "PIN minimal 4 digit.";
+    return;
+  }
+  clearErrors();
+  emit("submit-pin", pinInput.value);
+}
+
+function submitSetup() {
+  clearErrors();
+  if (!newPin.value || !confirmPin.value) {
+    localError.value = "PIN dan konfirmasi PIN harus diisi.";
+    return;
+  }
+  if (newPin.value.length < 4 || newPin.value.length > 12) {
+    localError.value = "Panjang PIN harus antara 4 hingga 12 karakter.";
+    return;
+  }
+  if (newPin.value !== confirmPin.value) {
+    localError.value = "Konfirmasi PIN tidak cocok.";
+    return;
+  }
+  emit("setup-pin", { pin: newPin.value, confirmPin: confirmPin.value });
+}
+
+function onKeyDown(e) {
+  if (mode.value !== "entry") return;
+  if (props.loading) return;
+
+  if (e.key >= "0" && e.key <= "9") {
+    handleDigit(e.key);
+  } else if (e.key === "Backspace") {
+    handleBackspace();
+  } else if (e.key === "Enter") {
+    if (pinInput.value.length >= 4) {
+      submitPin();
+    }
+  } else if (e.key === "Escape") {
+    handleClear();
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", onKeyDown);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("keydown", onKeyDown);
+  }
+});
 </script>
 
 <template>
@@ -66,81 +133,174 @@ async function handleDevClick() {
       <div class="brand-header">
         <div class="brand-badge-large">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m4.5 8.5-3 3.5 3 3.5" />
-            <path d="m19.5 8.5 3 3.5-3 3.5" />
-            <path d="M12 3c.4 3.8 2.2 5.6 6 6-3.8.4-5.6 2.2-6 6-.4-3.8-2.2-5.6-6-6 3.8-.4 5.6-2.2 6-6Z" />
-            <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         </div>
         <div class="brand-titles">
-          <span class="platform-tag">ANTIGRAVITY AI PLATFORM</span>
+          <span class="platform-tag">SOVEREIGN RUNTIME GATEWAY</span>
           <h2 id="login-title" class="product-title">AegisCode Studio</h2>
         </div>
       </div>
 
       <!-- Description -->
       <p class="login-desc">
-        Sign in with your Google account to authorize AI agent runtime tools, access local workspaces, and establish a verified operator session.
+        {{
+          mode === "setup"
+            ? "Tentukan PIN operator lokal untuk mengamankan gateway studio dan runtime tools Antigravity."
+            : "Masukkan PIN keamanan untuk membuka akses gateway dan workspace lokal."
+        }}
       </p>
 
       <!-- Active Loading State -->
-      <div v-if="loading || redirecting" class="login-state-box loading-box">
-        <div class="spinner-border text-primary spinner-border-sm" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <span class="loading-label">{{ redirecting ? "Opening Google sign-in..." : loadingMessage }}</span>
+      <div v-if="loading" class="login-state-box loading-box">
+        <svg class="spinner-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" />
+        </svg>
+        <span class="loading-label">{{ loadingMessage }}</span>
       </div>
 
       <!-- Error State -->
-      <div v-if="error || localError" class="login-state-box error-box">
+      <div v-if="displayError" class="login-state-box error-box">
         <svg class="error-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"></circle>
-          <line x1="12" y1="8" x2="12" y2="12"></line>
-          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
-        <span class="error-label">{{ error || localError }}</span>
+        <span class="error-label">{{ displayError }}</span>
       </div>
 
-      <!-- Action Button -->
-      <div class="login-actions">
-        <button
-          type="button"
-          class="btn-google-login"
-          :disabled="loading || redirecting"
-          @click="handleGoogleLogin"
-        >
-          <!-- Google 'G' Logo SVG -->
-          <svg class="google-logo" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-          </svg>
-          <span class="btn-text">Continue with Google</span>
-        </button>
+      <!-- MODE 1: SETUP PIN -->
+      <div v-if="mode === 'setup'" class="setup-form">
+        <div class="form-group">
+          <label class="form-label" for="setup-pin-input">PIN Baru (4–12 digit/karakter)</label>
+          <input
+            id="setup-pin-input"
+            v-model="newPin"
+            type="password"
+            class="pin-text-input"
+            maxlength="12"
+            autocomplete="new-password"
+            placeholder="Ketik PIN baru"
+            @input="clearErrors"
+          />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="setup-confirm-input">Konfirmasi PIN</label>
+          <input
+            id="setup-confirm-input"
+            v-model="confirmPin"
+            type="password"
+            class="pin-text-input"
+            maxlength="12"
+            autocomplete="new-password"
+            placeholder="Ulangi PIN baru"
+            @input="clearErrors"
+            @keydown.enter="submitSetup"
+          />
+        </div>
 
-        <button
-          type="button"
-          class="btn-dev-login"
-          :disabled="loading || redirecting"
-          title="Sign in with aditwicaksono34@gmail.com without Google Cloud Console credentials"
-          @click="handleDevClick"
+        <AppButton
+          variant="primary"
+          size="md"
+          class="action-btn-full"
+          :disabled="loading || newPin.length < 4 || confirmPin.length < 4"
+          :busy="loading"
+          @click="submitSetup"
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-          </svg>
-          <span>Dev Quick Sign-In (aditwicaksono34@gmail.com)</span>
-        </button>
+          Buat PIN & Buka Studio
+        </AppButton>
+      </div>
+
+      <!-- MODE 2: ENTRY PIN (NUMPAD) -->
+      <div v-else class="entry-pad">
+        <!-- Dot Indicators -->
+        <div class="pin-indicator-container">
+          <div class="pin-dots">
+            <span
+              v-for="idx in 6"
+              :key="idx"
+              class="pin-dot"
+              :class="{ filled: idx <= pinInput.length }"
+            />
+          </div>
+          <span v-if="pinInput.length > 6" class="pin-overflow-counter">
+            {{ pinInput.length }} digit
+          </span>
+        </div>
+
+        <!-- 3x4 Numpad -->
+        <div class="numpad-grid">
+          <AppButton
+            v-for="digit in [1, 2, 3, 4, 5, 6, 7, 8, 9]"
+            :key="digit"
+            variant="ghost"
+            size="md"
+            class="numpad-btn"
+            :disabled="loading"
+            @click="handleDigit(digit)"
+          >
+            {{ digit }}
+          </AppButton>
+
+          <AppButton
+            variant="ghost"
+            size="md"
+            class="numpad-btn numpad-action-btn"
+            :disabled="loading || pinInput.length === 0"
+            title="Hapus Semua"
+            @click="handleClear"
+          >
+            C
+          </AppButton>
+
+          <AppButton
+            variant="ghost"
+            size="md"
+            class="numpad-btn"
+            :disabled="loading"
+            @click="handleDigit(0)"
+          >
+            0
+          </AppButton>
+
+          <AppButton
+            variant="ghost"
+            size="md"
+            class="numpad-btn numpad-action-btn"
+            :disabled="loading || pinInput.length === 0"
+            title="Hapus Terakhir"
+            @click="handleBackspace"
+          >
+            <template #icon>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                <line x1="18" y1="9" x2="12" y2="15" />
+                <line x1="12" y1="9" x2="18" y2="15" />
+              </svg>
+            </template>
+          </AppButton>
+        </div>
+
+        <AppButton
+          variant="primary"
+          size="md"
+          class="action-btn-full"
+          :disabled="loading || pinInput.length < 4"
+          :busy="loading"
+          @click="submitPin"
+        >
+          Buka Studio
+        </AppButton>
       </div>
 
       <!-- Footer Info -->
       <div class="login-footer">
         <span class="footer-badge">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          Desktop Loopback Stateless Auth (Port 8478)
+          Sovereign Local PIN Authentication (.aegis/auth.json)
         </span>
       </div>
     </div>
@@ -163,16 +323,16 @@ async function handleDevClick() {
 
 .login-card {
   width: 100%;
-  max-width: 440px;
-  background: var(--bg-surface, #1e2430);
-  border: 1px solid var(--border-color, #2d3648);
-  border-radius: 12px;
-  padding: 32px 28px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  max-width: 420px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  box-shadow: var(--shadow-pop);
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  color: var(--text-primary, #f0f4f8);
+  gap: 18px;
+  color: var(--text);
 }
 
 .brand-header {
@@ -184,14 +344,14 @@ async function handleDevClick() {
 .brand-badge-large {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
-  color: #fff;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--border-hover);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
 }
 
 .brand-titles {
@@ -204,7 +364,7 @@ async function handleDevClick() {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #60a5fa;
+  color: var(--accent-dim);
   text-transform: uppercase;
 }
 
@@ -212,14 +372,14 @@ async function handleDevClick() {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: var(--text-primary, #f8fafc);
+  color: var(--text);
 }
 
 .login-desc {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--secondary);
 }
 
 .login-state-box {
@@ -227,90 +387,157 @@ async function handleDevClick() {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12.5px;
 }
 
 .loading-box {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  color: #93c5fd;
+  background: var(--accent-soft);
+  border: 1px solid var(--border-hover);
+  color: var(--accent);
+}
+
+.spinner-icon {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .error-box {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #fca5a5;
+  background: var(--alert-err-bg);
+  border: 1px solid var(--alert-err-border);
+  color: var(--alert-err-text);
 }
 
-.btn-google-login {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: #ffffff;
-  color: #1f2937;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 18px;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  cursor: pointer;
-  transition: all 0.15s ease-in-out;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
-
-.btn-google-login:hover:not(:disabled) {
-  background: #f9fafb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-1px);
-}
-
-.btn-google-login:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.login-actions {
+.setup-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
-.btn-dev-login {
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--secondary);
+}
+
+.pin-text-input {
   width: 100%;
+  padding: 10px 14px;
+  background: var(--input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--mono);
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.pin-text-input:focus {
+  border-color: var(--border-hover);
+}
+
+.entry-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.pin-indicator-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.pin-dots {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px dashed rgba(59, 130, 246, 0.4);
-  color: #60a5fa;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 16px;
-  border-radius: 8px;
-  cursor: pointer;
+  gap: 12px;
+}
+
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
   transition: all 0.15s ease-in-out;
 }
 
-.btn-dev-login:hover:not(:disabled) {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: #60a5fa;
-  transform: translateY(-1px);
+.pin-dot.filled {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.15);
 }
 
-.btn-dev-login:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.pin-overflow-counter {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.numpad-btn {
+  height: 52px;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.numpad-btn:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+.numpad-action-btn {
+  font-size: 14px;
+  color: var(--secondary);
+}
+
+.action-btn-full {
+  width: 100%;
+  margin-top: 4px;
+  height: 42px;
 }
 
 .login-footer {
   display: flex;
   justify-content: center;
-  padding-top: 4px;
-  border-top: 1px solid var(--border-color, #2d3648);
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
 .footer-badge {
@@ -318,7 +545,7 @@ async function handleDevClick() {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--text-muted, #64748b);
+  color: var(--muted);
 }
 
 @keyframes fadeIn {

@@ -16,7 +16,7 @@ Prinsip: (1) satu alur eksekusi yang dapat dipercaya; (2) satu sumber kebenaran 
 | P1 | Pecah orchestrator dan runtime | 2 |
 | P2 | Kontrak data queue, history, reasoning, SSE | 1 |
 | P3 | Stabilkan boundary provider | 3 |
-| P4 | Quality gate dan regression harness | 4 |
+| P4 | Quality gate, hardening keamanan browser & regression harness | 4 |
 | P5 | Polish produk, HITL, desktop native | 5 |
 
 Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan sebelum P0 dan P1 selesai.
@@ -33,7 +33,7 @@ Aturan: tidak memulai redesain visual, provider baru, atau fitur agent tambahan 
 | Fase 2 | Modularisasi orchestrator/runtime | Selesai |
 | Fase 2.5 | Migrasi CodeGraph & Relational Intelligence | Selesai |
 | Fase 3 | Normalisasi boundary provider | Sedang Berjalan |
-| Fase 4 | Reliability gate dan Triple-Gate QA | Direncanakan |
+| Fase 4 | Reliability gate, isolasi keamanan runner, dan Triple-Gate QA | Direncanakan |
 | Fase 5 | HITL guardrails, UI Studio, Tauri v2 | Pasca-Stabilisasi |
 
 ```mermaid
@@ -43,7 +43,7 @@ graph TD
     F1 --> F2["Fase 2: Modularisasi Orchestrator"]
     F2 --> F2_5["Fase 2.5: Migrasi CodeGraph"]
     F2_5 --> F3["Fase 3: Normalisasi Provider"]
-    F1 & F2 & F2_5 & F3 --> F4["Fase 4: Reliability Gate & Strict QA"]
+    F1 & F2 & F2_5 & F3 --> F4["Fase 4: Reliability & Security Gate (Strict QA)"]
     F4 --> F5["Fase 5: HITL, UI Studio, Desktop Tauri v2"]
 ```
 
@@ -127,6 +127,8 @@ Definition of done: Seluruh kebutuhan pencarian kode struktural ditangani determ
 
 ## 8. Fase 4: Reliability Gate & Strict QA
 
+### 8.1 Stop-Gate Reliabilitas & Triple-Gate QA
+
 Stop-gate sebelum Fase 5:
 1. Gate 1: seluruh `pytest` lulus (exit code 0).
 2. Gate 2: seluruh `node --test` lulus (exit code 0).
@@ -139,6 +141,17 @@ Syarat tambahan:
 - [ ] Hygiene frontend: refCount `monacoModelRegistry`, buffer event maksimum 500 dengan deduplikasi.
 - [ ] Tidak ada kredensial pada log atau payload event; workspace luar proyek tidak berubah tanpa approval.
 - [ ] Dokumentasi instalasi berhasil diikuti dari mesin bersih.
+
+### 8.2 Hardening Keamanan Browser Runner & Isolasi Zero-Trust (Track PR-SEC)
+
+Fase ini memitigasi risiko keamanan arsitektural pada antarmuka peramban lokal (browser runner), mencegah eksploitasi cross-origin (drive-by RCE), manipulasi loopback token bypass, dan kebocoran kredensial sesi.
+
+| Tahap | Perubahan | Gate wajib | Status |
+|---|---|---|:---:|
+| PR-SEC-1 | **Eliminasi Loopback Bypass & Ephemeral Secret Handshake**: Hapus bypass tanpa token untuk `127.0.0.1` pada `api/auth.py` (`is_auth_required_for_request`). Generate ephemeral handshake secret di `.aegis/run/gateway.token` (permissions `0600`) saat startup Django Gateway; inject otomatis ke bootstrap Vite/Vue. | Semua request HTTP/WebSocket wajib token valid meski dari `127.0.0.1`; bypass tanpa token ditolak (401/4001) | [ ] Direncanakan |
+| PR-SEC-2 | **Cross-Origin Boundary & Anti-CSRF Rest Endpoints**: Validasi ketat header `Origin` dan `Sec-Fetch-Site` untuk seluruh endpoint mutatif (`POST /api/terminal/run`, `POST /api/tasks`, `POST /api/projects`, `POST /api/sessions`). Cabut `@csrf_exempt` blanket pada endpoint eksekusi terminal dan manajemen tugas. | Request lintas-asal dari situs eksternal (`evil.com`) ditolak 403 Forbidden; zero cross-origin command execution | [ ] Direncanakan |
+| PR-SEC-3 | **Workspace Execution Sandboxing & Path Traversal Guard**: Kunci working directory dan path resolusi di `views.py:terminal_run` dan `tools/terminal.py` agar terkunci strictly di dalam project root workspace aktif. Tolak traversal (`../`) dan eksekusi di root OS tanpa persetujuan eksplisit HITL. | Subprocess execution terkunci di workspace boundary; percobaan traversal melempar ValidationError | [ ] Direncanakan |
+| PR-SEC-4 | **Content-Security-Policy (CSP) & Perlindungan XSS Token**: Konfigurasi header CSP ketat pada `SecurityMiddleware` untuk mencegah injeksi skrip peramban yang dapat mengakses token di `localStorage`. Audit sanitasi rendering Monaco dan Markdown parser. | Audit XSS lulus; header CSP aktif tanpa inline-eval tak tepercaya; token terproteksi dari kebocoran skrip | [ ] Direncanakan |
 
 ## 9. Fase 5: HITL, UI Studio, Desktop Native
 
@@ -163,6 +176,7 @@ Syarat tambahan:
 | Provider malformed response | Semua kasus berstatus terminal error |
 | Reproducibility test | 2 run berturut-turut lulus |
 | Onboarding | <= 15 menit untuk target provider |
+| Keamanan & isolasi browser | 0 unauthenticated request (loopback bypass dihapus), 0 cross-origin execution |
 
 Angka dikalibrasi ulang setelah baseline Fase 0 tersedia.
 

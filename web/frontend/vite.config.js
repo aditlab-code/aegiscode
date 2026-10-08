@@ -17,11 +17,23 @@ function backendPort() {
   }
 }
 
+function readDevEphemeralToken() {
+  try {
+    const tokenUrl = new URL("../../.aegis/run/gateway.token", import.meta.url);
+    return readFileSync(fileURLToPath(tokenUrl), "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
 // AETHER Workbench (#52).
 // Dev server mem-proxy /api ke Django Gateway (#50/#51) agar frontend tidak
 // perlu tahu host backend dan tidak ada logic agent di frontend.
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    __AEGIS_DEV_TOKEN__: JSON.stringify(readDevEphemeralToken()),
+  },
   server: {
     port: 5173,
     // Izinkan dev server menyajikan asset di luar root frontend (yaitu

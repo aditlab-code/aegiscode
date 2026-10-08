@@ -14,11 +14,13 @@ if str(django_dir) not in sys.path:
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 from config.asgi import application  # noqa: E402
+from api.auth import get_ephemeral_token
 
 
 def test_terminal_consumer_websocket_lifecycle() -> None:
     async def _run():
-        communicator = WebsocketCommunicator(application, "/ws/terminal/")
+        token = get_ephemeral_token()
+        communicator = WebsocketCommunicator(application, f"/ws/terminal/?token={token}")
         connected, _ = await communicator.connect()
         assert connected, "WebSocket connection should succeed"
 
@@ -102,7 +104,8 @@ def test_terminal_consumer_project_switching_isolation(tmp_path: Path) -> None:
             mock_get_service.return_value = mock_service
 
             # Connect Project A
-            comm_a = WebsocketCommunicator(application, "/ws/terminal/proj-a/")
+            token = get_ephemeral_token()
+            comm_a = WebsocketCommunicator(application, f"/ws/terminal/proj-a/?token={token}")
             connected_a, _ = await comm_a.connect()
             assert connected_a, "Project A connection should succeed"
 
@@ -122,7 +125,7 @@ def test_terminal_consumer_project_switching_isolation(tmp_path: Path) -> None:
             await comm_a.disconnect()
 
             # Connect Project B immediately
-            comm_b = WebsocketCommunicator(application, "/ws/terminal/proj-b/")
+            comm_b = WebsocketCommunicator(application, f"/ws/terminal/proj-b/?token={token}")
             connected_b, _ = await comm_b.connect()
             assert connected_b, "Project B connection should succeed"
 
