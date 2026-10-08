@@ -114,6 +114,9 @@ const emit = defineEmits([
   "collapse-sidebar",
   "open-diff",
   "discard-change",
+  "stage-change",
+  "unstage-change",
+  "checkpoint-created",
   "branch-info-updated",
 ]);
 
@@ -134,6 +137,13 @@ function handleOpenFile(file) {
 
 function handleOpenDiff(file) {
   emit("open-diff", file);
+}
+
+const changesPanelRef = ref(null);
+
+function onCheckpointCreated(result) {
+  changesPanelRef.value?.loadGitChanges();
+  emit("checkpoint-created", result);
 }
 
 // Task/Thread view subtab: Threads | History (Copilot Workspace model)
@@ -425,8 +435,10 @@ function statusTagClass(st) {
             :project="activeProject"
             :refresh-key="explorerRefresh"
             @branch-info-updated="emit('branch-info-updated', $event)"
+            @checkpoint-created="onCheckpointCreated"
           >
             <ChangesPanel
+              ref="changesPanelRef"
               :changes="changes"
               :validation="validation || {}"
               :project="activeProject"
@@ -434,6 +446,8 @@ function statusTagClass(st) {
               @open-file="handleOpenFile"
               @open-diff="handleOpenDiff"
               @discard-change="emit('discard-change', $event)"
+              @stage-change="emit('stage-change', $event)"
+              @unstage-change="emit('unstage-change', $event)"
             />
           </GithubBackupPanel>
         </div>

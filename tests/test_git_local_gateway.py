@@ -422,3 +422,168 @@ def test_gitignore_patterns_and_sync(tmp_path):
     assert st["gitignore_rules"] == ["*.log", "node_modules/", "secrets.env"]
 
 
+
+def test_git_repository_facade_stage_and_unstage(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+    assert facade.is_repository() is True
+
+    # Create 2 modified files
+    file_a = temp_git_repo / "hello.py"
+    file_a.write_text("print('hello world')\n# change 1\n", encoding="utf-8")
+
+    file_b = temp_git_repo / "extra.py"
+    file_b.write_text("print('extra file')\n", encoding="utf-8")
+
+    st = facade.status()
+    assert st.clean is False
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is False
+    assert st_map["extra.py"].staged is False
+
+    # Stage only hello.py
+    res_stage = facade.stage("hello.py")
+    assert res_stage["ok"] is True
+    assert res_stage["file_path"] == "hello.py"
+
+    # Check status and diff_detail
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is True
+    assert st_map["extra.py"].staged is False
+
+    diff_a = facade.diff_detail("hello.py")
+    assert diff_a["staged"] is True
+    diff_b = facade.diff_detail("extra.py")
+    assert diff_b["staged"] is False
+
+    # Unstage hello.py
+    res_unstage = facade.unstage("hello.py")
+    assert res_unstage["ok"] is True
+    assert res_unstage["file_path"] == "hello.py"
+
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is False
+    diff_a_after = facade.diff_detail("hello.py")
+    assert diff_a_after["staged"] is False
+
+    # Stage all
+    res_stage_all = facade.stage()
+    assert res_stage_all["ok"] is True
+    st = facade.status()
+    for f in st.files:
+        assert f.staged is True
+
+    # Unstage all
+    res_unstage_all = facade.unstage()
+    assert res_unstage_all["ok"] is True
+    st = facade.status()
+    for f in st.files:
+        assert f.staged is False
+
+
+def test_git_gateway_stage_and_unstage_endpoints(temp_git_repo):
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {"id": "proj-stage-1", "path": str(temp_git_repo)}
+
+    service = GatewayService(
+        project_store=mock_store,
+        project_registry=MagicMock(),
+        task_preparation=MagicMock(),
+        session_store=MagicMock(),
+    )
+
+    orig_get_service = views.get_service
+    views.get_service = lambda: service
+
+    try:
+        client = Client()
+
+        # Modify hello.py
+        (temp_git_repo / "hello.py").write_text("changed content\n", encoding="utf-8")
+
+        # POST stage
+        res_stage = client.post(
+            "/api/projects/proj-stage-1/git/stage",
+            data='{"file_path": "hello.py"}',
+            content_type="application/json",
+        )
+        assert res_stage.status_code == 200
+        data_stage = res_stage.json()
+        assert data_stage["ok"] is True
+        assert data_stage["file_path"] == "hello.py"
+
+        # Verify via diff endpoint
+        res_diff = client.get("/api/projects/proj-stage-1/git/diff?path=hello.py")
+        assert res_diff.status_code == 200
+        assert res_diff.json()["staged"] is True
+
+        # POST unstage
+        res_unstage = client.post(
+            "/api/projects/proj-stage-1/git/unstage",
+            data='{"file_path": "hello.py"}',
+            content_type="application/json",
+        )
+        assert res_unstage.status_code == 200
+        data_unstage = res_unstage.json()
+        assert data_unstage["ok"] is True
+        assert data_unstage["file_path"] == "hello.py"
+
+        # Verify diff endpoint now shows unstaged
+        res_diff2 = client.get("/api/projects/proj-stage-1/git/diff?path=hello.py")
+        assert res_diff2.status_code == 200
+        assert res_diff2.json()["staged"] is False
+    finally:
+        views.get_service = orig_get_service
+
+
+def test_create_checkpoint_selective_staging(temp_git_repo):
+    from api.github_backup import GithubBackupService
+
+    backup_service = GithubBackupService()
+    backup_service.save_config(root=temp_git_repo, repository="", branch="main")
+
+    # Commit .gitignore terlebih dahulu agar tidak terhitung sebagai untracked file baru
+    gi = temp_git_repo / ".gitignore"
+    gi.write_text(".aegis/\n", encoding="utf-8")
+    subprocess.run(["git", "add", ".gitignore"], cwd=str(temp_git_repo), check=True)
+    subprocess.run(["git", "commit", "-m", "Add gitignore"], cwd=str(temp_git_repo), check=True)
+
+    facade = GitRepositoryFacade(root=temp_git_repo)
+
+    # Create 2 modifications
+    file_a = temp_git_repo / "hello.py"
+    file_a.write_text("print('hello staged')\n", encoding="utf-8")
+
+    file_b = temp_git_repo / "world.py"
+    file_b.write_text("print('unstaged file')\n", encoding="utf-8")
+    # Stage only file_a
+    facade.stage("hello.py")
+
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is True
+    assert st_map["world.py"].staged is False
+
+    # Create checkpoint: should only commit hello.py
+    res = backup_service.create_checkpoint(root=temp_git_repo, description="Checkpoint Staged Only")
+    assert res["committed"] is True
+    assert res["checkpoint"]["files_changed"] == 1
+
+    # Verify world.py is still uncommitted in working tree
+    st_after = facade.status()
+    assert st_after.clean is False
+    st_after_map = {f.path: f for f in st_after.files}
+    assert "hello.py" not in st_after_map
+    assert "world.py" in st_after_map
+    assert st_after_map["world.py"].staged is False
+
+    # Second checkpoint without manual staging: should auto-stage remaining changes
+    res2 = backup_service.create_checkpoint(root=temp_git_repo, description="Checkpoint Fallback Auto Stage")
+    assert res2["committed"] is True
+    assert res2["checkpoint"]["files_changed"] == 1
+
+    # Working tree should now be clean
+    st_clean = facade.status()
+    assert st_clean.clean is True
+    assert st_clean.files == []

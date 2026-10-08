@@ -335,6 +335,28 @@ export function discardProjectGitChanges(projectId, filePath = null) {
   );
 }
 
+export function stageProjectGitChanges(projectId, filePath = null) {
+  return request(
+    `/projects/${encodeURIComponent(projectId)}/git/stage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_path: filePath }),
+    }
+  );
+}
+
+export function unstageProjectGitChanges(projectId, filePath = null) {
+  return request(
+    `/projects/${encodeURIComponent(projectId)}/git/unstage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_path: filePath }),
+    }
+  );
+}
+
 export function initProjectGit(projectId) {
   return request(
     `/projects/${encodeURIComponent(projectId)}/git/init`,

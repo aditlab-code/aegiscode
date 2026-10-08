@@ -96,6 +96,16 @@ class GitClient(ABC):
         """Tolak/buang perubahan working tree (revert ke HEAD atau hapus file untracked)."""
         raise NotImplementedError
 
+    @abstractmethod
+    def stage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Tambahkan perubahan ke staging index (git add)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def unstage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Hapus perubahan dari staging index (git restore --staged atau git reset)."""
+        raise NotImplementedError
+
 
 def _is_internal_ignored_path(path: str) -> bool:
     """True bila path merupakan direktori atau file internal Aegis/Git yang tidak boleh bocor.
@@ -533,3 +543,53 @@ class SubprocessGitClient(GitClient):
             pass
 
         return True
+
+    def stage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Tambahkan perubahan ke staging index (git add).
+
+        Bila `file_path` diberikan: stage file tersebut.
+        Bila `file_path` None: stage seluruh perubahan non-ignored di repository.
+        """
+        if file_path:
+            if _is_internal_ignored_path(file_path):
+                return False
+            try:
+                self._run(["add", "-A", "--", file_path], path)
+                return True
+            except GitError:
+                return False
+
+        try:
+            self._run(["add", "-A", "."], path)
+            return True
+        except GitError:
+            return False
+
+    def unstage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Hapus perubahan dari staging index (git restore --staged atau git reset).
+
+        Bila `file_path` diberikan: unstage file tersebut.
+        Bila `file_path` None: unstage seluruh file di staging index.
+        """
+        if file_path:
+            if _is_internal_ignored_path(file_path):
+                return False
+            try:
+                self._run(["restore", "--staged", "--", file_path], path)
+                return True
+            except GitError:
+                try:
+                    self._run(["reset", "HEAD", "--", file_path], path)
+                    return True
+                except GitError:
+                    return False
+
+        try:
+            self._run(["restore", "--staged", "."], path)
+            return True
+        except GitError:
+            try:
+                self._run(["reset", "HEAD"], path)
+                return True
+            except GitError:
+                return False

@@ -8,7 +8,11 @@
 //   - editing langsung di sisi modified dengan shortcut Save (Cmd+S / Ctrl+S),
 //   - lifecycle bersih: dispose diff editor, models, listener, & ResizeObserver.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { getProjectGitDiff } from "../api.js";
+import {
+  getProjectGitDiff,
+  stageProjectGitChanges,
+  unstageProjectGitChanges,
+} from "../api.js";
 import { languageForFile, languageLabel } from "../editorLanguages.js";
 import {
   getStoredEditorSettings,
@@ -25,7 +29,7 @@ const props = defineProps({
   instanceId: { type: String, default: "primary" },
 });
 
-const emit = defineEmits(["close", "error", "edit-file", "discard"]);
+const emit = defineEmits(["close", "error", "edit-file", "discard", "stage-change", "git-refresh"]);
 
 const container = ref(null);
 const loading = ref(true);
@@ -33,6 +37,8 @@ const loadError = ref("");
 const sideBySide = ref(true);
 const statusLabel = ref("modified");
 
+const isStaged = ref(false);
+const stagingBusy = ref(false);
 const cleanFilePath = computed(() => {
   if (props.filePath) return props.filePath;
   const p = props.path || "";
@@ -96,7 +102,7 @@ async function load() {
     const origText = typeof data?.original === "string" ? data.original : "";
     const modText = typeof data?.modified === "string" ? data.modified : "";
     statusLabel.value = data?.status || "modified";
-
+    isStaged.value = Boolean(data?.staged);
     await nextTick();
     await mountDiffEditor(origText, modText);
   } catch (e) {
@@ -107,6 +113,28 @@ async function load() {
     await nextTick();
     layout();
     setTimeout(() => layout(), 50);
+  }
+}
+
+async function toggleStage() {
+  const projectId = props.project?.id || props.project?.project_id;
+  if (!projectId || stagingBusy.value) return;
+  stagingBusy.value = true;
+  try {
+    if (isStaged.value) {
+      await unstageProjectGitChanges(projectId, cleanFilePath.value);
+      isStaged.value = false;
+      emit("stage-change", { path: cleanFilePath.value, unstage: true });
+    } else {
+      await stageProjectGitChanges(projectId, cleanFilePath.value);
+      isStaged.value = true;
+      emit("stage-change", { path: cleanFilePath.value, unstage: false });
+    }
+    emit("git-refresh");
+  } catch (err) {
+    console.error("Failed to toggle stage status:", err);
+  } finally {
+    stagingBusy.value = false;
   }
 }
 
@@ -274,6 +302,9 @@ defineExpose({ layout });
         <span class="diff-tag-pill" :class="'tag-' + statusLabel.toLowerCase()">
           {{ statusLabel.toUpperCase() }}
         </span>
+        <span v-if="isStaged" class="diff-tag-pill tag-staged" title="Staged in Git index">
+          STAGED
+        </span>
         <span class="diff-ref-indicator">HEAD ↔ Working Tree</span>
         <span class="diff-readonly-pill" title="This diff comparison is read-only. Click Edit File to edit in Code Editor.">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -315,19 +346,37 @@ defineExpose({ layout });
           </button>
         </div>
 
+        <!-- Approval action (Stage / Unstage toggle) -->
+        <button
+          type="button"
+          class="diff-btn diff-stage-btn"
+          :class="{ 'is-staged': isStaged }"
+          :title="isStaged ? 'Unstage Changes' : 'Stage Changes (Approve)'"
+          :aria-label="isStaged ? 'Unstage Changes' : 'Stage Changes (Approve)'"
+          :disabled="stagingBusy || loading"
+          @click.stop="toggleStage"
+        >
+          <svg v-if="isStaged" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          <svg v-else width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </button>
+
         <!-- Edit in Code Editor shortcut (for non-deleted files) -->
         <button
           v-if="statusLabel !== 'deleted'"
           type="button"
           class="diff-btn diff-edit-btn"
-          title="Open and edit this file in Code Editor"
+          title="Edit File"
+          aria-label="Edit File"
           @click="emit('edit-file', cleanFilePath)"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 20h9"/>
             <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>
           </svg>
-          <span>Edit File</span>
         </button>
 
         <!-- Discard Changes button / Inline In-Place Confirmation -->
@@ -356,27 +405,27 @@ defineExpose({ layout });
           v-else
           type="button"
           class="diff-btn diff-discard-btn"
-          title="Discard changes and revert file to HEAD"
+          title="Discard Changes"
+          aria-label="Discard Changes"
           @click.stop="confirmDiscard = true"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
             <path d="M3 3v5h5"/>
           </svg>
-          <span>Discard</span>
         </button>
 
         <button
           type="button"
           class="diff-btn"
           title="Refresh Diff"
+          aria-label="Refresh Diff"
           :disabled="loading"
           @click="load"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/>
           </svg>
-          <span>Refresh</span>
         </button>
 
         <button
@@ -698,5 +747,33 @@ defineExpose({ layout });
 
 @keyframes diff-spin {
   to { transform: rotate(360deg); }
+}
+
+.diff-btn.diff-stage-btn {
+  color: var(--text-faint);
+}
+
+.diff-btn.diff-stage-btn:hover:not(:disabled) {
+  color: var(--ok);
+  background: rgba(158, 206, 106, 0.14);
+  border-color: rgba(158, 206, 106, 0.35);
+}
+
+.diff-btn.diff-stage-btn.is-staged {
+  color: var(--ok);
+  background: rgba(158, 206, 106, 0.12);
+  border-color: rgba(158, 206, 106, 0.3);
+}
+
+.diff-btn.diff-stage-btn.is-staged:hover:not(:disabled) {
+  color: var(--accent);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.diff-tag-pill.tag-staged {
+  background: rgba(158, 206, 106, 0.14);
+  color: var(--ok);
+  border: 1px solid rgba(158, 206, 106, 0.3);
 }
 </style>

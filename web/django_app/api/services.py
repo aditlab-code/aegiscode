@@ -1759,6 +1759,46 @@ class GatewayService:
             "file_path": res.get("file_path"),
         }
 
+    def git_stage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Tambahkan perubahan file ke staging index (git add)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.stage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
+    def git_unstage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Hapus perubahan file dari staging index (git restore --staged atau git reset)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.unstage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
     def git_init(self, project_id: str) -> Dict[str, Any]:
         """Inisialisasi Git repository baru pada root project."""
         root = self._project_root_by_id(project_id)

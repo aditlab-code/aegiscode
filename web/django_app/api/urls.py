@@ -107,6 +107,16 @@ urlpatterns = [
         name="project_git_discard",
     ),
     path(
+        "projects/<str:project_id>/git/stage",
+        views.project_git_stage,
+        name="project_git_stage",
+    ),
+    path(
+        "projects/<str:project_id>/git/unstage",
+        views.project_git_unstage,
+        name="project_git_unstage",
+    ),
+    path(
         "projects/<str:project_id>/git/init",
         views.project_git_init,
         name="project_git_init",

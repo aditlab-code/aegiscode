@@ -487,6 +487,30 @@ def project_git_discard(
     return _json_response(service.git_discard(project_id, file_path=file_path))
 
 
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stage(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stage -> stage perubahan file ke index."""
+    payload = _parse_json_body(request)
+    file_path = payload.get("file_path") or request.GET.get("path")
+    return _json_response(service.git_stage(project_id, file_path=file_path))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_unstage(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/unstage -> unstage perubahan file dari index."""
+    payload = _parse_json_body(request)
+    file_path = payload.get("file_path") or request.GET.get("path")
+    return _json_response(service.git_unstage(project_id, file_path=file_path))
+
 @csrf_exempt
 @require_http_methods(["POST"])
 @_handle

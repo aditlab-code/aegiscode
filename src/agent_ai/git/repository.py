@@ -198,6 +198,7 @@ class GitRepositoryFacade:
                 "original": "",
                 "modified": "",
                 "diff": "",
+                "staged": False,
             }
 
         from agent_ai.git.client import _is_internal_ignored_path
@@ -208,6 +209,7 @@ class GitRepositoryFacade:
                 "original": "",
                 "modified": "",
                 "diff": "",
+                "staged": False,
             }
 
         target = self._resolve(file_path)
@@ -219,6 +221,7 @@ class GitRepositoryFacade:
                 "original": "",
                 "modified": "",
                 "diff": "",
+                "staged": False,
             }
 
         # Baca konten working tree (modified)
@@ -241,6 +244,8 @@ class GitRepositoryFacade:
             status = "deleted"
 
         diff_text = self.file_diff_unified(rel_path)
+        st = self.status()
+        is_staged = any(f.path == rel_path and f.staged for f in st.files)
 
         return {
             "path": rel_path,
@@ -248,6 +253,7 @@ class GitRepositoryFacade:
             "original": original_content,
             "modified": modified_content,
             "diff": diff_text,
+            "staged": is_staged,
         }
 
     def discard(self, file_path: Optional[str] = None) -> Dict[str, Any]:
@@ -262,4 +268,32 @@ class GitRepositoryFacade:
             return {"ok": ok, "file_path": rel_path}
 
         ok = self.client.discard(self.root, file_path=None)
+        return {"ok": ok, "file_path": None}
+
+    def stage(self, file_path: Optional[str] = None) -> Dict[str, Any]:
+        """Tambahkan perubahan pada file tertentu atau seluruh repository ke staging index."""
+        if not self.is_repository():
+            return {"ok": False, "file_path": file_path, "error": "not_a_repository"}
+
+        if file_path:
+            target = self._resolve(file_path)
+            rel_path = target.relative_to(self.root).as_posix()
+            ok = self.client.stage(self.root, file_path=rel_path)
+            return {"ok": ok, "file_path": rel_path}
+
+        ok = self.client.stage(self.root, file_path=None)
+        return {"ok": ok, "file_path": None}
+
+    def unstage(self, file_path: Optional[str] = None) -> Dict[str, Any]:
+        """Hapus perubahan pada file tertentu atau seluruh repository dari staging index."""
+        if not self.is_repository():
+            return {"ok": False, "file_path": file_path, "error": "not_a_repository"}
+
+        if file_path:
+            target = self._resolve(file_path)
+            rel_path = target.relative_to(self.root).as_posix()
+            ok = self.client.unstage(self.root, file_path=rel_path)
+            return {"ok": ok, "file_path": rel_path}
+
+        ok = self.client.unstage(self.root, file_path=None)
         return {"ok": ok, "file_path": None}

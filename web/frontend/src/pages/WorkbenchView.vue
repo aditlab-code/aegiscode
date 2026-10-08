@@ -322,6 +322,7 @@ const emit = defineEmits([
   "open-path",
   "open-explorer",
   "branch-info-updated",
+  "checkpoint-created",
 ]);
 
 // 1. Column Sizing & Visibility State (via useWorkbenchLayout)
@@ -1026,6 +1027,27 @@ async function handleDirectDiscard(filePath = null) {
   }
 }
 
+function handleCheckpointCreated(result) {
+  localGitRefresh.value++;
+  // Tutup diff tabs yang telah ter-commit
+  const diffTabs1 = pane1TabsState.tabs.value.filter((t) => t.isDiff);
+  const diffTabs2 = pane2TabsState.tabs.value.filter((t) => t.isDiff);
+  diffTabs1.forEach((t) => closeTab(pane1TabsState, t.path, { force: true }));
+  diffTabs2.forEach((t) => closeTab(pane2TabsState, t.path, { force: true }));
+  emit("checkpoint-created", result);
+}
+
+function handleStageChange({ path, unstage } = {}) {
+  localGitRefresh.value++;
+  showBgToast({
+    type: "success",
+    title: unstage ? "Changes Unstaged" : "Changes Staged",
+    message: path
+      ? `${unstage ? "Unstaged" : "Staged"} ${path}.`
+      : `${unstage ? "Unstaged all changes" : "Staged all changes"}.`,
+  });
+}
+
 function onMarkersChange(payload) {
   if (payload?.markers) {
     activeEditorMarkers.value = mapMonacoMarkersToDiagnostics(
@@ -1442,6 +1464,9 @@ defineExpose({
           @close-tab="(path, pane) => handleCloseTab(path, pane)"
           @clear-tabs="(pane) => clearAllTabs(pane)"
           @branch-info-updated="emit('branch-info-updated', $event)"
+          @stage-change="handleStageChange"
+          @unstage-change="handleStageChange"
+          @checkpoint-created="handleCheckpointCreated"
         />
       </aside>
 
@@ -1886,6 +1911,8 @@ defineExpose({
                   embedded
                   @edit-file="(f) => handleOpenFile(f, 'pane1')"
                   @discard="handleDirectDiscard"
+                  @stage-change="handleStageChange"
+                  @git-refresh="() => localGitRefresh++"
                   @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
                 />
                 <CodeEditor
@@ -2119,6 +2146,8 @@ defineExpose({
                   embedded
                   @edit-file="(f) => handleOpenFile(f, 'pane2')"
                   @discard="handleDirectDiscard"
+                  @stage-change="handleStageChange"
+                  @git-refresh="() => localGitRefresh++"
                   @close="handleCloseTab(pane2ActiveTabPath, 'pane2')"
                 />
                 <CodeEditor
@@ -2157,6 +2186,8 @@ defineExpose({
             embedded
             @edit-file="(f) => handleOpenFile(f, 'pane1')"
             @discard="handleDirectDiscard"
+            @stage-change="handleStageChange"
+            @git-refresh="() => localGitRefresh++"
             @close="handleCloseTab(pane1ActiveTabPath, 'pane1')"
           />
 

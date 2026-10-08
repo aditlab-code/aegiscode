@@ -26,7 +26,7 @@ const props = defineProps({
   refreshKey: { type: Number, default: 0 },
 });
 
-const emit = defineEmits(["branch-info-updated"]);
+const emit = defineEmits(["branch-info-updated", "checkpoint-created"]);
 
 const loading = ref(false);
 const busy = ref(false);
@@ -216,7 +216,7 @@ async function commitCheckpoint() {
     const data = await listGithubCheckpoints(id);
     checkpoints.value = data.checkpoints || [];
     await refreshStatus(id);
-  } catch (e) {
+    emit("checkpoint-created", result);
     error.value = e.message || String(e);
   } finally {
     busy.value = false;
