@@ -1984,3 +1984,78 @@ def server_terminate(request: HttpRequest, service: GatewayService) -> JsonRespo
         "force": force,
     })
 
+
+@require_http_methods(["GET"])
+def skills_catalog(request: HttpRequest) -> JsonResponse:
+    """GET /api/skills/catalog -> Kembalikan metadata katalog skills Addy Osmani / AegisCode."""
+    import os
+    from pathlib import Path
+    from agent_ai.projects.skills import SkillStore
+
+    workspace = request.GET.get("workspace") or request.GET.get("path")
+    if workspace and Path(workspace).is_dir():
+        target_root = Path(workspace)
+    else:
+        target_root = Path.cwd()
+
+    store = SkillStore(root=target_root, include_central=True)
+    catalog = store.get_catalog()
+
+    command_slugs = {
+        "spec-driven-development": "spec",
+        "planning-and-task-breakdown": "plan",
+        "incremental-implementation": "build",
+        "test-driven-development": "test",
+        "interview-me": "interview-me",
+        "code-review-and-quality": "review",
+        "constraint-driven-development": "constraints",
+        "code-simplification": "code-simplify",
+        "shipping-and-launch": "ship",
+    }
+
+    skill_display_names = {
+        "spec-driven-development": "Spec-Driven Development",
+        "planning-and-task-breakdown": "Planning & Task Breakdown",
+        "incremental-implementation": "Incremental Implementation",
+        "test-driven-development": "Test-Driven Development",
+        "interview-me": "Interview Me",
+        "code-review-and-quality": "Code Review & Quality",
+        "constraint-driven-development": "Constraint-Driven Development",
+        "code-simplification": "Code Simplification",
+        "shipping-and-launch": "Shipping & Launch",
+    }
+
+    placeholder_templates = {
+        "spec-driven-development": "/spec [Jelaskan spesifikasi fitur/sistem]: ",
+        "planning-and-task-breakdown": "/plan [Rincian scope/arsitektur]: ",
+        "incremental-implementation": "/build [Komponen yang diimplementasikan]: ",
+        "test-driven-development": "/test [Modul/skenario yang diuji]: ",
+        "interview-me": "/interview-me [Ide/kebutuhan yang ingin diekstrak]: ",
+        "code-review-and-quality": "/review [Berkas/diff yang direview]: ",
+        "constraint-driven-development": "/constraints [Standar kualitas/aturan batas]: ",
+        "code-simplification": "/code-simplify [Kode/fungsi yang disederhanakan]: ",
+        "shipping-and-launch": "/ship [Target rilis/lingkungan deploy]: ",
+    }
+
+    skills_data = []
+    for item in catalog:
+        slug = command_slugs.get(item.skill_id, item.skill_id)
+        display_name = skill_display_names.get(item.skill_id, item.name.replace("-", " ").title())
+        template = placeholder_templates.get(item.skill_id, f"/{slug} [Instruksi]: ")
+        skills_data.append({
+            "id": slug,
+            "skill_id": item.skill_id,
+            "name": display_name,
+            "command": f"/{slug}",
+            "description": item.description,
+            "scope": item.scope,
+            "location": item.location,
+            "template": template,
+        })
+
+    return _json_response({
+        "status": "ok",
+        "total": len(skills_data),
+        "skills": skills_data,
+    })
+

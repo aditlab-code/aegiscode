@@ -7,36 +7,118 @@ import { getCachedFiles, fetchWorkspaceFiles } from "./fileCacheService.js";
  * Implements Roadmap Item #5 (Mention popover @file, template prompt /shortcuts, history recall).
  */
 
-export const PROMPT_TEMPLATES = [
+export const DEFAULT_SKILL_TEMPLATES = [
   {
-    id: "fix",
-    command: "/fix",
-    label: "Quick Fix",
-    description: "Fix bug or error in specified component",
-    template: "Fix the following issue: ",
+    id: "spec",
+    command: "/spec",
+    skillId: "spec-driven-development",
+    label: "Spec-Driven Development",
+    description: "Buat spesifikasi terstruktur sebelum menulis kode",
+    template: "/spec [Jelaskan spesifikasi fitur/sistem]: ",
+  },
+  {
+    id: "plan",
+    command: "/plan",
+    skillId: "planning-and-task-breakdown",
+    label: "Planning & Task Breakdown",
+    description: "Pecah pekerjaan menjadi tugas terurut dan terverifikasi",
+    template: "/plan [Rincian scope/arsitektur]: ",
+  },
+  {
+    id: "build",
+    command: "/build",
+    skillId: "incremental-implementation",
+    label: "Incremental Implementation",
+    description: "Implementasi perubahan bertahap dalam irisan tipis terverifikasi",
+    template: "/build [Komponen/tugas yang diimplementasikan]: ",
   },
   {
     id: "test",
     command: "/test",
-    label: "Write & Run Tests",
-    description: "Write and execute unit or integration tests",
-    template: "Write and run comprehensive tests for: ",
+    skillId: "test-driven-development",
+    label: "Test-Driven Development",
+    description: "Tegakkan siklus red-green-refactor dan pastikan 100% tes lolos",
+    template: "/test [Modul/skenario yang diuji]: ",
   },
   {
-    id: "audit",
-    command: "/audit",
-    label: "Security & Quality Audit",
-    description: "Audit security vulnerabilities, bottlenecks, and code cleanliness",
-    template: "Perform a security, performance, and code quality audit of: ",
+    id: "interview-me",
+    command: "/interview-me",
+    skillId: "interview-me",
+    label: "Interview Me (Grill-Me)",
+    description: "Ekstraksi kebutuhan dan intensi mendalam melalui tanya jawab bertahap",
+    template: "/interview-me [Ide/kebutuhan yang ingin diekstrak]: ",
   },
   {
-    id: "refactor",
-    command: "/refactor",
-    label: "Lean Refactoring",
-    description: "Refactor and simplify code adhering strictly to YAGNI",
-    template: "Refactor and simplify the following code: ",
+    id: "review",
+    command: "/review",
+    skillId: "code-review-and-quality",
+    label: "Code Review & Quality",
+    description: "Evaluasi kualitas kode multi-axis (5 dimensi)",
+    template: "/review [Berkas/diff yang direview]: ",
+  },
+  {
+    id: "constraints",
+    command: "/constraints",
+    skillId: "constraint-driven-development",
+    label: "Constraint-Driven Development",
+    description: "Tetapkan standar kualitas proyek sebagai kontrak di CONSTRAINTS.md",
+    template: "/constraints [Standar kualitas/aturan batas]: ",
+  },
+  {
+    id: "code-simplify",
+    command: "/code-simplify",
+    skillId: "code-simplification",
+    label: "Code Simplification",
+    description: "Sederhanakan kode untuk kejelasan tanpa mengubah perilaku fungsi",
+    template: "/code-simplify [Kode/fungsi yang disederhanakan]: ",
+  },
+  {
+    id: "ship",
+    command: "/ship",
+    skillId: "shipping-and-launch",
+    label: "Shipping & Launch",
+    description: "Persiapan rilis produksi dan verifikasi pre-launch checklist",
+    template: "/ship [Target rilis/lingkungan deploy]: ",
   },
 ];
+
+export let PROMPT_TEMPLATES = [...DEFAULT_SKILL_TEMPLATES];
+
+let cachedDynamicSkills = null;
+
+/**
+ * Fetch dynamic skill templates from backend API.
+ * @param {string} [workspacePath=""]
+ * @returns {Promise<Array<object>>}
+ */
+export async function fetchSkillTemplates(workspacePath = "") {
+  try {
+    const url = workspacePath
+      ? `/api/skills/catalog?workspace=${encodeURIComponent(workspacePath)}`
+      : "/api/skills/catalog";
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      return PROMPT_TEMPLATES;
+    }
+    const data = await res.json();
+    if (data && Array.isArray(data.skills) && data.skills.length > 0) {
+      const dynamicList = data.skills.map((s) => ({
+        id: s.id || s.skill_id,
+        command: s.command || `/${s.id || s.skill_id}`,
+        skillId: s.skill_id,
+        label: s.name || s.skill_id,
+        description: s.description || "",
+        template: s.template || `${s.command || `/${s.id}`} [Instruksi]: `,
+      }));
+      cachedDynamicSkills = dynamicList;
+      PROMPT_TEMPLATES = dynamicList;
+      return dynamicList;
+    }
+  } catch (_err) {
+    // Non-blocking fallback to default skill templates
+  }
+  return PROMPT_TEMPLATES;
+}
 
 /**
  * Filter template suggestions by query.
@@ -321,6 +403,9 @@ export function usePromptAutocomplete({ storageKey = "", onUpdateText = null } =
     if (!cached || !cached.length) {
       fetchWorkspaceFiles().catch(() => {});
     }
+    if (!cachedDynamicSkills) {
+      fetchSkillTemplates().catch(() => {});
+    }
   }
 
   async function updateSuggestions(text, cursorPos) {
@@ -343,9 +428,20 @@ export function usePromptAutocomplete({ storageKey = "", onUpdateText = null } =
       popoverIndex.value = 0;
     } else if (trigger.type === "template") {
       popoverType.value = "template";
-      popoverItems.value = filterTemplates(trigger.query);
+      popoverItems.value = filterTemplates(trigger.query, PROMPT_TEMPLATES);
       popoverVisible.value = true;
       popoverIndex.value = 0;
+
+      // Lazy re-sync dynamic skills jika belum di-cache
+      if (!cachedDynamicSkills && typeof window !== "undefined") {
+        fetchSkillTemplates()
+          .then((latest) => {
+            if (activeTrigger.value && activeTrigger.value.type === "template") {
+              popoverItems.value = filterTemplates(activeTrigger.value.query, latest);
+            }
+          })
+          .catch(() => {});
+      }
     }
   }
 

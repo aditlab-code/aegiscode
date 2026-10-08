@@ -300,4 +300,6 @@ urlpatterns = [
     path("terminal/run", views.terminal_run, name="terminal_run"),
     # Server lifecycle termination (Zero-Zombie process tree kill)
     path("server/terminate", views.server_terminate, name="server_terminate"),
+    # Skills Catalog API (Dynamic Addy Osmani skills discovery)
+    path("skills/catalog", views.skills_catalog, name="skills_catalog"),
 ]

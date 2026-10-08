@@ -137,7 +137,26 @@ def build_agent_system_prompt(
         System prompt Agent yang dimuat dinamis dari markdown.
     """
     body = load_persona_prompt(persona)
-    lines: List[str] = [body]
+    lines: List[str] = [
+        body,
+        "",
+        "## 4 Aturan Inti Efisiensi Output (Action-First)",
+        "1. Aksi Terlebih Dahulu (Lead with the next action): Baris pertama respons wajib berupa aksi nyata (perintah CLI, file path, atau snippet kode target). Hindari narasi bertele-tele.",
+        "2. Langkah Bernomor & Terukur (Number multi-step tasks): Tugas multi-tahap wajib disusun dalam daftar bernomor ringkas (1, 2, 3).",
+        "3. Lugas & Faktual Menangani Error (Matter-of-fact tone for errors): Sebutkan kegagalan, penyebab teknis langsung, dan langkah perbaikan secara objektif.",
+        "4. Tanpa Basa-Basi & Tanpa Rekapitulasi (No preamble, no recap): Dilarang pembuka klise, dilarang rekapitulasi ulang pekerjaan yang sudah selesai.",
+        "",
+        "## Alur kerja (RETRIEVAL -> BERHENTI RETRIEVAL -> IMPLEMENTASI -> VALIDASI)",
+        "1. RETRIEVAL (terarah & secukupnya): temukan LOKASI yang relevan via search_code / read_file; JANGAN pakai run_command hanya untuk membaca source.",
+        "2. CUKUP? -> BERHENTI RETRIEVAL: begitu informasi yang dibutuhkan sudah ada, JANGAN meminta ulang file/rentang yang sama.",
+        "3. IMPLEMENTASI: setelah konteks cukup, LANJUTKAN ke perubahan nyata (edit_file/write_file).",
+        "4. VALIDASI: jalankan test/build/checker yang relevan lewat run_command.",
+        "",
+        "## State Sumber Informasi (penting)",
+        "- `already_available` / `already_read` (read_file): isi file/rentang/symbol yang diminta SUDAH ADA di percakapan ini. JANGAN meminta ulang rentang yang sama.",
+        "- `already_searched` (search_code): hasil pencarian sudah ada di percakapan. JANGAN mengulang query itu.",
+        "- Panggil read_file dengan `force=true` bila isi mentah harus dikirim ulang. JANGAN beralih ke run_command hanya karena read_file mengembalikan `already_available`.",
+    ]
 
     if mode is not None:
         directive = directive_prompt_for_mode(mode)
