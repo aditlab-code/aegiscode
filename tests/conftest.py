@@ -18,6 +18,29 @@ ter-load oleh test sebelumnya.
 from __future__ import annotations
 
 import pytest
+import time
+from typing import Callable
+
+
+def wait_for_condition(
+    predicate: Callable[[], bool],
+    timeout: float = 5.0,
+    interval: float = 0.05,
+    error_msg: str = "Condition not met",
+) -> bool:
+    """Helper standar polling berbatas waktu untuk pengujian asinkron/deterministik.
+
+    Mengulang pengecekan predicate() setiap interval detik hingga mengembalikan True
+    atau timeout terlampaui. Menghindari sleep statis yang rapuh.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    if predicate():
+        return True
+    raise AssertionError(f"{error_msg} dalam batas {timeout}s")
 
 
 def _reset_extension_process_state() -> None:

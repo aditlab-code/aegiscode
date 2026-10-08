@@ -117,7 +117,26 @@ export function useTaskLifecycle(options = {}) {
   const reportTaskId = ref("");
   const currentReport = ref("");
 
+  function getEventKey(evt) {
+    if (!evt) return null;
+    return evt.event_id || evt.id || (evt.sequence != null ? `seq-${evt.sequence}` : null) || JSON.stringify(evt);
+  }
+
+  function pushCappedActivityEvent(evt) {
+    if (!evt) return;
+    const key = getEventKey(evt);
+    if (key) {
+      const recent = activityEvents.value.slice(-50);
+      const isDuplicate = recent.some((e) => getEventKey(e) === key);
+      if (isDuplicate) return;
+    }
+    activityEvents.value.push(evt);
+    if (activityEvents.value.length > 500) {
+      activityEvents.value.shift();
+    }
+  }
 function activateTaskView(info) {
+
   task.id = info.id || "";
   task.prompt = info.prompt || "";
   task.status = info.status || "idle";
@@ -134,7 +153,7 @@ function activateTaskView(info) {
   runningTaskId.value = info.runningTaskId || (info.status === "running" ? info.id : "");
   activityPhase.value = info.status === "running" ? "planning" : "";
   lifecycleMilestones.value = info.status === "running" ? [0] : [];
-  activityEvents.value = info.events ? [...info.events] : [];
+  activityEvents.value = info.events ? info.events.slice(-500) : [];
   changes.value = [];
   tokenCount.value = info.tokenCount !== undefined ? info.tokenCount : null;
   taskTelemetry.rounds = 0;
@@ -186,7 +205,7 @@ function processEventCore(evt) {
           runningTaskId: startedId,
           taskStartedAt: eventTimeMs(evt),
         });
-        activityEvents.value.push(evt);
+        pushCappedActivityEvent(evt);
         durationTicker.start();
         playStatusSound("running");
       }
@@ -257,8 +276,7 @@ function processEventCore(evt) {
 
   const isForMonitoredNow = isEventForMonitoredTask({ monitoredTaskId: task.id }, evt);
   if (isForMonitoredNow && evt.event_type !== "task_started") {
-    activityEvents.value.push(evt);
-    if (activityEvents.value.length > 500) activityEvents.value.shift();
+    pushCappedActivityEvent(evt);
     if (evt.event_type === "provider_request") {
       taskTelemetry.rounds += 1;
     } else if (evt.event_type === "tool_called") {
@@ -518,7 +536,14 @@ async function handleViewTask(t) {
     const res = await getTaskActivity(taskId, currentProjectId);
     if (currentSeq !== viewTaskSeq || task.id !== taskId || (activeProject.value?.id || null) !== currentProjectId) return;
     const allEvents = res.events || [];
-    activityEvents.value = allEvents.slice(-500);
+    activityEvents.value = [];
+    if (typeof pushCappedActivityEvent === "function") {
+      for (const evt of allEvents.slice(-500)) {
+        pushCappedActivityEvent(evt);
+      }
+    } else {
+      activityEvents.value = allEvents.slice(-500);
+    }
     const tel = computeTaskTelemetry(allEvents);
     taskTelemetry.rounds = tel.rounds;
     taskTelemetry.toolCalls = tel.toolCalls;

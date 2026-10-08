@@ -18,6 +18,15 @@ from agent_ai.session.models import Session, SessionStatus, TaskReference, new_s
 
 #: Tipe callback subscriber: dipanggil setiap kali event di-append.
 EventSubscriber = Callable[[ExecutionEvent], None]
+TERMINAL_EVENT_TYPES = {
+    EventType.TASK_COMPLETED,
+    EventType.TASK_FAILED,
+    EventType.TASK_CANCELLED,
+    EventType.TASK_COMPLETED.value,
+    EventType.TASK_FAILED.value,
+    EventType.TASK_CANCELLED.value,
+}
+
 
 
 class SessionStore(ABC):
@@ -212,6 +221,14 @@ class InMemorySessionStore(SessionStore):
             if event.event_id and event.event_id in self._events_by_id:
                 return self._events_by_id[event.event_id]
 
+            # Deduplikasi event terminal: task_id hanya boleh memiliki tepat 1 terminal event
+            evt_val = getattr(event.event_type, "value", str(event.event_type))
+            if event.task_id and (event.event_type in TERMINAL_EVENT_TYPES or evt_val in TERMINAL_EVENT_TYPES):
+                for existing in reversed(self._events):
+                    if existing.task_id == event.task_id:
+                        ex_val = getattr(existing.event_type, "value", str(existing.event_type))
+                        if existing.event_type in TERMINAL_EVENT_TYPES or ex_val in TERMINAL_EVENT_TYPES:
+                            return existing
             self._sequence += 1
             sequence = self._sequence
             # ExecutionEvent frozen -> buat salinan dengan sequence.

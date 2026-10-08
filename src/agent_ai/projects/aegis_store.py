@@ -386,7 +386,7 @@ class ResponseLog:
             self._responses = [r for r in data if isinstance(r, dict)]
 
     def append(self, record: Dict[str, Any]) -> bool:
-        """Tambahkan SATU record response ke file task (best-effort).
+        """Tambahkan SATU record response ke file task (best-effort, disanitasi).
 
         Returns:
             True bila tertulis, False bila gagal (tidak pernah melempar).
@@ -395,9 +395,12 @@ class ResponseLog:
             self._load()
             if not isinstance(record, dict):
                 return False
+            from agent_ai.core.observability import sanitize_payload
+
+            clean_record = sanitize_payload(record, max_string_len=100_000)
             if self._created_at is None:
                 self._created_at = _now_iso()
-            self._responses.append(dict(record))
+            self._responses.append(dict(clean_record))
             payload: Dict[str, Any] = {
                 "task_id": self.task_id,
                 "created_at": self._created_at,

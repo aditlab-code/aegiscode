@@ -185,6 +185,22 @@ export function applyExternalContent(path, newText) {
 }
 
 /**
+ * Mengembalikan snapshot kondisi seluruh registry untuk keperluan pengujian dan audit kesehatan.
+ * @returns {Array<{ path: string, refCount: number, isDirty: boolean }>}
+ */
+export function getRegistrySnapshot() {
+  const snapshot = [];
+  for (const [path, entry] of registry.entries()) {
+    snapshot.push({
+      path,
+      refCount: entry.refCount,
+      isDirty: isDirty(path),
+    });
+  }
+  return snapshot;
+}
+
+/**
  * Membersihkan seluruh registry untuk keperluan unit test.
  */
 export function clearRegistryForTesting() {

@@ -26,7 +26,7 @@ The loop ends only when the LLM returns a final answer without requesting a tool
 |---|---|
 | Backend | Python 3.10+, Django, Channels, Daphne |
 | Frontend | Vue 3, Vite, Monaco Editor, xterm |
-| Storage | SQLite (`data/aegis.db`), sqlite-vec and fastembed (`.aegis/vectors.db`) |
+| Storage | SQLite (`data/aegis.db`), Standard library SQLite CodeGraph (`.aegis/codegraph.db`) |
 | Providers | Google Antigravity, OpenAI-compatible, OpenRouter, Ollama, custom |
 | Protocols | SSE (live events), PTY terminal bridge, MCP |
 | Desktop | Tauri v2 (planned) |
@@ -75,11 +75,11 @@ State directory is canonical `.aegis/` with transparent one-time legacy migratio
 
 ```
 Legacy (Phase 0-2.2)  Done: Antigravity provider, UI and Git facade, local hybrid RAG
-Phase 0-1             Baseline, task lifecycle, sequence-aware event contract  (active)
-Phase 2               Orchestrator and runtime modularization
-Phase 3               Provider boundary normalization
-Phase 4               Reliability gate and strict QA
-Phase 5               HITL guardrails, Studio UI, Tauri v2 desktop
+Phase 0-1             Baseline, task lifecycle, sequence-aware event contract  (Done)
+Phase 2               Orchestrator and runtime modularization                  (Done)
+Phase 3               Provider boundary normalization                          (Done)
+Phase 4               Reliability gate and strict QA                           (Done)
+Phase 5               HITL guardrails, Studio UI, Tauri v2 desktop             (Active)
 ```
 
 Stability first: no new features on the core execution path until Phases 1-2 are done. Details: `Roadmap.md` (development branch).

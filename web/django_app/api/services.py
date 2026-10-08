@@ -2458,6 +2458,8 @@ class GatewayService:
             self._run_task_inner(task_id, token)
         finally:
             # --- Release execution slot (COMPLETED/FAILED/CANCELLED/semua path).
+            term_status_to_update: Optional[str] = None
+            term_error_to_update: Optional[str] = None
             with self._lock:
                 self._cancel_tokens.pop(task_id, None)
                 # Attachment gambar tidak lagi dibutuhkan setelah eksekusi
@@ -2465,9 +2467,23 @@ class GatewayService:
                 self._task_attachments.pop(task_id, None)
                 rec = self._tasks.get(task_id)
                 # Bila runtime crash tanpa pernah mengirim status terminal,
-                # jangan biarkan slot "nyangkut" running selamanya.
-                if rec is not None and rec.queue_state == "running":
+                # pastikan record ditransisikan ke terminal dan queue_state menjadi done.
+                if rec is not None and rec.status not in ("completed", "failed", "cancelled"):
+                    term_status = "cancelled" if token.is_cancelled() else "failed"
+                    rec.status = term_status
+                    rec.error = rec.error or "Task terminated unexpectedly before completing."
                     rec.queue_state = "done"
+                    term_status_to_update = term_status
+                    term_error_to_update = rec.error
+                elif rec is not None and rec.queue_state == "running":
+                    rec.queue_state = "done"
+
+            if term_status_to_update is not None:
+                try:
+                    self._update_task_status(task_id, term_status_to_update, error=term_error_to_update)
+                except Exception:
+                    pass
+
             # Slot bebas -> scheduler memilih task berikutnya (FIFO).
             self._scheduler_pump()
 

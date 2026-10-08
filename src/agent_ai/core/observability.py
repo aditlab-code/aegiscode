@@ -125,7 +125,7 @@ _EVENT_STRING_LIMITS: Dict[str, int] = {
 }
 
 #: Batas kedalaman rekursi sanitasi.
-_MAX_DEPTH = 6
+_MAX_DEPTH = 16
 
 
 def _is_sensitive_key(key: str) -> bool:

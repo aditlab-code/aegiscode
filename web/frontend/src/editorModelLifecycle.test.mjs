@@ -10,6 +10,7 @@ import {
   markSaved,
   applyExternalContent,
   clearRegistryForTesting,
+  getRegistrySnapshot,
 } from "./services/monacoModelRegistry.js";
 import {
   createEditorTabsState,
@@ -143,6 +144,29 @@ test("AEG-06: Apply to Editor targets specific model directly without race", () 
   const activeTab = getActiveTab(tabsState);
   assert.equal(activeTab.path, targetPath, "Tab target harus menjadi active tab");
   assert.equal(activeTab.dirty, true, "Tab target harus ditandai dirty");
+
+  clearRegistryForTesting();
+});
+
+test("AEG-07: monacoModelRegistry getRegistrySnapshot and releaseModel non-negative refCount", () => {
+  clearRegistryForTesting();
+
+  assert.deepEqual(getRegistrySnapshot(), []);
+  const entry = getOrCreateModel(null, "src/snap.js", "content snap", "javascript");
+  assert.equal(entry.refCount, 1);
+
+  const snap1 = getRegistrySnapshot();
+  assert.equal(snap1.length, 1);
+  assert.equal(snap1[0].path, "src/snap.js");
+  assert.equal(snap1[0].refCount, 1);
+  assert.equal(snap1[0].isDirty, false);
+
+  releaseModel("src/snap.js");
+  assert.equal(getRegistrySnapshot().length, 0);
+
+  // Multiple release on nonexistent or already released model does not go negative
+  releaseModel("src/snap.js");
+  assert.equal(getRegistrySnapshot().length, 0);
 
   clearRegistryForTesting();
 });
