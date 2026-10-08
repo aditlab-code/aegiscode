@@ -1,49 +1,92 @@
-# AGENTS.md — AegisCode & Asgard Multi-Agent Framework (OMA)
+# AGENTS.md
 
-## 1. Tujuan
-Ekosistem **AegisCode** (Studio & Aegis Agent) dengan orkestrasi **Asgard OMA** untuk Antigravity CLI: Agent Build Hub (6 agen, skills `asgard-*`, hooks RTK), efisiensi token (RTK, Split-Brain < 4.000 token), dan mutu YAGNI (zero-orphan, zero-zombie tree-kill, standarisasi murni `.aegis/` dan `data/aegis.db` dengan auto-migrasi legacy).
+This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, Antigravity, etc.) when working with code in this repository.
 
-## 2. Branch Git (detail: `docs/Gitmaster.md`)
-- `master`: hub pengembangan; satu-satunya tempat `docs/`, `AGENTS.md`, `Roadmap.md`.
-- `main`: edisi komunitas BYOK; dilarang memuat `docs/`, `AGENTS.md`, `Roadmap.md`; hanya `README.md` publik; perubahan lewat issue dan PR; filtrasi via `.gitattributes` (`export-ignore`) dan sparse-checkout.
-- `release`: bundle enterprise `.dmg` via Tauri v2; debug dinonaktifkan; kerangka siaga.
+> **Scope:** This file configures agents working on the [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) repository itself. It is not meant to be copied into other projects or into a global agent configuration; the reusable assets are the skills in `skills/`, not this file.
 
-## 3. Framework Multi-Agent
-Antigravity bertindak sebagai `odin-orchestrator` via PreToolUse Hooks (`.agents/hooks.json`, `~/.gemini/hooks.json`). Alur: Odin (review, tanpa edit) -> Heimdall/Mimir/Forseti (scan, rencana, audit) -> Heimdall/Brokkr (implementasi) -> Thor (stop-gate).
+## Repository Overview
 
-| Agen | Peran | Hak Akses | Tools |
-|---|---|---|---|
-| `odin-orchestrator` | Orkestrator (1) | review-only | `invoke_subagent`, `send_message`, `manage_subagents`, `ask_question` |
-| `heimdall-scout` | Scout AST (2-3) | review-only | `view_file`, `search_web`, `read_url_content`, `codegraph_*` |
-| `mimir-architect` | Arsitek (2) | plan-only | `view_file`, `search_web`, `read_url_content`, `define_subagent` |
-| `forseti-auditor` | Auditor bash (2) | verification-audit | `view_file`, `run_command`, `read_verification` |
-| `brokkr-coder` | Coder (3) | code-editor | `write_to_file`, `replace_file_content`, `view_file`, `run_command` |
-| `thor-tester` | QA independen (4) | independent-qa | `run_command`, `view_file` |
+A collection of skills for Claude.ai and Claude Code for senior software engineers. Skills are packaged instructions and scripts that extend Claude and your coding agents capabilities.
 
-Mode (skills): `asgard-orchestrator` (1-2-3-4), `asgard-plan` (2), `asgard-executor` (3-4), `asgard-auditor` (4).
+## OpenCode Integration
 
-**Zero Self-Grading**: (1) Tahap 4 wajib didelegasikan ke `thor-tester` via `invoke_subagent`; Brokkr dan Odin dilarang mengesahkan kode sendiri. (2) Thor tanpa izin tulis. (3) Jika gagal, Thor menolak stop-gate, mencatat log di `docs/QA/logs/`, dan tidak memperbaiki kode.
+OpenCode uses a **skill-driven execution model** powered by the `skill` tool and this repository's `/skills` directory.
 
-## 4. Protokol RTK
-Wajib pakai `rtk`: `rtk rg`, `rtk find`, `rtk read`, `rtk git status/diff/log`, `rtk test` atau `node --test`, `rtk json`, `rtk smart`/`rtk err`. Fallback jika `which rtk` gagal: `rg`, `find`, `git`, `node --test`.
+### Core Rules
 
-## 5. Pengujian & Stop-Gate
-- Runner: `node:test`/`node:assert` dan `pytest`, tanpa dependensi tambahan.
-- Cakupan wajib: profil `.agents/agents/*/agent.md`, frontmatter `.agents/skills/*/SKILL.md`, validitas `hooks.json` (pemicu `rtk-hook.js`), integritas runtime `.aegis/` dan `data/aegis.db` (auto-migrasi legacy), zero-zombie saat sesi ditutup.
-- Setiap Stop-Gate penuh atau kegagalan dicatat di `docs/QA/logs/` sesuai `docs/QA/QA_LOGS_RULES.md`.
-- Tugas belum selesai sebelum semua uji lulus (exit code 0); assertion dilarang dimatikan.
+- If a task matches a skill, you MUST invoke it
+- Skills are located in `skills/<skill-name>/SKILL.md`
+- Never implement directly if a skill applies
+- Always follow the skill instructions exactly (do not partially apply them)
 
-## 6. Komunikasi & Output
-- Internal Inggris; output (respons, komentar, commit, dokumentasi) Bahasa Indonesia baku. Dilarang: Bahasa Jawa, emoji, dan chain-of-thought mentah.
-- Operan antar-subagent maks. 250 token, format `[Diagnosis]` `[Keputusan & YAGNI]` `[Kontrak/Diff]` `[Stop-Gate]`; sebutkan dokumen `docs/` rujukan pada `[Kontrak/Diff]` untuk perubahan arsitektur, API, UI, atau pengujian.
+### Intent → Skill Mapping
 
-## 7. Alur Kerja
-Inspeksi simbol dahulu (`rtk rg`/`rtk find`); baca seluruh log saat gagal; jalankan `node --test` atau `npm test` sebelum selesai; laporan ringkas dengan tautan markdown ke berkas yang diubah.
+The agent should automatically map user intent to skills:
 
-## 8. Rujukan Knowledge Base (JIT, dilarang memuat seluruh `docs/`)
-Visi: `docs/PRD.md` | Arsitektur: `docs/architecture.md` | API/JWT/Git/PTY: `docs/api.md` | UI: `docs/ui-design.md` | Standar rekayasa: `docs/ruleset.md` | Git: `docs/Gitmaster.md` | Antigravity: `docs/core-features/antigravity_provider.md` | Workbench: `docs/core-features/workbench_features.md` | CoT/Replanning: `docs/core-features/cot_reasoning_runtime.md` | Roadmap aktif: `Roadmap.md` | QA: `docs/QA/QA_PLAN.md`, `docs/QA/QA_LOGS_RULES.md` | Riwayat: `docs/history/legacy-roadmap.md` | Indeks: `docs/README.md`.
+- Feature / new functionality → `spec-driven-development`, then `incremental-implementation`, `test-driven-development`
+- Planning / breakdown → `planning-and-task-breakdown`
+- Bug / failure / unexpected behavior → `debugging-and-error-recovery`
+- Code review → `code-review-and-quality`
+- Refactoring / simplification → `code-simplification`
+- API or interface design → `api-and-interface-design`
+- UI work → `frontend-ui-engineering`
 
-## 9. Standar Front-End (`apps/frontend/`)
-- **9.1 Dual-Theme**: token latar (`--bg-drawer`, `--bg-sidebar`, `--bg-panel`, `--bg-card`, `--bg-deep`) wajib berpasangan di `src/styles/base/variables.css` (gelap) dan `src/styles/themes/theme-light.css` (`[data-theme="light"]`); dilarang fallback heksadesimal gelap pada `var()`.
-- **9.2 Drawer**: tab Agent dan Ask (termasuk `ConsultantChat` embedded) wajib memakai `var(--bg-drawer)` tanpa background independen; sidebar kiri `.app-left-sidebar` memakai `var(--bg-sidebar)`.
-- **9.3 Komponen**: gunakan `AppButton.vue` (`primary|ghost|danger|icon`, `sm|md`) dan `AppCard.vue` (`card|panel`); dialog lewat `.unified-popup-*` (tanpa modal overlay level aplikasi); dilarang `<button>` polosan, warna heksadesimal di `.vue`, dan emoji (ikon SVG inline).
+### Lifecycle Mapping (Implicit Commands)
+
+OpenCode does not support slash commands like `/spec` or `/plan`.
+
+Instead, the agent must internally follow this lifecycle:
+
+- DEFINE → `spec-driven-development`
+- PLAN → `planning-and-task-breakdown`
+- BUILD → `incremental-implementation` + `test-driven-development`
+- VERIFY → `debugging-and-error-recovery`
+- REVIEW → `code-review-and-quality`
+- SHIP → `shipping-and-launch`
+
+### Execution Model
+
+For every request:
+
+1. Determine if any skill applies (even 1% chance)
+2. Invoke the appropriate skill using the `skill` tool
+3. Follow the skill workflow strictly
+4. Only proceed to implementation after required steps (spec, plan, etc.) are complete
+
+### Anti-Rationalization
+
+The following thoughts are incorrect and must be ignored:
+
+- "This is too small for a skill"
+- "I can just quickly implement this"
+- "I’ll gather context first"
+
+Correct behavior:
+
+- Always check for and use skills first
+
+This ensures OpenCode behaves similarly to Claude Code with full workflow enforcement.
+
+## Orchestration: Personas, Skills, and Commands
+
+This repo has three composable layers. They have different jobs and should not be confused:
+
+- **Skills** (`skills/<name>/SKILL.md`) — workflows with steps and exit criteria. The *how*. Mandatory hops when an intent matches.
+- **Personas** (`agents/<role>.md`) — roles with a perspective and an output format. The *who*.
+- **Slash commands** (`.claude/commands/*.md`) — user-facing entry points. The *when*. The orchestration layer.
+
+Composition rule: **the user (or a slash command) is the orchestrator. Personas do not invoke other personas.** A persona may invoke skills.
+
+The only multi-persona orchestration pattern this repo endorses is **parallel fan-out with a merge step** — used by `/ship` to run `code-reviewer`, `security-auditor`, and `test-engineer` concurrently and synthesize their reports. Do not build a "router" persona that decides which other persona to call; that's the job of slash commands and intent mapping.
+
+See [docs/agents.md](docs/agents.md) for the decision matrix and [references/orchestration-patterns.md](references/orchestration-patterns.md) for the full pattern catalog.
+
+**Claude Code interop:** the personas in `agents/` work as Claude Code subagents (auto-discovered from this plugin's `agents/` directory) and as Agent Teams teammates (referenced by name when spawning). Two platform constraints align with our rules: subagents cannot spawn other subagents, and teams cannot nest. Plugin agents silently ignore the `hooks`, `mcpServers`, and `permissionMode` frontmatter fields.
+
+## Creating a New Skill
+
+> **Before you start:** run the pre-flight checks in [CONTRIBUTING.md](CONTRIBUTING.md#before-proposing-a-new-skill), search the catalog, check open PRs (`gh pr list --state open`), confirm the idea fits [docs/skill-anatomy.md](docs/skill-anatomy.md), and justify the gap in your PR description. Most new-skill ideas overlap an existing skill or an open PR; prefer extending an existing skill over adding a near-duplicate. CONTRIBUTING.md is the single source of truth for this workflow.
+
+Skills in this repo are markdown-first: each lives at `skills/<kebab-case-name>/SKILL.md` with YAML frontmatter (`name`, `description`) and follows the section anatomy (Overview, When to Use, Process, Common Rationalizations, Red Flags, Verification). Add a `scripts/` directory only when the skill ships runnable helpers; most skills are markdown only, and there are no per-skill zip packages.
+
+For the full format, naming conventions, frontmatter rules, supporting-file thresholds, and writing principles, see [docs/skill-anatomy.md](docs/skill-anatomy.md), the single source of truth for skill structure. Do not restate that guidance here, link to it.

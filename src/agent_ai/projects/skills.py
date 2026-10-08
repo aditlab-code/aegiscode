@@ -80,6 +80,24 @@ _SAFE_SKILL_ID_RE = re.compile(r"[^A-Za-z0-9._-]+")
 _MAX_SKILL_ID_LEN = 64
 _VALID_SKILL_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
+#: Kandidat nama berkas skill (SKILL.md kapital standar Addy Osmani / Antigravity, skill.md legacy).
+SKILL_FILE_CANDIDATES = ("SKILL.md", "skill.md")
+
+
+def _find_skill_file(skill_dir: Path) -> Optional[Path]:
+    """Cari SKILL.md atau skill.md di dalam direktori skill.
+
+    Returns:
+        Path berkas jika ditemukan dan merupakan file, None jika tidak ada.
+    """
+    if not skill_dir.is_dir():
+        return None
+    for name in SKILL_FILE_CANDIDATES:
+        p = skill_dir / name
+        if p.is_file():
+            return p
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Errors
@@ -264,9 +282,10 @@ def _parse_frontmatter(text: str) -> tuple[Dict[str, str], str]:
         elif ":" in stripped:
             key, value = stripped.split(":", 1)
             value = value.strip()
-        else:
-            continue
-        fm[key.strip()] = value.strip()
+        val = value.strip()
+        if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+            val = val[1:-1]
+        fm[key.strip()] = val
     return fm, body
 
 
@@ -326,103 +345,148 @@ def _skill_from_file(skill_id: str, path: Path) -> Optional[Skill]:
 # SkillStore — storage project-local (reuse pola BibleStore)
 # ---------------------------------------------------------------------------
 class SkillStore:
-    """Storage Skill berbasis filesystem project-local.
+    """Storage Skill berbasis filesystem native & project-local.
 
-    Lokasi: ``<root>/.aegis/bible/skills/<skill_id>/skill.md``
-    Setiap Skill memiliki folder sendiri + ``references/`` (opsional).
-    Format ``skill.md`` adalah markdown dengan frontmatter sederhana
-    (``---`` key: value ``---`` + body). Parsing toleran terhadap file rusak.
-
-    Reuse pola Bible:
-        - Memakai ``AegisProjectStore`` sebagai resolver path (single source
-          untuk ``.aegis``).
-        - Tulis file secara atomik via ``_atomic_write``.
-        - Validasi ``skill_id`` via ``validate_skill_id`` (mirip ``safe_task_id``).
-        - ``ensure()`` idempotent.
-        - Tidak ada DB/vektor/embeddings.
+    Mendukung auto-discovery native berkas `SKILL.md` (Addy Osmani / Antigravity spec)
+    maupun `skill.md` pada struktur folder:
+      1. `<root>/.agents/skills/<skill_id>/SKILL.md`
+      2. `<root>/skills/<skill_id>/SKILL.md`
+      3. `<root>/.aegis/bible/skills/<skill_id>/skill.md` (backward-compatibility fallback)
+      4. `<aegis_central_dir>/skills/<skill_id>/SKILL.md` (on-demand lintas proyek di IDE bila include_central aktif)
 
     Args:
         root: root project target (string/Path) atau instance ``AegisProjectStore``.
+        include_central: apakah menyertakan direktori sentral AegisCode saat mencari skill
+            (default False untuk isolasi per proyek/test, True saat diakses di level IDE).
     """
 
-    def __init__(self, root: Union[str, Path, AegisProjectStore]) -> None:
+    def __init__(
+        self,
+        root: Union[str, Path, AegisProjectStore],
+        include_central: Optional[bool] = None,
+    ) -> None:
         self.store = root if isinstance(root, AegisProjectStore) else AegisProjectStore(root)
+        if include_central is None:
+            import os
+            self.include_central = os.environ.get("AEGIS_INCLUDE_CENTRAL_SKILLS", "").strip().lower() in ("1", "true", "yes")
+        else:
+            self.include_central = bool(include_central)
 
     # ------------------------------------------------------------------ #
-    # Layout helpers (reuse AegisProjectStore.bible_dir)
+    # Layout helpers & Multi-directory Discovery
     # ------------------------------------------------------------------ #
     @property
     def root(self) -> Path:
         return self.store.root
 
     @property
+    def candidate_skills_dirs(self) -> List[Path]:
+        """Daftar direktori pencarian skills terurut prioritas."""
+        dirs: List[Path] = [
+            self.root / ".agents" / "skills",
+            self.root / "skills",
+            self.store.bible_dir / BIBLE_SKILLS_DIR_NAME,
+        ]
+        try:
+            from agent_ai.core.agent_prompt import get_aegis_central_dir
+            central = get_aegis_central_dir()
+            if self.include_central and central.resolve() != self.root.resolve():
+                dirs.append(central / ".agents" / "skills")
+                dirs.append(central / "skills")
+        except Exception:
+            pass
+        return dirs
+
+    @property
+    def primary_skills_dir(self) -> Path:
+        """Direktori utama untuk penulisan/pembuatan skill baru."""
+        dot_agents = self.root / ".agents" / "skills"
+        if dot_agents.is_dir():
+            return dot_agents
+        plain_skills = self.root / "skills"
+        if plain_skills.is_dir():
+            return plain_skills
+        return dot_agents
+
+    @property
     def skills_dir(self) -> Path:
-        """Directory ``<root>/.aegis/bible/skills``."""
-        return self.store.bible_dir / BIBLE_SKILLS_DIR_NAME
+        """Direktori skills yang aktif (kompatibilitas backward)."""
+        for d in self.candidate_skills_dirs:
+            if d.is_dir():
+                return d
+        return self.primary_skills_dir
 
     def skill_dir(self, skill_id: str) -> Path:
-        """Directory ``<root>/.aegis/bible/skills/<skill_id>``."""
+        """Direktori untuk sebuah Skill (lokasi yang ada atau primary)."""
         sid = validate_skill_id(skill_id)
-        return self.skills_dir / sid
+        for d in self.candidate_skills_dirs:
+            target = d / sid
+            if _find_skill_file(target) is not None:
+                return target
+        return self.primary_skills_dir / sid
 
     def skill_path(self, skill_id: str) -> Path:
-        """Path file ``skill.md`` untuk sebuah Skill."""
-        return self.skill_dir(skill_id) / SKILL_FILE_NAME
+        """Path file SKILL.md/skill.md untuk sebuah Skill."""
+        sid = validate_skill_id(skill_id)
+        for d in self.candidate_skills_dirs:
+            target = d / sid
+            found = _find_skill_file(target)
+            if found is not None:
+                return found
+        return self.primary_skills_dir / sid / "SKILL.md"
 
     def references_dir(self, skill_id: str) -> Path:
         """Directory references untuk sebuah Skill."""
         return self.skill_dir(skill_id) / SKILL_REFERENCES_DIR_NAME
 
     # ------------------------------------------------------------------ #
-    # ensure — idempotent (reuse pola BibleStore.ensure)
+    # ensure — idempotent
     # ------------------------------------------------------------------ #
     def ensure(self) -> bool:
-        """Pastikan struktur ``.aegis/bible/skills`` ada.
-
-        Returns:
-            True bila struktur siap, False bila gagal (tidak melempar error).
-        """
+        """Pastikan struktur direktori skills ada."""
         try:
             self.store.ensure()
-            self.skills_dir.mkdir(parents=True, exist_ok=True)
+            self.primary_skills_dir.mkdir(parents=True, exist_ok=True)
             return True
         except OSError:
             return False
 
     # ------------------------------------------------------------------ #
-    # Discovery — list semua Skill (reuse pola list_task_logs: sorted, toleran)
+    # Discovery — list semua Skill (native multi-directory, toleran)
     # ------------------------------------------------------------------ #
     def list_skills(self) -> List[Skill]:
-        """Daftar semua Skill di project ini.
+        """Daftar semua Skill di project ini (dan sentral bila diaktifkan).
 
         Returns:
             Daftar Skill terurut alfabetis berdasarkan skill_id (deterministik).
-            File rusak dilewati tanpa error (toleran, seperti Bible parsing).
         """
-        if not self.skills_dir.exists():
-            return []
-        skills: List[Skill] = []
-        try:
-            entries = sorted(
-                [p for p in self.skills_dir.iterdir() if p.is_dir()],
-                key=lambda p: p.name.lower(),
-            )
-        except OSError:
-            return []
-        for entry in entries:
-            skill_id = entry.name
-            # Validasi nama directory — lewati yang tidak valid
+        skills_map: Dict[str, Skill] = {}
+        for d in self.candidate_skills_dirs:
+            if not d.exists() or not d.is_dir():
+                continue
             try:
-                validate_skill_id(skill_id)
-            except InvalidSkillIdError:
+                entries = sorted(
+                    [p for p in d.iterdir() if p.is_dir()],
+                    key=lambda p: p.name.lower(),
+                )
+            except OSError:
                 continue
-            path = entry / SKILL_FILE_NAME
-            if not path.is_file():
-                continue
-            skill = _skill_from_file(skill_id, path)
-            if skill is not None:
-                skills.append(skill)
-        return skills
+            for entry in entries:
+                skill_id = entry.name
+                try:
+                    validate_skill_id(skill_id)
+                except InvalidSkillIdError:
+                    continue
+                if skill_id in skills_map:
+                    continue
+                file_path = _find_skill_file(entry)
+                if file_path is None:
+                    continue
+                skill = _skill_from_file(skill_id, file_path)
+                if skill is not None:
+                    skills_map[skill_id] = skill
+
+        return [skills_map[k] for k in sorted(skills_map.keys())]
 
     def list_skill_ids(self) -> List[str]:
         """Daftar skill_id saja (lebih ringan dari list_skills)."""
@@ -478,15 +542,21 @@ class SkillStore:
         Validasi skill_id tetap dilakukan (InvalidSkillIdError bila ilegal).
         """
         sid = validate_skill_id(skill_id)
-        path = self.skills_dir / sid / SKILL_FILE_NAME
-        if not path.is_file():
-            return None
-        return _skill_from_file(sid, path)
+        for d in self.candidate_skills_dirs:
+            target = d / sid
+            file_path = _find_skill_file(target)
+            if file_path is not None:
+                return _skill_from_file(sid, file_path)
+        return None
 
     def skill_exists(self, skill_id: str) -> bool:
         """True bila Skill dengan id tersebut ada."""
         sid = validate_skill_id(skill_id)
-        return (self.skills_dir / sid / SKILL_FILE_NAME).is_file()
+        for d in self.candidate_skills_dirs:
+            target = d / sid
+            if _find_skill_file(target) is not None:
+                return True
+        return False
 
     # ------------------------------------------------------------------ #
     # Progressive Loading (Task 03) — generic, dynamic, on-demand
@@ -671,22 +741,23 @@ class SkillStore:
             description=description.strip() if isinstance(description, str) else str(description),
             scope=scope,
             content=content if isinstance(content, str) else str(content),
-            location=str((self.skills_dir / sid / SKILL_FILE_NAME).resolve()),
+            location=str((self.primary_skills_dir / sid / "SKILL.md").resolve()),
             created_at=now,
             updated_at=now,
         )
         # Buat directory + references/
-        skill_dir = self.skills_dir / sid
-        refs_dir = skill_dir / SKILL_REFERENCES_DIR_NAME
+        target_dir = self.primary_skills_dir / sid
+        refs_dir = target_dir / SKILL_REFERENCES_DIR_NAME
         try:
             refs_dir.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise SkillError(f"Gagal membuat directory Skill '{sid}': {exc}") from exc
 
+        target_file = target_dir / "SKILL.md"
         text = _serialize_frontmatter(skill)
-        _atomic_write(self.skill_path(sid), text)
+        _atomic_write(target_file, text)
         # Update location ke path absolut yang sebenarnya (setelah write)
-        skill.location = str(self.skill_path(sid).resolve())
+        skill.location = str(target_file.resolve())
         return skill
 
     # ------------------------------------------------------------------ #
@@ -746,7 +817,7 @@ class SkillStore:
         sid = validate_skill_id(skill_id)
         if not self.skill_exists(sid):
             raise SkillNotFoundError(f"Skill '{sid}' tidak ditemukan.")
-        skill_dir = self.skills_dir / sid
+        skill_dir = self.skill_dir(sid)
         try:
             shutil.rmtree(skill_dir)
         except OSError as exc:

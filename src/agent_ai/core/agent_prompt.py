@@ -1,32 +1,17 @@
-"""System prompt default Aegis Agent (provider-agnostic, teks biasa).
+"""Dynamic System Prompt Loader untuk Aegis Agent.
 
-Prompt ini adalah PANDUAN (guidance), bukan planner deterministik dan bukan
-guard yang memaksa loop berhenti: LLM tetap bebas memilih tool, urutan, dan
-kapan task selesai (keputusan selesai tetap murni dari response LLM tanpa tool
-call). Tujuannya hanya memastikan LLM MEMAHAMI:
+Tidak ada hardcode prompt string di Python (.py). Semua instruksi prompt sistem
+dimuat secara dinamis dari direktori sentral AegisCode:
+    `agents/<persona>.md` dan `skills/<skill>/SKILL.md`
 
-    - POLA retrieval yang benar (locate -> inspect -> implementasi -> validasi);
-    - KAPAN retrieval sudah cukup dan harus DIHENTIKAN;
-    - arti STATE hasil tool (`already_available`/`already_read`/
-      `already_searched`) sehingga ia tidak mengulang permintaan yang sama atau
-      beralih ke run_command hanya untuk membaca source;
-    - workflow Skill System (catalog -> LLM memilih -> load_skill ->
-      reference on-demand) di mana LLM tetap pengambil keputusan (tanpa heuristic);
-    - bahwa setelah konteks cukup, ia harus MELANJUTKAN ke implementasi lalu
-      validasi (test/build), memperbaiki bila gagal, dan baru memberi jawaban
-      final.
-
-Pola ini SAMA dengan yang sudah dipakai Consultant (lihat
-`agent_ai.consultant.prompt._source_state_lines`): menjelaskan state sumber
-informasi dan kapan berhenti retrieval, tanpa menambah bound/heuristik baru.
-
-Dipakai sebagai DEFAULT hanya bila pemanggil TIDAK memberikan system prompt
-(mis. jalur produksi Agent lewat `AgentRuntime`). Bila pemanggil memberi system
-prompt sendiri (mis. Consultant), prompt ini TIDAK dipakai.
+Direktori sentral di root AegisCode melayani semua repositori proyek tanpa perlu
+duplikasi per repo.
 """
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any, List, Optional
 
 #: Nilai mode execution policy Agent yang valid (fast / balanced / deep).
@@ -39,6 +24,26 @@ DEFAULT_MODE = MODE_BALANCED
 MODE_ALIASES: dict[str, str] = {
     "minimal": MODE_FAST,
 }
+
+DEFAULT_PERSONA = "zeus-orchestrator"
+
+
+def get_aegis_central_dir() -> Path:
+    """Temukan direktori sentral AegisCode yang memuat folder agents/ dan skills/."""
+    custom_dir = os.environ.get("AEGIS_CENTRAL_DIR")
+    if custom_dir:
+        p = Path(custom_dir).resolve()
+        if (p / "agents").is_dir():
+            return p
+
+    # Cari dari path file ini ke atas
+    current = Path(__file__).resolve()
+    for parent in [current] + list(current.parents):
+        if (parent / "agents").is_dir() and (parent / "skills").is_dir():
+            return parent
+
+    # Fallback ke parent level 3 (root AegisCode)
+    return current.parents[3] if len(current.parents) > 3 else current.parent
 
 
 def _normalize_mode(value: Any, default: str = DEFAULT_MODE) -> str:
@@ -57,13 +62,7 @@ def _normalize_mode(value: Any, default: str = DEFAULT_MODE) -> str:
 
 
 def directive_prompt_for_mode(mode: Any) -> str:
-    """Prompt arahan direktif kerja per mode (Fast, Balanced, Deep).
-
-    Disisipkan sebagai system message agar LLM mematuhi strategi efisiensi kerja:
-    - Fast: Kerja bedah cepat, hemat token, prioritaskan CodeGraph references & callers.
-    - Balanced: Eksplorasi moderat terarah dengan penelusuran callers & callees.
-    - Deep: Eksplorasi arsitektur mendalam dengan impact analysis & trace API.
-    """
+    """Prompt arahan direktif kerja per mode (Fast, Balanced, Deep)."""
     norm = _normalize_mode(mode, DEFAULT_MODE)
     if norm == MODE_FAST:
         return (
@@ -80,7 +79,7 @@ def directive_prompt_for_mode(mode: Any) -> str:
             "[EXECUTION POLICY: DEEP MODE ACTIVE]\n"
             "You are operating under DEEP execution policy:\n"
             "- Goal: Thorough investigation, high-assurance architecture validation, and complete regression safety.\n"
-            "- Code Navigation: Unrestricted exploration allowed. Proactively utilize CodeGraph tools ('codegraph_impact_analysis', 'codegraph_trace_api', 'codegraph_find_orphans') and Project Map ('atlas_query').\n"
+            "- Code Navigation: Unrestricted exploration allowed. Proactively utilize CodeGraph tools ('codegraph_impact_analysis', 'codegraph_trace_api', 'codegraph_find_orphans') for structural architecture navigation.\n"
             "- Planning: Formulate detailed multi-phase plans.\n"
             "- Full Verification: Run broad regression test suites and inspect cross-module impact."
         )
@@ -95,116 +94,72 @@ def directive_prompt_for_mode(mode: Any) -> str:
     )
 
 
-def build_agent_system_prompt(mode: Optional[str] = None) -> str:
-    """Bangun system prompt default Agent sebagai teks.
+def load_persona_prompt(persona_name: str = DEFAULT_PERSONA) -> str:
+    """Muat teks prompt sistem langsung dari berkas markdown persona di agents/."""
+    central_dir = get_aegis_central_dir()
+    agents_dir = central_dir / "agents"
+
+    # Cek kandidat path: agents/<persona>.md atau agents/<persona>/agent.md
+    candidates = [
+        agents_dir / f"{persona_name}.md",
+        agents_dir / persona_name / "agent.md",
+        agents_dir / f"{DEFAULT_PERSONA}.md",
+    ]
+
+    for candidate in candidates:
+        if candidate.is_file():
+            try:
+                content = candidate.read_text(encoding="utf-8")
+                # Ekstrak body markdown setelah YAML frontmatter
+                if content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        return parts[2].strip()
+                return content.strip()
+            except Exception:
+                continue
+
+    # Fallback minimal bila berkas fisik tidak dapat dibaca
+    return "Anda adalah Aegis Agent: coding agent yang mengerjakan tugas menggunakan tools dan CodeGraph AST yang tersedia."
+
+
+def build_agent_system_prompt(
+    mode: Optional[str] = None,
+    persona: str = DEFAULT_PERSONA,
+) -> str:
+    """Bangun system prompt dinamis dari berkas sentral agents/ tanpa hardcode string di Python.
 
     Args:
-        mode: Mode eksekusi opsional ("fast" | "balanced" | "deep"). Bila
-            diberikan, arahan strategi mode CodeGraph akan disematkan ke
-            dalam system prompt.
+        mode: Mode eksekusi opsional ("fast" | "balanced" | "deep").
+        persona: Nama persona yang dimuat dari agents/<persona>.md (default: zeus-orchestrator).
 
     Returns:
-        System prompt Agent (panduan 4 aturan efisiensi -> alur kerja
-        retrieval -> implementasi -> validasi).
+        System prompt Agent yang dimuat dinamis dari markdown.
     """
-    lines: List[str] = [
-        "Anda adalah Aegis Agent: coding agent yang MENGERJAKAN task pada",
-        "sebuah project (memahami, mengubah source, dan memvalidasi hasil).",
-        "Bekerjalah lewat tool yang tersedia; jangan mengarang isi file/command.",
-        "",
-        "## 4 Aturan Inti Efisiensi Output (Action-First)",
-        "1. Aksi Terlebih Dahulu (Lead with the next action): Baris pertama respons wajib berupa aksi nyata (perintah CLI, file path, atau snippet kode target). Hindari paragraf pembuka, narasi perkenalan, atau konteks bertele-tele sebelum tindakan konkret.",
-        "2. Langkah Bernomor & Terukur (Number multi-step tasks): Tugas multi-tahap wajib disusun dalam daftar bernomor ringkas (1, 2, 3) di mana 1 langkah memuat 1 aksi terbatas (bounded action).",
-        "3. Lugas & Faktual Menangani Error (Matter-of-fact tone for errors): Sebutkan kegagalan, penyebab teknis langsung, dan langkah perbaikan secara objektif tanpa bahasa apologetik ('Maaf') atau dramatis ('Waduh').",
-        "4. Tanpa Basa-Basi & Tanpa Rekapitulasi (No preamble, no recap, no closing pleasantries): Dilarang pembuka klise ('Pertanyaan bagus!', 'Tentu saja!'), dilarang rekapitulasi ulang pekerjaan yang sudah selesai di akhir respons, dan dilarang penutup basa-basi ('Semoga membantu!').",
-        "",
-        "## Alur kerja (retrieval -> cukup -> implementasi -> validasi -> final)",
-        "1. RETRIEVAL (terarah & secukupnya): temukan dulu LOKASI yang relevan,",
-        "   baru baca bagian yang tepat. Pola utama:",
-        "     search_code (locate) -> read_file(symbol=/start_line/end_line)",
-        "     -> edit_file/write_file -> run_command (test/build) -> perbaiki.",
-        "   Gunakan list_files untuk melihat isi directory. Untuk MEMBACA source",
-        "   gunakan read_file/search_code; JANGAN pakai run_command (cat/type/",
-        "   Get-Content/Select-String/find/grep) hanya untuk menampilkan source.",
-        "   Untuk MENGANALISIS ISI file gambar lokal (mis. './xxx.png'), gunakan",
-        "   tool view_image(path): gambar dikirim sebagai input multimodal dan",
-        "   kamu melihatnya langsung. JANGAN memakai OCR/ASCII-art/statistik/",
-        "   script PIL atau browser sebagai pengganti, dan jangan mengarang isi.",
-        "   Baca SECUKUPNYA: cukup untuk mengambil keputusan, bukan seluruh project.",
-        "2. CUKUP? -> BERHENTI RETRIEVAL: begitu informasi yang dibutuhkan sudah",
-        "   ada, JANGAN meminta ulang file/rentang yang sama dan jangan",
-        "   memperbanyak evidence tanpa alasan. Tool bukan pengganti penalaran.",
-        "3. IMPLEMENTASI: setelah konteks cukup, LANJUTKAN ke perubahan nyata",
-        "   (edit_file/write_file) sesuai task. Jangan berhenti di tengah",
-        "   investigasi bila arahnya sudah jelas.",
-        "4. VALIDASI: jalankan test/build/checker yang relevan lewat run_command",
-        "   (mis. pytest, npm test/build, python checker.py). Bila GAGAL, baca",
-        "   error dengan teliti, PERBAIKI, lalu validasi lagi.",
-        "5. FINAL: hanya setelah pekerjaan (dan validasinya) tuntas, berikan",
-        "   jawaban final tanpa tool call. Jangan menyatakan selesai/terverifikasi",
-        "   bila belum dibuktikan.",
-        "",
-        "## Skill System (progressive, LLM memilih)",
-        "Saat task membutuhkan prosedur/konvensi project yang terdokumentasi, gunakan Skill:",
-        "  skill_catalog -> LLM memilih 0, 1, atau beberapa skill_id -> load_skill(skill_id) -> skill.md",
-        "  -> load_skill_reference(skill_id, reference) bila perlu reference spesifik.",
-        "Jangan otomatis memuat semua skill; hanya yang kamu pilih. Jangan otomatis membaca semua reference.",
-        "Skill hanya procedural guidance/context, tidak mengambil alih orchestrator dan tidak menentukan kapan task selesai.",
-        "",
-        "## Skill Lifecycle (LLM-driven, Agent only)",
-        "Skill dapat dikelola secara mandiri bila kamu menilai perlu:",
-        "  skill_catalog -> load_skill(skill_id) -> create_skill / update_skill / delete_skill (thin tools di atas SkillStore).",
-        "LLM memutuskan apakah lifecycle action diperlukan — jangan auto-create setelah task selesai,",
-        "jangan auto-update berdasarkan task, jangan pakai keyword matcher/scoring/heuristic.",
-        "Buat Skill baru hanya bila prosedur/pengetahuan tersebut memiliki nilai reusable untuk task berikutnya;",
-        "jangan membuat Skill baru untuk setiap task atau sekadar karena task selesai.",
-        "Gunakan:",
-        "  create_skill(skill_id, name, description, content, scope) — membuat skill.md baru (scope default 'project').",
-        "  update_skill(skill_id, name/description/content/scope) — memperbarui field yang diberikan.",
-        "  delete_skill(skill_id) — menghapus Skill (catalog langsung merefleksikan keadaan terbaru).",
-        "Hormati validasi ID dan atomic write yang sudah ada; jangan otomatis membuat references jika tidak diperlukan.",
-        "",
-        "## State Sumber Informasi (penting)",
-        "Hasil tool read/search dapat mengembalikan STATE, bukan isi baru. Pahami",
-        "artinya sebelum memutuskan memanggil tool lagi:",
-        "- `already_available` / `already_read` (read_file): isi file/rentang/symbol",
-        "  yang diminta SUDAH ADA di percakapan ini dan file tidak berubah. Ini",
-        "  BUKAN kegagalan: informasi itu SUDAH Anda miliki. JANGAN meminta ulang",
-        "  rentang/symbol yang sama; gunakan isi yang sudah ada lalu lanjut.",
-        "- `already_searched` (search_code): hasil pencarian dengan query yang sama",
-        "  sudah ada di percakapan. JANGAN mengulang query itu; pakai hasil",
-        "  sebelumnya (atau ubah query/scope bila memang perlu).",
-        "- Bila isi mentah BENAR-BENAR harus dikirim ulang (mis. konteks lama",
-        "  sudah diringkas sehingga isinya tidak lagi terlihat), panggil read_file",
-        "  dengan `force=true`. Di luar kasus itu, perlakukan state di atas sebagai",
-        "  tanda informasi SUDAH cukup: berhenti retrieval dan lanjut bekerja.",
-        "- JANGAN beralih ke run_command (mis. cat/type/Get-Content) hanya karena",
-        "  read_file mengembalikan `already_available`.",
-        "",
-        "## Batas",
-        "- Semua operasi dibatasi pada project root. Jangan menulis/menghapus di",
-        "  luar project.",
-        "- Pada Windows, pakai executable native atau CMD builtins; JANGAN pakai",
-        "  command Unix (find/grep/cat/head/tail/ls/rm/...).",
-        "- Jawab dengan bahasa yang sama seperti task user.",
-    ]
+    body = load_persona_prompt(persona)
+    lines: List[str] = [body]
+
     if mode is not None:
         directive = directive_prompt_for_mode(mode)
         if directive:
             lines.extend(["", "## Direktif Eksekusi Mode", directive])
+
     return "\n".join(lines)
 
 
-#: System prompt default Agent (dipakai bila pemanggil tidak memberi system prompt).
+#: System prompt default Agent (dimuat dinamis dari agents/zeus-orchestrator.md).
 AGENT_SYSTEM_PROMPT = build_agent_system_prompt()
 
 __all__ = [
     "AGENT_SYSTEM_PROMPT",
     "DEFAULT_MODE",
+    "DEFAULT_PERSONA",
     "MODE_ALIASES",
     "MODE_BALANCED",
     "MODE_DEEP",
     "MODE_FAST",
     "build_agent_system_prompt",
     "directive_prompt_for_mode",
+    "get_aegis_central_dir",
+    "load_persona_prompt",
 ]
