@@ -161,7 +161,7 @@ def _run_runtime(report: str, task_id: str, *, tool_call_first: str | None = Non
 
 
 def _read_log_events(task_id: str) -> list:
-    log_path = FIXTURE / ".aether" / "log" / f"{task_id}.log"
+    log_path = (FIXTURE / ".aegis" / "log" / f"{task_id}.log") if (FIXTURE / ".aegis" / "log").exists() else (FIXTURE / ".aether" / "log" / f"{task_id}.log")
     assert log_path.exists(), f"log task harus ada: {log_path}"
     events = []
     for line in log_path.read_text(encoding="utf-8").splitlines():
@@ -264,7 +264,7 @@ def _run() -> int:
     )
     finished_report = by_type.get("task_finished", [{}])[-1].get("result")
     assert finished_report == report, "task_finished.data.result (fallback report) harus utuh"
-    raw_log = (FIXTURE / ".aether" / "log" / f"{task_id}.log").read_text(encoding="utf-8")
+    raw_log = ((FIXTURE / ".aegis" / "log" / f"{task_id}.log") if (FIXTURE / ".aegis" / "log").exists() else (FIXTURE / ".aether" / "log" / f"{task_id}.log")).read_text(encoding="utf-8")
     assert SENTINEL in raw_log, "file log mentah harus memuat akhir report (tidak terpotong)"
     assert TRUNCATION_MARKER not in log_report[-len(TRUNCATION_MARKER) :]
     print(f"[3] .aether/log (task_completed + task_finished) utuh OK -> {len(log_report)} karakter")

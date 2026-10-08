@@ -180,3 +180,137 @@ def test_api_events_last_event_id_header():
             await stream.aclose()
 
     asyncio.run(_run())
+def test_session_store_append_event_idempotent():
+    """InMemorySessionStore menolak duplikasi event_id dan melaporkan status idempotent."""
+    store = InMemorySessionStore()
+
+    ev1 = make_event(
+        session_id="s_idem",
+        event_type=EventType.TASK_STARTED,
+        task_id="t_idem",
+        payload={"step": 1},
+    )
+
+    stored, is_new = store.append_event_idempotent(ev1)
+    assert is_new is True
+    assert stored.sequence == 1
+    assert stored.event_id == ev1.event_id
+
+    # Append ulang event dengan event_id yang sama persis
+    stored2, is_new2 = store.append_event_idempotent(ev1)
+    assert is_new2 is False
+    assert stored2.sequence == 1
+    assert stored2.event_id == ev1.event_id
+
+    # Pastikan total event tetap 1
+    events = store.get_events(session_id="s_idem")
+    assert len(events) == 1
+
+def test_event_subscription_concurrent_replay_and_live_append():
+    """EventSubscription menjamin atomic replay dan live buffering tanpa race condition atau lompatan sequence."""
+    import threading
+    import time
+
+    store = InMemorySessionStore()
+    # Buat 5 event awal (sequence 1 s.d. 5)
+    initial_events = []
+    for i in range(1, 6):
+        ev = store.append_event(
+            make_event(
+                session_id="s_conc",
+                event_type=EventType.TOOL_CALLED,
+                task_id="t_conc",
+                payload={"step": i},
+            )
+        )
+        initial_events.append(ev)
+
+    # Klien disconnect pada event 2 (sequence 2), reconnect meminta dari event 2
+    sub = EventSubscription(
+        store,
+        session_id="s_conc",
+        task_id="t_conc",
+        last_event_id=initial_events[1].event_id,
+    )
+
+    live_appended = []
+
+    def _worker_append():
+        # Jeda sangat singkat untuk menabrak jendela start() / replay
+        time.sleep(0.005)
+        for i in range(6, 11):
+            ev = store.append_event(
+                make_event(
+                    session_id="s_conc",
+                    event_type=EventType.TOOL_CALLED,
+                    task_id="t_conc",
+                    payload={"step": i},
+                )
+            )
+            live_appended.append(ev)
+            time.sleep(0.002)
+
+    t = threading.Thread(target=_worker_append)
+    t.start()
+    sub.start()
+    t.join()
+
+    # Kumpulkan seluruh event yang diterima subscriber
+    received = []
+    while True:
+        ev = sub.get(timeout=0.1)
+        if ev is None:
+            break
+        received.append(ev)
+
+    sub.close()
+
+    # Harus menerima sequence 3 s.d. 10 (total 8 event)
+    received_seqs = [e.sequence for e in received]
+    expected_seqs = list(range(3, 11))
+    assert received_seqs == expected_seqs, f"Expected {expected_seqs}, got {received_seqs}"
+    # Verifikasi tidak ada duplikasi sequence
+    assert len(received_seqs) == len(set(received_seqs))
+
+
+def test_event_subscription_unknown_last_event_id_prevents_history_flood():
+    """Jika last_event_id tidak dikenal, sistem tidak membanjiri klien dengan seluruh riwayat masa lalu."""
+    store = InMemorySessionStore()
+    # Isi store dengan 10 event lama
+    for i in range(1, 11):
+        store.append_event(
+            make_event(
+                session_id="s_flood",
+                event_type=EventType.TOOL_CALLED,
+                task_id="t_flood",
+                payload={"step": i},
+            )
+        )
+
+    # Klien reconnect membawa last_event_id acak yang tidak valid / tidak dikenal
+    sub = EventSubscription(
+        store,
+        session_id="s_flood",
+        task_id="t_flood",
+        last_event_id="unknown_bogus_event_id_9999",
+    )
+    sub.start()
+
+    # Verifikasi tidak ada event yang diputar ulang (mencegah flood riwayat lama)
+    assert sub.get(timeout=0.05) is None
+
+    # Event baru yang masuk setelahnya harus tetap diterima
+    new_ev = store.append_event(
+        make_event(
+            session_id="s_flood",
+            event_type=EventType.TASK_COMPLETED,
+            task_id="t_flood",
+            payload={"step": 11},
+        )
+    )
+    delivered = sub.get(timeout=0.1)
+    assert delivered is not None
+    assert delivered.event_id == new_ev.event_id
+    assert delivered.sequence == 11
+
+    sub.close()

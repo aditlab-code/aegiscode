@@ -487,6 +487,30 @@ def project_git_discard(
     return _json_response(service.git_discard(project_id, file_path=file_path))
 
 
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stage(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stage -> stage perubahan file ke index."""
+    payload = _parse_json_body(request)
+    file_path = payload.get("file_path") or request.GET.get("path")
+    return _json_response(service.git_stage(project_id, file_path=file_path))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_unstage(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/unstage -> unstage perubahan file dari index."""
+    payload = _parse_json_body(request)
+    file_path = payload.get("file_path") or request.GET.get("path")
+    return _json_response(service.git_unstage(project_id, file_path=file_path))
+
 @csrf_exempt
 @require_http_methods(["POST"])
 @_handle
@@ -506,6 +530,239 @@ def project_git_deinit(
     """POST /api/projects/<project_id>/git/deinit -> de-initialize Git repository."""
     return _json_response(service.git_deinit(project_id))
 
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_checkout(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/checkout -> beralih branch atau buat branch."""
+    payload = _parse_json_body(request)
+    branch = payload.get("branch", "")
+    create = bool(payload.get("create", False))
+    start_point = payload.get("start_point")
+    return _json_response(
+        service.git_checkout(
+            project_id, branch=branch, create=create, start_point=start_point
+        )
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_create_branch(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/branches/create -> buat branch baru."""
+    payload = _parse_json_body(request)
+    branch = payload.get("branch", "")
+    start_point = payload.get("start_point")
+    checkout = bool(payload.get("checkout", False))
+    return _json_response(
+        service.git_create_branch(
+            project_id, branch=branch, start_point=start_point, checkout=checkout
+        )
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_delete_branch(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/branches/delete -> hapus branch."""
+    payload = _parse_json_body(request)
+    branch = payload.get("branch", "")
+    force = bool(payload.get("force", False))
+    is_remote = bool(payload.get("is_remote", False))
+    remote = payload.get("remote", "origin")
+    return _json_response(
+        service.git_delete_branch(
+            project_id, branch=branch, force=force, is_remote=is_remote, remote=remote
+        )
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_merge(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/merge -> gabungkan branch ke branch aktif."""
+    payload = _parse_json_body(request)
+    branch = payload.get("branch", "")
+    message = payload.get("message")
+    no_ff = bool(payload.get("no_ff", False))
+    return _json_response(
+        service.git_merge(project_id, branch=branch, message=message, no_ff=no_ff)
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stash(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stash -> simpan perubahan ke stash."""
+    payload = _parse_json_body(request)
+    message = payload.get("message")
+    include_untracked = bool(payload.get("include_untracked", True))
+    return _json_response(
+        service.git_stash(
+            project_id, message=message, include_untracked=include_untracked
+        )
+    )
+
+
+@require_http_methods(["GET"])
+@_handle
+def project_git_stash_list(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """GET /api/projects/<project_id>/git/stash/list -> daftar stash."""
+    return _json_response(service.git_stash_list(project_id))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stash_pop(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stash/pop -> terapkan & hapus stash."""
+    payload = _parse_json_body(request)
+    index = int(payload.get("index", 0))
+    return _json_response(service.git_stash_pop(project_id, index=index))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stash_apply(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stash/apply -> terapkan stash."""
+    payload = _parse_json_body(request)
+    index = int(payload.get("index", 0))
+    return _json_response(service.git_stash_apply(project_id, index=index))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_stash_drop(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/stash/drop -> hapus stash."""
+    payload = _parse_json_body(request)
+    index = int(payload.get("index", 0))
+    return _json_response(service.git_stash_drop(project_id, index=index))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_push(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/push -> push commit ke remote."""
+    payload = _parse_json_body(request)
+    remote = payload.get("remote")
+    branch = payload.get("branch")
+    set_upstream = bool(payload.get("set_upstream", False))
+    force = bool(payload.get("force", False))
+    return _json_response(
+        service.git_push(
+            project_id,
+            remote=remote,
+            branch=branch,
+            set_upstream=set_upstream,
+            force=force,
+        )
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_pull(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/pull -> pull perubahan dari remote."""
+    payload = _parse_json_body(request)
+    remote = payload.get("remote")
+    branch = payload.get("branch")
+    rebase = bool(payload.get("rebase", False))
+    return _json_response(
+        service.git_pull(project_id, remote=remote, branch=branch, rebase=rebase)
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_fetch(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/fetch -> fetch perubahan dari remote."""
+    payload = _parse_json_body(request)
+    remote = payload.get("remote")
+    prune = bool(payload.get("prune", True))
+    return _json_response(service.git_fetch(project_id, remote=remote, prune=prune))
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+@_handle
+def project_git_remotes(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """GET/POST /api/projects/<project_id>/git/remotes -> list atau konfigurasi remote."""
+    if request.method == "GET":
+        return _json_response(service.git_remotes(project_id))
+    payload = _parse_json_body(request)
+    action = payload.get("action", "add")
+    name = payload.get("name", "")
+    url = payload.get("url", "")
+    if action == "set_url":
+        return _json_response(
+            service.git_set_remote_url(project_id, name=name, url=url)
+        )
+    return _json_response(service.git_add_remote(project_id, name=name, url=url))
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_clone(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/clone -> clone remote repositori."""
+    payload = _parse_json_body(request)
+    url = payload.get("url", "")
+    target_dir = payload.get("target_dir")
+    return _json_response(
+        service.git_clone(project_id, url=url, target_dir=target_dir)
+    )
+
+@csrf_exempt
+@require_http_methods(["POST"])
+@_handle
+def project_git_commit(
+    request: HttpRequest, service: GatewayService, project_id: str
+) -> JsonResponse:
+    """POST /api/projects/<project_id>/git/commit -> buat git commit pada branch aktif."""
+    payload = _parse_json_body(request)
+    message = payload.get("message", "")
+    stage_all = bool(payload.get("stage_all", False))
+    return _json_response(
+        service.git_commit(project_id, message=message, stage_all=stage_all)
+    )
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -844,13 +1101,23 @@ def task_history_clear(request: HttpRequest, service: GatewayService) -> JsonRes
 
 
 @csrf_exempt
-@require_http_methods(["GET", "DELETE"])
+@require_http_methods(["GET", "PATCH", "DELETE"])
 @_handle
 def task_history_detail(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
     """GET /api/tasks/history/<task_id> -> ringkasan task dari .aegis/log/.
+    PATCH /api/tasks/history/<task_id> -> ubah judul/prompt task history.
     DELETE /api/tasks/history/<task_id> -> hapus log dan history task.
     """
     project_id = request.GET.get("project_id") or None
+    if request.method == "PATCH":
+        body = _parse_json_body(request)
+        title = body.get("title") or body.get("task")
+        if not title or not str(title).strip():
+            from api.services import ValidationError
+            raise ValidationError("Field 'title' wajib diisi.")
+        return _json_response(
+            service.rename_task_history(task_id, str(title).strip(), project_id=project_id)
+        )
     if request.method == "DELETE":
         return _json_response(service.delete_task_history(task_id, project_id=project_id))
     return _json_response(service.get_task_history(task_id, project_id=project_id))
@@ -1428,7 +1695,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
     async def sse_event_stream():
         try:
             # Kirim comment frame inisial agar Daphne/reverse proxy langsung flush status HTTP 200 dan headers ke client
-            yield ": connected\n\n"
+            yield ": connected\nretry: 1000\n\n"
             async for chunk in stream:
                 yield chunk
         finally:
@@ -1444,7 +1711,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
         sse_event_stream(),
         content_type="text/event-stream",
     )
-    response["Cache-Control"] = "no-cache"
+    response["Cache-Control"] = "no-cache, no-transform"
     response["X-Accel-Buffering"] = "no"
     return response
 

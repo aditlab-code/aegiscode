@@ -40,6 +40,7 @@ from agent_ai.providers.base import (
     Message,
     ProviderAPIError,
     ProviderNotConfiguredError,
+    ProviderRequest,
     ProviderUnavailableError,
     ToolChoice,
     ToolDefinition,
@@ -81,21 +82,9 @@ def _extract_msg_content(msg: Any) -> str:
 
 def _map_agy_tool_name(agy_name: str) -> str:
     """Petakan nama tool internal Antigravity CLI (agy) ke nama tool standar Aegis."""
-    name = (agy_name or "").lower().strip()
-    if name in ("view_file", "read_file", "read_symbol", "view_symbol"):
-        return "read_file"
-    if name in ("write_to_file", "write_file"):
-        return "write_file"
-    if name in ("edit_file", "edit_file_part"):
-        return "edit_file"
-    if name in ("list_dir", "find_files", "find_by_name"):
-        return "list_files"
-    if name in ("grep", "grep_search", "search_file"):
-        return "search_code"
-    if name == "run_command":
-        return "run_command"
-    return name
+    from agent_ai.runtime.activity import normalize_canonical_tool_name
 
+    return normalize_canonical_tool_name(agy_name)
 
 def _extract_agy_target(tool_name: str, params: Dict[str, Any]) -> str:
     """Ekstrak path/command/target dari parameter tool Antigravity CLI."""
@@ -133,8 +122,8 @@ def _format_antigravity_policy_directive(mode: str) -> str:
 
     rules = [
         "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
-        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/', '.aether/log/', or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
-        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .aether/, .brain/).",
+        "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/' or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
+        "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .brain/).",
         "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
         "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
         "5. NO REPETITIVE SEARCH QUERIES: Do NOT repeat identical search queries or list directory calls. If a search yields 0 results, do not repeat with minor variations; adjust your strategy or proceed with implementation.",
@@ -146,14 +135,14 @@ def _format_antigravity_policy_directive(mode: str) -> str:
     if mode_clean == "fast":
         rules.extend([
             "5. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
-            "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
+            "   - SURGICAL RESOLUTION: Prioritize targeted symbol search and CodeGraph navigation before reading files.",
             "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
             "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
         ])
     elif mode_clean == "balanced":
         rules.extend([
             "5. EXECUTION MODE: BALANCED:",
-            "   - Read only files directly related to the user's task (max 6-8 files).",
+            "   - Read files directly related to the user's task with moderate exploration.",
             "   - Avoid redundant reads of the same file. Once read, proceed with implementation immediately.",
             "   - Apply edits as soon as sufficient context is gathered.",
         ])
@@ -706,8 +695,16 @@ class AntigravityProvider(BaseProvider):
         options: Optional[GenerateOptions] = None,
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
     ) -> GenerateResult:
         """Kirim request ke Antigravity via agy CLI bridge atau HTTP API."""
+        if request is not None or (prompt or messages):
+            resolved = self._resolve_request(prompt, messages, options, tools, tool_choice, request)
+            messages = resolved.messages
+            options = resolved.generation_options or options
+            tools = resolved.tools if resolved.tools is not None else tools
+            prompt = None
+
         if not prompt and not messages:
             raise ValueError("Minimal salah satu dari 'prompt' atau 'messages' harus diisi.")
 
@@ -781,9 +778,17 @@ class AntigravityProvider(BaseProvider):
                 env["GOOGLE_CLOUD_QUOTA_PROJECT"] = self.config.project_id
             if self.config.location:
                 env["GOOGLE_CLOUD_LOCATION"] = self.config.location
-
-            timeout = self.config.timeout or 120
-
+            base_timeout = self.config.timeout or 120
+            # Bila execution policy adalah 'balanced' atau 'deep' (atau model berkemampuan thinking/reasoning),
+            # naikkan timeout minimal menjadi 180 detik agar tidak terputus saat proses reasoning/thinking berlangsung.
+            if policy_mode in ("balanced", "deep") or getattr(self, "supports_thinking", False) or "flash-medium" in model or "pro-high" in model:
+                timeout = max(base_timeout, 180)
+            else:
+                timeout = base_timeout
+            # Idle timeout: batas waktu keheningan tanpa output baru (inactivity window)
+            idle_timeout = getattr(self.config, "idle_timeout", 60) or 60
+            # Max timeout: batas absolut keselamatan eksekusi (safety ceiling)
+            max_timeout = max(timeout, 600)
             cancel_check = (
                 options.extra.get("cancel_check")
                 if options and options.extra and callable(options.extra.get("cancel_check"))
@@ -827,6 +832,7 @@ class AntigravityProvider(BaseProvider):
                 final_response = ""
                 raw_data: Dict[str, Any] = {}
                 start_time = time.time()
+                last_activity_time = start_time
                 files_read_set: set[str] = set()
                 file_read_counts: Dict[str, int] = {}
                 tool_call_counts: Dict[str, int] = {}
@@ -838,10 +844,15 @@ class AntigravityProvider(BaseProvider):
                             raise ProviderUnavailableError(
                                 "Antigravity execution dibatalkan oleh pengguna (user stop)."
                             )
-                        if time.time() - start_time > timeout:
+                        if time.time() - last_activity_time > idle_timeout:
                             proc.kill()
                             raise ProviderUnavailableError(
-                                f"Antigravity CLI timeout setelah {timeout} detik."
+                                f"Antigravity CLI idle timeout: tidak ada aktivitas selama {idle_timeout} detik."
+                            )
+                        if time.time() - start_time > max_timeout:
+                            proc.kill()
+                            raise ProviderUnavailableError(
+                                f"Antigravity CLI melebihi batas waktu eksekusi maksimum {max_timeout} detik."
                             )
                         line = proc.stdout.readline() if proc.stdout else ""
                         if not line:
@@ -864,6 +875,7 @@ class AntigravityProvider(BaseProvider):
                         except Exception:
                             continue
 
+                        last_activity_time = time.time()
                         if isinstance(item, dict):
                             if item.get("event") == "step_update":
                                 step_update = item.get("step_update") or {}
@@ -952,17 +964,8 @@ class AntigravityProvider(BaseProvider):
                                                         })
                                                         event_sink("agent_reasoning_delta", {
                                                             "delta": f"\n{warning_msg}\n",
+                                                            "reasoning": f"\n{warning_msg}\n",
                                                         })
-                                            if policy_mode == "fast" and len(files_read_set) > 3:
-                                                proc.kill()
-                                                raise ProviderAPIError(
-                                                    f"Pelanggaran Guardrail Efisiensi Mode Fast: Antigravity CLI telah membaca {len(files_read_set)} berkas "
-                                                    f"(batas mode Fast adalah 3 berkas unik). Eksekusi dihentikan. "
-                                                    "Gunakan mode Balanced jika memerlukan analisis lintas berkas yang lebih luas.",
-                                                    status_code=429,
-                                                    endpoint="agy CLI",
-                                                    response_body=f"Circuit breaker: fast mode read limit exceeded ({len(files_read_set)} > 3)",
-                                                )
 
                                         # Multi-Tool Signature Redundancy Tracking & Circuit Breaker (non-read_file)
                                         if aegis_tool != "read_file":
@@ -983,7 +986,10 @@ class AntigravityProvider(BaseProvider):
                                                         "signature": tool_sig,
                                                         "call_count": tool_count,
                                                     })
-                                                    event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+                                                    event_sink("agent_reasoning_delta", {
+                                                        "delta": f"\n{loop_warning}\n",
+                                                        "reasoning": f"\n{loop_warning}\n",
+                                                    })
 
                                             if tool_count >= 4 or (policy_mode == "fast" and tool_count >= 3):
                                                 proc.kill()
@@ -1043,7 +1049,10 @@ class AntigravityProvider(BaseProvider):
                                     if thought_delta:
                                         accumulated_thoughts.append(thought_delta)
                                         if event_sink:
-                                            event_sink("agent_reasoning_delta", {"delta": thought_delta})
+                                            event_sink("agent_reasoning_delta", {
+                                                "delta": thought_delta,
+                                                "reasoning": thought_delta,
+                                            })
                                 elif step_type == "agent_response":
                                     text_delta = step_update.get("text_delta")
                                     if text_delta:
@@ -1224,6 +1233,7 @@ class AntigravityProvider(BaseProvider):
                                             })
                                             event_sink("agent_reasoning_delta", {
                                                 "delta": f"\n{warning_msg}\n",
+                                                "reasoning": f"\n{warning_msg}\n",
                                             })
 
                                     # Multi-Tool Signature Redundancy Tracking (non-read_file)
@@ -1244,7 +1254,10 @@ class AntigravityProvider(BaseProvider):
                                                     "signature": tool_sig,
                                                     "call_count": tool_count,
                                                 })
-                                                event_sink("agent_reasoning_delta", {"delta": f"\n{loop_warning}\n"})
+                                                event_sink("agent_reasoning_delta", {
+                                                    "delta": f"\n{loop_warning}\n",
+                                                    "reasoning": f"\n{loop_warning}\n",
+                                                })
 
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
@@ -1293,7 +1306,10 @@ class AntigravityProvider(BaseProvider):
                                 if thought_delta:
                                     accumulated_thoughts.append(thought_delta)
                                     if event_sink:
-                                        event_sink("agent_reasoning_delta", {"delta": thought_delta})
+                                        event_sink("agent_reasoning_delta", {
+                                            "delta": thought_delta,
+                                            "reasoning": thought_delta,
+                                        })
                             elif step_type == "agent_response":
                                 text_delta = step_update.get("text_delta")
                                 if text_delta:

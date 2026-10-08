@@ -2,6 +2,73 @@
    Buttons, Badges, Chips, Toggles, Splitters, Thinking Block, Command Palette & Context Menu. */
 
 /* Buttons */
+.btn-aegis,
+.btn-aether {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-sm, 6px);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  padding: 6px 14px;
+}
+
+.btn-sm {
+  padding: 4px 10px;
+  font-size: 11.5px;
+}
+
+.btn-ghost,
+.btn-ghost-a {
+  background: var(--inset, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--btn-outline-muted, var(--line, var(--border-soft)));
+  color: var(--text-dim, var(--secondary));
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-ghost-a:hover:not(:disabled) {
+  background: var(--hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--secondary, var(--edge));
+  color: var(--text);
+}
+
+.btn-ghost:disabled,
+.btn-ghost-a:disabled,
+.btn-aegis:disabled,
+.btn-aether:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary,
+.btn-primary-a {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-primary-a:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-danger,
+.btn-danger-a {
+  background: var(--alert-err-bg, rgba(247, 118, 142, 0.14));
+  border: 1px solid var(--alert-err-border, rgba(247, 118, 142, 0.45));
+  color: var(--err, #f7768e);
+}
+
+.btn-danger:hover:not(:disabled),
+.btn-danger-a:hover:not(:disabled) {
+  border-color: var(--err, #f7768e);
+}
+
 .btn-spinner {
   width: 14px;
   height: 14px;
@@ -127,6 +194,7 @@
 
 /* Canonical Badges */
 .app-badge,
+.aegis-badge,
 .aether-badge,
 .seg-badge,
 .badge-n,

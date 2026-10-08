@@ -127,6 +127,7 @@ class AgentRuntime:
         cancel_token: Optional[CancellationToken] = None,
         policy_resolver: Optional[ExecutionPolicyResolver] = None,
         requested_mode: Optional[str] = None,
+        codegraph_service: Optional[Any] = None,
     ) -> None:
         if provider is None:
             raise ValueError("AgentRuntime butuh provider (BaseProvider).")
@@ -155,6 +156,7 @@ class AgentRuntime:
         # aktif. Default None = tidak ada logging (perilaku sekarang).
         self._response_log: Optional[Any] = None
         self._brain: Optional[Any] = None
+        self.codegraph_service = codegraph_service
         # Environment Context project-local (`<project_root>/.aegis/ENVIRONMENT.md`).
         # Dibuat/dimuat SEKALI per session (instance runtime); hasilnya di-cache
         # di `_environment_text` dan hanya disuntikkan pada task pertama.
@@ -457,6 +459,9 @@ class AgentRuntime:
         # Project-local storage (Task 5): Task Log + AI Project Bible.
         # Best-effort: kegagalan di sini TIDAK boleh menggagalkan eksekusi.
         self._setup_project_storage(prepared)
+
+        # CodeGraph Relational Intelligence: pastikan graf kode termutakhir (best-effort).
+        self._ensure_codegraph_fresh()
 
         # Agent Execution Policy: resolve requested_mode -> effective_mode.
         # Murni informasi/strategi (bukan hard limit, bukan penggerak loop):
@@ -969,6 +974,27 @@ class AgentRuntime:
         except Exception:  # noqa: BLE001 - log tidak boleh crash
             return
 
+    def _ensure_codegraph_fresh(self) -> None:
+        """Pastikan CodeGraph termutakhir sebelum task berjalan (best-effort guardrail)."""
+        try:
+            service = self.codegraph_service
+            if service is None and self.project_root:
+                from agent_ai.codegraph.service import CodeGraphService
+
+                service = CodeGraphService(project_root=self.project_root)
+                self.codegraph_service = service
+            elif service is None and hasattr(self.executor, "registry") and self.executor.registry:
+                for tool in self.executor.registry._tools.values():
+                    if hasattr(tool, "service") and getattr(tool, "name", "").startswith("codegraph_"):
+                        service = tool.service
+                        self.codegraph_service = service
+                        break
+
+            if service is not None:
+                service.ensure_graph_fresh(max_stale_seconds=2.0)
+        except Exception as exc:  # noqa: BLE001 - defensive guardrail
+            logger.warning("CodeGraph ensure_graph_fresh guardrail non-fatal failure: %s", exc)
+
     def _make_orchestrator(self, provider: BaseProvider) -> AgentOrchestrator:
         """Bangun AgentOrchestrator dengan Project Brain (context-only).
 
@@ -1154,7 +1180,10 @@ class AgentRuntime:
         try:
             if self._working_state_manager is None:
                 return
-            tool = payload.get("tool") or payload.get("metadata", {}).get("tool")
+            from agent_ai.runtime.activity import normalize_canonical_tool_name
+
+            raw_tool = payload.get("tool") or payload.get("metadata", {}).get("tool")
+            tool = normalize_canonical_tool_name(raw_tool)
             content = payload.get("content")
             if not tool or content is None:
                 return
@@ -1169,8 +1198,7 @@ class AgentRuntime:
             if tool in ("read_file", "view_image", "atlas_query", "rig_query"):
                 if path:
                     self._working_state_manager.record_files_inspected(str(path))
-            elif tool in ("write_file", "edit_file", "delete_file", "move_file",
-                          "create_skill", "delete_skill", "update_skill"):
+            elif tool in ("write_file", "edit_file", "delete_file", "move_file"):
                 if path:
                     self._working_state_manager.record_files_changed(str(path))
         except Exception:  # noqa: BLE001 - state update tidak boleh crash
@@ -1179,17 +1207,24 @@ class AgentRuntime:
     def _emit_activity_phase_for_tool(self, payload: Dict[str, Any]) -> None:
         """Klasifikasi payload `tool_called` -> activity phase (terpusat)."""
         try:
-            from agent_ai.runtime.activity import classify_tool_activity
+            from agent_ai.runtime.activity import (
+                classify_tool_activity,
+                normalize_canonical_tool_name,
+            )
+
+            tool = payload.get("tool")
+            canonical_tool = normalize_canonical_tool_name(tool)
+            if canonical_tool and "canonical_tool" not in payload:
+                payload["canonical_tool"] = canonical_tool
 
             phase = classify_tool_activity(
-                payload.get("tool"), payload.get("arguments")
+                canonical_tool or tool, payload.get("arguments")
             )
         except Exception:  # noqa: BLE001 - klasifikasi tidak boleh menggagalkan task
             return
         if phase is None:
             return
         self._set_activity_phase(phase.value)
-
     def _set_activity_phase(self, phase: str) -> None:
         """Set + emit activity phase (dedup: hanya bila phase berubah).
 
@@ -1411,15 +1446,46 @@ class AgentRuntime:
             },
         )
 
-        if result.status == RuntimeStatus.COMPLETED:
-            self._emit_event("task_completed", {"result": report_text})
-        elif cancelled:
-            # Event terminal AETHER existing (task_cancelled) supaya Task
-            # History/Agent Activity mengetahui task dihentikan, bukan selesai.
-            self._emit_event("task_cancelled", {"reason": result.error})
-        else:
-            self._emit_event("task_failed", {"error": result.error})
+        task_id = getattr(self, "_current_task_id", None) or (
+            lifecycle.task_id if lifecycle is not None else None
+        )
 
+        has_terminal_event = False
+        if not hasattr(self, "_terminal_emitted_tasks"):
+            self._terminal_emitted_tasks = set()
+
+        if task_id and task_id in self._terminal_emitted_tasks:
+            has_terminal_event = True
+
+        if not has_terminal_event and self.session_store is not None and self.session_id:
+            try:
+                existing_events = self.session_store.get_events(
+                    session_id=self.session_id,
+                    task_id=task_id,
+                )
+                terminal_types = {"task_completed", "task_failed", "task_cancelled"}
+                has_terminal_event = any(
+                    (getattr(e.event_type, "value", str(e.event_type)) in terminal_types)
+                    for e in existing_events
+                )
+            except Exception:
+                has_terminal_event = False
+
+        if not has_terminal_event:
+            if result.status == RuntimeStatus.COMPLETED:
+                self._emit_event("task_completed", {"result": report_text})
+            elif cancelled:
+                # Event terminal AETHER existing (task_cancelled) supaya Task
+                # History/Agent Activity mengetahui task dihentikan, bukan selesai.
+                self._emit_event("task_cancelled", {"reason": result.error})
+            else:
+                error_str = str(result.error or "")
+                is_timeout_err = "timeout" in error_str.lower() or "timed out" in error_str.lower()
+                fail_payload = {"error": result.error}
+                if is_timeout_err:
+                    fail_payload["error_type"] = "timeout"
+                self._emit_event("task_failed", fail_payload)
+                self._terminal_emitted_tasks.add(task_id)
         if lifecycle is None or lifecycle.is_terminal:
             return
         from agent_ai.tasks.models import TaskStatus

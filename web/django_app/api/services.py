@@ -45,6 +45,7 @@ from agent_ai.projects.registry import (
 from agent_ai.session.store import InMemorySessionStore, SessionStore
 from agent_ai.task.preparation import TaskPreparation
 from agent_ai.tasks.models import new_task_id
+from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
 
 from api.project_store import ProjectStore
 
@@ -300,6 +301,8 @@ class GatewayService:
         # boundary. Token dihapus saat eksekusi selesai.
         self._cancel_tokens: Dict[str, "CancellationToken"] = {}
         # Monotonic counter untuk urutan antrian (di belakang self._lock).
+        # Task Lifecycle Managers untuk memelihara idempotensi transisi dan enqueue_guard
+        self._task_lifecycles: Dict[str, Any] = {}
         self._queue_seq = 0
         # Scheduler serial GLOBAL (1 execution slot). `_pumping` hanya penjaga
         # re-entrancy agar pump tidak rekursif; keputusan "slot bebas" SELALU
@@ -1756,6 +1759,46 @@ class GatewayService:
             "file_path": res.get("file_path"),
         }
 
+    def git_stage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Tambahkan perubahan file ke staging index (git add)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.stage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
+    def git_unstage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Hapus perubahan file dari staging index (git restore --staged atau git reset)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.unstage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
     def git_init(self, project_id: str) -> Dict[str, Any]:
         """Inisialisasi Git repository baru pada root project."""
         root = self._project_root_by_id(project_id)
@@ -1785,6 +1828,202 @@ class GatewayService:
             "message": res.get("message", "Git repository de-initialized"),
             "error": res.get("error"),
         }
+
+    def git_checkout(
+        self,
+        project_id: str,
+        branch: str,
+        create: bool = False,
+        start_point: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Beralih ke branch lain atau buat branch baru jika create=True."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.checkout(branch, create=create, start_point=start_point)
+
+    def git_create_branch(
+        self,
+        project_id: str,
+        branch: str,
+        start_point: Optional[str] = None,
+        checkout: bool = False,
+    ) -> Dict[str, Any]:
+        """Buat branch baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.create_branch(branch, start_point=start_point, checkout=checkout)
+
+    def git_delete_branch(
+        self,
+        project_id: str,
+        branch: str,
+        force: bool = False,
+        is_remote: bool = False,
+        remote: str = "origin",
+    ) -> Dict[str, Any]:
+        """Hapus branch lokal atau remote."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.delete_branch(
+            branch, force=force, is_remote=is_remote, remote=remote
+        )
+
+    def git_merge(
+        self,
+        project_id: str,
+        branch: str,
+        message: Optional[str] = None,
+        no_ff: bool = False,
+    ) -> Dict[str, Any]:
+        """Gabungkan branch target ke branch aktif saat ini."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.merge(branch, message=message, no_ff=no_ff)
+
+    def git_stash(
+        self,
+        project_id: str,
+        message: Optional[str] = None,
+        include_untracked: bool = True,
+    ) -> Dict[str, Any]:
+        """Simpan perubahan sementara ke git stash."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash(message=message, include_untracked=include_untracked)
+
+    def git_stash_list(self, project_id: str) -> Dict[str, Any]:
+        """Daftar stashes dalam repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"stashes": facade.stash_list()}
+
+    def git_stash_pop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash dan hapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_pop(index=index)
+
+    def git_stash_apply(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash tanpa menghapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_apply(index=index)
+
+    def git_stash_drop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Hapus stash dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_drop(index=index)
+
+    def git_push(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Push commit ke remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.push(
+            remote=remote, branch=branch, set_upstream=set_upstream, force=force
+        )
+
+    def git_pull(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        """Pull perubahan terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.pull(remote=remote, branch=branch, rebase=rebase)
+
+    def git_fetch(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        prune: bool = True,
+    ) -> Dict[str, Any]:
+        """Fetch referensi terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.fetch(remote=remote, prune=prune)
+
+    def git_remotes(self, project_id: str) -> Dict[str, Any]:
+        """Daftar remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"remotes": facade.remotes()}
+
+    def git_add_remote(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Tambahkan remote repositori baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.add_remote(name=name, url=url)
+
+    def git_set_remote_url(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Perbarui URL remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.set_remote_url(name=name, url=url)
+
+    def git_clone(
+        self, project_id: str, url: str, target_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Clone repositori ke dalam project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.clone(url=url, target_dir=target_dir)
+
+    def git_commit(
+        self, project_id: str, message: str, stage_all: bool = False
+    ) -> Dict[str, Any]:
+        """Buat git commit pada branch aktif project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.commit(message=message, stage_all=stage_all)
 
     # ------------------------------------------------------------------ #
     # Universal Linter Service
@@ -2005,6 +2244,11 @@ class GatewayService:
             task_id=task_id,
             payload={"task": record.task, "project_id": project_id},
         )
+        # Inisialisasi lifecycle manager untuk task ini
+        from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
+        manager = TaskLifecycleManager(task_id=task_id, session_id=session.session_id)
+        with self._lock:
+            self._task_lifecycles[task_id] = manager
 
         # Dispatch berdasarkan execution_mode (Task 02):
         # - queue: lewat scheduler serial GLOBAL (1 slot, FIFO) — perilaku
@@ -2012,9 +2256,12 @@ class GatewayService:
         # - parallel: langsung running tanpa menunggu slot queue (tanpa batas).
         if self.auto_execute:
             if execution_mode_norm == "parallel":
+                manager.enqueue_guard()
                 self._start_parallel_execution(task_id)
             else:
-                self._scheduler_pump()
+                # Enqueue guard memastikan task tidak terdaftar ganda ke queue
+                if manager.enqueue_guard():
+                    self._scheduler_pump()
 
         return record.to_dict()
 
@@ -2033,14 +2280,25 @@ class GatewayService:
             rec = self._tasks.get(task_id)
             if rec is None:
                 return
+            if task_id in self._cancel_tokens:
+                return
             # Hanya task pending yang dapat dipromosikan; running/done diabaikan.
             if rec.queue_state != "pending":
                 return
             if rec.status in ("completed", "failed", "cancelled"):
                 return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
             rec.queue_state = "running"
+            rec.status = "running"
             token = CancellationToken()
             self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
         run_in_background(lambda: self._execute_task(task_id, token))
 
     # ------------------------------------------------------------------ #
@@ -2057,24 +2315,22 @@ class GatewayService:
             - setelah disable/enable/cancel.
 
         Algoritma (seluruh keputusan di dalam self._lock):
-            1. Bila sudah ada task QUEUE RUNNING -> slot terpakai -> return.
+            1. Bila pumping atau sudah ada task QUEUE RUNNING -> slot terpakai -> return.
             2. Ambil task pending paling awal menurut queue_order (FIFO)
                yang execution_mode == "queue". Task disabled/done/terminal
                otomatis dilewati.
-            3. Tandai slot terpakai (queue_state="running") secara atomic agar
+            3. Tandai slot terpakai (queue_state="running", status="running") secara atomic agar
                task lain tidak bisa mengambil slot yang sama.
             4. Keluar lock, lalu mulai eksekusi (JANGAN tahan lock saat
                TaskExecutor bekerja).
 
-        Re-entrancy dijaga oleh self._pumping; ini hanya mencegah rekursi
-        tak terbatas, bukan sumber kebenaran status slot.
+        Re-entrancy dijaga oleh self._pumping di dalam lock.
         """
-        if self._pumping:
-            return
-
         from api.execution import run_in_background
 
         with self._lock:
+            if self._pumping:
+                return
             # [1] Slot serial HANYA ditempati task QUEUE. Parallel tidak
             #     memblokir slot queue dan tidak dibatasi jumlahnya.
             has_queue_running = any(
@@ -2088,24 +2344,36 @@ class GatewayService:
             if has_queue_running or has_queue_token:
                 return
             # [2] Kandidat: pending QUEUE saja, bukan terminal, queue_order paling awal.
-            candidates = [
-                r
-                for r in self._tasks.values()
-                if r.queue_state == "pending"
-                and r.execution_mode == "queue"
-                and r.status not in ("completed", "failed", "cancelled")
-            ]
+            candidates = []
+            for r in self._tasks.values():
+                if r.queue_state != "pending" or r.execution_mode != "queue":
+                    continue
+                if r.status in ("completed", "failed", "cancelled"):
+                    continue
+                lc = self._task_lifecycles.get(r.task_id)
+                if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                    continue
+                candidates.append(r)
+
             if not candidates:
                 return  # Sistem idle.
             candidate = min(candidates, key=lambda r: (r.queue_order, r.task_id))
             # [3] Ambil slot secara atomic (di dalam lock yang sama).
             candidate.queue_state = "running"
+            candidate.status = "running"
             task_id = candidate.task_id
             # Token cancellation dibuat & didaftarkan SINKRON di sini
             # (sebelum thread jalan) agar Stop selalu menemukan token.
             token = CancellationToken()
             self._cancel_tokens[task_id] = token
             self._pumping = True
+
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and not lc.is_terminal and lc.current_state != TaskLifecycleState.RUNNING.value:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
 
         try:
             # [4] Mulai eksekusi di luar lock.
@@ -2117,6 +2385,7 @@ class GatewayService:
                 rec = self._tasks.get(task_id)
                 if rec is not None and rec.queue_state == "running":
                     rec.queue_state = "pending"
+                    rec.status = "pending"
             raise
         else:
             with self._lock:
@@ -2141,11 +2410,27 @@ class GatewayService:
 
         with self._lock:
             existing = self._tasks.get(task_id)
-            if existing is not None and existing.queue_state == "pending":
-                existing.queue_state = "running"
-        token = CancellationToken()
-        with self._lock:
+            if existing is None:
+                return
+            if task_id in self._cancel_tokens:
+                return
+            if existing.queue_state == "running":
+                return
+            if existing.status in ("completed", "failed", "cancelled"):
+                return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
+            existing.queue_state = "running"
+            existing.status = "running"
+            token = CancellationToken()
             self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
+
         run_in_background(lambda: self._execute_task(task_id, token))
 
     def _execute_task(self, task_id: str, token: CancellationToken) -> None:
@@ -2161,6 +2446,15 @@ class GatewayService:
         AgentRuntime sebagai scheduler: runtime tetap tak tahu soal queue.
         """
         try:
+            with self._lock:
+                rec = self._tasks.get(task_id)
+                lc = self._task_lifecycles.get(task_id)
+                is_terminal = (
+                    (rec is not None and rec.status in ("completed", "failed", "cancelled"))
+                    or (lc is not None and lc.is_terminal)
+                )
+                if token.is_cancelled() or is_terminal:
+                    return
             self._run_task_inner(task_id, token)
         finally:
             # --- Release execution slot (COMPLETED/FAILED/CANCELLED/semua path).
@@ -2173,10 +2467,7 @@ class GatewayService:
                 # Bila runtime crash tanpa pernah mengirim status terminal,
                 # jangan biarkan slot "nyangkut" running selamanya.
                 if rec is not None and rec.queue_state == "running":
-                    if rec.status in ("completed", "failed", "cancelled"):
-                        rec.queue_state = "done"
-                    else:
-                        rec.queue_state = "done"
+                    rec.queue_state = "done"
             # Slot bebas -> scheduler memilih task berikutnya (FIFO).
             self._scheduler_pump()
 
@@ -2421,6 +2712,15 @@ class GatewayService:
                 record.queue_state = "running"
             elif status in ("completed", "failed", "cancelled"):
                 record.queue_state = "done"
+            manager = self._task_lifecycles.get(task_id)
+            if manager is not None:
+                try:
+                    manager.transition_to(
+                        status,
+                        payload={"result": result, "error": error},
+                    )
+                except Exception:
+                    pass
 
             # Sinkronisasi ke UnifiedSessionStore bila task terkait unified session.
             unified_sid = (record.metadata or {}).get("session_id")
@@ -2855,6 +3155,50 @@ class GatewayService:
             }
         return info
 
+    def rename_task_history(
+        self,
+        task_id: str,
+        new_title: str,
+        project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Ubah judul/prompt ringkasan satu task history.
+
+        Memperbarui atribut `task` pada record in-memory bila ada, serta
+        menambahkan event `task_renamed` ke file log task di `.aegis/log/`.
+
+        Raises:
+            ValidationError: bila new_title kosong.
+            NotFoundError: bila task tidak ditemukan di in-memory maupun log.
+        """
+        from api.services import ValidationError as _ValidationError
+        from agent_ai.projects.aegis_store import TaskLog
+
+        clean_title = str(new_title or "").strip()
+        if not clean_title:
+            raise _ValidationError("Judul task baru tidak boleh kosong.")
+
+        had_record = False
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is not None:
+                record.task = clean_title
+                had_record = True
+
+        target_root = self._resolve_project_root(project_id) if project_id else None
+        log_path = self._find_log_file(task_id, root=target_root, project_id=project_id)
+        had_log = False
+        if log_path is not None and log_path.is_file():
+            had_log = True
+            # log_path adalah <project_root>/.aegis/log/<task_id>.log
+            project_root = log_path.parent.parent.parent
+            task_log = TaskLog(project_root, task_id=log_path.stem)
+            task_log.append("task_renamed", {"title": clean_title, "prompt": clean_title})
+
+        if not had_record and not had_log:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di history.")
+
+        return {"task_id": task_id, "task": clean_title, "renamed": True}
+
     def delete_task_history(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
         """Hapus satu task history (file log + response log + state in-memory).
 
@@ -2894,7 +3238,7 @@ class GatewayService:
                 pass
 
         if not had_record and not had_log:
-            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di history.")
+            return {"task_id": task_id, "deleted": True, "already_absent": True}
 
         return {"task_id": task_id, "deleted": True}
 
@@ -3217,7 +3561,7 @@ class GatewayService:
 
         # 1) Sinyal kooperatif: Agent loop berhenti di safe boundary.
         if token is not None:
-            token.request("user_requested")
+            token.request("user_cancelled")
         # 1b) Tolak approval PENDING milik task ini agar action tertahan tidak
         #     menggantung (gate menerima DENY -> action dibatalkan segera).
         try:
@@ -3227,13 +3571,35 @@ class GatewayService:
         # 2) Status record gateway langsung CANCELLED (UI/HTTP responsif).
         #    Ini juga menyetel queue_state="done" (via _update_task_status),
         #    sehingga task keluar dari antrian aktif.
-        self._update_task_status(task_id, "cancelled")
-        # Bila task yang dibatalkan BELUM running (tidak ada token), slot tidak
-        # pernah terpakai — tetap pump agar antrian bergerak sesuai urutan.
-        # Bila task sedang running, slot dilepas oleh _execute_task (finally)
-        # setelah cancellation mencapai terminal state.
-        if token is None and self.auto_execute:
-            self._scheduler_pump()
+        with self._lock:
+            manager = self._task_lifecycles.get(task_id)
+        if manager is not None:
+            try:
+                manager.cancel_task(reason="user_cancelled")
+            except Exception:
+                pass
+
+        if token is None:
+            # Task BELUM pernah running (masih antre di queue): pancarkan
+            # event kanonik task_cancelled tepat satu kali dan pump scheduler.
+            try:
+                self._emit(
+                    record.session_id,
+                    "task_cancelled",
+                    task_id=task_id,
+                    payload={"reason": "user_cancelled", "task_id": task_id},
+                )
+            except Exception:
+                pass
+            self._update_task_status(task_id, "cancelled")
+            if self.auto_execute:
+                self._scheduler_pump()
+        else:
+            # Task sedang aktif di background: jangan pancarkan event di sini
+            # agar tidak duplikat dengan event yang dipancarkan saat runtime
+            # mencapai safe boundary. Cukup mutasi status record gateway.
+            self._update_task_status(task_id, "cancelled")
+
         return self.get_task(task_id)
 
     def cancel_all_tasks(self) -> int:

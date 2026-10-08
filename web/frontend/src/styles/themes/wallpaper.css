@@ -339,25 +339,32 @@ html:not([data-wallpaper="disabled"]) .settings-content .card {
   box-shadow: none !important;
 }
 
+html:not([data-wallpaper="disabled"]) .aegis-table thead th,
 html:not([data-wallpaper="disabled"]) .aether-table thead th {
   background: rgba(0, 0, 0, 0.06) !important;
   border-bottom: 1px solid var(--glass-border) !important;
 }
 
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aegis-table thead th,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .aether-table thead th,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aegis-table thead th,
 html:not([data-wallpaper="disabled"])[data-theme="light"] .aether-table thead th {
   background: rgba(255, 255, 255, 0.40) !important;
 }
 
+html:not([data-wallpaper="disabled"]) .aegis-table tbody td,
 html:not([data-wallpaper="disabled"]) .aether-table tbody td {
   border-bottom: 1px solid var(--glass-border) !important;
 }
 
+html:not([data-wallpaper="disabled"]) .aegis-table tbody tr:hover,
 html:not([data-wallpaper="disabled"]) .aether-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aegis-table tbody tr:hover,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .aether-table tbody tr:hover,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aegis-table tbody tr:hover,
 html:not([data-wallpaper="disabled"])[data-theme="light"] .aether-table tbody tr:hover {
   background: rgba(0, 0, 0, 0.03) !important;
 }

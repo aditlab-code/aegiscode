@@ -59,8 +59,10 @@ def _read_json(path: Path) -> dict:
 
 
 def _permissions_path(root: Path) -> Path:
+    p = root / ".aegis" / "permissions.json"
+    if p.exists():
+        return p
     return root / ".aether" / "permissions.json"
-
 
 def _run() -> int:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")

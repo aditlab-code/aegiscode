@@ -426,6 +426,16 @@ def test_agent_default_prompt_guides_retrieval_and_state() -> None:
     assert "force=true" in prompt
     # Larangan memakai run_command untuk membaca source.
     assert "JANGAN pakai run_command" in prompt
+    # 4 Aturan Inti Efisiensi Output (Action-First).
+    assert "4 Aturan Inti Efisiensi Output" in prompt
+    assert "Aksi Terlebih Dahulu" in prompt and "Lead with the next action" in prompt
+    assert "Langkah Bernomor" in prompt and "Number multi-step tasks" in prompt
+    assert "Lugas & Faktual" in prompt and "Matter-of-fact tone for errors" in prompt
+    assert "Tanpa Basa-Basi" in prompt and "No preamble, no recap" in prompt
+    # Direktif mode opsional.
+    fast_prompt = build_agent_system_prompt(mode="fast")
+    assert "FAST MODE ACTIVE" in fast_prompt
+    assert "codegraph" in fast_prompt.lower()
 
 
 def test_runtime_injects_default_agent_prompt() -> None:

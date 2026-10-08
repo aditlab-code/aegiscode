@@ -8,7 +8,12 @@
 import { computed, reactive, ref } from "vue";
 import { formatTokens, usageTokens } from "../tokenFormat.js";
 import { isViewedTaskRunning, shouldAdoptSubmittedTask, shouldFollowStartedTask } from "../taskView.js";
-import { isEventForMonitoredTask } from "../services/taskStateReducer.js";
+import {
+  createInitialTaskState,
+  shouldProcessEventIdempotent,
+  resolveSequenceGap,
+  isEventForMonitoredTask,
+} from "../services/taskStateReducer.js";
 import {
   createTask,
   cancelTask,
@@ -40,8 +45,10 @@ export function useTaskLifecycle(options = {}) {
   const activeSessionId = options.activeSessionId || ref("");
   const lastReceivedEventId = options.lastReceivedEventId || ref("");
   const settingsOpen = options.settingsOpen || ref(false);
+  const llmProviders = options.llmProviders || ref([]);
 
   const task = reactive({ id: "", prompt: "", status: "idle", phase: "" });
+  const taskReducerState = createInitialTaskState();
   const isRunning = computed(() => ["running", "validating", "cancelling"].includes(task.status));
   const stopInProgress = ref(false);
   const runningTaskId = ref("");
@@ -115,6 +122,15 @@ function activateTaskView(info) {
   task.prompt = info.prompt || "";
   task.status = info.status || "idle";
   task.phase = "";
+  taskReducerState.monitoredTaskId = task.id;
+  taskReducerState.lastProcessedSequence = 0;
+  if (taskReducerState.processedEventIds) {
+    taskReducerState.processedEventIds.clear();
+  } else {
+    taskReducerState.processedEventIds = new Set();
+  }
+  taskReducerState.hasSequenceGap = false;
+  taskReducerState.missingSequenceGaps = [];
   runningTaskId.value = info.runningTaskId || (info.status === "running" ? info.id : "");
   activityPhase.value = info.status === "running" ? "planning" : "";
   lifecycleMilestones.value = info.status === "running" ? [0] : [];
@@ -132,8 +148,7 @@ function activateTaskView(info) {
   }
 }
 
-function handleEvent(evt) {
-  if (!evt || !evt.event_type) return;
+function processEventCore(evt) {
   if (evt.event_id) {
     lastReceivedEventId.value = String(evt.event_id);
   } else if (evt.lastEventId) {
@@ -191,8 +206,6 @@ function handleEvent(evt) {
       break;
     }
     case "tool_called":
-      if (!isForMonitored) break;
-      if (p.tool) activityPhase.value = "running";
       break;
     case "tool_completed":
     case "observation_received":
@@ -256,6 +269,25 @@ function handleEvent(evt) {
   }
 }
 
+function handleEvent(evt) {
+  if (!evt || !evt.event_type) return;
+
+  taskReducerState.monitoredTaskId = task.id;
+  if (!shouldProcessEventIdempotent(taskReducerState, evt)) {
+    return;
+  }
+  if (taskReducerState.hasSequenceGap) {
+    console.warn("[TaskLifecycle] SSE sequence gap detected:", taskReducerState.missingSequenceGaps);
+  }
+  processEventCore(evt);
+}
+
+function reconcileSequenceGap(gapEvents) {
+  return resolveSequenceGap(taskReducerState, gapEvents, (gapEvt) => {
+    processEventCore(gapEvt);
+  });
+}
+
   async function syncActiveRunningTask() {
     try {
       const res = await listTaskQueue(activeProject.value?.id || null);
@@ -271,15 +303,30 @@ function handleEvent(evt) {
     } catch (_) {}
   }
 
-async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null) {
+async function submitTask(text, providerId = null, modelId = null, execMode = null, images = null, activeFile = null) {
   if (!text || !text.trim()) return;
   error.value = "";
   const targetProjectId = activeProject.value?.id || null;
   const startGen = workspaceGen.value;
   isSubmittingTask.value = true;
   try {
-    const pId = providerId || selectedProviderInstanceId.value || null;
-    const mId = modelId || selectedModelId.value || null;
+    let pId = providerId || selectedProviderInstanceId.value || null;
+    let mId = modelId || selectedModelId.value || null;
+
+    // Fallback otomatis jika pId atau mId belum terpilih namun llmProviders tersedia
+    const providersList = (typeof llmProviders !== "undefined" && llmProviders?.value) ? llmProviders.value : [];
+    if ((!pId || !mId) && Array.isArray(providersList) && providersList.length) {
+      const enabledProv = providersList.filter((p) => p.enabled !== false);
+      const defaultInst = enabledProv.find((p) => (p.models || []).some((m) => m.enabled !== false)) || enabledProv[0];
+      if (defaultInst) {
+        if (!pId) pId = defaultInst.id;
+        if (!mId) {
+          const activeModels = (defaultInst.models || []).filter((m) => m.enabled !== false);
+          if (activeModels.length) mId = activeModels[0].id;
+        }
+      }
+    }
+
     const eMode = execMode || selectedExecutionMode.value || "queue";
     const meta = {};
     if (pId) meta.provider_instance_id = pId;
@@ -290,7 +337,7 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
         meta.session_id = activeSessionId.value;
       }
     } catch (_) {}
-    const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images);
+    const res = await createTask(text.trim(), activeProject.value?.id || null, Object.keys(meta).length ? meta : null, eMode, images, activeFile || null);
     try {
       if (typeof activeSessionId !== "undefined" && res?.session_id && !activeSessionId.value) {
         activeSessionId.value = res.session_id;
@@ -361,13 +408,14 @@ async function submitTask(text, providerId = null, modelId = null, execMode = nu
 
 async function handleComposerSubmit(payload) {
   const text = typeof payload === "string" ? payload : payload?.text;
-  if (!text) return;
+  const activeFile = typeof payload === "object" ? payload?.activeFile : null;
   await submitTask(
     text,
     payload?.providerInstanceId || null,
     payload?.modelId || null,
     payload?.executionMode || null,
-    payload?.images || null
+    payload?.images || null,
+    activeFile || null
   );
 }
 
@@ -544,5 +592,7 @@ async function handleOpenReport(taskId) {
     resetTaskState,
     handleViewTask,
     handleOpenReport,
+    taskReducerState,
+    reconcileSequenceGap,
   };
 }

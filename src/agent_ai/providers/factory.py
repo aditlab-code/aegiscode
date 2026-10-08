@@ -251,6 +251,8 @@ def build_provider_from_config(config: Dict[str, Any]) -> BaseProvider:
             ag_kwargs["model"] = model
         if timeout:
             ag_kwargs["timeout"] = int(timeout)
+        if "idle_timeout" in config and config["idle_timeout"] is not None:
+            ag_kwargs["idle_timeout"] = int(config["idle_timeout"])
         if context_window:
             ag_kwargs["context_window"] = int(context_window)
         provider = AntigravityProvider(config=AntigravityConfig(**ag_kwargs))

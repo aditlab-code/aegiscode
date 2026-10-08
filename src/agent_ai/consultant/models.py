@@ -9,37 +9,50 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-#: Mode Consultant:
-#:   quick       -> percakapan cepat berbasis Project Bible + Project Map
-#:                  READ-ONLY (atlas_query/rig_query/project_map_status);
-#:                  TANPA tool source/runtime (read_file/search_code/list_files/
-#:                  run_command) dan TANPA refresh_project_map.
-#:   investigate -> Project Bible sebagai konteks awal, lalu boleh memakai tool
-#:                  source/runtime existing bila perlu verifikasi/investigasi.
+#: Mode Consultant kanonik (harmonisasi triad: fast, balanced, deep):
+#:   fast     -> percakapan cepat berbasis Project Bible, Project Map, dan
+#:               simbol CodeGraph READ-ONLY (codegraph_find_references);
+#:               TANPA pembacaan berkas source penuh.
+#:   balanced -> investigasi moderat: Project Map + CodeGraph callers/callees
+#:               (depth=2) + inspeksi berkas source spesifik (read_file/search_code).
+#:   deep     -> audit arsitektur penuh: CodeGraph impact analysis (blast radius),
+#:               trace API, orphan detection + inspeksi berkas + run_command.
+MODE_FAST = "fast"
+MODE_BALANCED = "balanced"
+MODE_DEEP = "deep"
+
+#: Alias lama (backward compatibility):
 MODE_QUICK = "quick"
 MODE_INVESTIGATE = "investigate"
 
-#: Mode default Consultant (percakapan cepat).
-DEFAULT_CONSULTANT_MODE = MODE_QUICK
+#: Mode default Consultant (balanced).
+DEFAULT_CONSULTANT_MODE = MODE_BALANCED
 
-#: Mode Consultant yang valid.
-VALID_CONSULTANT_MODES = (MODE_QUICK, MODE_INVESTIGATE)
+#: Mode Consultant kanonik yang valid.
+VALID_CONSULTANT_MODES = (MODE_FAST, MODE_BALANCED, MODE_DEEP, MODE_QUICK, MODE_INVESTIGATE)
+
+CONSULTANT_MODE_ALIASES: Dict[str, str] = {
+    "quick": MODE_FAST,
+    "investigate": MODE_DEEP,
+    "minimal": MODE_FAST,
+    "standard": MODE_BALANCED,
+}
 
 
 def normalize_consultant_mode(mode: Optional[str]) -> str:
-    """Normalisasi mode Consultant.
+    """Normalisasi mode Consultant ke kanonik atau alias yang valid.
 
-    Nilai kosong / tidak dikenal dipetakan ke mode default (``quick``), sehingga
-    pemanggil lama (tanpa mode) tetap memakai mode default yang aman.
+    Menerima mode baru (fast, balanced, deep) dan mode lama (quick, investigate).
+    Nilai kosong dipetakan ke default (``balanced``).
     """
     if not mode:
         return DEFAULT_CONSULTANT_MODE
     value = str(mode).strip().lower()
     if value in VALID_CONSULTANT_MODES:
         return value
+    if value in CONSULTANT_MODE_ALIASES:
+        return CONSULTANT_MODE_ALIASES[value]
     return DEFAULT_CONSULTANT_MODE
-
-
 @dataclass
 class ConsultantTurn:
     """Satu giliran percakapan konsultasi (session context)."""

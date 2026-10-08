@@ -489,16 +489,34 @@ class TaskExecutor:
             )
         except Exception as exc:  # noqa: BLE001 - provider/runtime error -> FAILED
             error = f"{type(exc).__name__}: {exc}"
-            self._emit(
-                session_id,
-                EventType.TASK_FAILED,
-                task_id=task_id,
-                payload={"error": error},
-            )
-            if on_status is not None:
-                on_status(TaskStatus.FAILED.value, None, error)
-            return {"status": TaskStatus.FAILED.value, "result": None, "error": error, "iterations": 0}
+            is_cancelled = cancel_token is not None and cancel_token.is_cancelled()
+            final_status = TaskStatus.CANCELLED.value if is_cancelled else TaskStatus.FAILED.value
+            terminal_event = EventType.TASK_CANCELLED if is_cancelled else EventType.TASK_FAILED
+            event_payload = {"reason": error} if is_cancelled else {"error": error}
 
+            # Hindari event duplikat jika session store sudah memilikinya
+            has_terminal = False
+            if self.sessions is not None and session_id:
+                try:
+                    existing = self.sessions.get_events(session_id=session_id, task_id=task_id)
+                    term_types = {"task_completed", "task_failed", "task_cancelled"}
+                    has_terminal = any(
+                        (getattr(e.event_type, "value", str(e.event_type)) in term_types)
+                        for e in existing
+                    )
+                except Exception:
+                    pass
+
+            if not has_terminal:
+                self._emit(
+                    session_id,
+                    terminal_event,
+                    task_id=task_id,
+                    payload=event_payload,
+                )
+            if on_status is not None:
+                on_status(final_status, None, error)
+            return {"status": final_status, "result": None, "error": error, "iterations": 0}
         # Consistency check AKHIR via Change Tracker Aegis (existing) dan emit
         # event change_detected (event system existing) untuk perubahan yang
         # TIDAK tercakup event live (mis. file dibuat lewat run_command).
@@ -530,7 +548,7 @@ class TaskExecutor:
         # diemit oleh AgentRuntime (sumber tunggal observability). Di sini hanya
         # update status record gateway.
         runtime_status = getattr(result, "status", None)
-        if runtime_status == RuntimeStatus.CANCELLED:
+        if (cancel_token is not None and cancel_token.is_cancelled()) or runtime_status == RuntimeStatus.CANCELLED:
             # Dibatalkan secara kooperatif: CANCELLED, bukan FAILED (tanpa retry).
             status = TaskStatus.CANCELLED.value
         elif runtime_status == RuntimeStatus.COMPLETED:

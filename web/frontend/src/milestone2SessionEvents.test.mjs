@@ -10,7 +10,7 @@ const readSrc = (relPath) => fs.readFileSync(path.join(__dirname, relPath), "utf
 const between = (s, a, b) => s.slice(s.indexOf(a), s.indexOf(b, s.indexOf(a)));
 
 test("AI-06: resumeSessionFromId out-of-order response tidak menimpa sesi baru", async () => {
-  const chatCode = readSrc("components/ConsultantChat.vue");
+  const chatCode = readSrc("components/drawer/ConsultantChat.vue");
   const resumeSource = between(
     chatCode,
     "async function resumeSessionFromId(id) {",
@@ -52,11 +52,14 @@ test("AI-06: resumeSessionFromId out-of-order response tidak menimpa sesi baru",
 
 test("BUG-03: onFilesPicked membatasi pemilihan batch gambar tepat di batas 8 lampiran", async () => {
   // Pastikan kedua komponen mengimpor dan menggunakan useAttachmentPipeline
-  for (const componentFile of ["TaskComposer.vue", "ConsultantChat.vue"]) {
-    const code = readSrc(`components/${componentFile}`);
+  const attachmentChecks = [
+    { file: "TaskComposer.vue", code: readSrc("components/workspace/TaskComposer.vue") },
+    { file: "ConsultantChat.vue", code: readSrc("components/drawer/ConsultantChat.vue") },
+  ];
+  for (const { file, code } of attachmentChecks) {
     assert.ok(
       code.includes("useAttachmentPipeline"),
-      `${componentFile} wajib mengintegrasikan useAttachmentPipeline`
+      `${file} wajib mengintegrasikan useAttachmentPipeline`
     );
   }
 
@@ -108,7 +111,7 @@ test("BUG-04: diagnosticService tidak mengeluarkan false SyntaxError pada triple
 });
 
 test("BUG-05: penutupan socket lama tidak menghapus referensi socket terminal proyek baru", () => {
-  const terminalCode = readSrc("components/TerminalView.vue");
+  const terminalCode = readSrc("components/terminal/TerminalView.vue");
   const socketSource = between(terminalCode, "function initPtySocket() {", "\nwatch(");
 
   const sockets = [];

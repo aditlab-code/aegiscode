@@ -49,6 +49,7 @@
   --border-soft:    rgba(73, 64, 97, 0.08);
   --border-subtle:  rgba(73, 64, 97, 0.05);
   --border-hover:   rgba(130, 97, 187, 0.35);
+  --btn-outline-muted: rgba(85, 81, 104, 0.28);
 
   /* Typography */
   --text-dim:       #555168;
@@ -86,6 +87,7 @@
 
 /* Badges & Slider Tracks */
 [data-theme="light"] .app-badge,
+[data-theme="light"] .aegis-badge,
 [data-theme="light"] .aether-badge,
 [data-theme="light"] .seg-badge,
 [data-theme="light"] .badge-n,

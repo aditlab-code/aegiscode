@@ -779,6 +779,9 @@
 }
 
 .side-hist-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   padding: 8px 10px;
   border-radius: 6px;
   background: var(--bg-panel);
@@ -792,6 +795,15 @@
   border-color: var(--border, #383447);
 }
 
+.side-hist-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.side-hist-item:hover .side-sess-actions,
+.side-hist-item:focus-within .side-sess-actions {
+  opacity: 1;
+}
 .side-hist-top {
   display: flex;
   align-items: center;

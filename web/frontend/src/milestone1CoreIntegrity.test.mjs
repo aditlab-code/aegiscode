@@ -12,7 +12,7 @@ const readSrc = (relPath) => fs.readFileSync(path.join(__dirname, relPath), "utf
 const between = (s, a, b) => s.slice(s.indexOf(a), s.indexOf(b, s.indexOf(a)));
 
 test("BUG-01: switchToFile tidak melempar ReferenceError ketika model sudah ada di cache", async () => {
-  const editorCode = readSrc("components/CodeEditor.vue");
+  const editorCode = readSrc("components/editor/CodeEditor.vue");
   const switchSource = between(editorCode, "async function switchToFile(", "\nasync function initEditor(");
 
   let syntaxCallback = null;
@@ -88,7 +88,7 @@ test("BUG-01: switchToFile tidak melempar ReferenceError ketika model sudah ada 
 });
 
 test("BUG-02: save() berbasis snapshot versi mempertahankan dirty: true bila ada ketikan baru saat proses simpan lambat", async () => {
-  const editorCode = readSrc("components/CodeEditor.vue");
+  const editorCode = readSrc("components/editor/CodeEditor.vue");
   const saveSource = between(editorCode, "async function save()", "\nfunction applyContent(");
 
   let currentText = "Konten Versi A";

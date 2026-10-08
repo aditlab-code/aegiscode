@@ -1,23 +1,23 @@
 <script setup>
 /**
  * App.vue - Root Application Coordinator.
- * Coordinates AppNavbar, AppActivityBar, WorkbenchView, AppFooter,
+ * Coordinates AppNavbar, AppActivityBar, WorkbenchView, AppStatusBar,
  * SettingsOverlay, and modal dialogs.
  * Coordinated workbench panels: AgentActivity, ChangesPanel, FileExplorer.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { AEGIS_VERSION, AETHER_VERSION } from "./version.js";
+import { AEGIS_VERSION } from "./version.js";
 import AppNavbar from "./components/layout/AppNavbar.vue";
 import AppActivityBar from "./components/layout/AppActivityBar.vue";
-import AppFooter from "./components/layout/AppFooter.vue";
+import AppStatusBar from "./components/layout/AppStatusBar.vue";
 import WorkbenchView from "./pages/WorkbenchView.vue";
-import ProjectLauncher from "./components/ProjectLauncher.vue";
-import ReportViewer from "./components/ReportViewer.vue";
-import ProjectPolicyPanel from "./components/ProjectPolicyPanel.vue";
+import ProjectLauncher from "./components/workspace/ProjectLauncher.vue";
+import ReportViewer from "./components/workspace/ReportViewer.vue";
+import ProjectPolicyPanel from "./components/workspace/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
 import AppButton from "./components/ui/AppButton.vue";
-import LoginOverlay from "./components/LoginOverlay.vue";
+import LoginOverlay from "./components/workspace/LoginOverlay.vue";
 import { useAuth } from "./services/authService.js";
 import {
   listTaskHistory,
@@ -187,8 +187,8 @@ const {
   activeSessionId,
   lastReceivedEventId,
   settingsOpen,
+  llmProviders,
 });
-
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
 const activeProviderLabel = computed(() => activeProvider.value?.name || config.value.provider || "");
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
@@ -210,7 +210,20 @@ async function refreshTaskHistory() {
 }
 async function handleDeleteHistory(t) {
   if (!t?.task_id) return;
-  try { await deleteTaskHistory(t.task_id, activeProject.value?.id || null); await refreshTaskHistory(); } catch (err) { error.value = `Failed to delete task history: ${err.message || err}`; }
+  try {
+    await deleteTaskHistory(t.task_id, activeProject.value?.id || null);
+  } catch (err) {
+    console.warn("Delete task history warning:", err);
+  } finally {
+    if (activeProject.value?.id) {
+      const ctx = loadWorkspaceContext(activeProject.value.id);
+      if (ctx?.task?.viewedTaskId === t.task_id) {
+        saveWorkspaceContext(activeProject.value.id, { task: { viewedTaskId: null } }, true);
+        resetTaskState();
+      }
+    }
+    await refreshTaskHistory();
+  }
 }
 async function handleClearHistory() {
   try { await clearTaskHistory(activeProject.value?.id || null); await refreshTaskHistory(); } catch (err) { error.value = `Failed to clear history: ${err.message || err}`; }
@@ -224,16 +237,29 @@ async function loadConfig() {
   } catch (_) { config.value = {}; }
 }
 async function refreshLLMProviders() {
-  try { const d = await getLLMProviders(); llmProviders.value = d?.providers || []; } catch { llmProviders.value = []; }
-  const en = llmProviders.value.filter((p) => p.enabled !== false), cfgPid = config.value.provider_instance_id, cfgMid = config.value.model_id;
+  try {
+    const d = await getLLMProviders();
+    llmProviders.value = d?.providers || [];
+  } catch {
+    llmProviders.value = [];
+  }
+  const en = llmProviders.value.filter((p) => p.enabled !== false);
+  const cfgPid = config.value.provider_instance_id;
+  const cfgMid = config.value.model_id;
+
   if (!en.some((p) => p.id === selectedProviderInstanceId.value)) {
     const withM = en.filter((p) => (p.models || []).some((m) => m.enabled !== false));
-    selectedProviderInstanceId.value = (en.find((p) => p.id === cfgPid) || withM[0] || en[0])?.id || "";
-    selectedModelId.value = "";
+    const chosen = en.find((p) => p.id === cfgPid) || withM[0] || en[0];
+    selectedProviderInstanceId.value = chosen?.id || "";
+    const ms = chosen ? (chosen.models || []).filter((m) => m.enabled !== false) : [];
+    selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
+  } else {
+    const inst = en.find((p) => p.id === selectedProviderInstanceId.value);
+    const ms = inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
+    if (!ms.some((m) => m.id === selectedModelId.value)) {
+      selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
+    }
   }
-  const inst = en.find((p) => p.id === selectedProviderInstanceId.value);
-  const ms = inst ? (inst.models || []).filter((m) => m.enabled !== false) : [];
-  if (!ms.some((m) => m.id === selectedModelId.value)) selectedModelId.value = ms.find((m) => m.id === cfgMid)?.id || ms[0]?.id || "";
 }
 async function refreshAllConfig() { await loadConfig(); await refreshLLMProviders(); }
 function toggleSidebarAction(f) { responsive.toggleSidebar(f); }
@@ -271,7 +297,14 @@ onMounted(async () => {
   if (activeProject.value?.id && !runningTaskId.value) {
     const ctx = loadWorkspaceContext(activeProject.value.id);
     if (ctx?.task?.viewedTaskId) {
-      await handleViewTask(ctx.task.viewedTaskId);
+      const exists = (taskHistory.value || []).some(
+        (item) => (item.task_id || item.id) === ctx.task.viewedTaskId
+      );
+      if (exists) {
+        await handleViewTask(ctx.task.viewedTaskId);
+      } else {
+        saveWorkspaceContext(activeProject.value.id, { task: { viewedTaskId: null } }, true);
+      }
     }
   }
   initAuth();
@@ -348,9 +381,9 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <AppFooter
+      <AppStatusBar
         :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
-        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aether-version="AETHER_VERSION" :git-branch-info="gitBranchInfo"
+        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
         :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
         @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
       />

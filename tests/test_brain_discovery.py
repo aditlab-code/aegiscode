@@ -2,7 +2,7 @@
 
 Memastikan:
 1. Pemisahan knowledge (.brain/) dan runtime log (.aegis/log/).
-2. Layered discovery: .brain/ -> .aegis/bible/ -> .aether/bible/.
+2. Layered discovery: .brain/ -> .aegis/bible/ dengan auto-migrasi legacy .aether.
 3. Provider Antigravity secara otomatis memprioritaskan .brain/.
 """
 
@@ -58,8 +58,8 @@ def test_antigravity_provider_activates_brain_store(tmp_path: Path) -> None:
     assert not (tmp_path / ".brain" / "log").exists()
 
 
-def test_layered_fallback_to_aegis_and_aether(tmp_path: Path) -> None:
-    """Fallback transparan membaca knowledge dari .aegis/bible/ dan .aether/bible/."""
+def test_layered_fallback_to_aegis_and_auto_migration(tmp_path: Path) -> None:
+    """Discovery membaca knowledge dari .aegis/bible/ dan auto-migrasi legacy .aether/bible/."""
     # 1. Fallback ke .aegis/bible
     aegis_bible = tmp_path / ".aegis" / "bible"
     aegis_bible.mkdir(parents=True)
@@ -75,7 +75,7 @@ def test_layered_fallback_to_aegis_and_aether(tmp_path: Path) -> None:
     assert len(entries) == 1
     assert entries[0].id == "conv-1"
 
-    # 2. Fallback ke legacy .aether/bible bila .aegis/bible tidak ada
+    # 2. Auto-migrasi transparan dari legacy .aether/bible bila .aegis/bible belum ada
     with tempfile.TemporaryDirectory() as td2:
         tmp2 = Path(td2).resolve()
         aether_bible = tmp2 / ".aether" / "bible"
@@ -85,7 +85,8 @@ def test_layered_fallback_to_aegis_and_aether(tmp_path: Path) -> None:
             encoding="utf-8",
         )
         bible2 = BibleStore(tmp2)
-        assert bible2.store.bible_dir == aether_bible
+        assert (tmp2 / ".aegis" / "bible" / "decisions.md").exists()
+        assert bible2.store.bible_dir == (tmp2 / ".aegis" / "bible").resolve()
         entries2 = bible2.read_category("decisions")
         assert len(entries2) == 1
         assert entries2[0].id == "dec-1"

@@ -12,7 +12,7 @@ from __future__ import annotations
 import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from agent_ai.git.models import (
     GitBranchInfo,
@@ -94,6 +94,131 @@ class GitClient(ABC):
     @abstractmethod
     def discard(self, path: Path, file_path: Optional[str] = None) -> bool:
         """Tolak/buang perubahan working tree (revert ke HEAD atau hapus file untracked)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Tambahkan perubahan ke staging index (git add)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def unstage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Hapus perubahan dari staging index (git restore --staged atau git reset)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def checkout(
+        self, path: Path, branch: str, create: bool = False, start_point: Optional[str] = None
+    ) -> bool:
+        """Beralih ke branch lain, atau buat branch baru jika create=True."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_branch(
+        self, path: Path, branch: str, start_point: Optional[str] = None, checkout: bool = False
+    ) -> bool:
+        """Buat branch baru."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_branch(
+        self, path: Path, branch: str, force: bool = False, is_remote: bool = False, remote: str = "origin"
+    ) -> bool:
+        """Hapus branch (lokal atau remote)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def merge(
+        self, path: Path, branch: str, message: Optional[str] = None, no_ff: bool = False
+    ) -> Dict[str, Any]:
+        """Gabungkan branch target ke branch aktif saat ini."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stash(
+        self, path: Path, message: Optional[str] = None, include_untracked: bool = True
+    ) -> bool:
+        """Simpan perubahan sementara ke git stash."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stash_list(self, path: Path) -> List[Dict[str, Any]]:
+        """Daftar stashes yang tersimpan."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stash_pop(self, path: Path, index: int = 0) -> bool:
+        """Terapkan stash dan hapus dari stash list."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stash_apply(self, path: Path, index: int = 0) -> bool:
+        """Terapkan stash tanpa menghapusnya dari stash list."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def stash_drop(self, path: Path, index: int = 0) -> bool:
+        """Hapus stash dari stash list."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def push(
+        self,
+        path: Path,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Push commit ke remote repository."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def pull(
+        self,
+        path: Path,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        """Pull perubahan terbaru dari remote repository."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def fetch(
+        self, path: Path, remote: Optional[str] = None, prune: bool = True
+    ) -> Dict[str, Any]:
+        """Fetch referensi dan objek dari remote."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def remotes(self, path: Path) -> List[Dict[str, str]]:
+        """Daftar remote repository yang dikonfigurasi."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_remote(self, path: Path, name: str, url: str) -> bool:
+        """Tambahkan remote repository baru."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_remote_url(self, path: Path, name: str, url: str) -> bool:
+        """Ubah URL remote repository."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def clone(self, url: str, target_path: Path) -> bool:
+        """Clone repositori dari URL ke target_path."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def commit(
+        self,
+        path: Path,
+        message: str,
+        stage_all: bool = False,
+    ) -> Dict[str, Any]:
+        """Lakukan git commit pada branch aktif saat ini."""
         raise NotImplementedError
 
 
@@ -533,3 +658,325 @@ class SubprocessGitClient(GitClient):
             pass
 
         return True
+
+    def stage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Tambahkan perubahan ke staging index (git add).
+
+        Bila `file_path` diberikan: stage file tersebut.
+        Bila `file_path` None: stage seluruh perubahan non-ignored di repository.
+        """
+        if file_path:
+            if _is_internal_ignored_path(file_path):
+                return False
+            try:
+                self._run(["add", "-A", "--", file_path], path)
+                return True
+            except GitError:
+                return False
+
+        try:
+            self._run(["add", "-A", "."], path)
+            return True
+        except GitError:
+            return False
+
+    def unstage(self, path: Path, file_path: Optional[str] = None) -> bool:
+        """Hapus perubahan dari staging index (git restore --staged atau git reset).
+
+        Bila `file_path` diberikan: unstage file tersebut.
+        Bila `file_path` None: unstage seluruh file di staging index.
+        """
+        if file_path:
+            if _is_internal_ignored_path(file_path):
+                return False
+            try:
+                self._run(["restore", "--staged", "--", file_path], path)
+                return True
+            except GitError:
+                try:
+                    self._run(["reset", "HEAD", "--", file_path], path)
+                    return True
+                except GitError:
+                    return False
+
+        try:
+            self._run(["restore", "--staged", "."], path)
+            return True
+        except GitError:
+            try:
+                self._run(["reset", "HEAD"], path)
+                return True
+            except GitError:
+                return False
+
+    def checkout(
+        self, path: Path, branch: str, create: bool = False, start_point: Optional[str] = None
+    ) -> bool:
+        args = ["checkout"]
+        if create:
+            args.extend(["-b", branch])
+            if start_point:
+                args.append(start_point)
+        else:
+            args.append(branch)
+        try:
+            self._run(args, path)
+            return True
+        except GitError:
+            # Bila gagal checkout langsung ke remote branch, coba checkout --track
+            if "/" in branch and not create:
+                try:
+                    self._run(["checkout", "--track", branch], path)
+                    return True
+                except GitError:
+                    pass
+            return False
+
+    def create_branch(
+        self, path: Path, branch: str, start_point: Optional[str] = None, checkout: bool = False
+    ) -> bool:
+        if checkout:
+            return self.checkout(path, branch, create=True, start_point=start_point)
+        args = ["branch", branch]
+        if start_point:
+            args.append(start_point)
+        try:
+            self._run(args, path)
+            return True
+        except GitError:
+            return False
+
+    def delete_branch(
+        self, path: Path, branch: str, force: bool = False, is_remote: bool = False, remote: str = "origin"
+    ) -> bool:
+        try:
+            if is_remote:
+                remote_name = remote
+                target_branch = branch
+                if "/" in branch:
+                    parts = branch.split("/", 1)
+                    remote_name, target_branch = parts[0], parts[1]
+                self._run(["push", remote_name, "--delete", target_branch], path)
+                return True
+            flag = "-D" if force else "-d"
+            self._run(["branch", flag, branch], path)
+            return True
+        except GitError:
+            return False
+
+    def merge(
+        self, path: Path, branch: str, message: Optional[str] = None, no_ff: bool = False
+    ) -> Dict[str, Any]:
+        args = ["merge"]
+        if no_ff:
+            args.append("--no-ff")
+        if message:
+            args.extend(["-m", message])
+        args.append(branch)
+        try:
+            out = self._run(args, path)
+            return {"ok": True, "output": out}
+        except GitCommandError as exc:
+            err_msg = str(exc)
+            return {
+                "ok": False,
+                "error": err_msg,
+                "conflict": "conflict" in err_msg.lower() or "merge conflict" in err_msg.lower(),
+            }
+
+    def stash(
+        self, path: Path, message: Optional[str] = None, include_untracked: bool = True
+    ) -> bool:
+        args = ["stash", "push"]
+        if include_untracked:
+            args.append("-u")
+        if message:
+            args.extend(["-m", message])
+        try:
+            self._run(args, path)
+            return True
+        except GitError:
+            return False
+
+    def stash_list(self, path: Path) -> List[Dict[str, Any]]:
+        fmt = "%gd%x1f%h%x1f%gs%x1f%cr"
+        try:
+            out = self._run(["stash", "list", f"--pretty=format:{fmt}"], path)
+        except GitError:
+            return []
+        stashes = []
+        for line in out.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split("\x1f")
+            if len(parts) < 4:
+                continue
+            ref, short_hash, msg, date = parts[0], parts[1], parts[2], parts[3]
+            idx = 0
+            if "{" in ref and "}" in ref:
+                try:
+                    idx = int(ref.split("{")[1].split("}")[0])
+                except ValueError:
+                    idx = len(stashes)
+            stashes.append(
+                {
+                    "index": idx,
+                    "ref": ref,
+                    "hash": short_hash,
+                    "message": msg,
+                    "date": date,
+                }
+            )
+        return stashes
+
+    def stash_pop(self, path: Path, index: int = 0) -> bool:
+        try:
+            self._run(["stash", "pop", f"stash@{{{index}}}"], path)
+            return True
+        except GitError:
+            return False
+
+    def stash_apply(self, path: Path, index: int = 0) -> bool:
+        try:
+            self._run(["stash", "apply", f"stash@{{{index}}}"], path)
+            return True
+        except GitError:
+            return False
+
+    def stash_drop(self, path: Path, index: int = 0) -> bool:
+        try:
+            self._run(["stash", "drop", f"stash@{{{index}}}"], path)
+            return True
+        except GitError:
+            return False
+
+    def push(
+        self,
+        path: Path,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        args = ["push"]
+        if set_upstream:
+            args.append("-u")
+        if force:
+            args.append("--force")
+        if remote:
+            args.append(remote)
+            if branch:
+                args.append(branch)
+        try:
+            out = self._run(args, path)
+            return {"ok": True, "output": out}
+        except GitCommandError as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def pull(
+        self,
+        path: Path,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        args = ["pull"]
+        if rebase:
+            args.append("--rebase")
+        if remote:
+            args.append(remote)
+            if branch:
+                args.append(branch)
+        try:
+            out = self._run(args, path)
+            return {"ok": True, "output": out}
+        except GitCommandError as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def fetch(
+        self, path: Path, remote: Optional[str] = None, prune: bool = True
+    ) -> Dict[str, Any]:
+        args = ["fetch"]
+        if prune:
+            args.append("--prune")
+        if remote:
+            args.append(remote)
+        else:
+            args.append("--all")
+        try:
+            out = self._run(args, path)
+            return {"ok": True, "output": out}
+        except GitCommandError as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def remotes(self, path: Path) -> List[Dict[str, str]]:
+        try:
+            out = self._run(["remote", "-v"], path)
+        except GitError:
+            return []
+        remotes_dict: Dict[str, Dict[str, str]] = {}
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 3:
+                name, url, direction = parts[0], parts[1], parts[2]
+                if name not in remotes_dict:
+                    remotes_dict[name] = {"name": name, "fetch_url": "", "push_url": ""}
+                if "(fetch)" in direction:
+                    remotes_dict[name]["fetch_url"] = url
+                elif "(push)" in direction:
+                    remotes_dict[name]["push_url"] = url
+        return list(remotes_dict.values())
+
+    def add_remote(self, path: Path, name: str, url: str) -> bool:
+        try:
+            self._run(["remote", "add", name, url], path)
+            return True
+        except GitError:
+            return False
+
+    def set_remote_url(self, path: Path, name: str, url: str) -> bool:
+        try:
+            self._run(["remote", "set-url", name, url], path)
+            return True
+        except GitError:
+            return False
+
+    def clone(self, url: str, target_path: Path) -> bool:
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            self._run(["clone", url, str(target_path)], target_path.parent)
+            return True
+        except GitError:
+            return False
+
+    def commit(
+        self,
+        path: Path,
+        message: str,
+        stage_all: bool = False,
+    ) -> Dict[str, Any]:
+        clean_msg = (message or "").strip()
+        if not clean_msg:
+            return {"ok": False, "error": "Commit message is required."}
+
+        st = self.status(path)
+        has_staged = any(f.staged for f in st.files)
+        if not has_staged or stage_all:
+            self.stage(path, None)
+
+        try:
+            out = self._run(["commit", "-m", clean_msg], path)
+            short_hash = ""
+            try:
+                short_hash = self._run(["rev-parse", "--short", "HEAD"], path).strip()
+            except Exception:
+                pass
+            return {
+                "ok": True,
+                "commit": short_hash,
+                "message": out,
+                "branch": self.current_branch(path),
+            }
+        except GitCommandError as exc:
+            return {"ok": False, "error": str(exc)}

@@ -22,6 +22,10 @@ export function createInitialTaskState() {
     tokenCount: null,
     taskStartedAt: null,
     taskEndedAt: null,
+    lastProcessedSequence: 0,
+    processedEventIds: new Set(),
+    hasSequenceGap: false,
+    missingSequenceGaps: [], // Array of { from: number, to: number }
   };
 }
 
@@ -38,6 +42,101 @@ export function isEventForMonitoredTask(state, event) {
   const evtTaskId = event.task_id || event.taskId;
   if (!evtTaskId) return true; // Event global sistem
   return evtTaskId === state.monitoredTaskId;
+}
+
+/**
+ * Periksa apakah event merupakan duplikat berdasarkan sequence atau event_id (idempotent guard).
+ * Mengembalikan true jika event valid untuk diproses, false jika harus diabaikan.
+ *
+ * @param {object} state
+ * @param {object} event
+ * @returns {boolean}
+ */
+export function shouldProcessEventIdempotent(state, event) {
+  if (!event || typeof event !== "object") return false;
+
+  const eventId = event.event_id || event.eventId || event.id;
+  if (eventId) {
+    if (!state.processedEventIds) {
+      state.processedEventIds = new Set();
+    }
+    if (state.processedEventIds.has(eventId)) {
+      return false; // Duplikat berdasarkan event_id
+    }
+  }
+
+  const seq = typeof event.sequence === "number" ? event.sequence : null;
+  if (seq !== null && seq > 0) {
+    const lastSeq = state.lastProcessedSequence || 0;
+    if (seq <= lastSeq) {
+      return false; // Duplikat / out-of-order sequence yang sudah pernah diproses
+    }
+    // Deteksi gap: jika lastSeq > 0 dan sequence melompat lebih dari 1 langkah
+    if (lastSeq > 0 && seq > lastSeq + 1) {
+      state.hasSequenceGap = true;
+      if (!Array.isArray(state.missingSequenceGaps)) {
+        state.missingSequenceGaps = [];
+      }
+      state.missingSequenceGaps.push({ from: lastSeq + 1, to: seq - 1 });
+    }
+    state.lastProcessedSequence = seq;
+  }
+  if (eventId) {
+    state.processedEventIds.add(eventId);
+    // Batasi memori processedEventIds agar tidak membengkak tak terhingga
+    if (state.processedEventIds.size > 2000) {
+      const oldest = Array.from(state.processedEventIds).slice(0, 500);
+      for (const id of oldest) {
+        state.processedEventIds.delete(id);
+      }
+    }
+  }
+
+  return true;
+}
+/**
+ * Rekonsiliasi event-event yang hilang akibat gap sequence.
+ * Memproses daftar event secara berurutan dan membersihkan status missingSequenceGaps.
+ *
+ * @param {object} state
+ * @param {Array<object>} events
+ * @param {function(object): void} [onApplyEvent]
+ * @returns {number} Jumlah event gap yang berhasil dipulihkan
+ */
+export function resolveSequenceGap(state, events, onApplyEvent) {
+  if (!state || !Array.isArray(events) || !events.length) return 0;
+  let resolvedCount = 0;
+
+  // Urutkan event berdasarkan sequence
+  const sorted = [...events].sort((a, b) => {
+    const seqA = typeof a.sequence === "number" ? a.sequence : 0;
+    const seqB = typeof b.sequence === "number" ? b.sequence : 0;
+    return seqA - seqB;
+  });
+
+  for (const evt of sorted) {
+    if (!evt || typeof evt !== "object") continue;
+    const eventId = evt.event_id || evt.eventId || evt.id;
+    if (eventId && state.processedEventIds?.has(eventId)) {
+      continue; // Sudah pernah diproses
+    }
+    if (eventId) {
+      state.processedEventIds?.add(eventId);
+    }
+    const seq = typeof evt.sequence === "number" ? evt.sequence : null;
+    if (seq !== null && seq > (state.lastProcessedSequence || 0)) {
+      state.lastProcessedSequence = seq;
+    }
+    if (typeof onApplyEvent === "function") {
+      onApplyEvent(evt);
+    }
+    resolvedCount++;
+  }
+
+  // Jika gap telah terisi, perbarui status hasSequenceGap
+  state.hasSequenceGap = false;
+  state.missingSequenceGaps = [];
+  return resolvedCount;
 }
 
 /**

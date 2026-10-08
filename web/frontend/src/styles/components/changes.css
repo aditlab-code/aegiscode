@@ -167,9 +167,19 @@
   color: var(--err);
 }
 
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
 .file-edit,
 .file-diff-btn,
-.file-discard-btn {
+.file-discard-btn,
+.file-stage-btn,
+.file-unstage-btn {
   width: 24px;
   height: 24px;
   flex: 0 0 auto;
@@ -194,6 +204,58 @@
   color: var(--err);
   background: rgba(247, 118, 142, 0.14);
   border-color: rgba(247, 118, 142, 0.35);
+}
+
+.file-stage-btn:hover {
+  color: var(--ok);
+  background: rgba(158, 206, 106, 0.14);
+  border-color: rgba(158, 206, 106, 0.35);
+}
+
+.file-unstage-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.sc-header-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.sc-action-icon-btn {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  padding: 0;
+}
+
+.sc-action-icon-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.sc-action-icon-btn.stage-all:hover {
+  color: var(--ok);
+  background: rgba(158, 206, 106, 0.14);
+  border-color: rgba(158, 206, 106, 0.35);
+}
+
+.sc-action-icon-btn.unstage-all:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .sc-discard-all-btn {

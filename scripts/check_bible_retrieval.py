@@ -314,15 +314,16 @@ def check_consultant_parity(root: Path) -> None:
 
 
 def check_bible_untouched(root: Path) -> None:
-    facts = root / ".aether" / "bible" / "facts.md"
+    bible_dir = (root / ".aegis" / "bible") if (root / ".aegis" / "bible").exists() else (root / ".aether" / "bible")
+    facts = bible_dir / "facts.md"
     before = facts.read_text(encoding="utf-8")
     brain = ProjectBrain.for_project(root)
     BibleRetriever(brain).retrieve("fix authentication bug")
     after = facts.read_text(encoding="utf-8")
     assert before == after, "retrieval TIDAK boleh mengubah Bible"
-    files_before = sorted(p.name for p in (root / ".aether" / "bible").glob("*.md"))
+    files_before = sorted(p.name for p in bible_dir.glob("*.md"))
     BibleRetriever(brain).retrieve("deployment server")
-    files_after = sorted(p.name for p in (root / ".aether" / "bible").glob("*.md"))
+    files_after = sorted(p.name for p in bible_dir.glob("*.md"))
     assert files_before == files_after, "retrieval tidak boleh menambah/menghapus file Bible"
     print("[9] Bible tetap utuh OK -> retrieval READ-ONLY")
 

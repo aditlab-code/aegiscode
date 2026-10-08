@@ -246,6 +246,19 @@ expectStates(
   assert.equal(currentPhase, "planning");
 }
 
+// Event tool_called (mis. view_file/bash) TIDAK menimpa currentPhase dari phase_changed.
+{
+  const events = [
+    { event: "task_started", data: {} },
+    { event: "phase_changed", data: { phase: "inspecting" } },
+    { event: "tool_called", data: { tool: "view_file", canonical_tool: "read_file" } },
+    { event: "phase_changed", data: { phase: "editing" } },
+    { event: "tool_called", data: { tool: "replace_file_content", canonical_tool: "edit_file" } },
+  ];
+  const { milestones, currentPhase } = lifecycleFromEvents(events);
+  assert.deepEqual(milestones, [0, 1, 2]);
+  assert.equal(currentPhase, "editing", "tool_called tidak boleh menimpa editing menjadi running");
+}
 console.log(
   "[OK] lifecycle: phase_changed -> 6 step; milestone tetap done saat mundur; completed/failed/cancelled benar."
 );

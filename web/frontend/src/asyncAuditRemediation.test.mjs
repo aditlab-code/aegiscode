@@ -23,7 +23,7 @@ test("T01_ASYNC01: KNOWN_SSE_EVENTS dan EVENT_DESCRIBERS memuat warning & reason
   assert.ok(KNOWN_SSE_EVENTS.includes("warning"), "KNOWN_SSE_EVENTS harus memuat 'warning'");
   assert.ok(KNOWN_SSE_EVENTS.includes("agent_reasoning_delta"), "KNOWN_SSE_EVENTS harus memuat 'agent_reasoning_delta'");
 
-  const actCode = readSrc("components/AgentActivity.vue");
+  const actCode = readSrc("components/drawer/AgentActivity.vue");
   const descSource = between(
     actCode,
     "const EVENT_DESCRIBERS = {",
@@ -255,17 +255,27 @@ test("T05_ASYNC05: activateTaskView membersihkan prompt, tokens, dan state saat 
   const validation = { state: "ok" };
   let tickerStopped = false;
   const durationTicker = { stop: () => { tickerStopped = true; } };
+  const taskReducerState = {
+    monitoredTaskId: "",
+    lastProcessedSequence: 0,
+    processedEventIds: new Set(),
+    hasSequenceGap: false,
+    missingSequenceGaps: [],
+  };
 
   const activateTaskView = new Function(
     "task", "runningTaskId", "activityPhase", "lifecycleMilestones",
     "activityEvents", "changes", "tokenCount", "taskTelemetry",
     "taskStartedAt", "taskEndedAt", "validation", "durationTicker",
+    "taskReducerState",
     `${activateSrc}\nreturn activateTaskView;`
   )(
     task, runningTaskId, activityPhase, lifecycleMilestones,
     activityEvents, changes, tokenCount, taskTelemetry,
-    taskStartedAt, taskEndedAt, validation, durationTicker
+    taskStartedAt, taskEndedAt, validation, durationTicker,
+    taskReducerState
   );
+
 
   // Adopsi task baru yang masih pending
   activateTaskView({
@@ -335,7 +345,7 @@ test("T06_ASYNC06: submitTask guard generasi workspace menolak adopsi jika proje
 
 // ── T07: ASYNC-07 ─────────────────────────────────────────────────────────────
 test("T07_ASYNC07: ConsultantChat send() membuang respons terlambat jika sesi berganti", async () => {
-  const chatCode = readSrc("components/ConsultantChat.vue");
+  const chatCode = readSrc("components/drawer/ConsultantChat.vue");
   const sendSrc = between(
     chatCode,
     "let consultSeq = 0;",
@@ -421,10 +431,10 @@ test("T08_ASYNC08: usageTokens memproses token tepat satu kali tanpa duplikasi",
 });
 
 // ── T09: ASYNC-09 ─────────────────────────────────────────────────────────────
-test("T09_ASYNC09: AppRightDrawer mengizinkan enqueue saat running dan menolak saat isSubmitting", () => {
-  const drawerCode = readSrc("components/layout/AppRightDrawer.vue");
+test("T09_ASYNC09: AgentDrawerPanel mengizinkan enqueue saat running dan menolak saat isSubmitting", () => {
+  const panelCode = readSrc("components/drawer/AgentDrawerPanel.vue");
   const submitSrc = between(
-    drawerCode,
+    panelCode,
     "function handleSubmit() {",
     "\nasync function viewReport("
   );
@@ -453,7 +463,7 @@ test("T09_ASYNC09: AppRightDrawer mengizinkan enqueue saat running dan menolak s
 
 // ── T10: ASYNC-10 ─────────────────────────────────────────────────────────────
 test("T10_ASYNC10: EVENT_DESCRIBERS merender kegagalan provider_response error dan task_failed", () => {
-  const actCode = readSrc("components/AgentActivity.vue");
+  const actCode = readSrc("components/drawer/AgentActivity.vue");
   const descSource = between(
     actCode,
     "const EVENT_DESCRIBERS = {",

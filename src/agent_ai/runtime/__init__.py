@@ -25,6 +25,12 @@ from agent_ai.runtime.working_state import (
     PlanEntryStatus,
     TERMINAL_PLAN_ENTRY_STATUSES,
 )
+from agent_ai.runtime.lifecycle import (
+    TaskLifecycleManager,
+    TaskLifecycleState,
+    TaskLifecycleTransitionError,
+    TERMINAL_LIFECYCLE_STATES,
+)
 
 __all__ = [
     "AgentRuntime",
@@ -36,4 +42,8 @@ __all__ = [
     "PlanEntry",
     "PlanEntryStatus",
     "TERMINAL_PLAN_ENTRY_STATUSES",
+    "TaskLifecycleManager",
+    "TaskLifecycleState",
+    "TaskLifecycleTransitionError",
+    "TERMINAL_LIFECYCLE_STATES",
 ]

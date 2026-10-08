@@ -102,7 +102,7 @@ test("7. diagnosticService: validateCodeSyntax catches bracket imbalance and inv
   assert.equal(jsErrors[0].type, "syntax");
   assert.equal(jsErrors[0].label, "Syntax Error");
 
-  const badJson = '{\n  "name": "aether",\n  "version": \n}';
+  const badJson = '{\n  "name": "aegis",\n  "version": \n}';
   const jsonErrors = validateCodeSyntax(badJson, "json", "config.json");
   assert.ok(jsonErrors.length > 0);
   assert.equal(jsonErrors[0].type, "syntax");
@@ -119,7 +119,7 @@ test("8. diagnosticService: validateCodeSyntax catches missing Python colons", (
 });
 
 test("9. diagnosticService: validateCodeSyntax catches JSON lints (comments, duplicate keys)", () => {
-  const commentedJson = '{\n  // this is a comment\n  "name": "Aether",\n  "name": "Duplicate"\n}';
+  const commentedJson = '{\n  // this is a comment\n  "name": "Aegis",\n  "name": "Duplicate"\n}';
   const errors = validateCodeSyntax(commentedJson, "json", "package.json");
 
   const commentLint = errors.find((e) => e.text.includes("comments") && e.type === "lint");

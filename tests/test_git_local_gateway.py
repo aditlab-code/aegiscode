@@ -66,7 +66,7 @@ def test_git_repository_facade_diff_detail(temp_git_repo):
 
     # 1. Modify hello.py
     hello_file = temp_git_repo / "hello.py"
-    hello_file.write_text("print('hello world')\nprint('welcome to aether')\n", encoding="utf-8")
+    hello_file.write_text("print('hello world')\nprint('welcome to aegis')\n", encoding="utf-8")
 
     # 2. Add an untracked file
     new_file = temp_git_repo / "new_module.py"
@@ -84,9 +84,9 @@ def test_git_repository_facade_diff_detail(temp_git_repo):
     assert diff_hello["path"] == "hello.py"
     assert diff_hello["status"] == "modified"
     assert "print('hello world')" in diff_hello["original"]
-    assert "welcome to aether" not in diff_hello["original"]
-    assert "welcome to aether" in diff_hello["modified"]
-    assert "+print('welcome to aether')" in diff_hello["diff"]
+    assert "welcome to aegis" not in diff_hello["original"]
+    assert "welcome to aegis" in diff_hello["modified"]
+    assert "+print('welcome to aegis')" in diff_hello["diff"]
 
     # diff_detail for untracked file
     diff_new = facade.diff_detail("new_module.py")
@@ -422,3 +422,387 @@ def test_gitignore_patterns_and_sync(tmp_path):
     assert st["gitignore_rules"] == ["*.log", "node_modules/", "secrets.env"]
 
 
+
+def test_git_repository_facade_stage_and_unstage(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+    assert facade.is_repository() is True
+
+    # Create 2 modified files
+    file_a = temp_git_repo / "hello.py"
+    file_a.write_text("print('hello world')\n# change 1\n", encoding="utf-8")
+
+    file_b = temp_git_repo / "extra.py"
+    file_b.write_text("print('extra file')\n", encoding="utf-8")
+
+    st = facade.status()
+    assert st.clean is False
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is False
+    assert st_map["extra.py"].staged is False
+
+    # Stage only hello.py
+    res_stage = facade.stage("hello.py")
+    assert res_stage["ok"] is True
+    assert res_stage["file_path"] == "hello.py"
+
+    # Check status and diff_detail
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is True
+    assert st_map["extra.py"].staged is False
+
+    diff_a = facade.diff_detail("hello.py")
+    assert diff_a["staged"] is True
+    diff_b = facade.diff_detail("extra.py")
+    assert diff_b["staged"] is False
+
+    # Unstage hello.py
+    res_unstage = facade.unstage("hello.py")
+    assert res_unstage["ok"] is True
+    assert res_unstage["file_path"] == "hello.py"
+
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is False
+    diff_a_after = facade.diff_detail("hello.py")
+    assert diff_a_after["staged"] is False
+
+    # Stage all
+    res_stage_all = facade.stage()
+    assert res_stage_all["ok"] is True
+    st = facade.status()
+    for f in st.files:
+        assert f.staged is True
+
+    # Unstage all
+    res_unstage_all = facade.unstage()
+    assert res_unstage_all["ok"] is True
+    st = facade.status()
+    for f in st.files:
+        assert f.staged is False
+
+
+def test_git_gateway_stage_and_unstage_endpoints(temp_git_repo):
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {"id": "proj-stage-1", "path": str(temp_git_repo)}
+
+    service = GatewayService(
+        project_store=mock_store,
+        project_registry=MagicMock(),
+        task_preparation=MagicMock(),
+        session_store=MagicMock(),
+    )
+
+    orig_get_service = views.get_service
+    views.get_service = lambda: service
+
+    try:
+        client = Client()
+
+        # Modify hello.py
+        (temp_git_repo / "hello.py").write_text("changed content\n", encoding="utf-8")
+
+        # POST stage
+        res_stage = client.post(
+            "/api/projects/proj-stage-1/git/stage",
+            data='{"file_path": "hello.py"}',
+            content_type="application/json",
+        )
+        assert res_stage.status_code == 200
+        data_stage = res_stage.json()
+        assert data_stage["ok"] is True
+        assert data_stage["file_path"] == "hello.py"
+
+        # Verify via diff endpoint
+        res_diff = client.get("/api/projects/proj-stage-1/git/diff?path=hello.py")
+        assert res_diff.status_code == 200
+        assert res_diff.json()["staged"] is True
+
+        # POST unstage
+        res_unstage = client.post(
+            "/api/projects/proj-stage-1/git/unstage",
+            data='{"file_path": "hello.py"}',
+            content_type="application/json",
+        )
+        assert res_unstage.status_code == 200
+        data_unstage = res_unstage.json()
+        assert data_unstage["ok"] is True
+        assert data_unstage["file_path"] == "hello.py"
+
+        # Verify diff endpoint now shows unstaged
+        res_diff2 = client.get("/api/projects/proj-stage-1/git/diff?path=hello.py")
+        assert res_diff2.status_code == 200
+        assert res_diff2.json()["staged"] is False
+    finally:
+        views.get_service = orig_get_service
+
+
+def test_create_checkpoint_selective_staging(temp_git_repo):
+    from api.github_backup import GithubBackupService
+
+    backup_service = GithubBackupService()
+    backup_service.save_config(root=temp_git_repo, repository="", branch="main")
+
+    # Commit .gitignore terlebih dahulu agar tidak terhitung sebagai untracked file baru
+    gi = temp_git_repo / ".gitignore"
+    gi.write_text(".aegis/\n", encoding="utf-8")
+    subprocess.run(["git", "add", ".gitignore"], cwd=str(temp_git_repo), check=True)
+    subprocess.run(["git", "commit", "-m", "Add gitignore"], cwd=str(temp_git_repo), check=True)
+
+    facade = GitRepositoryFacade(root=temp_git_repo)
+
+    # Create 2 modifications
+    file_a = temp_git_repo / "hello.py"
+    file_a.write_text("print('hello staged')\n", encoding="utf-8")
+
+    file_b = temp_git_repo / "world.py"
+    file_b.write_text("print('unstaged file')\n", encoding="utf-8")
+    # Stage only file_a
+    facade.stage("hello.py")
+
+    st = facade.status()
+    st_map = {f.path: f for f in st.files}
+    assert st_map["hello.py"].staged is True
+    assert st_map["world.py"].staged is False
+
+    # Create checkpoint: should only commit hello.py
+    res = backup_service.create_checkpoint(root=temp_git_repo, description="Checkpoint Staged Only")
+    assert res["committed"] is True
+    assert res["checkpoint"]["files_changed"] == 1
+
+    # Verify world.py is still uncommitted in working tree
+    st_after = facade.status()
+    assert st_after.clean is False
+    st_after_map = {f.path: f for f in st_after.files}
+    assert "hello.py" not in st_after_map
+    assert "world.py" in st_after_map
+    assert st_after_map["world.py"].staged is False
+
+    # Second checkpoint without manual staging: should auto-stage remaining changes
+    res2 = backup_service.create_checkpoint(root=temp_git_repo, description="Checkpoint Fallback Auto Stage")
+    assert res2["committed"] is True
+    assert res2["checkpoint"]["files_changed"] == 1
+
+    # Working tree should now be clean
+    st_clean = facade.status()
+    assert st_clean.clean is True
+    assert st_clean.files == []
+
+
+def test_git_branch_checkout_create_delete_merge(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+    assert facade.is_repository() is True
+
+    # Create new branch 'feature-auth' and checkout
+    res_create = facade.create_branch("feature-auth", checkout=True)
+    assert res_create["ok"] is True
+    assert res_create["branch"] == "feature-auth"
+    assert facade.current_branch() == "feature-auth"
+
+    # Commit on feature-auth
+    feat_file = temp_git_repo / "auth.py"
+    feat_file.write_text("print('auth module')\n", encoding="utf-8")
+    facade.stage("auth.py")
+    subprocess.run(["git", "commit", "-m", "Add auth"], cwd=str(temp_git_repo), check=True)
+
+    # Checkout back to initial branch (master or main)
+    b_info = facade.branch_info()
+    initial_branch = "main" if "main" in b_info.local_branches else "master"
+    res_co = facade.checkout(initial_branch)
+    assert res_co["ok"] is True
+    assert facade.current_branch() == initial_branch
+
+    # Merge feature-auth into initial_branch
+    res_merge = facade.merge("feature-auth", message="Merge feature auth")
+    assert res_merge["ok"] is True
+    assert (temp_git_repo / "auth.py").exists()
+
+    # Delete branch feature-auth
+    res_del = facade.delete_branch("feature-auth")
+    assert res_del["ok"] is True
+    b_info_after = facade.branch_info()
+    assert "feature-auth" not in b_info_after.local_branches
+
+
+def test_git_stash_operations(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+
+    # Make a change
+    hello = temp_git_repo / "hello.py"
+    hello.write_text("print('modified for stash')\n", encoding="utf-8")
+
+    # Stash
+    res_stash = facade.stash(message="WIP stash test")
+    assert res_stash["ok"] is True
+    assert facade.status().clean is True
+
+    # Stash list
+    stashes = facade.stash_list()
+    assert len(stashes) >= 1
+    assert "WIP stash test" in stashes[0]["message"]
+
+    # Stash pop
+    res_pop = facade.stash_pop(0)
+    assert res_pop["ok"] is True
+    assert facade.status().clean is False
+    assert "modified for stash" in hello.read_text(encoding="utf-8")
+
+
+def test_git_remotes_operations(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+
+    # Add remote
+    res_add = facade.add_remote("origin", "https://github.com/example/test.git")
+    assert res_add["ok"] is True
+
+    # List remotes
+    remotes = facade.remotes()
+    assert len(remotes) == 1
+    assert remotes[0]["name"] == "origin"
+    assert "https://github.com/example/test.git" in remotes[0]["fetch_url"]
+
+    # Set remote url
+    res_set = facade.set_remote_url("origin", "https://github.com/example/updated.git")
+    assert res_set["ok"] is True
+    remotes_updated = facade.remotes()
+    assert "https://github.com/example/updated.git" in remotes_updated[0]["fetch_url"]
+
+
+def test_git_endpoints_branch_stash_remotes(temp_git_repo):
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {
+        "id": "proj-multi-1",
+        "name": "Multi Branch Project",
+        "path": str(temp_git_repo),
+    }
+    svc = GatewayService(project_store=mock_store)
+    orig_get_service = views.get_service
+    views.get_service = lambda: svc
+
+    try:
+        client = Client()
+
+        # 1. Create branch endpoint
+        res_create = client.post(
+            "/api/projects/proj-multi-1/git/branches/create",
+            data='{"branch": "endpoint-branch", "checkout": true}',
+            content_type="application/json",
+        )
+        assert res_create.status_code == 200
+        assert res_create.json()["ok"] is True
+        assert res_create.json()["branch"] == "endpoint-branch"
+
+        # 2. Checkout endpoint back
+        b_info = svc.git_branches("proj-multi-1")
+        main_b = "main" if "main" in b_info["local_branches"] else "master"
+        res_co = client.post(
+            "/api/projects/proj-multi-1/git/checkout",
+            data=f'{{"branch": "{main_b}"}}',
+            content_type="application/json",
+        )
+        assert res_co.status_code == 200
+        assert res_co.json()["ok"] is True
+
+        # 3. Merge endpoint
+        res_merge = client.post(
+            "/api/projects/proj-multi-1/git/merge",
+            data='{"branch": "endpoint-branch"}',
+            content_type="application/json",
+        )
+        assert res_merge.status_code == 200
+        assert res_merge.json()["ok"] is True
+
+        # 4. Stash endpoint
+        hello = temp_git_repo / "hello.py"
+        hello.write_text("print('endpoint stash')\n", encoding="utf-8")
+        res_stash = client.post(
+            "/api/projects/proj-multi-1/git/stash",
+            data='{"message": "Endpoint stash"}',
+            content_type="application/json",
+        )
+        assert res_stash.status_code == 200
+        assert res_stash.json()["ok"] is True
+
+        # 5. Stash list endpoint
+        res_slist = client.get("/api/projects/proj-multi-1/git/stash/list")
+        assert res_slist.status_code == 200
+        assert len(res_slist.json()["stashes"]) >= 1
+
+        # 6. Stash pop endpoint
+        res_spop = client.post(
+            "/api/projects/proj-multi-1/git/stash/pop",
+            data='{"index": 0}',
+            content_type="application/json",
+        )
+        assert res_spop.status_code == 200
+        assert res_spop.json()["ok"] is True
+
+        # 7. Remotes endpoint GET & POST
+        res_rem_post = client.post(
+            "/api/projects/proj-multi-1/git/remotes",
+            data='{"name": "upstream", "url": "https://github.com/origin/repo.git"}',
+            content_type="application/json",
+        )
+        assert res_rem_post.status_code == 200
+        assert res_rem_post.json()["ok"] is True
+
+        res_rem_get = client.get("/api/projects/proj-multi-1/git/remotes")
+        assert res_rem_get.status_code == 200
+        assert any(r["name"] == "upstream" for r in res_rem_get.json()["remotes"])
+
+        # 8. Delete branch endpoint
+        res_del = client.post(
+            "/api/projects/proj-multi-1/git/branches/delete",
+            data='{"branch": "endpoint-branch"}',
+            content_type="application/json",
+        )
+        assert res_del.status_code == 200
+        assert res_del.json()["ok"] is True
+    finally:
+        views.get_service = orig_get_service
+
+
+def test_git_clone_operation(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+    res_clone = facade.clone(url=str(temp_git_repo), target_dir="subclone")
+    assert res_clone["ok"] is True
+    assert (temp_git_repo / "subclone" / "hello.py").exists()
+
+
+def test_git_native_commit_facade_and_endpoint(temp_git_repo):
+    facade = GitRepositoryFacade(root=temp_git_repo)
+
+    # 1. Modify file and test facade.commit
+    hello = temp_git_repo / "hello.py"
+    hello.write_text("print('native branch commit')\n", encoding="utf-8")
+    facade.stage("hello.py")
+    res_commit = facade.commit("Native commit on active branch")
+    assert res_commit["ok"] is True
+    assert res_commit["commit"] != ""
+    assert facade.status().clean is True
+
+    # 2. Test HTTP endpoint /git/commit
+    hello.write_text("print('endpoint native commit')\n", encoding="utf-8")
+    mock_store = MagicMock()
+    mock_store.get_project.return_value = {
+        "id": "proj-commit-1",
+        "name": "Commit Project",
+        "path": str(temp_git_repo),
+    }
+    svc = GatewayService(project_store=mock_store)
+    orig_get_service = views.get_service
+    views.get_service = lambda: svc
+    try:
+        client = Client()
+        res = client.post(
+            "/api/projects/proj-commit-1/git/commit",
+            data='{"message": "Endpoint native commit", "stage_all": true}',
+            content_type="application/json",
+        )
+        assert res.status_code == 200
+        data = res.json()
+        assert data["ok"] is True
+        assert data["commit"] != ""
+        assert facade.status().clean is True
+    finally:
+        views.get_service = orig_get_service

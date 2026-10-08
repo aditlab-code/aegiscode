@@ -1,16 +1,9 @@
 <script setup>
-import { computed, ref, watch } from "vue";
-import FileExplorer from "../FileExplorer.vue";
-import ChangesPanel from "../ChangesPanel.vue";
-import GithubBackupPanel from "../GithubBackupPanel.vue";
-import QueuePanel from "../QueuePanel.vue";
+import { computed } from "vue";
+import ExplorerSidebarPanel from "../sidebar/ExplorerSidebarPanel.vue";
+import GitSidebarPanel from "../sidebar/GitSidebarPanel.vue";
+import ThreadsHistoryPanel from "../sidebar/ThreadsHistoryPanel.vue";
 import { formatProjectOption } from "../../services/projectService.js";
-import {
-  listSessions,
-  createSession,
-  renameSession,
-  deleteSession,
-} from "../../api.js";
 
 const props = defineProps({
   activeNav: {
@@ -104,6 +97,7 @@ const emit = defineEmits([
   "view-task",
   "open-history-task",
   "refresh-history",
+  "delete-history",
   "open-consultant-session",
   "open-session",
   "select-tab",
@@ -112,6 +106,9 @@ const emit = defineEmits([
   "collapse-sidebar",
   "open-diff",
   "discard-change",
+  "stage-change",
+  "unstage-change",
+  "checkpoint-created",
   "branch-info-updated",
 ]);
 
@@ -119,137 +116,18 @@ const projectOptions = computed(() => {
   return props.projects.map((p) => formatProjectOption(p));
 });
 
+const navDisplayLabel = computed(() => ({
+  explorer: 'EXPLORER',
+  git: 'SOURCE CONTROL',
+  queue: 'THREADS & HISTORY',
+  settings: 'SETTINGS',
+}[props.activeNav] ?? props.activeNav.toUpperCase()));
+
 function onProjectChange(event) {
   const newId = event.target.value;
   if (newId) {
     emit("select-project", newId);
   }
-}
-
-function handleOpenFile(file) {
-  emit("open-file", file);
-}
-
-function handleOpenDiff(file) {
-  emit("open-diff", file);
-}
-
-// Task/Thread view subtab: Threads | Queue | History
-const taskSubTab = ref("threads");
-const sessions = ref([]);
-const sessionsLoading = ref(false);
-const renamingSessionId = ref("");
-const renameTitleInput = ref("");
-
-async function loadThreads() {
-  if (sessionsLoading.value) return;
-  sessionsLoading.value = true;
-  try {
-    const projId = props.selectedProjectId || props.activeProject?.id || null;
-    const res = await listSessions(projId);
-    sessions.value = res?.sessions || [];
-  } catch (err) {
-    sessions.value = [];
-  } finally {
-    sessionsLoading.value = false;
-  }
-}
-
-function selectSession(sessionId) {
-  emit("open-session", sessionId);
-  emit("open-consultant-session", sessionId);
-}
-
-async function handleNewThread() {
-  try {
-    const projId = props.selectedProjectId || props.activeProject?.id || null;
-    const res = await createSession({ projectId: projId, title: "New Thread" });
-    if (res?.session_id) {
-      await loadThreads();
-      selectSession(res.session_id);
-    }
-  } catch (err) {
-    selectSession("");
-  }
-}
-
-function startRename(s, event) {
-  event?.stopPropagation?.();
-  renamingSessionId.value = s.session_id;
-  renameTitleInput.value = s.title || "";
-}
-
-async function saveRename(s, event) {
-  event?.stopPropagation?.();
-  const nextTitle = renameTitleInput.value.trim();
-  if (!nextTitle) {
-    renamingSessionId.value = "";
-    return;
-  }
-  try {
-    const projId = props.selectedProjectId || props.activeProject?.id || null;
-    await renameSession(s.session_id, nextTitle, projId);
-    await loadThreads();
-  } catch (err) {
-    console.error("Gagal mengubah judul sesi:", err);
-  } finally {
-    renamingSessionId.value = "";
-  }
-}
-
-async function handleDeleteSession(s, event) {
-  event?.stopPropagation?.();
-  if (!confirm(`Hapus thread "${s.title || s.session_id}"?`)) return;
-  try {
-    const projId = props.selectedProjectId || props.activeProject?.id || null;
-    await deleteSession(s.session_id, projId);
-    if (props.activeSessionId === s.session_id) {
-      selectSession("");
-    }
-    await loadThreads();
-  } catch (err) {
-    console.error("Gagal menghapus sesi:", err);
-  }
-}
-
-watch(
-  () => [taskSubTab.value, props.activeProject?.id, props.queueRefresh],
-  ([tab]) => {
-    if (tab === "threads" || tab === "sessions") {
-      loadThreads();
-    } else if (tab === "history") {
-      emit("refresh-history");
-    }
-  },
-  { immediate: true }
-);
-
-function formatSessionTime(iso) {
-  if (!iso) return "";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch (e) {
-    return "";
-  }
-}
-
-function formatTaskTime(ts) {
-  if (!ts) return "";
-  try {
-    const d = new Date(typeof ts === "number" ? ts * 1000 : ts);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch (e) {
-    return String(ts);
-  }
-}
-
-function statusTagClass(st) {
-  const s = String(st || "").toLowerCase();
-  if (s === "done" || s === "success") return "tag-done";
-  if (s === "running") return "tag-running";
-  if (s === "failed" || s === "error") return "tag-err";
-  return "tag-idle";
 }
 </script>
 
@@ -258,7 +136,7 @@ function statusTagClass(st) {
     <!-- Header: Section Title & Project Switcher -->
     <div class="sidebar-header">
       <div class="sidebar-section-title-row">
-        <span class="sidebar-section-title">{{ activeNav.toUpperCase() }}</span>
+        <span class="sidebar-section-title">{{ navDisplayLabel }}</span>
         <div class="sidebar-header-actions">
           <button
             type="button"
@@ -330,254 +208,56 @@ function statusTagClass(st) {
     <!-- Content Area: Dynamic Panels based on activeNav -->
     <div class="sidebar-content">
       <!-- 1. Explorer Section -->
-      <section v-if="activeNav === 'explorer'" class="sidebar-panel explorer-panel" aria-label="EXPLORER">
-        <span class="sr-only">EXPLORER</span>
-        <FileExplorer
-          v-if="activeProject"
-          :project="activeProject"
-          :refresh-key="explorerRefresh"
-          :live-change="liveFsChange"
-          :open-tabs="openTabs"
-          :active-tab-path="activeTabPath"
-          :open-tabs2="openTabs2"
-          :active-tab-path2="activeTabPath2"
-          :split-active="splitActive"
-          :active-pane="activePane"
-          @open-file="handleOpenFile"
-          @open-file-editor="handleOpenFile"
-          @select-tab="(path, pane) => emit('select-tab', path, pane)"
-          @close-tab="(path, pane) => emit('close-tab', path, pane)"
-          @clear-tabs="(pane) => emit('clear-tabs', pane)"
-        />
-        <div v-else class="sidebar-empty-workspace">
-          <div class="empty-ws-content">
-            <span class="empty-ws-title">No Folder Opened</span>
-            <p class="empty-ws-desc">Open a folder to start inspecting and editing files.</p>
-            <button
-              type="button"
-              class="sidebar-open-folder-btn"
-              @click="emit('open-folder')"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-              </svg>
-              <span>Open Folder…</span>
-            </button>
-          </div>
-        </div>
-      </section>
+      <ExplorerSidebarPanel
+        v-if="activeNav === 'explorer'"
+        :active-project="activeProject"
+        :explorer-refresh="explorerRefresh"
+        :live-fs-change="liveFsChange"
+        :open-tabs="openTabs"
+        :active-tab-path="activeTabPath"
+        :open-tabs2="openTabs2"
+        :active-tab-path2="activeTabPath2"
+        :split-active="splitActive"
+        :active-pane="activePane"
+        @open-file="emit('open-file', $event)"
+        @open-file-editor="emit('open-file', $event)"
+        @select-tab="(path, pane) => emit('select-tab', path, pane)"
+        @close-tab="(path, pane) => emit('close-tab', path, pane)"
+        @clear-tabs="(pane) => emit('clear-tabs', pane)"
+        @open-folder="emit('open-folder')"
+      />
 
       <!-- 2. Git & Source Control Section -->
-      <section v-else-if="activeNav === 'git'" class="sidebar-panel git-panel">
-        <div class="backup-subpanel">
-          <GithubBackupPanel
-            :project="activeProject"
-            :refresh-key="explorerRefresh"
-            @branch-info-updated="emit('branch-info-updated', $event)"
-          >
-            <ChangesPanel
-              :changes="changes"
-              :validation="validation || {}"
-              :project="activeProject"
-              :refresh-key="explorerRefresh"
-              @open-file="handleOpenFile"
-              @open-diff="handleOpenDiff"
-              @discard-change="emit('discard-change', $event)"
-            />
-          </GithubBackupPanel>
-        </div>
-      </section>
+      <GitSidebarPanel
+        v-else-if="activeNav === 'git'"
+        :active-project="activeProject"
+        :explorer-refresh="explorerRefresh"
+        :changes="changes"
+        :validation="validation"
+        @open-file="emit('open-file', $event)"
+        @open-diff="emit('open-diff', $event)"
+        @discard-change="emit('discard-change', $event)"
+        @stage-change="emit('stage-change', $event)"
+        @unstage-change="emit('unstage-change', $event)"
+        @checkpoint-created="emit('checkpoint-created', $event)"
+        @branch-info-updated="emit('branch-info-updated', $event)"
+      />
 
-      <!-- 3. Task Queue / History / Threads Section -->
-      <section v-else-if="activeNav === 'queue'" class="sidebar-panel queue-panel task-multitab-panel">
-        <div class="task-subtabs-bar" role="tablist" aria-label="Task Subtabs">
-          <button
-            type="button"
-            class="task-subtab-pill"
-            :class="{ active: taskSubTab === 'threads' || taskSubTab === 'sessions' }"
-            role="tab"
-            :aria-selected="taskSubTab === 'threads' || taskSubTab === 'sessions'"
-            @click="taskSubTab = 'threads'; loadThreads();"
-          >
-            Threads
-            <span v-if="sessions.length" class="subtab-count">{{ sessions.length }}</span>
-          </button>
-          <button
-            type="button"
-            class="task-subtab-pill"
-            :class="{ active: taskSubTab === 'queue' }"
-            role="tab"
-            :aria-selected="taskSubTab === 'queue'"
-            @click="taskSubTab = 'queue'"
-          >
-            Queue
-          </button>
-          <button
-            type="button"
-            class="task-subtab-pill"
-            :class="{ active: taskSubTab === 'history' }"
-            role="tab"
-            :aria-selected="taskSubTab === 'history'"
-            @click="taskSubTab = 'history'; emit('refresh-history');"
-          >
-            History
-            <span v-if="taskHistory.length" class="subtab-count">{{ taskHistory.length }}</span>
-          </button>
-        </div>
-
-        <div class="task-subtab-body">
-          <!-- Subtab 1: Threads / Sessions -->
-          <div v-if="taskSubTab === 'threads' || taskSubTab === 'sessions'" class="task-subpane sidebar-sessions-pane">
-            <div class="side-sess-head">
-              <span class="side-sess-title">Threads</span>
-              <button
-                type="button"
-                class="side-sess-new-btn"
-                title="Start New Thread"
-                @click="handleNewThread"
-              >
-                + New Thread
-              </button>
-            </div>
-
-            <div v-if="sessionsLoading && !sessions.length" class="side-task-loading">
-              Loading threads…
-            </div>
-
-            <div v-else-if="!sessions.length" class="side-task-empty">
-              <span>No conversation threads</span>
-              <small>Start a new thread to begin chatting or executing tasks</small>
-            </div>
-
-            <div v-else class="side-sess-list">
-              <div
-                v-for="s in sessions"
-                :key="s.session_id"
-                class="side-sess-item"
-                :class="{ active: s.session_id === activeSessionId }"
-                role="button"
-                tabindex="0"
-                @click="selectSession(s.session_id)"
-                @keydown.enter="selectSession(s.session_id)"
-              >
-                <div class="side-sess-main">
-                  <template v-if="renamingSessionId === s.session_id">
-                    <input
-                      v-model="renameTitleInput"
-                      type="text"
-                      class="side-sess-rename-input"
-                      @click.stop
-                      @keydown.enter.stop="saveRename(s, $event)"
-                      @keydown.esc.stop="renamingSessionId = ''"
-                    />
-                  </template>
-                  <template v-else>
-                    <div class="side-sess-name-row">
-                      <span class="side-sess-name" :title="s.title || 'New Thread'">
-                        {{ s.title || "New Thread" }}
-                      </span>
-                      <span v-if="s.execution_state === 'running'" class="side-sess-running-tag">
-                        Running
-                      </span>
-                    </div>
-                    <div class="side-sess-meta">
-                      <span>{{ formatSessionTime(s.updated_at) }}</span>
-                      <span v-if="s.turn_count"> · {{ s.turn_count }} turns</span>
-                    </div>
-                  </template>
-                </div>
-
-                <div class="side-sess-actions" @click.stop>
-                  <template v-if="renamingSessionId === s.session_id">
-                    <button
-                      type="button"
-                      class="side-sess-action-btn"
-                      title="Simpan"
-                      @click="saveRename(s, $event)"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="side-sess-action-btn"
-                      title="Batal"
-                      @click="renamingSessionId = ''"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </template>
-                  <template v-else>
-                    <button
-                      type="button"
-                      class="side-sess-action-btn"
-                      title="Ubah judul"
-                      @click="startRename(s, $event)"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="side-sess-action-btn side-sess-delete-btn"
-                      title="Hapus thread"
-                      @click="handleDeleteSession(s, $event)"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Subtab 2: Queue -->
-          <div v-show="taskSubTab === 'queue'" class="task-subpane">
-            <QueuePanel
-              :hide-header="true"
-              :project-id="selectedProjectId || (activeProject ? activeProject.id : null)"
-              :refresh-key="queueRefresh"
-              @stop-task="emit('stop-task', $event)"
-              @view-task="emit('view-task', $event)"
-            />
-          </div>
-
-          <!-- Subtab 3: Task History -->
-          <div v-if="taskSubTab === 'history'" class="task-subpane sidebar-history-pane">
-            <div v-if="!taskHistory.length" class="side-task-empty">
-              <span>No recorded task history</span>
-              <small>Active and completed tasks will appear here</small>
-            </div>
-            <div v-else class="side-hist-list">
-              <div
-                v-for="t in taskHistory"
-                :key="t.task_id"
-                class="side-hist-item"
-                role="button"
-                tabindex="0"
-                @click="emit('open-history-task', t)"
-                @keydown.enter="emit('open-history-task', t)"
-              >
-                <div class="side-hist-top">
-                  <span class="status-tag" :class="statusTagClass(t.status)">{{ t.status }}</span>
-                  <span class="side-hist-time">{{ formatTaskTime(t.last_timestamp) }}</span>
-                </div>
-                <div class="side-hist-prompt" :title="t.task || '(no prompt)'">
-                  {{ t.task || "(no prompt)" }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- 3. Threads / History Section -->
+      <ThreadsHistoryPanel
+        v-else-if="activeNav === 'queue'"
+        :selected-project-id="selectedProjectId"
+        :active-project="activeProject"
+        :active-session-id="activeSessionId"
+        :task-history="taskHistory"
+        :queue-refresh="queueRefresh"
+        @open-session="emit('open-session', $event)"
+        @open-consultant-session="emit('open-consultant-session', $event)"
+        @view-task="emit('view-task', $event)"
+        @open-history-task="emit('open-history-task', $event)"
+        @refresh-history="emit('refresh-history')"
+        @delete-history="emit('delete-history', $event)"
+      />
     </div>
   </aside>
 </template>

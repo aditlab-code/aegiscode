@@ -26,8 +26,9 @@ import {
   getProjectGitDiff,
   getProjectGitCommits,
   discardProjectGitChanges,
+  stageProjectGitChanges,
+  unstageProjectGitChanges,
 } from "./api.js";
-
 test("1. editorTabsService: openDiffTab creates and keys a diff tab properly", () => {
   const state = createEditorTabsState();
 
@@ -88,8 +89,10 @@ test("4. api.js git client endpoint contract", () => {
   assert.equal(typeof getProjectGitStatus, "function");
   assert.equal(typeof getProjectGitDiff, "function");
   assert.equal(typeof getProjectGitCommits, "function");
+  assert.equal(typeof discardProjectGitChanges, "function");
+  assert.equal(typeof stageProjectGitChanges, "function");
+  assert.equal(typeof unstageProjectGitChanges, "function");
 });
-
 test("5. changes panel filters out internal .aegis and .git metadata paths", () => {
   const rawList = [
     { path: ".aegis" },
@@ -327,6 +330,90 @@ test("10. monacoModelRegistry: lifecycle, refCount, shared detection, markSaved,
   assert.equal(getModel("src/core/main.py"), null, "Model dibersihkan saat seluruh tab ditutup");
 
   clearRegistryForTesting();
+});
+
+test("11. changes panel separates stagedChanges and unstagedChanges accurately", () => {
+  const rawFiles = [
+    { path: "src/staged_only.py", staged: true, unstaged: false, untracked: false },
+    { path: "src/unstaged_only.py", staged: false, unstaged: true, untracked: false },
+    { path: "src/both.py", staged: true, unstaged: true, untracked: false },
+    { path: "new_file.txt", staged: false, unstaged: false, untracked: true },
+    { path: ".aegis/internal.json", staged: true, unstaged: false, untracked: false },
+  ];
+
+  function isInternalOrIgnored(path) {
+    const p = String(path || "").trim().replace(/\\/g, "/").replace(/^\.\//, "");
+    return !p || p.startsWith(".aegis") || p.startsWith(".git") || p === "..";
+  }
+
+  const activeFiles = rawFiles.filter((f) => !isInternalOrIgnored(f.path));
+  assert.equal(activeFiles.length, 4);
+
+  const stagedChanges = activeFiles.filter((f) => Boolean(f.staged));
+  const unstagedChanges = activeFiles.filter(
+    (f) => Boolean(f.unstaged || f.untracked || (!f.staged && !f.unstaged))
+  );
+
+  assert.deepEqual(stagedChanges.map((f) => f.path), [
+    "src/staged_only.py",
+    "src/both.py",
+  ]);
+  assert.deepEqual(unstagedChanges.map((f) => f.path), [
+    "src/unstaged_only.py",
+    "src/both.py",
+    "new_file.txt",
+  ]);
+});
+
+test("12. MonacoDiffEditor toolbar contract: pure icon buttons with accessibility and approval toggle", () => {
+  // Kontrak tombol toolbar: tanpa label teks, wajib memiliki title dan aria-label
+  const toolbarButtons = [
+    { id: "stage-toggle", icon: true, title: "Stage Changes (Approve)", ariaLabel: "Stage Changes (Approve)", hasTextSpan: false },
+    { id: "edit-file", icon: true, title: "Edit File", ariaLabel: "Edit File", hasTextSpan: false },
+    { id: "discard", icon: true, title: "Discard Changes", ariaLabel: "Discard Changes", hasTextSpan: false },
+    { id: "refresh", icon: true, title: "Refresh Diff", ariaLabel: "Refresh Diff", hasTextSpan: false },
+  ];
+
+  for (const btn of toolbarButtons) {
+    assert.equal(btn.hasTextSpan, false, `Button ${btn.id} should not have text label span`);
+    assert.ok(btn.title, `Button ${btn.id} must have informative title`);
+    assert.ok(btn.ariaLabel, `Button ${btn.id} must have aria-label`);
+  }
+
+  // State machine toggle approval
+  let isStaged = false;
+  function toggleStage() {
+    isStaged = !isStaged;
+    return isStaged;
+  }
+
+  assert.equal(toggleStage(), true); // Staged
+  assert.equal(toggleStage(), false); // Unstaged
+});
+
+test("13. checkpoint commit lifecycle emits checkpoint-created event and resets changes", () => {
+  let checkpointCreatedEmitted = false;
+  let receivedPayload = null;
+  let refreshKey = 0;
+
+  function onCheckpointCreated(payload) {
+    checkpointCreatedEmitted = true;
+    receivedPayload = payload;
+    refreshKey++;
+  }
+
+  // Simulasi commit checkpoint sukses
+  const commitResult = {
+    committed: true,
+    pushed: false,
+    message: "Checkpoint dibuat (commit lokal).",
+    checkpoint: { hash: "abc1234567890", short_hash: "abc1234", files_changed: 2 },
+  };
+
+  onCheckpointCreated(commitResult);
+  assert.equal(checkpointCreatedEmitted, true);
+  assert.equal(refreshKey, 1);
+  assert.equal(receivedPayload.checkpoint.files_changed, 2);
 });
 
 

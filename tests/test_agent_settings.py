@@ -212,5 +212,5 @@ def test_consultant_prompt_is_unaffected(settings_file):
     """Prompt Consultant TIDAK boleh ikut berubah oleh setting Agent."""
     _write(settings_file, {"agent": {"system_prompt": "PROMPT AGENT KUSTOM"}})
     prompt = build_consultant_system_prompt("investigate")
-    assert "AETHER Consultant" in prompt
+    assert "Aegis Consultant" in prompt
     assert "PROMPT AGENT KUSTOM" not in prompt

@@ -39,7 +39,7 @@ from agent_ai.providers.base import GenerateResult  # noqa: E402
 from agent_ai.providers.openai_compatible import OpenAICompatibleProvider  # noqa: E402
 from agent_ai.tools.registry import build_registry  # noqa: E402
 
-EXT_ID = "aether.playwright"
+EXT_ID = "aegis.playwright"
 PREFIX = EXT_ID + "."
 SAFE_TOOL = EXT_ID + ".session_state_list"
 
@@ -52,7 +52,7 @@ def _loaded():
     assert ensure_agent_extensions_loaded() is True
     manager = get_agent_extension_manager()
     if not manager.registry.exists(EXT_ID):
-        pytest.skip("Extension 'aether.playwright' tidak ter-discover di env ini")
+        pytest.skip("Extension 'aegis.playwright' tidak ter-discover di env ini")
     return manager
 
 
@@ -127,7 +127,7 @@ def test_provider_payload_message_tool_names_are_provider_safe():
     provider = OpenAICompatibleProvider(
         config=OpenAIConfig(api_key="k", base_url="http://localhost.invalid/v1", model="m")
     )
-    dotted = "aether.playwright.browser_snapshot"
+    dotted = "aegis.playwright.browser_snapshot"
     messages = [
         {"role": "user", "content": "hi"},
         {
@@ -157,7 +157,7 @@ def test_normalize_response_decodes_provider_safe_name():
     """Nama provider-safe pada response di-decode balik -> lookup registry benar."""
     from agent_ai.providers.base import to_provider_safe_tool_name
 
-    dotted = "aether.playwright.browser_snapshot"
+    dotted = "aegis.playwright.browser_snapshot"
     safe = to_provider_safe_tool_name(dotted)
     assert safe != dotted
 

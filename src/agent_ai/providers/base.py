@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
@@ -123,6 +124,20 @@ def filter_provider_extra(extra: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 RETRYABLE_HTTP_STATUSES: frozenset = frozenset({429, 500, 529})
 
 
+class ProviderErrorCategory(str, Enum):
+    """Kategori kanonik untuk ProviderError (Fase 3 Normalisasi Boundary Provider)."""
+
+    AUTHENTICATION = "authentication"
+    NOT_FOUND = "not_found"
+    RATE_LIMIT = "rate_limit"
+    SERVER_ERROR = "server_error"
+    NETWORK_UNAVAILABLE = "network_unavailable"
+    INVALID_REQUEST = "invalid_request"
+    RESPONSE_MALFORMED = "response_malformed"
+    CONFIGURATION = "configuration"
+    UNKNOWN = "unknown"
+
+
 class ProviderError(Exception):
     """Base exception untuk semua error provider.
 
@@ -130,14 +145,65 @@ class ProviderError(Exception):
     (sementara) sehingga layak di-retry di layer provider. Default False:
     retry HANYA untuk kegagalan teknis (network/timeout/HTTP 429/5xx), BUKAN
     untuk kegagalan logika agent (tool/command/validation/prompt).
+
+    Skema Kanonik (Fase 3):
+        kategori: kategori error terstandardisasi (authentication, rate_limit, dll).
+        retryable: True bila error layak di-retry di infrastruktur.
+        provider: nama provider pemancar error (mis. 'antigravity', 'ollama').
+        raw_reference: rujukan diagnostik mentah (endpoint, error code, atau body).
     """
 
     #: True bila error bersifat infrastruktur sementara (boleh di-retry).
     retryable: bool = False
+    kategori: str = "unknown"
+    provider: str = ""
+    raw_reference: Optional[str] = None
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        kategori: Optional[str] = None,
+        retryable: Optional[bool] = None,
+        provider: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+    ) -> None:
+        super().__init__(message)
+        if kategori is not None:
+            self.kategori = str(kategori)
+        if retryable is not None:
+            self.retryable = bool(retryable)
+        if provider is not None:
+            self.provider = str(provider)
+        if raw_reference is not None:
+            self.raw_reference = str(raw_reference)
+
+    @property
+    def category(self) -> str:
+        """Alias bahasa Inggris untuk kompatibilitas."""
+        return self.kategori
 
 
 class ProviderNotConfiguredError(ProviderError):
     """Provider belum dikonfigurasi (mis. API key / base URL kosong)."""
+
+    retryable = False
+    kategori = ProviderErrorCategory.CONFIGURATION.value
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            message,
+            kategori=ProviderErrorCategory.CONFIGURATION.value,
+            retryable=False,
+            provider=provider,
+            raw_reference=raw_reference,
+        )
 
 
 class ProviderUnavailableError(ProviderError):
@@ -148,6 +214,22 @@ class ProviderUnavailableError(ProviderError):
     """
 
     retryable = True
+    kategori = ProviderErrorCategory.NETWORK_UNAVAILABLE.value
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            message,
+            kategori=ProviderErrorCategory.NETWORK_UNAVAILABLE.value,
+            retryable=True,
+            provider=provider,
+            raw_reference=raw_reference,
+        )
 
 
 class ProviderAPIError(ProviderError):
@@ -159,6 +241,8 @@ class ProviderAPIError(ProviderError):
         response_body: potongan body respons (diagnostik, sudah dipotong +
             credential bergaya "Bearer <token>" disamarkan). Bila kosong,
             body tidak tersedia / tidak dapat dibaca.
+        provider: nama provider pemancar error.
+        raw_reference: rujukan diagnostik endpoint atau body.
     """
 
     def __init__(
@@ -167,20 +251,40 @@ class ProviderAPIError(ProviderError):
         status_code: Optional[int] = None,
         endpoint: Optional[str] = None,
         response_body: Optional[str] = None,
+        *,
+        provider: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+        kategori: Optional[str] = None,
     ) -> None:
-        super().__init__(message)
+        if kategori is None:
+            if status_code in (401, 403):
+                kategori = ProviderErrorCategory.AUTHENTICATION.value
+            elif status_code == 404:
+                kategori = ProviderErrorCategory.NOT_FOUND.value
+            elif status_code == 429:
+                kategori = ProviderErrorCategory.RATE_LIMIT.value
+            elif status_code in (500, 502, 503, 504, 529):
+                kategori = ProviderErrorCategory.SERVER_ERROR.value
+            elif status_code is not None and 400 <= status_code < 500:
+                kategori = ProviderErrorCategory.INVALID_REQUEST.value
+            else:
+                kategori = ProviderErrorCategory.UNKNOWN.value
+
+        is_retry = status_code is not None and status_code in RETRYABLE_HTTP_STATUSES
+        ref = raw_reference or endpoint or (response_body[:100] if response_body else None)
+
+        super().__init__(
+            message,
+            kategori=kategori,
+            retryable=is_retry,
+            provider=provider,
+            raw_reference=ref,
+        )
         self.status_code = status_code
         #: Endpoint/URL yang gagal (diagnostik). Tidak pernah berisi secret.
         self.endpoint = endpoint
         #: Potongan body respons (diagnostik). Tidak pernah berisi secret.
         self.response_body = response_body
-        # Retry HANYA untuk status HTTP infrastruktur (429/500/529). Tanpa status
-        # code, error dianggap TIDAK retryable (aman: hindari retry buta).
-        self.retryable = (
-            status_code is not None and status_code in RETRYABLE_HTTP_STATUSES
-        )
-
-
 #: Panjang maksimum potongan body respons provider yang disertakan pada pesan
 #: error (diagnostik). Cukup untuk membedakan 404 "model not found" (body JSON
 #: pendek) dari 404 "page not found" (body non-JSON) tanpa membanjiri log/UI.
@@ -325,11 +429,31 @@ def build_provider_api_error(
         status_code=status_code,
         endpoint=(url or None),
         response_body=(detail or None),
+        provider=provider_name,
+        raw_reference=(url or None),
     )
 
 
 class ProviderResponseError(ProviderError):
     """Response dari provider tidak valid atau tidak dapat diparse."""
+
+    retryable = False
+    kategori = ProviderErrorCategory.RESPONSE_MALFORMED.value
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        provider: Optional[str] = None,
+        raw_reference: Optional[str] = None,
+    ) -> None:
+        super().__init__(
+            message,
+            kategori=ProviderErrorCategory.RESPONSE_MALFORMED.value,
+            retryable=False,
+            provider=provider,
+            raw_reference=raw_reference,
+        )
 
 
 @dataclass
@@ -432,6 +556,141 @@ class GenerateResult:
     raw: Dict[str, Any] = field(default_factory=dict)
     reasoning: Optional[str] = None
 
+
+class ProviderEventType(str, Enum):
+    """Jenis event kanonik dari provider (Fase 3 Normalisasi Boundary Provider)."""
+
+    TEXT = "text"
+    REASONING = "reasoning"
+    TOOL_CALL = "tool_call"
+    USAGE = "usage"
+    ERROR = "error"
+    DONE = "done"
+
+
+@dataclass
+class ProviderEvent:
+    """Skema kanonik event provider (Fase 3 Normalisasi Boundary Provider).
+
+    Varian event:
+    - text: potongan teks keluaran model
+    - reasoning: penalaran/chain-of-thought (thinking)
+    - tool_call: pemanggilan tool terstruktur
+    - usage: informasi penggunaan token (input, output, total)
+    - error: galat saat inferensi atau streaming
+    - done: penanda selesai
+    """
+
+    event_type: str
+    text: Optional[str] = None
+    reasoning: Optional[str] = None
+    tool_call: Optional[Dict[str, Any]] = None
+    usage: Optional[Dict[str, int]] = None
+    error: Optional[Any] = None
+    done: bool = False
+    raw: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def text_event(cls, text: str, raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.TEXT.value, text=text, raw=raw)
+
+    @classmethod
+    def reasoning_event(cls, reasoning: str, raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.REASONING.value, reasoning=reasoning, raw=raw)
+
+    @classmethod
+    def tool_call_event(cls, tool_call: Dict[str, Any], raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.TOOL_CALL.value, tool_call=tool_call, raw=raw)
+
+    @classmethod
+    def usage_event(cls, usage: Dict[str, int], raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.USAGE.value, usage=usage, raw=raw)
+
+    @classmethod
+    def error_event(cls, error: Any, raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.ERROR.value, error=error, raw=raw)
+
+    @classmethod
+    def done_event(cls, raw: Optional[Dict[str, Any]] = None) -> "ProviderEvent":
+        return cls(event_type=ProviderEventType.DONE.value, done=True, raw=raw)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "text": self.text,
+            "reasoning": self.reasoning,
+            "tool_call": self.tool_call,
+            "usage": self.usage,
+            "error": str(self.error) if self.error is not None else None,
+            "done": self.done,
+            "raw": self.raw,
+        }
+
+
+@dataclass
+class ProviderRequest:
+    """Skema kanonik permintaan provider (Fase 3 Normalisasi Boundary Provider).
+
+    Attributes:
+        model: Nama/ID model yang dituju.
+        messages: Daftar pesan percakapan (Message).
+        tools: Daftar definisi tool (ToolDefinition).
+        generation_options: Opsi inferensi (GenerateOptions).
+        runtime_context: Konteks runtime operasional (metadata, environment, dll).
+    """
+
+    model: str = ""
+    messages: List[Message] = field(default_factory=list)
+    tools: Optional[List[ToolDefinition]] = None
+    generation_options: Optional[GenerateOptions] = None
+    runtime_context: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_legacy(
+        cls,
+        prompt: Optional[str] = None,
+        messages: Optional[List[Message]] = None,
+        options: Optional[GenerateOptions] = None,
+        tools: Optional[List[ToolDefinition]] = None,
+        tool_choice: Optional[ToolChoice] = None,
+        runtime_context: Optional[Dict[str, Any]] = None,
+        default_model: str = "",
+    ) -> "ProviderRequest":
+        """Bangun ProviderRequest dari parameter legacy generate()."""
+        norm_messages: List[Message] = []
+        if messages:
+            norm_messages = list(messages)
+        elif prompt:
+            norm_messages = [Message(role="user", content=prompt)]
+
+        model = (options.model if options and options.model else default_model) or ""
+
+        ctx = dict(runtime_context or {})
+        if tool_choice:
+            ctx["tool_choice"] = tool_choice.to_dict()
+        if options and options.extra:
+            for k, v in options.extra.items():
+                if k not in ctx:
+                    ctx[k] = v
+
+        return cls(
+            model=model,
+            messages=norm_messages,
+            tools=tools,
+            generation_options=options,
+            runtime_context=ctx or None,
+        )
+
+    def to_legacy_kwargs(self) -> Dict[str, Any]:
+        """Konversi kembali ke kwargs yang kompatibel dengan signature generate() lama."""
+        return {
+            "prompt": None,
+            "messages": self.messages,
+            "options": self.generation_options,
+            "tools": self.tools,
+        }
+
+
 class BaseProvider(ABC):
     """Abstract base class untuk semua provider AI.
 
@@ -453,6 +712,27 @@ class BaseProvider(ABC):
     supports_thinking: bool = False
     reasoning_budget: Optional[int] = None
 
+    def _resolve_request(
+        self,
+        prompt: Optional[str] = None,
+        messages: Optional[List[Message]] = None,
+        options: Optional[GenerateOptions] = None,
+        tools: Optional[List[ToolDefinition]] = None,
+        tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
+    ) -> ProviderRequest:
+        """Selesaikan parameter input menjadi ProviderRequest kanonik tunggal."""
+        if request is not None:
+            return request
+        return ProviderRequest.from_legacy(
+            prompt=prompt,
+            messages=messages,
+            options=options,
+            tools=tools,
+            tool_choice=tool_choice,
+            default_model=getattr(self, "model", "") or getattr(self, "name", ""),
+        )
+
     @abstractmethod
     def generate(
         self,
@@ -461,6 +741,7 @@ class BaseProvider(ABC):
         options: Optional[GenerateOptions] = None,
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
     ) -> GenerateResult:
         """Hasilkan teks dari model.
 
@@ -470,15 +751,15 @@ class BaseProvider(ABC):
             options: opsi generasi (temperature, max_tokens, model, dll).
             tools: definisi tool (provider-agnostic) untuk native tool calling.
             tool_choice: preferensi pemilihan tool (opsional).
+            request: skema kanonik ProviderRequest (opsional, alternatif terpadu).
 
         Returns:
             GenerateResult berisi teks hasil dan metadata.
 
         Catatan:
-            Minimal salah satu dari `prompt` atau `messages` harus diisi.
+            Minimal salah satu dari `prompt`, `messages`, atau `request` harus diisi.
         """
         raise NotImplementedError
-
     def is_available(self) -> bool:
         """Cek apakah provider siap dipakai. Default: True.
 

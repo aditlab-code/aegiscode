@@ -240,11 +240,19 @@ def _read_settings_document() -> Dict[str, Any]:
 
 
 def port_setting() -> int:
-    """Baca `port` dari `data/settings.json` (default aman `DEFAULT_PORT`).
+    """Baca `port` dari env AEGIS_PORT/AETHER_PORT atau `data/settings.json` (default aman `DEFAULT_PORT`).
 
     Nilai non-angka atau di luar rentang port valid (1..65535) jatuh ke default
-    sehingga AETHER tetap berjalan. Fungsi ini TIDAK pernah melempar.
+    sehingga server tetap berjalan. Fungsi ini TIDAK pernah melempar.
     """
+    env_port = os.environ.get("AEGIS_PORT") or os.environ.get("AETHER_PORT")
+    if env_port:
+        try:
+            val = int(env_port)
+            if 1 <= val <= 65535:
+                return val
+        except (TypeError, ValueError):
+            pass
     raw = _read_settings_document().get("port", DEFAULT_PORT)
     try:
         value = int(raw)
@@ -782,6 +790,7 @@ class AntigravityConfig:
         ANTIGRAVITY_CLI_PATH       : Path ke executable agy CLI (opsional)
         ANTIGRAVITY_MODEL          : Model default (default: gemini-3.8-flash-medium)
         ANTIGRAVITY_TIMEOUT        : Timeout dalam detik (default: 120)
+        ANTIGRAVITY_IDLE_TIMEOUT   : Idle timeout tanpa output stream dalam detik (default: 60)
         ANTIGRAVITY_CONTEXT_WINDOW : Context window token (default: 1048576)
         GOOGLE_CLOUD_PROJECT       : Google Cloud Project ID (Enterprise)
         GOOGLE_CLOUD_LOCATION      : Regional endpoint (global, us, eu)
@@ -797,6 +806,7 @@ class AntigravityConfig:
         default_factory=lambda: _get("ANTIGRAVITY_MODEL", "gemini-3.8-flash-medium")
     )
     timeout: int = field(default_factory=lambda: _get_int("ANTIGRAVITY_TIMEOUT", 120))
+    idle_timeout: int = field(default_factory=lambda: _get_int("ANTIGRAVITY_IDLE_TIMEOUT", 60))
     context_window: int = field(
         default_factory=lambda: _get_int("ANTIGRAVITY_CONTEXT_WINDOW", 1048576)
     )

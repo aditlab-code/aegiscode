@@ -22,9 +22,8 @@ def test_format_antigravity_policy_directive() -> None:
     """Pastikan direktif memuat larangan log dan batas per mode."""
     fast_dir = _format_antigravity_policy_directive("fast")
     assert ".aegis/log/" in fast_dir
-    assert ".aether/log/" in fast_dir
     assert "FAST" in fast_dir
-    assert "2-3" in fast_dir
+    assert "SURGICAL RESOLUTION" in fast_dir
 
     balanced_dir = _format_antigravity_policy_directive("balanced")
     assert ".aegis/log/" in balanced_dir
@@ -122,8 +121,8 @@ def test_streaming_circuit_breaker_blocks_log_file(monkeypatch: pytest.MonkeyPat
     assert fake_proc.killed is True
 
 
-def test_streaming_circuit_breaker_enforces_fast_mode_file_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifikasi bahwa circuit breaker menghentikan pembacaan berkas ke-4 di mode fast."""
+def test_streaming_circuit_breaker_allows_fast_mode_file_reads(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa pembacaan berkas ke-4 di mode fast tidak memutus proses (limit kaku dilepas)."""
     cfg = AntigravityConfig(cli_path="/bin/agy_mock")
     p = AntigravityProvider(config=cfg)
     monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
@@ -172,7 +171,10 @@ def test_streaming_circuit_breaker_enforces_fast_mode_file_limit(monkeypatch: py
                         "tool_info": {"parameters": {"path": "src/file4.ts"}},
                     },
                 }) + "\n",
-                "",
+                json.dumps({
+                    "event": "result",
+                    "result": {"response": "ok", "status": "SUCCESS"},
+                }) + "\n",
             ]
             self.stdout = self
             self.stderr = self
@@ -188,7 +190,9 @@ def test_streaming_circuit_breaker_enforces_fast_mode_file_limit(monkeypatch: py
         def kill(self) -> None:
             self.killed = True
 
-        def wait(self) -> None:
+        def wait(self, timeout: Any = None) -> None:
+            pass
+        def terminate(self) -> None:
             pass
 
         def read(self) -> str:
@@ -202,10 +206,9 @@ def test_streaming_circuit_breaker_enforces_fast_mode_file_limit(monkeypatch: py
 
     opts = GenerateOptions(extra={"event_sink": dummy_sink, "mode": "fast"})
 
-    with pytest.raises(ProviderAPIError, match="Pelanggaran Guardrail Efisiensi Mode Fast"):
-        p.generate(prompt="Perlu dilanjutkan", options=opts)
-
-    assert fake_proc.killed is True
+    res = p.generate(prompt="Perlu dilanjutkan", options=opts)
+    assert res is not None
+    assert fake_proc.killed is False
 
 
 def test_read_file_tool_rejects_log_directories(tmp_path: Path) -> None:

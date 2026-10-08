@@ -17,6 +17,7 @@ from agent_ai.providers.base import (
     GenerateResult,
     Message,
     ProviderAPIError,
+    ProviderRequest,
     ProviderResponseError,
     ToolChoice,
     ToolDefinition,
@@ -247,9 +248,17 @@ class OllamaProvider(BaseProvider):
         options: Optional[GenerateOptions] = None,
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
     ) -> GenerateResult:
         """Hasilkan teks via Ollama /api/chat."""
-        payload = self._build_payload(prompt, messages, options, tools, tool_choice)
+        resolved = self._resolve_request(prompt, messages, options, tools, tool_choice, request)
+        payload = self._build_payload(
+            prompt=None,
+            messages=resolved.messages,
+            options=resolved.generation_options,
+            tools=resolved.tools,
+            tool_choice=tool_choice,
+        )
         url = f"{self.config.host.rstrip('/')}/api/chat"
 
         # Retry INFRASTRUKTUR (technical only) dibatasi di layer ini: network/

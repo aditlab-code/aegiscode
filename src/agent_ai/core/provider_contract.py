@@ -47,10 +47,12 @@ def sanitize_provider_response(provider: Any, gen_result: Any) -> LLMResponse:
     else:
         text = getattr(gen_result, "text", "") or ""
         reasoning = getattr(gen_result, "reasoning", None)
+        raw = getattr(gen_result, "raw", None)
         response = LLMResponse(
             text=text,
             finish_reason=FinishReason.STOP,
             reasoning=reasoning,
+            raw=raw,
         )
 
     # Validasi dan sanitasi actions / tool calls

@@ -728,15 +728,18 @@ class GithubBackupService:
         except Exception as exc:  # noqa: BLE001
             raise GithubBackupError(f"Gagal membaca status Git: {exc}") from exc
 
-        staged: List[str] = []
+        already_staged: List[str] = []
+        all_candidates: List[str] = []
         for f in status.files:
             if _is_aegis_metadata(f.path):
                 continue
             if _matches_exclude(f.path, exclude_patterns):
                 continue
-            staged.append(f.path)
+            all_candidates.append(f.path)
+            if f.staged:
+                already_staged.append(f.path)
 
-        if not staged:
+        if not already_staged and not all_candidates:
             return {
                 "committed": False,
                 "pushed": False,
@@ -749,14 +752,18 @@ class GithubBackupService:
         except Exception:
             token = None
 
-        # 3) add -> commit -> push (token via credential helper/env bila ada).
-        self.git.add(root, staged, token)
-        commit_hash = self.git.commit(root, message, token)
+        # 3) selective add -> commit -> push (token via credential helper/env bila ada).
+        if already_staged:
+            target_files = already_staged
+            commit_hash = self.git.commit(root, message, token)
+        else:
+            target_files = all_candidates
+            self.git.add(root, target_files, token)
+            commit_hash = self.git.commit(root, message, token)
 
         last = facade.log(limit=1)
         checkpoint = last[0].to_dict() if last else {"hash": commit_hash, "short_hash": commit_hash[:7]}
-        checkpoint["files_changed"] = len(staged)
-
+        checkpoint["files_changed"] = len(target_files)
         pushed = False
         push_error: Optional[str] = None
         if repo and branch:
@@ -775,7 +782,7 @@ class GithubBackupService:
                 else ("Checkpoint dibuat (commit lokal)." if not repo else f"Checkpoint dibuat lokal, push tidak berhasil: {push_error}")
             ),
             "checkpoint": checkpoint,
-            "files_changed": len(staged),
+            "files_changed": len(target_files),
         }
         if push_error:
             result["push_error"] = push_error

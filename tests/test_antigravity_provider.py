@@ -668,3 +668,202 @@ def test_generate_cli_workspace_root_scoping(monkeypatch: pytest.MonkeyPatch, tm
     assert "--add-dir" in captured_call["cmd"]
     add_dir_idx = captured_call["cmd"].index("--add-dir")
     assert captured_call["cmd"][add_dir_idx + 1] == str(workspace.resolve())
+# --------------------------------------------------------------------------- #
+# 13. Idle Activity Timeout & Max Execution Cap in Streaming Loop
+# --------------------------------------------------------------------------- #
+def test_streaming_idle_timeout_kills_process_when_stalled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Jika stream tidak memancarkan data selama melebihi idle_timeout, proses dibunuh dan raise ProviderUnavailableError."""
+    import agent_ai.providers.antigravity as agy_mod
+
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock", idle_timeout=10, timeout=120)
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    kill_called = False
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.stdout = MagicMock()
+            self.stdout.readline.return_value = ""  # Silent stream
+            self.stderr = MagicMock()
+            self.stderr.read.return_value = ""
+            self.returncode = 0
+
+        def poll(self) -> Any:
+            return None  # Masih berjalan (stalled/hung)
+
+        def kill(self) -> None:
+            nonlocal kill_called
+            kill_called = True
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: Any = None) -> None:
+            pass
+
+    fake_proc = FakeProc()
+
+    # Pastikan subprocess.run is _orig_subprocess_run agar masuk Jalur A
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+    monkeypatch.setattr(agy_mod, "_orig_subprocess_run", subprocess.run)
+
+    # Simulasikan lonjakan waktu setelah start: panggilan time.time() melampaui idle_timeout (10s)
+    current_time = 1000.0
+    call_count = 0
+
+    def mock_time() -> float:
+        nonlocal current_time, call_count
+        call_count += 1
+        # Setelah loop dimulai, majukan waktu sebanyak 15 detik
+        if call_count > 5:
+            current_time += 15.0
+        return current_time
+
+    monkeypatch.setattr(agy_mod.time, "time", mock_time)
+
+    sink_events = []
+    opts = GenerateOptions(extra={"event_sink": lambda ev, d: sink_events.append((ev, d))})
+    with pytest.raises(ProviderUnavailableError) as exc_info:
+        p.generate(prompt="Long reasoning task", options=opts)
+    assert "idle timeout" in str(exc_info.value).lower()
+    assert kill_called is True
+
+
+def test_streaming_active_stream_resets_idle_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Jika stream aktif memancarkan chunk secara berkala melebihi durasi idle_timeout, eksekusi tidak putus."""
+    import agent_ai.providers.antigravity as agy_mod
+
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock", idle_timeout=5, timeout=120)
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    # Siapkan baris stream: 3 thought lalu result penutup
+    lines = [
+        json.dumps({"event": "step_update", "step_update": {"step_type": "thought", "text_delta": "Thinking step 1"}}),
+        json.dumps({"event": "step_update", "step_update": {"step_type": "thought", "text_delta": "Thinking step 2"}}),
+        json.dumps({"event": "step_update", "step_update": {"step_type": "thought", "text_delta": "Thinking step 3"}}),
+        json.dumps({"event": "result", "result": {"status": "SUCCESS", "response": "Finished."}}),
+    ]
+    line_iter = iter(lines)
+
+    def fake_readline() -> str:
+        try:
+            return next(line_iter)
+        except StopIteration:
+            return ""
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.stdout = MagicMock()
+            self.stdout.readline.side_effect = fake_readline
+            self.stderr = MagicMock()
+            self.stderr.read.return_value = ""
+            self.returncode = 0
+            self._poll_count = 0
+
+        def poll(self) -> Any:
+            self._poll_count += 1
+            return 0 if self._poll_count > 4 else None
+
+        def kill(self) -> None:
+            pass
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: Any = None) -> None:
+            pass
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+    monkeypatch.setattr(agy_mod, "_orig_subprocess_run", subprocess.run)
+
+    # Simulasikan waktu: setiap kali readline sukses, maju 3 detik.
+    # Total waktu akan mencapai 12 detik (> idle_timeout 5 detik), namun karena timer
+    # aktivitas di-reset setiap chunk, proses tetap berjalan hingga selesai.
+    current_time = 100.0
+
+    def mock_time() -> float:
+        return current_time
+
+    def fake_readline_with_clock() -> str:
+        nonlocal current_time
+        try:
+            val = next(line_iter)
+            current_time += 3.0  # Maju 3s setiap baris (kurang dari idle_timeout 5s)
+            return val
+        except StopIteration:
+            return ""
+
+    fake_proc.stdout.readline.side_effect = fake_readline_with_clock
+    monkeypatch.setattr(agy_mod.time, "time", mock_time)
+
+    sink_events = []
+    opts = GenerateOptions(extra={"event_sink": lambda ev, d: sink_events.append((ev, d))})
+    res = p.generate(prompt="Active reasoning task", options=opts)
+    assert res.text == "Finished."
+    assert "Thinking step 1" in (res.reasoning or "")
+
+
+def test_streaming_max_timeout_kills_process_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Jika eksekusi melampaui max_timeout meskipun ada aktivitas berkala, batas absolut memutus proses."""
+    import agent_ai.providers.antigravity as agy_mod
+
+    cfg = AntigravityConfig(cli_path="/bin/agy_mock", idle_timeout=60, timeout=120)
+    p = AntigravityProvider(config=cfg)
+    monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
+
+    kill_called = False
+
+    class FakeProc:
+        def __init__(self) -> None:
+            self.stdout = MagicMock()
+            # Terus memancarkan aktivitas
+            self.stdout.readline.return_value = json.dumps({
+                "event": "step_update",
+                "step_update": {"step_type": "thought", "text_delta": "Still active..."},
+            })
+            self.stderr = MagicMock()
+            self.stderr.read.return_value = ""
+            self.returncode = 0
+
+        def poll(self) -> Any:
+            return None
+
+        def kill(self) -> None:
+            nonlocal kill_called
+            kill_called = True
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: Any = None) -> None:
+            pass
+
+    fake_proc = FakeProc()
+    monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
+    monkeypatch.setattr(agy_mod, "_orig_subprocess_run", subprocess.run)
+
+    start_sim_time = 1000.0
+    current_time = start_sim_time
+    call_count = 0
+
+    def mock_time() -> float:
+        nonlocal current_time, call_count
+        call_count += 1
+        # Setelah loop berjalan beberapa iterasi, majukan waktu melampaui max_timeout (600s)
+        if call_count > 6:
+            current_time = start_sim_time + 700.0
+        else:
+            current_time += 1.0
+        return current_time
+
+    monkeypatch.setattr(agy_mod.time, "time", mock_time)
+
+    sink_events = []
+    opts = GenerateOptions(extra={"event_sink": lambda ev, d: sink_events.append((ev, d))})
+    with pytest.raises(ProviderUnavailableError) as exc_info:
+        p.generate(prompt="Runaway task", options=opts)
+    assert "melebihi batas waktu eksekusi maksimum" in str(exc_info.value).lower()
+    assert kill_called is True

@@ -13,13 +13,13 @@
  * Strict SSR safe, zero forbidden tokens, compliant with check_workbench.py and check_ui_refactor.py.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import SettingsView from "../components/SettingsView.vue";
-import GlobalSettingsPanel from "../components/GlobalSettingsPanel.vue";
-import AgentSettingsPanel from "../components/AgentSettingsPanel.vue";
-import ExtensionManager from "../components/ExtensionManager.vue";
-import EditorSettingsPanel from "../components/EditorSettingsPanel.vue";
-import AboutSettingsPanel from "../components/AboutSettingsPanel.vue";
-import ProjectPolicyPanel from "../components/ProjectPolicyPanel.vue";
+import SettingsView from "../components/settings/SettingsView.vue";
+import GlobalSettingsPanel from "../components/settings/GlobalSettingsPanel.vue";
+import AgentSettingsPanel from "../components/settings/AgentSettingsPanel.vue";
+import ExtensionManager from "../components/settings/ExtensionManager.vue";
+import EditorSettingsPanel from "../components/settings/EditorSettingsPanel.vue";
+import AboutSettingsPanel from "../components/settings/AboutSettingsPanel.vue";
+import ProjectPolicyPanel from "../components/workspace/ProjectPolicyPanel.vue";
 import AppButton from "../components/ui/AppButton.vue";
 import AppCard from "../components/ui/AppCard.vue";
 import {
@@ -108,12 +108,6 @@ const NAV_TABS = [
     label: "Extensions Manager",
     description: "Tools, MCP plugins, and capabilities",
     icon: "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z",
-  },
-  {
-    id: "architecture",
-    label: "Architecture",
-    description: "System model and core subsystems",
-    icon: "M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
   },
   {
     id: "overview",
@@ -268,7 +262,7 @@ onBeforeUnmount(() => {
       <!-- Header bar (modal & embedded editor tab) -->
       <header class="settings-overlay-header" :class="{ 'header-embedded': embedded }">
         <div class="settings-header-info">
-          <div class="settings-badge aether-badge">Admin</div>
+          <div class="settings-badge aegis-badge">Admin</div>
           <div>
             <h2 class="settings-title">AEGIS Settings &amp; Administration</h2>
             <p v-if="!embedded" class="settings-subtitle">Configure providers, workspaces, task history, and extensions</p>
@@ -331,10 +325,10 @@ onBeforeUnmount(() => {
                 <span class="settings-nav-label">{{ tab.label }}</span>
                 <span v-if="!embedded" class="settings-nav-desc">{{ tab.description }}</span>
               </div>
-              <span v-if="tab.id === 'projects' && projects.length" class="settings-nav-badge aether-badge">
+              <span v-if="tab.id === 'projects' && projects.length" class="settings-nav-badge aegis-badge">
                 {{ projects.length }}
               </span>
-              <span v-else-if="tab.id === 'history' && taskHistory.length" class="settings-nav-badge aether-badge">
+              <span v-else-if="tab.id === 'history' && taskHistory.length" class="settings-nav-badge aegis-badge">
                 {{ taskHistory.length }}
               </span>
             </button>
@@ -381,14 +375,12 @@ onBeforeUnmount(() => {
           <section v-else-if="currentTab === 'projects'" class="settings-tab-pane">
             <AppCard variant="panel" class="settings-panel">
               <template #header>
-                <div class="panel-head">
-                  <div class="title">Project Registry</div>
-                </div>
+                <span class="title">Project Registry</span>
               </template>
               <div v-if="!projects.length" class="panel-body">
                 <div class="wb-empty">No projects yet.</div>
               </div>
-              <table v-else class="aether-table">
+              <table v-else class="aegis-table app-table">
                 <thead>
                   <tr>
                     <th style="width: 34%">Project</th>
@@ -458,24 +450,21 @@ onBeforeUnmount(() => {
           <section v-else-if="currentTab === 'history'" class="settings-tab-pane">
             <AppCard variant="panel" class="settings-panel">
               <template #header>
-                <div class="panel-head">
-                  <div class="title">Task History</div>
+                <span class="title">Task History</span>
+                <div class="panel-actions hist-head-actions">
+                  <span v-if="taskHistory.length" class="meta">{{ taskHistory.length }} recorded</span>
+                  <AppButton
+                    v-if="taskHistory.length"
+                    variant="danger"
+                    size="sm"
+                    class="hist-clear-btn"
+                    :disabled="historyActionBusy"
+                    @click="emit('clear-history')"
+                  >
+                    Clear History
+                  </AppButton>
                 </div>
               </template>
-
-              <div v-if="taskHistory.length" class="hist-toolbar">
-                <span class="meta">{{ taskHistory.length }} recorded task(s)</span>
-                <AppButton
-                  variant="danger"
-                  size="sm"
-                  class="hist-clear-btn"
-                  :disabled="historyActionBusy"
-                  @click="emit('clear-history')"
-                >
-                  Clear History
-                </AppButton>
-              </div>
-
               <div v-if="!taskHistory.length" class="panel-body">
                 <div class="wb-empty">No task history yet.</div>
               </div>
@@ -484,7 +473,7 @@ onBeforeUnmount(() => {
                   <div class="hist-group-head">
                     {{ grp.label }} <span class="hist-group-count">({{ grp.items.length }})</span>
                   </div>
-                  <table class="aether-table hist-table">
+                  <table class="aegis-table app-table hist-table">
                     <thead>
                       <tr>
                         <th style="width: 50%">Task</th>
@@ -629,10 +618,6 @@ onBeforeUnmount(() => {
             <AboutSettingsPanel section="overview" />
           </section>
 
-          <!-- Tab 9: Architecture -->
-          <section v-else-if="currentTab === 'architecture'" class="settings-tab-pane">
-            <AboutSettingsPanel section="architecture" />
-          </section>
 
           <!-- Tab 10: License -->
           <section v-else-if="currentTab === 'license'" class="settings-tab-pane">

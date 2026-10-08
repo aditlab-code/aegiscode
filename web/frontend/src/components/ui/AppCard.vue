@@ -31,9 +31,10 @@ defineProps({
     <slot />
   </div>
   <div v-else-if="variant === 'panel'" class="panel-card">
-    <div v-if="$slots.header || title" class="panel-head">
+    <div v-if="$slots.header || title || $slots.actions" class="panel-head">
       <slot name="header">
-        <span class="panel-title">{{ title }}</span>
+        <span class="panel-title"><slot name="title">{{ title }}</slot></span>
+        <div v-if="$slots.actions" class="panel-actions"><slot name="actions" /></div>
       </slot>
     </div>
     <slot />

@@ -1,5 +1,5 @@
 # =============================================================================
-# AETHER - Template environment untuk DEPLOYMENT.
+# AegisCode - Template environment untuk DEPLOYMENT.
 # =============================================================================
 # Salin file ini menjadi `.env` lalu isi nilainya sesuai environment Anda:
 #     Copy-Item deployment.template .env
@@ -14,7 +14,7 @@
 # Provider aktif
 # -----------------------------------------------------------------------------
 # Provider aktif TIDAK lagi ditentukan lewat .env. Pilih Provider Instance +
-# Model dari halaman Settings (tersimpan di SQLite `data/aether.db`).
+# Model dari halaman Settings (tersimpan di SQLite `data/aegis.db`).
 # .env HANYA menyimpan secret (API key), bukan menentukan provider aktif.
 
 # -----------------------------------------------------------------------------
@@ -66,15 +66,15 @@ PERMISSION_UNKNOWN=require_approval
 # Django Gateway (web/django_app)
 # -----------------------------------------------------------------------------
 # Batas ukuran body request (bytes).
-AETHER_GATEWAY_MAX_BODY_BYTES=1000000
+AEGIS_GATEWAY_MAX_BODY_BYTES=1000000
 
 # -----------------------------------------------------------------------------
 # Django production hardening (#57)
 # -----------------------------------------------------------------------------
-# AETHER_ENV: development | production
+# AEGIS_ENV: development | production
 #   - development (default): DEBUG=true, ALLOWED_HOSTS=localhost, tanpa TLS.
 #   - production: WAJIB isi DJANGO_SECRET_KEY + DJANGO_ALLOWED_HOSTS, DEBUG=false.
-AETHER_ENV=development
+AEGIS_ENV=development
 
 # SECRET_KEY Django. WAJIB diisi di production (JANGAN pakai nilai dev).
 # Hasilkan dengan: python -c "import secrets; print(secrets.token_urlsafe(64))"
@@ -84,10 +84,10 @@ DJANGO_SECRET_KEY=
 DJANGO_DEBUG=true
 
 # ALLOWED_HOSTS: daftar host dipisah koma (WAJIB di production).
-# Contoh: DJANGO_ALLOWED_HOSTS=aether.example.com,www.aether.example.com
+# Contoh: DJANGO_ALLOWED_HOSTS=aegis.example.com,www.aegis.example.com
 DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
 
-# Security (default mengikuti AETHER_ENV; override bila perlu).
+# Security (default mengikuti AEGIS_ENV; override bila perlu).
 # DJANGO_SECURE_SSL_REDIRECT=true
 # DJANGO_SESSION_COOKIE_SECURE=true
 # DJANGO_CSRF_COOKIE_SECURE=true

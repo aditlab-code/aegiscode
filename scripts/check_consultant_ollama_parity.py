@@ -336,7 +336,7 @@ def _real_provider() -> RecordingOllama:
     from agent_ai.llm_config import LLMConfigService
     from agent_ai.providers.factory import build_provider_from_config
 
-    service = LLMConfigService(db_path=PROJECT_ROOT / "data" / "aether.db")
+    service = LLMConfigService(db_path=(PROJECT_ROOT / "data" / "aegis.db") if (PROJECT_ROOT / "data" / "aegis.db").exists() else (PROJECT_ROOT / "data" / "aether.db"))
     last_error = None
     for instance in service.list_provider_instances():
         if instance.provider_type != "ollama" or instance.enabled is False:

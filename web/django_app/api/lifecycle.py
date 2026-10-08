@@ -7,6 +7,7 @@ server dihentikan melalui antarmuka pengguna, panggilan API, maupun sinyal OS.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
 import signal
@@ -16,7 +17,6 @@ import time
 from typing import Any, Optional, Set
 
 logger = logging.getLogger(__name__)
-
 
 class ServerLifecycleManager:
     """Pengawas siklus hidup dan pembersihan sub-proses server AegisCode."""
@@ -52,16 +52,36 @@ class ServerLifecycleManager:
             sessions = list(self._pty_sessions)
             self._pty_sessions.clear()
 
-        # 1. Hentikan seluruh sesi PTY (lepaskan slave/master fd dan bunuh shell process)
+        # 1. Hentikan seluruh sesi PTY secara paralel (lepaskan slave/master fd dan bunuh shell process)
         terminated_ptys = 0
-        for pty in sessions:
-            try:
-                if hasattr(pty, "terminate"):
-                    pty.terminate()
-                    terminated_ptys += 1
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Gagal menghentikan sesi PTY: %s", exc)
+        if sessions:
+            def _terminate_one(pty: Any) -> bool:
+                try:
+                    if hasattr(pty, "terminate"):
+                        pty.terminate()
+                        return True
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Gagal menghentikan sesi PTY: %s", exc)
+                return False
 
+            max_workers = min(len(sessions), 8)
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+            try:
+                futures = [executor.submit(_terminate_one, p) for p in sessions]
+                done, not_done = concurrent.futures.wait(futures, timeout=2.0)
+                for f in done:
+                    try:
+                        if f.result():
+                            terminated_ptys += 1
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Error saat menunggu terminasi PTY: %s", exc)
+                if not_done:
+                    logger.warning(
+                        "%d sesi PTY tidak selesai dalam batas timeout 2.0s",
+                        len(not_done),
+                    )
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
         # 2. Batalkan task agen yang sedang berjalan di GatewayService
         cancelled_tasks = 0
         try:

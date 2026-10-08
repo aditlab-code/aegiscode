@@ -121,11 +121,12 @@ def _run() -> int:
     print(f"[2] main App render OK -> {len(html)} bytes HTML (SSR)")
 
     # 3) task composer tersedia (input utama user).
-    composer = sources.get("src/components/TaskComposer.vue", "")
+    composer = sources.get("src/components/workspace/TaskComposer.vue") or sources.get("src/components/TaskComposer.vue", "")
     assert composer, "TaskComposer.vue tidak ada"
     assert "<textarea" in composer or "<input" in composer, "composer harus punya input"
     assert "submit" in composer, "composer harus emit submit"
-    assert "TaskComposer" in sources.get("src/App.vue", ""), "App harus memakai TaskComposer"
+    all_workbench_src = "".join(v for k, v in sources.items() if k.startswith("src/components/") or k.startswith("src/pages/") or k == "src/App.vue")
+    assert "TaskComposer" in all_workbench_src or "AgentDrawerPanel" in all_workbench_src, "App/Workbench harus memakai TaskComposer/AgentDrawerPanel"
     print("[3] task composer tersedia OK -> TaskComposer.vue")
 
     # 4) API #50 digunakan.
@@ -141,11 +142,11 @@ def _run() -> int:
     assert "/events" in api_src, "api.js harus memakai /api/events"
     assert "EventSource" in api_src, "harus memakai EventSource (SSE)"
     assert "openEventStream" in api_src, "harus ada openEventStream"
-    assert "openEventStream" in sources.get("src/App.vue", ""), "App harus memakai SSE"
+    assert "openEventStream" in sources.get("src/App.vue", "") or "useServerConnection" in sources.get("src/App.vue", ""), "App harus memakai SSE"
     print("[5] SSE #51 digunakan OK -> /api/events via EventSource")
 
     # 6) event activity dapat diproses (handler event #51).
-    app_src = sources.get("src/App.vue", "")
+    app_src = sources.get("src/App.vue", "") + sources.get("src/composables/useTaskLifecycle.js", "")
     required_events = [
         "task_started",
         "phase_changed",
@@ -166,16 +167,17 @@ def _run() -> int:
     print(f"[6] event activity diproses OK -> {len(required_events)} event type")
 
     # 7) status/activity dapat diperbarui.
-    assert "task.status" in app_src, "App harus meng-update status task"
-    assert "AgentActivity" in app_src, "App harus memakai AgentActivity"
-    assert "ChangesPanel" in app_src, "App harus memakai ChangesPanel"
-    assert "FileExplorer" in app_src, "App harus memakai FileExplorer"
+    assert "task.status" in app_src or "task.status" in workbench_or_app, "App/Workbench harus meng-update status task"
+    all_workbench_src = "".join(v for k, v in sources.items() if k.startswith("src/components/") or k.startswith("src/pages/"))
+    assert "AgentActivity" in app_src or "AgentActivity" in all_workbench_src, "App/Workbench harus memakai AgentActivity"
+    assert "ChangesPanel" in app_src or "ChangesPanel" in all_workbench_src, "App/Workbench harus memakai ChangesPanel"
+    assert "FileExplorer" in app_src or "FileExplorer" in all_workbench_src, "App/Workbench harus memakai FileExplorer"
     print("[7] status/activity diperbarui OK -> status + AgentActivity")
 
     # 8) agent activity = unified chronological timeline.
     # Activity menampilkan commentary + tool call + tool result + observation
     # dalam satu alur. Panel "tool log" terpisah tidak lagi diperlukan.
-    activity_src = sources.get("src/components/AgentActivity.vue", "")
+    activity_src = sources.get("src/components/drawer/AgentActivity.vue") or sources.get("src/components/AgentActivity.vue", "")
     assert activity_src, "AgentActivity.vue tidak ada"
     for evt in ("agent_commentary", "tool_called", "tool_completed", "observation_received"):
         assert evt in activity_src, f"AgentActivity harus menampilkan event '{evt}'"
@@ -249,7 +251,7 @@ def _run() -> int:
     print("[11] Django API/SSE tetap kompatibel OK -> #50 + #51")
 
     # 12) Explorer: daftar file adalah scroll owner (bukan seluruh kolom).
-    css_src = sources.get("src/styles.css", "")
+    css_src = sources.get("src/styles/components/explorer.css") or sources.get("src/styles.css", "")
     assert ".explorer-block" in css_src, "explorer-block style tidak ada"
     assert ".explorer {" in css_src or ".explorer{" in css_src, (
         "rule .explorer (scroll owner daftar file) tidak ada"
