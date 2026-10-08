@@ -431,10 +431,10 @@ test("T08_ASYNC08: usageTokens memproses token tepat satu kali tanpa duplikasi",
 });
 
 // ── T09: ASYNC-09 ─────────────────────────────────────────────────────────────
-test("T09_ASYNC09: AppRightDrawer mengizinkan enqueue saat running dan menolak saat isSubmitting", () => {
-  const drawerCode = readSrc("components/layout/AppRightDrawer.vue");
+test("T09_ASYNC09: AgentDrawerPanel mengizinkan enqueue saat running dan menolak saat isSubmitting", () => {
+  const panelCode = readSrc("components/AgentDrawerPanel.vue");
   const submitSrc = between(
-    drawerCode,
+    panelCode,
     "function handleSubmit() {",
     "\nasync function viewReport("
   );

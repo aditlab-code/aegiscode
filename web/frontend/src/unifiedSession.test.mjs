@@ -19,21 +19,25 @@ test("UNIFY-01: api.js mengekspor fungsi Unified Session API lengkap", async () 
   assert.equal(typeof apiModule.cancelSessionRun, "function", "cancelSessionRun harus diekspor");
 });
 
-test("UNIFY-02: AppLeftSidebar mengintegrasikan subtab Threads & History (tanpa subtab Queue redundan) dengan operasi CRUD in-situ", () => {
+test("UNIFY-02: AppLeftSidebar mengintegrasikan subtab Threads & History (tanpa subtab Queue redundan) dengan operasi CRUD in-situ via ThreadsHistoryPanel", () => {
   const sidebarCode = readSrc("components/layout/AppLeftSidebar.vue");
+  const panelCode = readSrc("components/ThreadsHistoryPanel.vue");
 
-  assert.ok(sidebarCode.includes("loadThreads"), "AppLeftSidebar harus memuat thread sesi");
-  assert.ok(sidebarCode.includes("handleNewThread"), "AppLeftSidebar harus mendukung pembuatan thread baru");
-  assert.ok(sidebarCode.includes("startRename"), "AppLeftSidebar harus mendukung rename in-situ");
-  assert.ok(sidebarCode.includes("handleDeleteSession"), "AppLeftSidebar harus mendukung penghapusan thread");
-  assert.ok(sidebarCode.includes("side-sess-running-tag"), "AppLeftSidebar harus menampilkan badge running");
+  assert.ok(sidebarCode.includes("ThreadsHistoryPanel"), "AppLeftSidebar harus menyematkan ThreadsHistoryPanel");
   assert.ok(sidebarCode.includes("open-session"), "AppLeftSidebar harus memancarkan event open-session");
   assert.ok(!sidebarCode.includes("<QueuePanel"), "AppLeftSidebar tidak boleh menyematkan QueuePanel (streamline ke Threads & History)");
-  assert.ok(sidebarCode.includes("taskSubTab === 'history'"), "AppLeftSidebar harus mendukung subtab history");
-  assert.ok(sidebarCode.includes("startRenameTask"), "AppLeftSidebar harus mendukung rename task history");
-  assert.ok(sidebarCode.includes("handleDeleteTask"), "AppLeftSidebar harus mendukung hapus task history");
-  assert.ok(sidebarCode.includes("renameTaskHistory"), "AppLeftSidebar harus mengimpor/memanggil renameTaskHistory");
-  assert.ok(sidebarCode.includes("deleteTaskHistory"), "AppLeftSidebar harus mengimpor/memanggil deleteTaskHistory");
+
+  assert.ok(panelCode.includes("loadThreads"), "ThreadsHistoryPanel harus memuat thread sesi");
+  assert.ok(panelCode.includes("handleNewThread"), "ThreadsHistoryPanel harus mendukung pembuatan thread baru");
+  assert.ok(panelCode.includes("startRename"), "ThreadsHistoryPanel harus mendukung rename in-situ");
+  assert.ok(panelCode.includes("handleDeleteSession"), "ThreadsHistoryPanel harus mendukung penghapusan thread");
+  assert.ok(panelCode.includes("side-sess-running-tag"), "ThreadsHistoryPanel harus menampilkan badge running");
+  assert.ok(panelCode.includes("open-session"), "ThreadsHistoryPanel harus memancarkan event open-session");
+  assert.ok(panelCode.includes("taskSubTab === 'history'"), "ThreadsHistoryPanel harus mendukung subtab history");
+  assert.ok(panelCode.includes("startRenameTask"), "ThreadsHistoryPanel harus mendukung rename task history");
+  assert.ok(panelCode.includes("handleDeleteTask"), "ThreadsHistoryPanel harus mendukung hapus task history");
+  assert.ok(panelCode.includes("renameTaskHistory"), "ThreadsHistoryPanel harus mengimpor/memanggil renameTaskHistory");
+  assert.ok(panelCode.includes("deleteTaskHistory"), "ThreadsHistoryPanel harus mengimpor/memanggil deleteTaskHistory");
 });
 
 test("UNIFY-03: Penyelarasan ID Sesi: App.vue meneruskan session_id ke task metadata", () => {
