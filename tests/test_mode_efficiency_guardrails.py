@@ -46,20 +46,19 @@ class DummyProvider:
 def test_directive_prompt_contents():
     fast_prompt = directive_prompt_for_mode("fast")
     assert "FAST MODE ACTIVE" in fast_prompt
-    assert "maximum 3 full file reads" in fast_prompt.lower()
+    assert "codegraph" in fast_prompt.lower()
     assert "request_policy_escalation" in fast_prompt
 
     balanced_prompt = directive_prompt_for_mode("balanced")
     assert "BALANCED MODE ACTIVE" in balanced_prompt
-    assert "up to 8 full file reads" in balanced_prompt.lower()
+    assert "codegraph_find_callers" in balanced_prompt
 
     deep_prompt = directive_prompt_for_mode("deep")
     assert "DEEP MODE ACTIVE" in deep_prompt
-    assert "unrestricted exploration" in deep_prompt.lower()
+    assert "codegraph_impact_analysis" in deep_prompt
 
 
-
-def test_fast_mode_read_file_limit():
+def test_fast_mode_read_file_unrestricted():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td).resolve()
         # Buat 5 berkas dummy
@@ -70,37 +69,26 @@ def test_fast_mode_read_file_limit():
         cache.set_policy_mode("fast")
         read_tool = ReadFileTool(root=root, read_cache=cache)
 
-        # 1. Tiga berkas pertama berhasil dibaca penuh
-        r1 = read_tool.execute(path="file1.py")
-        assert "func_1" in r1["content"]
-        r2 = read_tool.execute(path="file2.py")
-        assert "func_2" in r2["content"]
-        r3 = read_tool.execute(path="file3.py")
-        assert "func_3" in r3["content"]
-        assert cache.full_read_count() == 3
+        # 1. Seluruh berkas berhasil dibaca penuh tanpa hambatan kuota kaku
+        for i in range(1, 6):
+            res = read_tool.execute(path=f"file{i}.py")
+            assert f"func_{i}" in res["content"]
+
+        assert cache.full_read_count() == 5
 
         # 2. Berkas yang sudah dibaca boleh dibaca ulang
         r1_again = read_tool.execute(path="file1.py")
         assert r1_again.get("already_available") is True or "func_1" in r1_again.get("content", "")
 
-        # 3. Berkas ke-4 DITOLAK dengan pesan instruksi eskalasi
-        with pytest.raises(ToolExecutionError) as exc_info:
-            read_tool.execute(path="file4.py")
-
-        err_msg = str(exc_info.value)
-        assert "FAST_MODE_FILE_LIMIT_EXCEEDED" in err_msg
-        assert "request_policy_escalation" in err_msg
-        assert "target_mode='balanced'" in err_msg
-
-        # 4. Pembacaan simbol atau rentang baris TETAP DIIZINKAN (surgical read)
+        # 3. Pembacaan simbol atau rentang baris tetap berfungsi
         r4_symbol = read_tool.execute(path="file4.py", symbol="func_4")
         assert "func_4" in r4_symbol["content"]
 
         r5_range = read_tool.execute(path="file5.py", start_line=1, end_line=1)
-        assert "def func_5" in r5_range["content"]
+        assert r5_range.get("already_read") is True or "def func_5" in r5_range.get("content", "")
 
 
-def test_escalation_broadens_read_file_limit():
+def test_escalation_mode_transitions():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td).resolve()
         for i in range(1, 12):
@@ -110,40 +98,27 @@ def test_escalation_broadens_read_file_limit():
         cache.set_policy_mode("fast")
         read_tool = ReadFileTool(root=root, read_cache=cache)
 
-        # Baca 3 berkas di mode Fast
-        for i in range(1, 4):
-            read_tool.execute(path=f"f{i}.py")
-
-        # Berkas ke-4 ditolak di Fast
-        with pytest.raises(ToolExecutionError) as exc_info:
-            read_tool.execute(path="f4.py")
-        assert "FAST_MODE_FILE_LIMIT_EXCEEDED" in str(exc_info.value)
+        # Baca berkas di mode Fast
+        for i in range(1, 5):
+            r = read_tool.execute(path=f"f{i}.py")
+            assert f"file {i}" in r["content"]
+        assert cache.full_read_count() == 4
 
         # Escalasi ke Balanced
         cache.set_policy_mode("balanced")
-
-        # Sekarang berkas ke-4 berhasil dibaca!
-        r4 = read_tool.execute(path="f4.py")
-        assert "file 4" in r4["content"]
-
-        # Baca hingga berkas ke-8
+        assert cache.get_policy_mode() == "balanced"
         for i in range(5, 9):
-            read_tool.execute(path=f"f{i}.py")
+            r = read_tool.execute(path=f"f{i}.py")
+            assert f"file {i}" in r["content"]
         assert cache.full_read_count() == 8
-
-        # Berkas ke-9 ditolak di Balanced
-        with pytest.raises(ToolExecutionError) as exc_info:
-            read_tool.execute(path="f9.py")
-        assert "BALANCED_MODE_FILE_LIMIT_EXCEEDED" in str(exc_info.value)
 
         # Escalasi ke Deep
         cache.set_policy_mode("deep")
-
-        # Berkas ke-9 dan seterusnya bebas dibaca
-        r9 = read_tool.execute(path="f9.py")
-        assert "file 9" in r9["content"]
-        r10 = read_tool.execute(path="f10.py")
-        assert "file 10" in r10["content"]
+        assert cache.get_policy_mode() == "deep"
+        for i in range(9, 12):
+            r = read_tool.execute(path=f"f{i}.py")
+            assert f"file {i}" in r["content"]
+        assert cache.full_read_count() == 11
 
 
 def test_request_policy_escalation_tool():

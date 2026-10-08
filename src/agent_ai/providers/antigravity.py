@@ -134,14 +134,14 @@ def _format_antigravity_policy_directive(mode: str) -> str:
     if mode_clean == "fast":
         rules.extend([
             "5. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
-            "   - MAXIMUM 2-3 SOURCE FILES: You are restricted to reading at most 2-3 target files before editing.",
+            "   - SURGICAL RESOLUTION: Prioritize targeted symbol search and CodeGraph navigation before reading files.",
             "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
             "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
         ])
     elif mode_clean == "balanced":
         rules.extend([
             "5. EXECUTION MODE: BALANCED:",
-            "   - Read only files directly related to the user's task (max 6-8 files).",
+            "   - Read files directly related to the user's task with moderate exploration.",
             "   - Avoid redundant reads of the same file. Once read, proceed with implementation immediately.",
             "   - Apply edits as soon as sufficient context is gathered.",
         ])
@@ -957,16 +957,6 @@ class AntigravityProvider(BaseProvider):
                                                             "delta": f"\n{warning_msg}\n",
                                                             "reasoning": f"\n{warning_msg}\n",
                                                         })
-                                            if policy_mode == "fast" and len(files_read_set) > 3:
-                                                proc.kill()
-                                                raise ProviderAPIError(
-                                                    f"Pelanggaran Guardrail Efisiensi Mode Fast: Antigravity CLI telah membaca {len(files_read_set)} berkas "
-                                                    f"(batas mode Fast adalah 3 berkas unik). Eksekusi dihentikan. "
-                                                    "Gunakan mode Balanced jika memerlukan analisis lintas berkas yang lebih luas.",
-                                                    status_code=429,
-                                                    endpoint="agy CLI",
-                                                    response_body=f"Circuit breaker: fast mode read limit exceeded ({len(files_read_set)} > 3)",
-                                                )
 
                                         # Multi-Tool Signature Redundancy Tracking & Circuit Breaker (non-read_file)
                                         if aegis_tool != "read_file":

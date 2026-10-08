@@ -394,10 +394,10 @@ def policy_activity_text(
 def directive_prompt_for_mode(mode: Any) -> str:
     """Prompt arahan direktif kerja per mode (Fast, Balanced, Deep).
 
-    Disisipkan sebagai system message agar LLM mematuhi batas efisiensi kerja:
-    - Fast: Kerja bedah, hemat token, batas maks 3 berkas penuh, prioritaskan search_code/symbol.
-    - Balanced: Eksplorasi moderat terarah (hingga 8 berkas penuh).
-    - Deep: Eksplorasi mendalam tanpa batas berkas.
+    Disisipkan sebagai system message agar LLM mematuhi strategi efisiensi kerja:
+    - Fast: Kerja bedah cepat, hemat token, prioritaskan CodeGraph references & callers.
+    - Balanced: Eksplorasi moderat terarah dengan penelusuran callers & callees.
+    - Deep: Eksplorasi arsitektur mendalam dengan impact analysis & trace API.
     """
     norm = normalize_mode(mode, DEFAULT_MODE)
     if norm == MODE_FAST:
@@ -405,17 +405,17 @@ def directive_prompt_for_mode(mode: Any) -> str:
             "[EXECUTION POLICY: FAST MODE ACTIVE]\n"
             "You are operating under FAST execution policy:\n"
             "- Goal: Rapid, surgical resolution with minimal latency and minimal token consumption.\n"
-            "- File Reading Guardrail: Strictly maximum 3 full file reads per task. Use 'search_code' or 'read_file(symbol=...)' / line ranges instead of reading entire files.\n"
+            "- Code Navigation: Prioritize CodeGraph tools ('codegraph_find_references', 'codegraph_find_callers') and 'search_code' to pinpoint exact symbols before reading files.\n"
             "- Minimal Planning: Do not construct verbose multi-step planning lists. Directly apply surgical changes.\n"
             "- Targeted Verification: Validate syntax and verify only the modified files.\n"
-            "- Escalation: If you discover this task genuinely requires exploring >3 files or architecture-wide refactoring, invoke the 'request_policy_escalation' tool with target_mode='balanced'."
+            "- Escalation: If you discover this task genuinely requires architecture-wide refactoring, invoke the 'request_policy_escalation' tool with target_mode='balanced'."
         )
     if norm == MODE_DEEP:
         return (
             "[EXECUTION POLICY: DEEP MODE ACTIVE]\n"
             "You are operating under DEEP execution policy:\n"
             "- Goal: Thorough investigation, high-assurance architecture validation, and complete regression safety.\n"
-            "- File Reading: Unrestricted exploration allowed. Proactively utilize 'semantic_search', 'hybrid_search', and 'atlas_query' / Project Map.\n"
+            "- Code Navigation: Unrestricted exploration allowed. Proactively utilize CodeGraph tools ('codegraph_impact_analysis', 'codegraph_trace_api', 'codegraph_find_orphans') and Project Map ('atlas_query').\n"
             "- Planning: Formulate detailed multi-phase plans.\n"
             "- Full Verification: Run broad regression test suites and inspect cross-module impact."
         )
@@ -424,11 +424,10 @@ def directive_prompt_for_mode(mode: Any) -> str:
         "[EXECUTION POLICY: BALANCED MODE ACTIVE]\n"
         "You are operating under BALANCED execution policy (Standard):\n"
         "- Goal: Optimal balance between execution velocity, code correctness, and token efficiency.\n"
-        "- File Reading Guardrail: Moderate exploration up to 8 full file reads. Use 'search_code' to pinpoint code locations before reading.\n"
+        "- Code Navigation: Moderate exploration. Use CodeGraph tools ('codegraph_find_callers', 'codegraph_find_callees') to inspect direct caller/callee relations before editing.\n"
         "- Standard Verification: Run tests and checkers targeted to modified and related modules.\n"
         "- Escalation: If you encounter widespread ripple effects requiring exhaustive repository-wide search, invoke 'request_policy_escalation' with target_mode='deep'."
     )
-
 
 
 class ExecutionPolicyResolver:

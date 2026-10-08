@@ -352,47 +352,14 @@ class ToolReadCache:
     def can_read_full(self, rel_path: str) -> Tuple[bool, Optional[str]]:
         """Periksa apakah pembacaan penuh berkas baru diizinkan oleh policy.
 
+        Pasca-integrasi CodeGraph MCP (Fase 2.5), pembatasan keras kuota berkas
+        telah dilepas (zero-stuck). Navigasi diarahkan secara deterministik oleh
+        CodeGraph AST, dan method ini selalu mengizinkan pembacaan berkas.
+
         Returns:
-            (allowed, message): True bila diizinkan; False + pesan instruksi
-            bila melebihi ambang kuota mode.
+            (allowed, message): Selalu (True, None).
         """
-        with self._lock:
-            mode = self._policy_mode
-            if not mode or mode in ("deep", "unlimited"):
-                return True, None
-
-            # Berkas yang sudah pernah dibaca penuh selalu diizinkan dibaca ulang
-            if rel_path in self._full_reads:
-                return True, None
-
-            current_count = len(self._full_reads)
-            if mode == "fast" and current_count >= FAST_MODE_MAX_FULL_READS:
-                paths_str = ", ".join(f"'{p}'" for p in sorted(self._full_reads))
-                msg = (
-                    f"FAST_MODE_FILE_LIMIT_EXCEEDED: Mode Fast telah mencapai batas pembacaan berkas penuh "
-                    f"(maksimal {FAST_MODE_MAX_FULL_READS} berkas unik: {paths_str}). "
-                    f"Dilarang membaca berkas baru '{rel_path}' secara utuh.\n"
-                    "Solusi hemat token:\n"
-                    f"1. Gunakan 'search_code' untuk mencari teks/simbol spesifik pada '{rel_path}'.\n"
-                    f"2. Gunakan 'read_file(path=\"{rel_path}\", symbol=\"nama_simbol\")' atau tentukan rentang 'start_line'/'end_line'.\n"
-                    "3. Jika tugas ini memerlukan pemahaman arsitektur multi-berkas lebih luas, panggil tool 'request_policy_escalation' dengan target_mode='balanced'."
-                )
-                return False, msg
-
-            if mode == "balanced" and current_count >= BALANCED_MODE_MAX_FULL_READS:
-                paths_str = ", ".join(f"'{p}'" for p in sorted(self._full_reads))
-                msg = (
-                    f"BALANCED_MODE_FILE_LIMIT_EXCEEDED: Mode Balanced telah mencapai batas wajar pembacaan berkas penuh "
-                    f"(maksimal {BALANCED_MODE_MAX_FULL_READS} berkas unik: {paths_str}). "
-                    f"Dilarang membaca berkas baru '{rel_path}' secara utuh.\n"
-                    "Solusi efisien:\n"
-                    f"1. Gunakan 'search_code' atau 'read_file(symbol=...)' untuk mengambil bagian yang relevan saja.\n"
-                    "2. Jika perubahan berskala arsitektur besar, panggil tool 'request_policy_escalation' dengan target_mode='deep'."
-                )
-                return False, msg
-
-            return True, None
-
+        return True, None
     def record_full_read(self, rel_path: str) -> None:
         """Catat bahwa berkas rel_path telah dibaca secara utuh."""
         with self._lock:
