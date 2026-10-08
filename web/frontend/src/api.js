@@ -375,6 +375,134 @@ export function deinitProjectGit(projectId) {
   );
 }
 
+export function checkoutProjectGitBranch(projectId, branch, create = false, startPoint = null) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/checkout`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch, create, start_point: startPoint }),
+  });
+}
+
+export function createProjectGitBranch(projectId, branch, startPoint = null, checkout = false) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/branches/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch, start_point: startPoint, checkout }),
+  });
+}
+
+export function deleteProjectGitBranch(projectId, branch, force = false, isRemote = false, remote = "origin") {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/branches/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch, force, is_remote: isRemote, remote }),
+  });
+}
+
+export function mergeProjectGitBranch(projectId, branch, message = null, noFf = false) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/merge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ branch, message, no_ff: noFf }),
+  });
+}
+
+export function stashProjectGitChanges(projectId, message = null, includeUntracked = true) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/stash`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, include_untracked: includeUntracked }),
+  });
+}
+
+export function listProjectGitStashes(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/stash/list`);
+}
+
+export function popProjectGitStash(projectId, index = 0) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/stash/pop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ index }),
+  });
+}
+
+export function applyProjectGitStash(projectId, index = 0) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/stash/apply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ index }),
+  });
+}
+
+export function dropProjectGitStash(projectId, index = 0) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/stash/drop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ index }),
+  });
+}
+
+export function pushProjectGit(projectId, remote = null, branch = null, setUpstream = false, force = false) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/push`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remote, branch, set_upstream: setUpstream, force }),
+  });
+}
+
+export function pullProjectGit(projectId, remote = null, branch = null, rebase = false) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/pull`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remote, branch, rebase }),
+  });
+}
+
+export function fetchProjectGit(projectId, remote = null, prune = true) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/fetch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ remote, prune }),
+  });
+}
+
+export function getProjectGitRemotes(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/remotes`);
+}
+
+export function addProjectGitRemote(projectId, name, url) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/remotes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "add", name, url }),
+  });
+}
+
+export function setProjectGitRemoteUrl(projectId, name, url) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/remotes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "set_url", name, url }),
+  });
+}
+
+export function cloneProjectGit(projectId, url, targetDir = null) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, target_dir: targetDir }),
+  });
+}
+
+export function commitProjectGit(projectId, message, stageAll = false) {
+  return request(`/projects/${encodeURIComponent(projectId)}/git/commit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, stage_all: stageAll }),
+  });
+}
+
 export function createTask(task, projectId = null, metadata = null, executionMode = null, images = null, activeFile = null) {
   const body = { task };
   if (projectId) body.project_id = projectId;

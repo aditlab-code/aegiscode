@@ -1,6 +1,6 @@
 <script setup>
 // Changes / Diff + Result with Git Staging (VS Code-like Source Control model).
-import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
+import { computed, ref, watch, onMounted, onBeforeUnmount, inject } from "vue";
 import {
   getProjectGitStatus,
   getProjectGitDiff,
@@ -36,6 +36,7 @@ const stagingFile = ref(null);
 const unstagingFile = ref(null);
 const stageAllBusy = ref(false);
 const unstageAllBusy = ref(false);
+
 
 function requestDiscardAll() {
   confirmDiscardAll.value = true;

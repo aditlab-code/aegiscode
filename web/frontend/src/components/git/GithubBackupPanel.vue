@@ -8,17 +8,25 @@
 // dibuka dan hanya dikirim saat user mengisi.
 import { computed, reactive, ref, watch } from "vue";
 import {
+  checkoutProjectGitBranch,
+  commitProjectGit,
   createGithubCheckpoint,
   deinitProjectGit,
+  dropProjectGitStash,
   getGithubConfig,
   getProjectGitBranches,
   initProjectGit,
   listGithubCheckpoints,
+  listProjectGitStashes,
+  popProjectGitStash,
+  pullProjectGit,
+  pushProjectGit,
   restoreGithubCheckpoint,
   saveGithubConfig,
   testGithubConnection,
 } from "../../api";
 import { computeGitGraph } from "../../services/gitGraphLayout";
+import GitActionModal from "./GitActionModal.vue";
 
 const props = defineProps({
   // Project (dari daftar launcher / active project): { id, name, root|path }.
@@ -63,6 +71,61 @@ const restoreTarget = ref(null);
 const restoring = ref(false);
 const configureOpen = ref(false);
 const checkpointsCollapsed = ref(false);
+const branchesCollapsed = ref(true);
+const stashesCollapsed = ref(true);
+const stashesList = ref([]);
+const branchSearch = ref("");
+const branchSwitching = ref(false);
+const syncBusy = ref(false);
+const gitActionModalOpen = ref(false);
+const currentGitAction = ref("create_branch");
+const gitContextMenuOpen = ref(false);
+const activeSubmenu = ref(null);
+const viewAsTree = ref(false);
+const sortOrder = ref("path");
+const contextMenuPosition = ref({ top: 0, left: 0 });
+
+function toggleGitContextMenu(event) {
+  if (gitContextMenuOpen.value) {
+    closeGitContextMenu();
+    return;
+  }
+  const btn = event?.currentTarget || event?.target?.closest("button");
+  const rect = btn?.getBoundingClientRect ? btn.getBoundingClientRect() : { bottom: 60, right: 230 };
+  contextMenuPosition.value = {
+    top: Math.round(rect.bottom + 4),
+    left: Math.max(10, Math.round(rect.right - 210)),
+  };
+  gitContextMenuOpen.value = true;
+  activeSubmenu.value = null;
+}
+
+function closeGitContextMenu() {
+  gitContextMenuOpen.value = false;
+  activeSubmenu.value = null;
+}
+
+const contextMenuPositionStyle = computed(() => {
+  return {
+    top: `${contextMenuPosition.value.top}px`,
+    left: `${contextMenuPosition.value.left}px`,
+  };
+});
+
+
+const filteredSidebarLocalBranches = computed(() => {
+  const branches = gitBranchInfo.value?.local_branches || [];
+  const q = branchSearch.value.trim().toLowerCase();
+  if (!q) return branches;
+  return branches.filter((b) => b.toLowerCase().includes(q));
+});
+
+const filteredSidebarRemoteBranches = computed(() => {
+  const branches = gitBranchInfo.value?.remote_branches || [];
+  const q = branchSearch.value.trim().toLowerCase();
+  if (!q) return branches;
+  return branches.filter((b) => b.toLowerCase().includes(q));
+});
 
 const currentBranchName = computed(() => {
   return gitBranchInfo.value?.current || config.value.current_branch || config.value.branch || "main";
@@ -134,13 +197,137 @@ async function load() {
     if (config.value.configured || config.value.is_repository) {
       const data = await listGithubCheckpoints(id);
       checkpoints.value = data.checkpoints || [];
+      try {
+        const sData = await listProjectGitStashes(id);
+        stashesList.value = sData?.stashes || [];
+      } catch (_) {
+        stashesList.value = [];
+      }
     } else {
       checkpoints.value = [];
+      stashesList.value = [];
     }
-  } catch (e) {
     error.value = e.message || String(e);
   } finally {
     loading.value = false;
+  }
+}
+
+function openGitAction(act) {
+  currentGitAction.value = act;
+  gitActionModalOpen.value = true;
+  closeGitContextMenu();
+}
+
+function onGitActionSuccess(payload) {
+  if (payload?.message) {
+    notice.value = payload.message;
+  }
+  load();
+}
+
+async function handleQuickPull() {
+  const id = projectId();
+  if (!id) return;
+  syncBusy.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await pullProjectGit(id);
+    if (res?.ok) {
+      notice.value = "Pull completed successfully.";
+      await load();
+    } else {
+      error.value = res?.error || "Pull failed.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    syncBusy.value = false;
+  }
+}
+
+async function handleQuickPush() {
+  const id = projectId();
+  if (!id) return;
+  syncBusy.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await pushProjectGit(id);
+    if (res?.ok) {
+      notice.value = "Push completed successfully.";
+      await load();
+    } else {
+      error.value = res?.error || "Push failed.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    syncBusy.value = false;
+  }
+}
+
+async function handleQuickSwitchBranch(target) {
+  const id = projectId();
+  if (!id || !target || target === currentBranchName.value) return;
+  branchSwitching.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await checkoutProjectGitBranch(id, target);
+    if (res?.ok) {
+      notice.value = `Switched to branch '${target}'.`;
+      await load();
+    } else {
+      error.value = res?.error || `Failed to switch to '${target}'.`;
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    branchSwitching.value = false;
+  }
+}
+
+async function handleQuickPopStash(idx) {
+  const id = projectId();
+  if (!id) return;
+  busy.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await popProjectGitStash(id, idx);
+    if (res?.ok) {
+      notice.value = `Stash@{${idx}} popped.`;
+      await load();
+    } else {
+      error.value = res?.error || "Failed to pop stash.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function handleQuickDropStash(idx) {
+  const id = projectId();
+  if (!id) return;
+  busy.value = true;
+  error.value = "";
+  notice.value = "";
+  try {
+    const res = await dropProjectGitStash(id, idx);
+    if (res?.ok) {
+      notice.value = `Stash@{${idx}} dropped.`;
+      await load();
+    } else {
+      error.value = res?.error || "Failed to drop stash.";
+    }
+  } catch (err) {
+    error.value = err.message || String(err);
+  } finally {
+    busy.value = false;
   }
 }
 
@@ -193,35 +380,32 @@ async function test() {
   }
 }
 
-async function commitCheckpoint() {
+async function commitOnBranch() {
   const id = projectId();
   if (!id || !checkpointDescription.value.trim()) return;
   busy.value = true;
   error.value = "";
   notice.value = "";
   try {
-    if (!config.value.configured && config.value.is_repository) {
-      try {
-        await saveGithubConfig(id, {
-          repository: form.repository || config.value.repository || "",
-          branch: form.branch || config.value.branch || config.value.current_branch || "main",
-          exclude: excludeList(),
-        });
-      } catch (_) {}
+    const msg = checkpointDescription.value.trim();
+    const result = await commitProjectGit(id, msg);
+    if (!result.ok) {
+      error.value = result.error || "Git commit failed.";
+      return;
     }
-    const result = await createGithubCheckpoint(id, checkpointDescription.value.trim());
     checkpointDescription.value = "";
-    notice.value = result.message || "Checkpoint dibuat.";
-    if (result.push_error) error.value = result.push_error;
+    notice.value = `Commit [${result.commit || "HEAD"}] created on branch '${currentBranchName.value}'.`;
     const data = await listGithubCheckpoints(id);
     checkpoints.value = data.checkpoints || [];
     await refreshStatus(id);
     emit("checkpoint-created", result);
-    error.value = e.message || String(e);
+  } catch (err) {
+    error.value = err.message || String(err);
   } finally {
     busy.value = false;
   }
 }
+const commitCheckpoint = commitOnBranch;
 
 async function handleInitGit() {
   const id = projectId();
@@ -399,14 +583,40 @@ watch(
             <button
               type="button"
               class="sc-action-btn"
-              :class="{ active: configureOpen }"
-              :title="configureOpen ? 'Close Settings' : 'Remote & Token Settings'"
-              @click="configureOpen = !configureOpen"
+              title="Pull from remote (git pull)"
+              :disabled="syncBusy || loading"
+              @click="handleQuickPull"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
               </svg>
             </button>
+            <button
+              type="button"
+              class="sc-action-btn"
+              title="Push to remote (git push)"
+              :disabled="syncBusy || loading"
+              @click="handleQuickPush"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="sc-action-btn more-actions-btn"
+              :class="{ active: gitContextMenuOpen }"
+              title="Views and More Actions..."
+              aria-label="Views and More Actions"
+              @click.stop="toggleGitContextMenu"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="5" cy="12" r="1.5" fill="currentColor"/>
+                <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
+              </svg>
+            </button>
+
             <button
               type="button"
               class="sc-action-btn"
@@ -436,113 +646,169 @@ watch(
         </div>
       </div>
 
-      <!-- Remote Configuration Drawer (collapsible) -->
-      <div v-if="configureOpen" class="sc-config-box">
-        <div class="sc-config-title">Remote &amp; Auth Configuration</div>
-        <div class="sc-fields-stack">
-          <label class="sc-field">
-            <span class="sc-field-label">Repository URL</span>
-            <input
-              v-model="form.repository"
-              class="sc-input"
-              placeholder="https://github.com/owner/repo.git"
-            />
-          </label>
-          <label class="sc-field">
-            <span class="sc-field-label">Branch</span>
-            <input v-model="form.branch" class="sc-input" placeholder="main" />
-          </label>
-          <label class="sc-field">
-            <span class="sc-field-label">Access Token <span class="sc-hint">(Optional — uses local git credentials if empty)</span></span>
-            <input
-              v-model="form.token"
-              class="sc-input"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="config.credential_set ? '•••••••• (saved)' : 'Optional: Personal Access Token'"
-            />
-          </label>
-          <div class="sc-config-btn-row">
-            <button class="sc-btn sc-btn-primary" type="button" :disabled="busy" @click="save">
-              Save
-            </button>
-            <button class="sc-btn sc-btn-secondary" type="button" :disabled="busy" @click="test">
-              Test Connection
-            </button>
-          </div>
 
-          <!-- Danger Zone: De-initialize Git -->
-          <div class="sc-danger-zone">
-            <div class="sc-danger-title">Danger Zone</div>
-            <div v-if="!confirmDeinit" class="sc-danger-action-row">
-              <button
-                class="sc-btn sc-danger-btn"
-                type="button"
-                :disabled="busy || deinitializingGit"
-                @click="confirmDeinit = true"
-              >
-                De-initialize Git Repository
-              </button>
-            </div>
-            <div v-else class="sc-danger-confirm-card">
-              <span class="sc-danger-warning">
-                Hapus direktori lokal .git? Seluruh riwayat commit lokal akan dihapus dan proyek kembali ke status non-repository.
-              </span>
-              <div class="sc-danger-confirm-btns">
-                <button
-                  class="sc-btn sc-confirm-danger-yes-btn"
-                  type="button"
-                  :disabled="deinitializingGit"
-                  @click="handleDeinitGit"
-                >
-                  {{ deinitializingGit ? "Removing…" : "Yes, Delete .git" }}
-                </button>
-                <button
-                  class="sc-btn sc-confirm-danger-no-btn"
-                  type="button"
-                  :disabled="deinitializingGit"
-                  @click="confirmDeinit = false"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Commit Box (Top-level IDE pattern) -->
+      <!-- Commit Box (Native Git commit on active branch) -->
       <div v-if="config.configured || config.is_repository" class="sc-commit-block">
         <div class="sc-commit-card">
           <textarea
             v-model="checkpointDescription"
             class="sc-commit-textarea"
             rows="2"
-            placeholder="Message (Cmd+Enter to commit)..."
-            @keydown.cmd.enter="commitCheckpoint"
-            @keydown.ctrl.enter="commitCheckpoint"
+            :placeholder="`Message (⌘Enter to commit on &quot;${currentBranchName}&quot;)`"
+            @keydown.cmd.enter="commitOnBranch"
+            @keydown.ctrl.enter="commitOnBranch"
           ></textarea>
           <button
             class="sc-commit-submit-btn"
             type="button"
             :disabled="busy || !checkpointDescription.trim()"
-            @click="commitCheckpoint"
+            :title="`Git Commit on branch ${currentBranchName}`"
+            @click="commitOnBranch"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            <span>Create Checkpoint</span>
+            <span>Commit to "{{ currentBranchName }}"</span>
           </button>
+        </div>
+      </div>
+
+      <!-- Branches Section Header & List (collapsible) -->
+      <div v-if="config.configured || config.is_repository" class="sc-branches-section">
+        <div class="drawer-sec-head sc-sec-head" @click="branchesCollapsed = !branchesCollapsed">
+          <span class="sec-caret sc-caret" aria-hidden="true">{{ branchesCollapsed ? "▸" : "▾" }}</span>
+          <span class="drawer-sec-title sc-sec-title">BRANCHES</span>
+          <div class="drawer-sec-actions" @click.stop>
+            <span class="drawer-badge sc-sec-badge">{{ (gitBranchInfo?.local_branches?.length || 0) + (gitBranchInfo?.remote_branches?.length || 0) }}</span>
+            <button
+              type="button"
+              class="sc-mini-action-btn"
+              title="Create new branch"
+              @click="openGitAction('create_branch')"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div v-show="!branchesCollapsed" class="sc-branches-body">
+          <div class="sc-branch-filter-box">
+            <input
+              v-model="branchSearch"
+              class="sc-branch-filter-input"
+              placeholder="Filter branches..."
+            />
+          </div>
+
+          <!-- Local Branches list -->
+          <div class="sc-branch-group-label">LOCAL ({{ filteredSidebarLocalBranches.length }})</div>
+          <div class="sc-branch-sidebar-list">
+            <div
+              v-for="b in filteredSidebarLocalBranches"
+              :key="b"
+              class="sc-branch-sidebar-item"
+              :class="{ active: b === currentBranchName }"
+              :title="b === currentBranchName ? 'Current active branch' : `Click to switch to ${b}`"
+              @click="handleQuickSwitchBranch(b)"
+            >
+              <div class="sc-branch-sidebar-item-left mono">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>
+                </svg>
+                <span>{{ b }}</span>
+              </div>
+              <div class="sc-branch-sidebar-item-right" @click.stop>
+                <span v-if="b === currentBranchName" class="sc-branch-active-dot">●</span>
+                <button
+                  v-if="b !== currentBranchName"
+                  type="button"
+                  class="sc-branch-item-btn"
+                  title="Merge into current branch"
+                  @click="targetBranch = b; openGitAction('merge')"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>
+                </button>
+              </div>
+            </div>
+            <div v-if="!filteredSidebarLocalBranches.length" class="sc-empty-hint">No matching local branches.</div>
+          </div>
+
+          <!-- Remote Branches list -->
+          <div v-if="filteredSidebarRemoteBranches.length" class="sc-branch-group-label">REMOTE ({{ filteredSidebarRemoteBranches.length }})</div>
+          <div v-if="filteredSidebarRemoteBranches.length" class="sc-branch-sidebar-list">
+            <div
+              v-for="rb in filteredSidebarRemoteBranches"
+              :key="rb"
+              class="sc-branch-sidebar-item remote"
+              :title="`Click to switch/track ${rb}`"
+              @click="handleQuickSwitchBranch(rb)"
+            >
+              <div class="sc-branch-sidebar-item-left mono">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                </svg>
+                <span>{{ rb }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Injected Changes Panel Slot -->
       <slot />
+
+      <!-- Stashes Section Header & List (collapsible) -->
+      <div v-if="(config.configured || config.is_repository) && stashesList.length" class="sc-stashes-section">
+        <div class="drawer-sec-head sc-sec-head" @click="stashesCollapsed = !stashesCollapsed">
+          <span class="sec-caret sc-caret" aria-hidden="true">{{ stashesCollapsed ? "▸" : "▾" }}</span>
+          <span class="drawer-sec-title sc-sec-title">STASHES</span>
+          <div class="drawer-sec-actions" @click.stop>
+            <span class="drawer-badge sc-sec-badge">{{ stashesList.length }}</span>
+            <button
+              type="button"
+              class="sc-mini-action-btn"
+              title="Stash changes"
+              @click="openGitAction('stash')"
+            >
+              +
+            </button>
+          </div>
+        </div>
+
+        <div v-show="!stashesCollapsed" class="sc-stashes-body">
+          <div v-for="st in stashesList" :key="st.index" class="sc-stash-row">
+            <div class="sc-stash-info">
+              <span class="sc-stash-ref mono">{{ st.ref }}</span>
+              <span class="sc-stash-msg" :title="st.message">{{ st.message || "(No message)" }}</span>
+            </div>
+            <div class="sc-stash-actions">
+              <button
+                type="button"
+                class="sc-mini-stash-btn"
+                title="Pop this stash"
+                :disabled="busy"
+                @click="handleQuickPopStash(st.index)"
+              >
+                Pop
+              </button>
+              <button
+                type="button"
+                class="sc-mini-stash-btn danger"
+                title="Drop this stash"
+                :disabled="busy"
+                @click="handleQuickDropStash(st.index)"
+              >
+                Drop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- Checkpoints Section Header & List -->
       <div v-if="config.configured || config.is_repository" class="sc-checkpoints-section">
         <div class="drawer-sec-head sc-sec-head" @click="checkpointsCollapsed = !checkpointsCollapsed">
           <span class="sec-caret sc-caret" aria-hidden="true">{{ checkpointsCollapsed ? "▸" : "▾" }}</span>
-          <span class="drawer-sec-title sc-sec-title">CHECKPOINTS</span>
+          <span class="drawer-sec-title sc-sec-title">GRAPH</span>
           <div class="drawer-sec-actions">
             <span class="drawer-badge sc-sec-badge">{{ checkpoints.length }}</span>
           </div>
@@ -638,6 +904,208 @@ watch(
             </button>
             <button class="sc-btn sc-btn-danger" type="button" :disabled="restoring" @click="confirmRestore">
               {{ restoring ? "Restoring..." : "Restore" }}
+            </button>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- Git Comprehensive Action Modal -->
+      <GitActionModal
+        :show="gitActionModalOpen"
+        :action="currentGitAction"
+        :project="project"
+        :branch-info="gitBranchInfo"
+        @close="gitActionModalOpen = false"
+        @success="onGitActionSuccess"
+      />
+
+      <!-- Floating Git Context Menu (VS Code style) -->
+      <Teleport to="body">
+        <div v-if="gitContextMenuOpen" class="sc-context-menu-backdrop" @click="closeGitContextMenu">
+          <div
+            class="sc-context-menu-popover"
+            :style="contextMenuPositionStyle"
+            role="menu"
+            aria-label="Git Actions Menu"
+            @click.stop
+          >
+            <!-- View as Tree -->
+            <button type="button" class="sc-ctx-item" @click="viewAsTree = !viewAsTree; closeGitContextMenu()">
+              <span>{{ viewAsTree ? "View as List" : "View as Tree" }}</span>
+            </button>
+
+            <!-- View & Sort > -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'view_sort'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>View &amp; Sort</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'view_sort'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="sortOrder = 'name'; closeGitContextMenu()">
+                  <span>Sort by Name</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="sortOrder = 'path'; closeGitContextMenu()">
+                  <span>Sort by Path</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="sortOrder = 'status'; closeGitContextMenu()">
+                  <span>Sort by Status</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="sc-ctx-separator"></div>
+
+            <!-- Primary Git operations -->
+            <button type="button" class="sc-ctx-item" :disabled="syncBusy" @click="handleQuickPull(); closeGitContextMenu()">
+              <span>Pull</span>
+            </button>
+            <button type="button" class="sc-ctx-item" :disabled="syncBusy" @click="handleQuickPush(); closeGitContextMenu()">
+              <span>Push</span>
+            </button>
+            <button type="button" class="sc-ctx-item" @click="openGitAction('clone')">
+              <span>Clone</span>
+            </button>
+            <button type="button" class="sc-ctx-item" @click="openGitAction('switch_branch')">
+              <span>Checkout to...</span>
+            </button>
+            <button type="button" class="sc-ctx-item" @click="openGitAction('fetch')">
+              <span>Fetch</span>
+            </button>
+
+            <div class="sc-ctx-separator"></div>
+
+            <!-- Submenu: Commit -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'commit'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Commit</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'commit'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="commitCheckpoint(); closeGitContextMenu()">
+                  <span>Commit Staged</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="commitCheckpoint(); closeGitContextMenu()">
+                  <span>Commit All</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submenu: Changes -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'changes'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Changes</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'changes'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="openGitAction('stage_all'); closeGitContextMenu()">
+                  <span>Stage All Changes</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('unstage_all'); closeGitContextMenu()">
+                  <span>Unstage All Changes</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submenu: Pull, Push -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'pull_push'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Pull, Push</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'pull_push'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" :disabled="syncBusy" @click="handleQuickPull(); closeGitContextMenu()">
+                  <span>Pull</span>
+                </button>
+                <button type="button" class="sc-ctx-item" :disabled="syncBusy" @click="handleQuickPush(); closeGitContextMenu()">
+                  <span>Push</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('push')">
+                  <span>Push (Force)...</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submenu: Branch -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'branch'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Branch</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'branch'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="openGitAction('create_branch')">
+                  <span>Create Branch...</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('switch_branch')">
+                  <span>Checkout to...</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('merge')">
+                  <span>Merge Branch...</span>
+                </button>
+                <button type="button" class="sc-ctx-item danger" @click="openGitAction('delete_branch')">
+                  <span>Delete Branch...</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submenu: Remote -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'remote'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Remote</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'remote'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="openGitAction('remote_settings')">
+                  <span>Remote &amp; Auth Settings...</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('manage_remotes')">
+                  <span>Manage Remotes...</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Submenu: Stash -->
+            <div
+              class="sc-ctx-item has-submenu"
+              @mouseenter="activeSubmenu = 'stash'"
+              @mouseleave="activeSubmenu = null"
+            >
+              <span>Stash</span>
+              <svg class="sc-ctx-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              <div v-show="activeSubmenu === 'stash'" class="sc-ctx-submenu">
+                <button type="button" class="sc-ctx-item" @click="openGitAction('stash')">
+                  <span>Stash Changes...</span>
+                </button>
+                <button type="button" class="sc-ctx-item" :disabled="!stashesList.length" @click="handleQuickPopStash(0); closeGitContextMenu()">
+                  <span>Pop Latest Stash</span>
+                </button>
+                <button type="button" class="sc-ctx-item" @click="openGitAction('manage_stashes')">
+                  <span>View All Stashes...</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tags -->
+            <button type="button" class="sc-ctx-item" @click="openGitAction('fetch')">
+              <span>Tags</span>
+            </button>
+
+            <div class="sc-ctx-separator"></div>
+
+            <!-- Show Git Output -->
+            <button type="button" class="sc-ctx-item" @click="notice = 'Git operations active'; closeGitContextMenu()">
+              <span>Show Git Output</span>
             </button>
           </div>
         </div>
@@ -899,135 +1367,294 @@ watch(
   background: var(--accent-soft);
 }
 
-/* Remote Config Drawer */
-.sc-config-box {
-  padding: 8px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-  border-radius: 6px;
+/* Floating VS Code Style Context Menu */
+.sc-context-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: transparent;
+}
+
+.sc-context-menu-popover {
+  position: fixed;
+  z-index: 1045;
+  min-width: 195px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  padding: 4px 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  animation: unified-popup-scale 0.12s ease-out;
 }
-.sc-config-title {
-  font-size: 11px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+
+.sc-ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.1s ease;
+  box-sizing: border-box;
+}
+
+.sc-ctx-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sc-ctx-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sc-ctx-item.danger {
+  color: var(--alert-err-text);
+}
+
+.sc-ctx-item.has-submenu {
+  cursor: default;
+}
+
+.sc-ctx-chevron {
   color: var(--text-dim);
+  margin-left: 10px;
+  flex-shrink: 0;
 }
-.sc-fields-stack {
+
+.sc-ctx-submenu {
+  position: absolute;
+  left: 100%;
+  top: -4px;
+  min-width: 175px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  padding: 4px 0;
   display: flex;
   flex-direction: column;
+  z-index: 1050;
+  animation: unified-popup-fade 0.1s ease-out;
+}
+
+.sc-ctx-separator {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 3px 0;
+}
+
+/* Branches Section */
+.sc-branches-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sc-branches-body {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 10px;
   gap: 6px;
 }
-.sc-field {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.sc-field-label {
-  font-size: 11px;
-  color: var(--text-faint);
-}
-.sc-hint {
-  font-size: 9.5px;
-  color: var(--text-faint);
-}
-.sc-input {
+
+.sc-branch-filter-box {
   width: 100%;
-  box-sizing: border-box;
-  padding: 5px 8px;
-  font-size: 11.5px;
-  font-family: var(--mono);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-soft);
-  color: var(--text);
-  border-radius: 4px;
-  outline: none;
 }
-.sc-input:focus {
+
+.sc-branch-filter-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.sc-branch-filter-input:focus {
+  outline: none;
   border-color: var(--accent);
 }
-.sc-config-btn-row {
-  display: flex;
-  gap: 6px;
+
+.sc-branch-group-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
   margin-top: 4px;
 }
 
-/* Danger Zone */
-.sc-danger-zone {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border-soft);
+.sc-branch-sidebar-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
 }
-.sc-danger-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--danger, #ef4444);
-}
-.sc-danger-action-row {
+
+.sc-branch-sidebar-item {
   display: flex;
-}
-.sc-danger-btn {
-  background: transparent;
-  color: var(--danger, #ef4444);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 4px;
-  padding: 5px 10px;
-  font-size: 11px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11.5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s;
 }
-.sc-danger-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: var(--danger, #ef4444);
+
+.sc-branch-sidebar-item:hover {
+  background: var(--bg-hover);
 }
-.sc-danger-confirm-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 10px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 4px;
-}
-.sc-danger-warning {
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-normal, #fca5a5);
-}
-.sc-danger-confirm-btns {
-  display: flex;
-  gap: 6px;
-  margin-top: 2px;
-}
-.sc-confirm-danger-yes-btn {
-  background: var(--danger, #ef4444);
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 11px;
+
+.sc-branch-sidebar-item.active {
+  background: var(--selection);
+  color: var(--accent);
   font-weight: 600;
-  cursor: pointer;
 }
-.sc-confirm-danger-yes-btn:hover:not(:disabled) {
-  opacity: 0.9;
+
+.sc-branch-sidebar-item.remote {
+  color: var(--text-dim);
 }
-.sc-confirm-danger-no-btn {
+
+.sc-branch-sidebar-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-branch-sidebar-item-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sc-branch-active-dot {
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.sc-branch-item-btn {
   background: transparent;
-  color: var(--text-normal);
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sc-branch-item-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sc-mini-action-btn {
+  background: transparent;
   border: 1px solid var(--border-soft);
-  border-radius: 4px;
-  padding: 4px 10px;
+  color: var(--text-dim);
+  border-radius: 3px;
+  padding: 0 5px;
   font-size: 11px;
   cursor: pointer;
+}
+
+.sc-mini-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Stashes Section */
+.sc-stashes-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sc-stashes-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 10px 10px;
+}
+
+.sc-stash-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+}
+
+.sc-stash-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sc-stash-ref {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 10.5px;
+}
+
+.sc-stash-msg {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+}
+
+.sc-stash-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sc-mini-stash-btn {
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sc-mini-stash-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.sc-mini-stash-btn.danger {
+  color: var(--alert-err-text);
+}
+
+.sc-mini-stash-btn.danger:hover:not(:disabled) {
+  background: var(--alert-err-bg);
 }
 
 /* Commit Block */

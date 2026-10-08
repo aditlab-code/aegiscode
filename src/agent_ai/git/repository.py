@@ -297,3 +297,195 @@ class GitRepositoryFacade:
 
         ok = self.client.unstage(self.root, file_path=None)
         return {"ok": ok, "file_path": None}
+
+    def checkout(
+        self, branch: str, create: bool = False, start_point: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Beralih branch atau buat branch baru bila create=True."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_branch = (branch or "").strip()
+        if not clean_branch:
+            return {"ok": False, "error": "Branch name is required"}
+        ok = self.client.checkout(
+            self.root, clean_branch, create=create, start_point=start_point
+        )
+        return {
+            "ok": ok,
+            "branch": clean_branch,
+            "current_branch": self.current_branch(),
+        }
+
+    def create_branch(
+        self, branch: str, start_point: Optional[str] = None, checkout: bool = False
+    ) -> Dict[str, Any]:
+        """Buat branch baru."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_branch = (branch or "").strip()
+        if not clean_branch:
+            return {"ok": False, "error": "Branch name is required"}
+        ok = self.client.create_branch(
+            self.root, clean_branch, start_point=start_point, checkout=checkout
+        )
+        return {
+            "ok": ok,
+            "branch": clean_branch,
+            "current_branch": self.current_branch(),
+        }
+
+    def delete_branch(
+        self,
+        branch: str,
+        force: bool = False,
+        is_remote: bool = False,
+        remote: str = "origin",
+    ) -> Dict[str, Any]:
+        """Hapus branch (lokal atau remote)."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_branch = (branch or "").strip()
+        if not clean_branch:
+            return {"ok": False, "error": "Branch name is required"}
+        ok = self.client.delete_branch(
+            self.root, clean_branch, force=force, is_remote=is_remote, remote=remote
+        )
+        return {"ok": ok, "branch": clean_branch}
+
+    def merge(
+        self, branch: str, message: Optional[str] = None, no_ff: bool = False
+    ) -> Dict[str, Any]:
+        """Gabungkan branch lain ke branch aktif saat ini."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_branch = (branch or "").strip()
+        if not clean_branch:
+            return {"ok": False, "error": "Branch name is required"}
+        return self.client.merge(
+            self.root, clean_branch, message=message, no_ff=no_ff
+        )
+
+    def stash(
+        self, message: Optional[str] = None, include_untracked: bool = True
+    ) -> Dict[str, Any]:
+        """Simpan perubahan ke git stash."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        ok = self.client.stash(
+            self.root, message=message, include_untracked=include_untracked
+        )
+        return {"ok": ok}
+
+    def stash_list(self) -> List[Dict[str, Any]]:
+        """Daftar stashes dalam repositori."""
+        if not self.is_repository():
+            return []
+        return self.client.stash_list(self.root)
+
+    def stash_pop(self, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash dan hapus dari stash list."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        ok = self.client.stash_pop(self.root, index=index)
+        return {"ok": ok, "index": index}
+
+    def stash_apply(self, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash tanpa menghapus dari stash list."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        ok = self.client.stash_apply(self.root, index=index)
+        return {"ok": ok, "index": index}
+
+    def stash_drop(self, index: int = 0) -> Dict[str, Any]:
+        """Hapus stash dari stash list."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        ok = self.client.stash_drop(self.root, index=index)
+        return {"ok": ok, "index": index}
+
+    def push(
+        self,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Push commit ke remote repositori."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        return self.client.push(
+            self.root,
+            remote=remote,
+            branch=branch,
+            set_upstream=set_upstream,
+            force=force,
+        )
+
+    def pull(
+        self,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        """Pull perubahan terbaru dari remote repositori."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        return self.client.pull(
+            self.root, remote=remote, branch=branch, rebase=rebase
+        )
+
+    def fetch(
+        self, remote: Optional[str] = None, prune: bool = True
+    ) -> Dict[str, Any]:
+        """Fetch referensi terbaru dari remote repositori."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        return self.client.fetch(self.root, remote=remote, prune=prune)
+
+    def remotes(self) -> List[Dict[str, str]]:
+        """Daftar remote repositori."""
+        if not self.is_repository():
+            return []
+        return self.client.remotes(self.root)
+
+    def add_remote(self, name: str, url: str) -> Dict[str, Any]:
+        """Tambahkan remote repositori baru."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_name = (name or "").strip()
+        clean_url = (url or "").strip()
+        if not clean_name or not clean_url:
+            return {"ok": False, "error": "Name and URL are required"}
+        ok = self.client.add_remote(self.root, clean_name, clean_url)
+        return {"ok": ok, "name": clean_name, "url": clean_url}
+
+    def set_remote_url(self, name: str, url: str) -> Dict[str, Any]:
+        """Perbarui URL remote repositori."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_name = (name or "").strip()
+        clean_url = (url or "").strip()
+        if not clean_name or not clean_url:
+            return {"ok": False, "error": "Name and URL are required"}
+        ok = self.client.set_remote_url(self.root, clean_name, clean_url)
+        return {"ok": ok, "name": clean_name, "url": clean_url}
+
+    def clone(self, url: str, target_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Clone repositori ke dalam boundary workspace."""
+        clean_url = (url or "").strip()
+        if not clean_url:
+            return {"ok": False, "error": "Repository URL is required"}
+        target = self._resolve(target_dir) if target_dir else self.root
+        ok = self.client.clone(clean_url, target)
+        return {"ok": ok, "target": str(target)}
+
+    def commit(
+        self, message: str, stage_all: bool = False
+    ) -> Dict[str, Any]:
+        """Buat git commit pada branch aktif saat ini."""
+        if not self.is_repository():
+            return {"ok": False, "error": "not_a_repository"}
+        clean_msg = (message or "").strip()
+        if not clean_msg:
+            return {"ok": False, "error": "Commit message is required."}
+        return self.client.commit(self.root, clean_msg, stage_all=stage_all)

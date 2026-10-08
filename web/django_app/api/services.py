@@ -1829,6 +1829,202 @@ class GatewayService:
             "error": res.get("error"),
         }
 
+    def git_checkout(
+        self,
+        project_id: str,
+        branch: str,
+        create: bool = False,
+        start_point: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Beralih ke branch lain atau buat branch baru jika create=True."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.checkout(branch, create=create, start_point=start_point)
+
+    def git_create_branch(
+        self,
+        project_id: str,
+        branch: str,
+        start_point: Optional[str] = None,
+        checkout: bool = False,
+    ) -> Dict[str, Any]:
+        """Buat branch baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.create_branch(branch, start_point=start_point, checkout=checkout)
+
+    def git_delete_branch(
+        self,
+        project_id: str,
+        branch: str,
+        force: bool = False,
+        is_remote: bool = False,
+        remote: str = "origin",
+    ) -> Dict[str, Any]:
+        """Hapus branch lokal atau remote."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.delete_branch(
+            branch, force=force, is_remote=is_remote, remote=remote
+        )
+
+    def git_merge(
+        self,
+        project_id: str,
+        branch: str,
+        message: Optional[str] = None,
+        no_ff: bool = False,
+    ) -> Dict[str, Any]:
+        """Gabungkan branch target ke branch aktif saat ini."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.merge(branch, message=message, no_ff=no_ff)
+
+    def git_stash(
+        self,
+        project_id: str,
+        message: Optional[str] = None,
+        include_untracked: bool = True,
+    ) -> Dict[str, Any]:
+        """Simpan perubahan sementara ke git stash."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash(message=message, include_untracked=include_untracked)
+
+    def git_stash_list(self, project_id: str) -> Dict[str, Any]:
+        """Daftar stashes dalam repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"stashes": facade.stash_list()}
+
+    def git_stash_pop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash dan hapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_pop(index=index)
+
+    def git_stash_apply(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash tanpa menghapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_apply(index=index)
+
+    def git_stash_drop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Hapus stash dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_drop(index=index)
+
+    def git_push(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Push commit ke remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.push(
+            remote=remote, branch=branch, set_upstream=set_upstream, force=force
+        )
+
+    def git_pull(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        """Pull perubahan terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.pull(remote=remote, branch=branch, rebase=rebase)
+
+    def git_fetch(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        prune: bool = True,
+    ) -> Dict[str, Any]:
+        """Fetch referensi terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.fetch(remote=remote, prune=prune)
+
+    def git_remotes(self, project_id: str) -> Dict[str, Any]:
+        """Daftar remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"remotes": facade.remotes()}
+
+    def git_add_remote(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Tambahkan remote repositori baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.add_remote(name=name, url=url)
+
+    def git_set_remote_url(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Perbarui URL remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.set_remote_url(name=name, url=url)
+
+    def git_clone(
+        self, project_id: str, url: str, target_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Clone repositori ke dalam project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.clone(url=url, target_dir=target_dir)
+
+    def git_commit(
+        self, project_id: str, message: str, stage_all: bool = False
+    ) -> Dict[str, Any]:
+        """Buat git commit pada branch aktif project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.commit(message=message, stage_all=stage_all)
+
     # ------------------------------------------------------------------ #
     # Universal Linter Service
     # ------------------------------------------------------------------ #
