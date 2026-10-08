@@ -27,19 +27,96 @@ prompt sendiri (mis. Consultant), prompt ini TIDAK dipakai.
 
 from __future__ import annotations
 
-from typing import List
+from typing import Any, List, Optional
+
+#: Nilai mode execution policy Agent yang valid (fast / balanced / deep).
+MODE_FAST = "fast"
+MODE_BALANCED = "balanced"
+MODE_DEEP = "deep"
+DEFAULT_MODE = MODE_BALANCED
+
+#: Alias mode lama/eksternal yang dipetakan ke mode kanonik.
+MODE_ALIASES: dict[str, str] = {
+    "minimal": MODE_FAST,
+}
 
 
-def build_agent_system_prompt() -> str:
+def _normalize_mode(value: Any, default: str = DEFAULT_MODE) -> str:
+    valid_modes = {MODE_FAST, MODE_BALANCED, MODE_DEEP}
+    fallback = str(default).strip().lower()
+    if fallback not in valid_modes:
+        fallback = DEFAULT_MODE
+    if value is None:
+        return fallback
+    raw = getattr(value, "value", value)
+    text = str(raw).strip().lower() if raw is not None else ""
+    if not text:
+        return fallback
+    text = MODE_ALIASES.get(text, text)
+    return text if text in valid_modes else fallback
+
+
+def directive_prompt_for_mode(mode: Any) -> str:
+    """Prompt arahan direktif kerja per mode (Fast, Balanced, Deep).
+
+    Disisipkan sebagai system message agar LLM mematuhi strategi efisiensi kerja:
+    - Fast: Kerja bedah cepat, hemat token, prioritaskan CodeGraph references & callers.
+    - Balanced: Eksplorasi moderat terarah dengan penelusuran callers & callees.
+    - Deep: Eksplorasi arsitektur mendalam dengan impact analysis & trace API.
+    """
+    norm = _normalize_mode(mode, DEFAULT_MODE)
+    if norm == MODE_FAST:
+        return (
+            "[EXECUTION POLICY: FAST MODE ACTIVE]\n"
+            "You are operating under FAST execution policy:\n"
+            "- Goal: Rapid, surgical resolution with minimal latency and minimal token consumption.\n"
+            "- Code Navigation: Prioritize CodeGraph tools ('codegraph_find_references', 'codegraph_find_callers') and 'search_code' to pinpoint exact symbols before reading files.\n"
+            "- Minimal Planning: Do not construct verbose multi-step planning lists. Directly apply surgical changes.\n"
+            "- Targeted Verification: Validate syntax and verify only the modified files.\n"
+            "- Escalation: If you discover this task genuinely requires architecture-wide refactoring, invoke the 'request_policy_escalation' tool with target_mode='balanced'."
+        )
+    if norm == MODE_DEEP:
+        return (
+            "[EXECUTION POLICY: DEEP MODE ACTIVE]\n"
+            "You are operating under DEEP execution policy:\n"
+            "- Goal: Thorough investigation, high-assurance architecture validation, and complete regression safety.\n"
+            "- Code Navigation: Unrestricted exploration allowed. Proactively utilize CodeGraph tools ('codegraph_impact_analysis', 'codegraph_trace_api', 'codegraph_find_orphans') and Project Map ('atlas_query').\n"
+            "- Planning: Formulate detailed multi-phase plans.\n"
+            "- Full Verification: Run broad regression test suites and inspect cross-module impact."
+        )
+    # Default Balanced
+    return (
+        "[EXECUTION POLICY: BALANCED MODE ACTIVE]\n"
+        "You are operating under BALANCED execution policy (Standard):\n"
+        "- Goal: Optimal balance between execution velocity, code correctness, and token efficiency.\n"
+        "- Code Navigation: Moderate exploration. Use CodeGraph tools ('codegraph_find_callers', 'codegraph_find_callees') to inspect direct caller/callee relations before editing.\n"
+        "- Standard Verification: Run tests and checkers targeted to modified and related modules.\n"
+        "- Escalation: If you encounter widespread ripple effects requiring exhaustive repository-wide search, invoke 'request_policy_escalation' with target_mode='deep'."
+    )
+
+
+def build_agent_system_prompt(mode: Optional[str] = None) -> str:
     """Bangun system prompt default Agent sebagai teks.
 
+    Args:
+        mode: Mode eksekusi opsional ("fast" | "balanced" | "deep"). Bila
+            diberikan, arahan strategi mode CodeGraph akan disematkan ke
+            dalam system prompt.
+
     Returns:
-        System prompt Agent (panduan retrieval -> implementasi -> validasi).
+        System prompt Agent (panduan 4 aturan efisiensi -> alur kerja
+        retrieval -> implementasi -> validasi).
     """
     lines: List[str] = [
         "Anda adalah Aegis Agent: coding agent yang MENGERJAKAN task pada",
         "sebuah project (memahami, mengubah source, dan memvalidasi hasil).",
         "Bekerjalah lewat tool yang tersedia; jangan mengarang isi file/command.",
+        "",
+        "## 4 Aturan Inti Efisiensi Output (Action-First)",
+        "1. Aksi Terlebih Dahulu (Lead with the next action): Baris pertama respons wajib berupa aksi nyata (perintah CLI, file path, atau snippet kode target). Hindari paragraf pembuka, narasi perkenalan, atau konteks bertele-tele sebelum tindakan konkret.",
+        "2. Langkah Bernomor & Terukur (Number multi-step tasks): Tugas multi-tahap wajib disusun dalam daftar bernomor ringkas (1, 2, 3) di mana 1 langkah memuat 1 aksi terbatas (bounded action).",
+        "3. Lugas & Faktual Menangani Error (Matter-of-fact tone for errors): Sebutkan kegagalan, penyebab teknis langsung, dan langkah perbaikan secara objektif tanpa bahasa apologetik ('Maaf') atau dramatis ('Waduh').",
+        "4. Tanpa Basa-Basi & Tanpa Rekapitulasi (No preamble, no recap, no closing pleasantries): Dilarang pembuka klise ('Pertanyaan bagus!', 'Tentu saja!'), dilarang rekapitulasi ulang pekerjaan yang sudah selesai di akhir respons, dan dilarang penutup basa-basi ('Semoga membantu!').",
         "",
         "## Alur kerja (retrieval -> cukup -> implementasi -> validasi -> final)",
         "1. RETRIEVAL (terarah & secukupnya): temukan dulu LOKASI yang relevan,",
@@ -111,8 +188,23 @@ def build_agent_system_prompt() -> str:
         "  command Unix (find/grep/cat/head/tail/ls/rm/...).",
         "- Jawab dengan bahasa yang sama seperti task user.",
     ]
+    if mode is not None:
+        directive = directive_prompt_for_mode(mode)
+        if directive:
+            lines.extend(["", "## Direktif Eksekusi Mode", directive])
     return "\n".join(lines)
 
 
 #: System prompt default Agent (dipakai bila pemanggil tidak memberi system prompt).
 AGENT_SYSTEM_PROMPT = build_agent_system_prompt()
+
+__all__ = [
+    "AGENT_SYSTEM_PROMPT",
+    "DEFAULT_MODE",
+    "MODE_ALIASES",
+    "MODE_BALANCED",
+    "MODE_DEEP",
+    "MODE_FAST",
+    "build_agent_system_prompt",
+    "directive_prompt_for_mode",
+]
