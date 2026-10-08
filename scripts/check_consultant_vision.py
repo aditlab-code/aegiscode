@@ -26,7 +26,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -230,10 +230,10 @@ def main() -> int:
     print("[6b/6c] validasi images + backward compatible OK")
 
     # 7) Frontend: jalur attach image ada di api.js + ConsultantChat.vue.
-    api_js = (PROJECT_ROOT / "web" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
+    api_js = (PROJECT_ROOT / "apps" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
     assert "body.images = images" in api_js, "api.js harus mengirim field 'images'"
     chat_vue = (
-        PROJECT_ROOT / "web" / "frontend" / "src" / "components" / "ConsultantChat.vue"
+        PROJECT_ROOT / "apps" / "frontend" / "src" / "components" / "ConsultantChat.vue"
     ).read_text(encoding="utf-8")
     for needle in ("onFilesPicked", "attachments", "attach-btn", "removeAttachment", "images:"):
         assert needle in chat_vue, f"ConsultantChat.vue harus memuat: {needle}"

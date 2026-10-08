@@ -76,7 +76,7 @@ graph TD
 * **Panjang Maksimal**: 128 karakter.
 * **Karakter yang Diizinkan**: Teks bebas alfanumerik dan simbol (misal `admin123`, `sandiRahasia!`).
 
-### Spesifikasi Kriptografi (`web/django_app/api/auth.py`):
+### Spesifikasi Kriptografi (`apps/django_app/api/auth.py`):
 1. **Derivasi Hash**:
    $$\text{Hash} = \text{PBKDF2-HMAC-SHA256}(\text{Password}, \text{Salt}, \text{iterations}=100\,000)$$
 2. **Salt**: 16-byte acak via `secrets.token_bytes(16)`.
@@ -97,7 +97,7 @@ Untuk mencegah kerusakan data (*partial writes*) saat disk crash:
 Ketika operator menjalankan server pengembangan (misal `npm run dev` atau `uvicorn`) di terminal AegisCode, runner dapat mencetak URL seperti `http://localhost:5173`. Jika proyek memuat dependensi pihak ketiga yang mengeksploitasi celah browser, peramban dapat diarahkan ke situs penyerang yang mencoba mengirimkan *drive-by request* balik ke Gateway internal AegisCode (`http://localhost:8478`).
 
 ### Mitigasi Sisi Klien (Terminal Link Sandbox):
-Pada [web/frontend/src/components/terminal/TerminalView.vue](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/web/frontend/src/components/terminal/TerminalView.vue):
+Pada [apps/frontend/src/components/terminal/TerminalView.vue](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/apps/frontend/src/components/terminal/TerminalView.vue):
 1. **Filter Protokol Ketat**: Hanya protokol `http:` dan `https:` yang diizinkan untuk dibuka. Protokol berbahaya (`javascript:`, `data:`, `file:`, `blob:`) otomatis diblokir.
 2. **Isolasi Referensi DOM**:
    Tautan dibuka di tab baru dengan proteksi:
@@ -155,4 +155,4 @@ rm .aegis/auth.json
 Suite pengujian keamanan terpusat pada:
 * **`tests/test_pin_auth.py`**: Uji unit kriptografi hash PBKDF2, aturan minimal 6 karakter, endpoint setup, login, status, dan isolasi izin berkas `0o600`.
 * **`tests/test_auth_boundary.py`**: Uji batas perimeter HTTP dan WebSocket Channels (menolak request tanpa token meski dari IP loopback, menolak origin asing).
-* **`web/frontend/src/authService.test.mjs`**: Uji unit client auth frontend (penyimpanan token, login password, verifikasi sesi).
+* **`apps/frontend/tests/authService.test.mjs`**: Uji unit client auth frontend (penyimpanan token, login password, verifikasi sesi).

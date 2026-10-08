@@ -21,8 +21,8 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT / "src") not in sys.path:
     sys.path.insert(0, str(_ROOT / "src"))
-if str(_ROOT / "web" / "django_app") not in sys.path:
-    sys.path.insert(0, str(_ROOT / "web" / "django_app"))
+if str(_ROOT / "apps" / "django_app") not in sys.path:
+    sys.path.insert(0, str(_ROOT / "apps" / "django_app"))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 os.environ["DJANGO_ALLOWED_HOSTS"] = "testserver,127.0.0.1,localhost"

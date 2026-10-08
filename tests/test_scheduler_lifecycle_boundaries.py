@@ -24,7 +24,7 @@ import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_DIR = PROJECT_ROOT / "apps" / "django_app"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 if str(DJANGO_DIR) not in sys.path:

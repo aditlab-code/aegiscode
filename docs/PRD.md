@@ -29,7 +29,7 @@
 └──────────────────────────────┬──────────────────────────────┘
                                │ WebSocket / SSE / REST
 ┌──────────────────────────────▼──────────────────────────────┐
-│           Django API Gateway (web/django_app)               │
+│           Django API Gateway (apps/django_app)              │
 │   [Stateless Auth] [Git Facade] [PTY Bridge Consumer]       │
 └──────────────────────────────┬──────────────────────────────┘
                                │

@@ -23,7 +23,7 @@ from typing import Any, Dict
 import pytest
 
 # Pastikan path modul terdaftar
-django_dir = Path(__file__).resolve().parent.parent / "web" / "django_app"
+django_dir = Path(__file__).resolve().parent.parent / "apps" / "django_app"
 src_dir = Path(__file__).resolve().parent.parent / "src"
 if str(django_dir) not in sys.path:
     sys.path.insert(0, str(django_dir))

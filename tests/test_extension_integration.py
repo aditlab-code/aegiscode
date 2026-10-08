@@ -958,7 +958,7 @@ def test_uninstall_removes_capabilities_but_keeps_config_and_state(tmp_path):
 def _ensure_django():
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     os.environ["DJANGO_ALLOWED_HOSTS"] = "testserver,127.0.0.1,localhost"
-    sys.path.insert(0, str(_ROOT / "web" / "django_app"))
+    sys.path.insert(0, str(_ROOT / "apps" / "django_app"))
     from django.conf import settings
 
     if "testserver" not in settings.ALLOWED_HOSTS:
@@ -1306,7 +1306,7 @@ def test_no_hardcoded_extension_logic_in_core():
     import re
 
     core_files = list((_ROOT / "src" / "agent_ai" / "extensions").glob("*.py"))
-    core_files.append(_ROOT / "web" / "django_app" / "api" / "services.py")
+    core_files.append(_ROOT / "apps" / "django_app" / "api" / "services.py")
     product_names = ("comfyui", "veo3", "excel", "selenium", "tiktok", "stable-diffusion")
     for path in core_files:
         text = path.read_text(encoding="utf-8", errors="ignore")

@@ -63,7 +63,7 @@ PERMISSION_EXTERNAL_NETWORK=allow
 PERMISSION_UNKNOWN=require_approval
 
 # -----------------------------------------------------------------------------
-# Django Gateway (web/django_app)
+# Django Gateway (apps/django_app)
 # -----------------------------------------------------------------------------
 # Batas ukuran body request (bytes).
 AEGIS_GATEWAY_MAX_BODY_BYTES=1000000

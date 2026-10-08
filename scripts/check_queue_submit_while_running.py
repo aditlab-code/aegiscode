@@ -36,8 +36,8 @@ from typing import Any, Dict, List, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
-FRONTEND_SRC = PROJECT_ROOT / "web" / "frontend" / "src"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
+FRONTEND_SRC = PROJECT_ROOT / "apps" / "frontend" / "src"
 for _p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)

@@ -125,8 +125,8 @@ The loop runs without heuristic "done" detectors:
 ## 4. AegisCode Studio Workbench & System Integration
 
 AegisCode features a developer-first IDE workbench (**AegisCode Studio**) engineered with a high-performance, reactive front-end architecture:
-- **Backend Gateway:** Django application (`web/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
-- **Frontend Architecture:** Modern Vue 3 + Vite single-page application (`web/frontend/`) featuring a VS Code-style 3-column layout governed by a **Thin Layout Coordinator Pattern** and domain-driven **Facade Subsystems**:
+- **Backend Gateway:** Django application (`apps/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
+- **Frontend Architecture:** Modern Vue 3 + Vite single-page application (`apps/frontend/`) featuring a VS Code-style 3-column layout governed by a **Thin Layout Coordinator Pattern** and domain-driven **Facade Subsystems**:
   - **Thin Layout Coordinator (`WorkbenchView.vue` < 450 lines):** Acts strictly as the root orchestrator connecting layout splitters, keyboard shortcuts, and lifecycle events, delegating all domain state and business logic to dedicated facades.
   - **Layout & Editor Facades (`src/composables/workbench/`):**
     - `useWorkbenchEditorFacade.js`: Manages Monaco editor lifecycle, single & multi-pane split editors (horizontal/vertical), model registry synchronization, external modification conflict resolution (Keep Mine / Accept Agent / Review Diff), diagnostic marker tracking, and workspace context serialization (`localStorage`).

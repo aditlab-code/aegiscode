@@ -1,6 +1,6 @@
 # AegisCode API Gateway Specification
 
-Dokumen ini mendefinisikan spesifikasi antarmuka pemrograman aplikasi (API) pada **Django API Gateway** (`web/django_app/api`) yang menghubungkan antarmuka pengguna AegisCode Studio (`web/frontend`) dengan mesin Aegis Agent (`src/agent_ai`).
+Dokumen ini mendefinisikan spesifikasi antarmuka pemrograman aplikasi (API) pada **Django API Gateway** (`apps/django_app/api`) yang menghubungkan antarmuka pengguna AegisCode Studio (`apps/frontend`) dengan mesin Aegis Agent (`src/agent_ai`).
 
 ---
 

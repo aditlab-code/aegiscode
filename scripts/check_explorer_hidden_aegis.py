@@ -1,6 +1,6 @@
 """Verifikasi folder .aegis TIDAK muncul di File Explorer AegisCode.
 
-Masalah: File Explorer (web/frontend/src/components/FileExplorer.vue) merender
+Masalah: File Explorer (apps/frontend/src/components/FileExplorer.vue) merender
 daftar file/folder dari endpoint GET /api/files, yang di backend memakai
 ListFilesTool AegisCode (src/agent_ai/tools/filesystem.py). Folder internal
 AegisCode `.aegis` ikut terdaftar sehingga tampil di UI.
@@ -42,7 +42,7 @@ from agent_ai.tools.filesystem import ListFilesTool, SearchCodeTool  # noqa: E40
 
 DUMMY_ROOT = PROJECT_ROOT / "dummy_test"
 FIXTURE = DUMMY_ROOT / "explorer_fixture"
-FRONTEND_SRC = PROJECT_ROOT / "web" / "frontend" / "src" / "components" / "FileExplorer.vue"
+FRONTEND_SRC = PROJECT_ROOT / "apps" / "frontend" / "src" / "components" / "FileExplorer.vue"
 
 
 def setup_fixture() -> None:

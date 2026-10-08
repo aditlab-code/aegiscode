@@ -62,8 +62,8 @@ Then: open the printed URL, pick a Project, add a Provider Instance and Model in
 ```
 .
 ├── src/agent_ai/     # Core: runtime, providers, tools, project intelligence, permission
-├── web/django_app/   # Thin HTTP/SSE gateway
-├── web/frontend/     # Vue 3 + Vite workbench (AegisCode Studio)
+├── apps/django_app/  # Thin HTTP/SSE gateway
+├── apps/frontend/    # Vue 3 + Vite workbench (AegisCode Studio)
 ├── scripts/          # Installer and verification scripts
 ├── tests/            # Pytest suite
 └── data/             # Local settings and SQLite state

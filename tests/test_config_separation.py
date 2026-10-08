@@ -31,7 +31,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-for _p in (str(PROJECT_ROOT / "src"), str(PROJECT_ROOT / "web" / "django_app")):
+for _p in (str(PROJECT_ROOT / "src"), str(PROJECT_ROOT / "apps" / "django_app")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

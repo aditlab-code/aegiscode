@@ -20,9 +20,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.test import Client
 
-# Pastikan web/django_app dan src berada di sys.path
+# Pastikan apps/django_app dan src berada di sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DJANGO_APP_DIR = REPO_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = REPO_ROOT / "apps" / "django_app"
 SRC_DIR = REPO_ROOT / "src"
 
 for p in (str(DJANGO_APP_DIR), str(SRC_DIR), str(REPO_ROOT)):

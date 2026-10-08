@@ -554,7 +554,7 @@ def test_custom_view_contract(tmp_path):
 def test_no_new_frontend_framework():
     # Ensure extension UI does not introduce React/Svelte/Angular
     import pathlib
-    pkg = Path("web/frontend/package.json")
+    pkg = Path("apps/frontend/package.json")
     if pkg.exists():
         text = pkg.read_text()
         assert '"react"' not in text.lower()

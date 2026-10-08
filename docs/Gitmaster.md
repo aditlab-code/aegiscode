@@ -114,7 +114,7 @@ git merge master
 
 # Memastikan konfigurasi Tauri v2 tetap dalam mode release (debug = false)
 # Jalankan verifikasi build lokal
-cd web/frontend && npm run build && cd ../..
+cd apps/frontend && npm run build && cd ../..
 
 # Commit dan push ke remote privat dev
 git push dev release
@@ -135,7 +135,7 @@ Jika kontributor komunitas mengajukan Pull Request di repositori publik `origin`
    git fetch origin pull/<ID_PR>/head:pr-<ID_PR>
    git checkout pr-<ID_PR>
    pytest
-   cd web/frontend && npm run build && cd ../..
+   cd apps/frontend && npm run build && cd ../..
    ```
 3. **Merge ke `main`**: Gabungkan PR tersebut ke branch `main` publik setelah lolos uji verifikasi.
 4. **Tarik Balik ke `master`**:

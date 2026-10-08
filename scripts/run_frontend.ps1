@@ -9,7 +9,7 @@
 #   - Node.js + npm terpasang.
 #   - Backend Django berjalan pada port dari `data/settings.json` (lihat
 #     run_backend.ps1). Vite mem-proxy /api ke backend tersebut (lihat
-#     web/frontend/vite.config.js).
+#     apps/frontend/vite.config.js).
 # =============================================================================
 
 param(
@@ -19,10 +19,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$Frontend = Join-Path $ProjectRoot "web\frontend"
+$Frontend = Join-Path $ProjectRoot "apps\frontend"
 
 if (-not (Test-Path $Frontend)) {
-    Write-Error "Tidak menemukan web\frontend di $Frontend"
+    Write-Error "Tidak menemukan apps\frontend di $Frontend"
     exit 1
 }
 

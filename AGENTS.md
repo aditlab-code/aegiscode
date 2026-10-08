@@ -43,7 +43,7 @@ Inspeksi simbol dahulu (`rtk rg`/`rtk find`); baca seluruh log saat gagal; jalan
 ## 8. Rujukan Knowledge Base (JIT, dilarang memuat seluruh `docs/`)
 Visi: `docs/PRD.md` | Arsitektur: `docs/architecture.md` | API/JWT/Git/PTY: `docs/api.md` | UI: `docs/ui-design.md` | Standar rekayasa: `docs/ruleset.md` | Git: `docs/Gitmaster.md` | Antigravity: `docs/core-features/antigravity_provider.md` | Workbench: `docs/core-features/workbench_features.md` | CoT/Replanning: `docs/core-features/cot_reasoning_runtime.md` | Roadmap aktif: `Roadmap.md` | QA: `docs/QA/QA_PLAN.md`, `docs/QA/QA_LOGS_RULES.md` | Riwayat: `docs/history/legacy-roadmap.md` | Indeks: `docs/README.md`.
 
-## 9. Standar Front-End (`web/frontend/`)
+## 9. Standar Front-End (`apps/frontend/`)
 - **9.1 Dual-Theme**: token latar (`--bg-drawer`, `--bg-sidebar`, `--bg-panel`, `--bg-card`, `--bg-deep`) wajib berpasangan di `src/styles/base/variables.css` (gelap) dan `src/styles/themes/theme-light.css` (`[data-theme="light"]`); dilarang fallback heksadesimal gelap pada `var()`.
 - **9.2 Drawer**: tab Agent dan Ask (termasuk `ConsultantChat` embedded) wajib memakai `var(--bg-drawer)` tanpa background independen; sidebar kiri `.app-left-sidebar` memakai `var(--bg-sidebar)`.
 - **9.3 Komponen**: gunakan `AppButton.vue` (`primary|ghost|danger|icon`, `sm|md`) dan `AppCard.vue` (`card|panel`); dialog lewat `.unified-popup-*` (tanpa modal overlay level aplikasi); dilarang `<button>` polosan, warna heksadesimal di `.vue`, dan emoji (ikon SVG inline).

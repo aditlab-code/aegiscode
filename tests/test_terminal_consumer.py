@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from channels.testing import WebsocketCommunicator
 
-# Ensure web/django_app is in sys.path
-django_dir = Path(__file__).resolve().parent.parent / "web" / "django_app"
+# Ensure apps/django_app is in sys.path
+django_dir = Path(__file__).resolve().parent.parent / "apps" / "django_app"
 if str(django_dir) not in sys.path:
     sys.path.insert(0, str(django_dir))
 

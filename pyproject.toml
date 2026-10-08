@@ -12,7 +12,7 @@ license = { text = "MIT" }
 authors = [{ name = "AegisCode Authors" }]
 
 # Dependency runtime AegisCode (core library + gateway).
-# Catatan: Django hanya dipakai oleh interface layer (web/django_app), tetapi
+# Catatan: Django hanya dipakai oleh interface layer (apps/django_app), tetapi
 # disertakan di sini agar instalasi dari root project langsung siap pakai.
 dependencies = [
     "Django>=4.2,<5.1",
@@ -56,10 +56,10 @@ where = ["src"]
 include = ["agent_ai*"]
 
 # ---------------------------------------------------------------------------
-# Catatan: web/django_app dan web/frontend BUKAN bagian dari distribusi
+# Catatan: apps/django_app dan apps/frontend BUKAN bagian dari distribusi
 # package Python. Keduanya dijalankan langsung dari repo (lihat README).
 # ---------------------------------------------------------------------------
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "web/django_app"]
+pythonpath = ["src", "apps/django_app"]
 

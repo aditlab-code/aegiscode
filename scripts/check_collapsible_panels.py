@@ -14,7 +14,7 @@ Menguji:
   6. Tombol header Explorer (refresh/up) memakai @click.stop agar tidak
      ikut men-toggle saat diklik.
   7. Kontrak scroll Explorer tetap utuh (single scroll owner .explorer).
-  8. Tidak ada perubahan backend/Python (git status -- src web/django_app kosong).
+  8. Tidak ada perubahan backend/Python (git status -- src apps/django_app kosong).
 
 Jalankan:
     python scripts/check_collapsible_panels.py
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend"
 SRC_FRONTEND = FRONTEND_DIR / "src"
 COMPONENTS = SRC_FRONTEND / "components"
 
@@ -123,14 +123,14 @@ def main() -> int:
 
     # --- 5) Tidak ada perubahan backend ---
     proc = subprocess.run(
-        ["git", "status", "--porcelain", "--", "src", "web/django_app"],
+        ["git", "status", "--porcelain", "--", "src", "apps/django_app"],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
     )
     dirty = proc.stdout.strip()
     assert dirty == "", f"backend/Python berubah (harusnya kosong):\n{dirty}"
-    print("[5] Backend/Python TIDAK berubah (git status -- src web/django_app kosong) OK")
+    print("[5] Backend/Python TIDAK berubah (git status -- src apps/django_app kosong) OK")
 
     print()
     print("[OK] Collapsible Panel (EXPLORER open; TASK & CHANGES closed) bekerja.")

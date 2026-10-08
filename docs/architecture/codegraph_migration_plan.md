@@ -270,8 +270,8 @@ Implementasi pengindeksan difokuskan secara presisi pada alur terpenting AegisCo
    - `src/agent_ai/consultant/service.py`
    - `src/agent_ai/contextbuilder/`
 4. **Queue Sidebar, Session, & Task State**:
-   - Backend: `web/django_app/api/execution.py`, `views.py`
-   - Frontend: `web/frontend/src/services/api.js`, `taskStateReducer.js`, `useWorkbenchLiveEvents.js`
+   - Backend: `apps/django_app/api/execution.py`, `views.py`
+   - Frontend: `apps/frontend/src/services/api.js`, `taskStateReducer.js`, `useWorkbenchLiveEvents.js`
 
 ---
 

@@ -55,7 +55,7 @@ Fase ini berfokus pada stabilisasi fondasi pengujian yang ada dan menutup celah 
 - **Frontend**: Menggunakan fixture JSON yang dihasilkan dari skema tersebut untuk menguji `taskStateReducer` dan parser streaming.
 
 ### 3.3. Pengujian Komponen Antarmuka Vue 3
-- Memasang dependensi pengujian antarmuka ringan di `web/frontend/`:
+- Memasang dependensi pengujian antarmuka ringan di `apps/frontend/`:
   - `vitest`
   - `@vue/test-utils`
   - `happy-dom`
