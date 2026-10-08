@@ -54,6 +54,8 @@ const {
   clearAuthSession,
   isAuthenticated,
   fetchAuthStatus,
+  loginWithPassword,
+  setupInitialPassword,
   loginWithPin,
   setupInitialPin,
   verifyCurrentSession,
@@ -86,6 +88,7 @@ test("authService: fetchAuthStatus calls /api/auth/status", async () => {
     assert.equal(url, "/api/auth/status");
     const payload = {
       configured: true,
+      has_password: true,
       has_pin: true,
       authenticated: false,
       user: null,
@@ -99,21 +102,21 @@ test("authService: fetchAuthStatus calls /api/auth/status", async () => {
 
   const status = await fetchAuthStatus();
   assert.equal(status.configured, true);
-  assert.equal(status.has_pin, true);
+  assert.equal(status.has_password, true);
   assert.equal(status.authenticated, false);
 });
 
-test("authService: loginWithPin saves token and user on success", async () => {
+test("authService: loginWithPassword saves token and user on success", async () => {
   clearAuthSession();
 
   globalThis.fetch = async (url, options) => {
-    assert.equal(url, "/api/auth/pin");
+    assert.equal(url, "/api/auth/login");
     assert.equal(options.method, "POST");
     const body = JSON.parse(options.body);
-    assert.equal(body.pin, "123456");
+    assert.equal(body.password, "securepassword123");
 
     const payload = {
-      token: "minted.pin.session.jwt",
+      token: "minted.password.session.jwt",
       user: { sub: "local-operator", email: "operator@aegis.local", name: "Local Operator" },
     };
     return {
@@ -123,23 +126,23 @@ test("authService: loginWithPin saves token and user on success", async () => {
     };
   };
 
-  const result = await loginWithPin("123456");
-  assert.equal(result.token, "minted.pin.session.jwt");
-  assert.equal(getAuthToken(), "minted.pin.session.jwt");
+  const result = await loginWithPassword("securepassword123");
+  assert.equal(result.token, "minted.password.session.jwt");
+  assert.equal(getAuthToken(), "minted.password.session.jwt");
   assert.equal(isAuthenticated(), true);
   assert.equal(getStoredUser().sub, "local-operator");
   assert.equal(getStoredUser().email, "operator@aegis.local");
 });
 
-test("authService: setupInitialPin saves token and user on success", async () => {
+test("authService: setupInitialPassword saves token and user on success", async () => {
   clearAuthSession();
 
   globalThis.fetch = async (url, options) => {
-    assert.equal(url, "/api/auth/pin/setup");
+    assert.equal(url, "/api/auth/setup");
     assert.equal(options.method, "POST");
     const body = JSON.parse(options.body);
-    assert.equal(body.pin, "654321");
-    assert.equal(body.confirm_pin, "654321");
+    assert.equal(body.password, "initialpass123");
+    assert.equal(body.confirm_password, "initialpass123");
 
     const payload = {
       token: "minted.setup.session.jwt",
@@ -153,7 +156,7 @@ test("authService: setupInitialPin saves token and user on success", async () =>
     };
   };
 
-  const result = await setupInitialPin("654321", "654321");
+  const result = await setupInitialPassword("initialpass123", "initialpass123");
   assert.equal(result.token, "minted.setup.session.jwt");
   assert.equal(result.success, true);
   assert.equal(getAuthToken(), "minted.setup.session.jwt");

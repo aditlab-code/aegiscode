@@ -1,17 +1,21 @@
 <script setup>
 /**
- * LoginOverlay.vue - Sovereign Local PIN Authentication Gatekeeper.
+ * LoginOverlay.vue - Sovereign Local Password Authentication Gatekeeper.
  *
- * Menampilkan numpad lokal minimalis atau antarmuka setup PIN pertama kali
- * untuk mengamankan sesi operator studio tanpa koneksi ke domain eksternal.
+ * Menampilkan antarmuka otentikasi kata sandi operator lokal (minimal 6 karakter)
+ * untuk mengamankan gateway studio tanpa dependensi pihak ketiga eksternal.
  */
-import { ref, computed, watch, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted } from "vue";
 import AppButton from "../ui/AppButton.vue";
 
 const props = defineProps({
-  hasPin: {
+  hasPassword: {
     type: Boolean,
     default: true,
+  },
+  hasPin: {
+    type: Boolean,
+    default: undefined,
   },
   loading: {
     type: Boolean,
@@ -19,7 +23,7 @@ const props = defineProps({
   },
   loadingMessage: {
     type: String,
-    default: "Memeriksa PIN...",
+    default: "Memeriksa kata sandi...",
   },
   error: {
     type: String,
@@ -27,42 +31,47 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["submit-pin", "setup-pin", "clear-error"]);
+const emit = defineEmits([
+  "submit-password",
+  "setup-password",
+  "submit-pin",
+  "setup-pin",
+  "clear-error",
+]);
 
-const mode = ref(props.hasPin ? "entry" : "setup");
-const pinInput = ref("");
-const newPin = ref("");
-const confirmPin = ref("");
+const isConfigured = computed(() => {
+  if (props.hasPin !== undefined) return props.hasPin;
+  return props.hasPassword;
+});
+
+const mode = ref(isConfigured.value ? "entry" : "setup");
+const passwordInput = ref("");
+const newPassword = ref("");
+const confirmPassword = ref("");
 const localError = ref("");
+const showPassword = ref(false);
+const showNewPassword = ref(false);
 
-watch(
-  () => props.hasPin,
-  (val) => {
-    mode.value = val ? "entry" : "setup";
-    localError.value = "";
-    pinInput.value = "";
-  }
-);
+const passwordInputRef = ref(null);
+const newPasswordInputRef = ref(null);
+
+watch(isConfigured, (val) => {
+  mode.value = val ? "entry" : "setup";
+  localError.value = "";
+  passwordInput.value = "";
+  focusInput();
+});
 
 const displayError = computed(() => props.error || localError.value);
 
-function handleDigit(d) {
-  if (pinInput.value.length < 12) {
-    pinInput.value += String(d);
-    clearErrors();
-  }
-}
-
-function handleBackspace() {
-  if (pinInput.value.length > 0) {
-    pinInput.value = pinInput.value.slice(0, -1);
-    clearErrors();
-  }
-}
-
-function handleClear() {
-  pinInput.value = "";
-  clearErrors();
+function focusInput() {
+  nextTick(() => {
+    if (mode.value === "entry" && passwordInputRef.value) {
+      passwordInputRef.value.focus();
+    } else if (mode.value === "setup" && newPasswordInputRef.value) {
+      newPasswordInputRef.value.focus();
+    }
+  });
 }
 
 function clearErrors() {
@@ -70,59 +79,46 @@ function clearErrors() {
   emit("clear-error");
 }
 
-function submitPin() {
-  if (pinInput.value.length < 4) {
-    localError.value = "PIN minimal 4 digit.";
+function submitLogin() {
+  if (passwordInput.value.length < 6) {
+    localError.value = "Kata sandi minimal 6 karakter.";
     return;
   }
   clearErrors();
-  emit("submit-pin", pinInput.value);
+  emit("submit-password", passwordInput.value);
+  emit("submit-pin", passwordInput.value);
 }
 
 function submitSetup() {
   clearErrors();
-  if (!newPin.value || !confirmPin.value) {
-    localError.value = "PIN dan konfirmasi PIN harus diisi.";
+  if (!newPassword.value || !confirmPassword.value) {
+    localError.value = "Kata sandi dan konfirmasi harus diisi.";
     return;
   }
-  if (newPin.value.length < 4 || newPin.value.length > 12) {
-    localError.value = "Panjang PIN harus antara 4 hingga 12 karakter.";
+  if (newPassword.value.length < 6) {
+    localError.value = "Kata sandi minimal 6 karakter.";
     return;
   }
-  if (newPin.value !== confirmPin.value) {
-    localError.value = "Konfirmasi PIN tidak cocok.";
+  if (newPassword.value.length > 128) {
+    localError.value = "Kata sandi maksimal 128 karakter.";
     return;
   }
-  emit("setup-pin", { pin: newPin.value, confirmPin: confirmPin.value });
-}
-
-function onKeyDown(e) {
-  if (mode.value !== "entry") return;
-  if (props.loading) return;
-
-  if (e.key >= "0" && e.key <= "9") {
-    handleDigit(e.key);
-  } else if (e.key === "Backspace") {
-    handleBackspace();
-  } else if (e.key === "Enter") {
-    if (pinInput.value.length >= 4) {
-      submitPin();
-    }
-  } else if (e.key === "Escape") {
-    handleClear();
+  if (newPassword.value !== confirmPassword.value) {
+    localError.value = "Konfirmasi kata sandi tidak cocok.";
+    return;
   }
+  emit("setup-password", {
+    password: newPassword.value,
+    confirmPassword: confirmPassword.value,
+  });
+  emit("setup-pin", {
+    pin: newPassword.value,
+    confirmPin: confirmPassword.value,
+  });
 }
 
 onMounted(() => {
-  if (typeof window !== "undefined") {
-    window.addEventListener("keydown", onKeyDown);
-  }
-});
-
-onUnmounted(() => {
-  if (typeof window !== "undefined") {
-    window.removeEventListener("keydown", onKeyDown);
-  }
+  focusInput();
 });
 </script>
 
@@ -147,8 +143,8 @@ onUnmounted(() => {
       <p class="login-desc">
         {{
           mode === "setup"
-            ? "Tentukan PIN operator lokal untuk mengamankan gateway studio dan runtime tools Antigravity."
-            : "Masukkan PIN keamanan untuk membuka akses gateway dan workspace lokal."
+            ? "Tentukan kata sandi operator lokal (minimal 6 karakter) untuk mengamankan gateway studio dan runtime tools Antigravity."
+            : "Masukkan kata sandi operator lokal untuk membuka sesi studio dan workspace."
         }}
       </p>
 
@@ -170,129 +166,124 @@ onUnmounted(() => {
         <span class="error-label">{{ displayError }}</span>
       </div>
 
-      <!-- MODE 1: SETUP PIN -->
-      <div v-if="mode === 'setup'" class="setup-form">
+      <!-- MODE 1: SETUP KATA SANDI BARU -->
+      <form v-if="mode === 'setup'" class="auth-form" @submit.prevent="submitSetup">
         <div class="form-group">
-          <label class="form-label" for="setup-pin-input">PIN Baru (4–12 digit/karakter)</label>
-          <input
-            id="setup-pin-input"
-            v-model="newPin"
-            type="password"
-            class="pin-text-input"
-            maxlength="12"
-            autocomplete="new-password"
-            placeholder="Ketik PIN baru"
-            @input="clearErrors"
-          />
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="setup-confirm-input">Konfirmasi PIN</label>
-          <input
-            id="setup-confirm-input"
-            v-model="confirmPin"
-            type="password"
-            class="pin-text-input"
-            maxlength="12"
-            autocomplete="new-password"
-            placeholder="Ulangi PIN baru"
-            @input="clearErrors"
-            @keydown.enter="submitSetup"
-          />
+          <label class="form-label" for="setup-password-input">Kata Sandi Baru (minimal 6 karakter)</label>
+          <div class="password-field-wrapper">
+            <input
+              id="setup-password-input"
+              ref="newPasswordInputRef"
+              v-model="newPassword"
+              :type="showNewPassword ? 'text' : 'password'"
+              class="auth-text-input"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="Masukkan kata sandi baru"
+              autofocus
+              @input="clearErrors"
+            />
+            <button
+              type="button"
+              class="eye-toggle-btn"
+              tabindex="-1"
+              :title="showNewPassword ? 'Sembunyikan' : 'Perlihatkan'"
+              @click="showNewPassword = !showNewPassword"
+            >
+              <svg v-if="!showNewPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <AppButton
-          variant="primary"
-          size="md"
-          class="action-btn-full"
-          :disabled="loading || newPin.length < 4 || confirmPin.length < 4"
-          :busy="loading"
-          @click="submitSetup"
-        >
-          Buat PIN & Buka Studio
-        </AppButton>
-      </div>
-
-      <!-- MODE 2: ENTRY PIN (NUMPAD) -->
-      <div v-else class="entry-pad">
-        <!-- Dot Indicators -->
-        <div class="pin-indicator-container">
-          <div class="pin-dots">
-            <span
-              v-for="idx in 6"
-              :key="idx"
-              class="pin-dot"
-              :class="{ filled: idx <= pinInput.length }"
+        <div class="form-group">
+          <label class="form-label" for="setup-confirm-input">Ulangi Kata Sandi</label>
+          <div class="password-field-wrapper">
+            <input
+              id="setup-confirm-input"
+              v-model="confirmPassword"
+              :type="showNewPassword ? 'text' : 'password'"
+              class="auth-text-input"
+              maxlength="128"
+              autocomplete="new-password"
+              placeholder="Konfirmasi kata sandi baru"
+              @input="clearErrors"
             />
           </div>
-          <span v-if="pinInput.length > 6" class="pin-overflow-counter">
-            {{ pinInput.length }} digit
-          </span>
-        </div>
-
-        <!-- 3x4 Numpad -->
-        <div class="numpad-grid">
-          <AppButton
-            v-for="digit in [1, 2, 3, 4, 5, 6, 7, 8, 9]"
-            :key="digit"
-            variant="ghost"
-            size="md"
-            class="numpad-btn"
-            :disabled="loading"
-            @click="handleDigit(digit)"
-          >
-            {{ digit }}
-          </AppButton>
-
-          <AppButton
-            variant="ghost"
-            size="md"
-            class="numpad-btn numpad-action-btn"
-            :disabled="loading || pinInput.length === 0"
-            title="Hapus Semua"
-            @click="handleClear"
-          >
-            C
-          </AppButton>
-
-          <AppButton
-            variant="ghost"
-            size="md"
-            class="numpad-btn"
-            :disabled="loading"
-            @click="handleDigit(0)"
-          >
-            0
-          </AppButton>
-
-          <AppButton
-            variant="ghost"
-            size="md"
-            class="numpad-btn numpad-action-btn"
-            :disabled="loading || pinInput.length === 0"
-            title="Hapus Terakhir"
-            @click="handleBackspace"
-          >
-            <template #icon>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
-                <line x1="18" y1="9" x2="12" y2="15" />
-                <line x1="12" y1="9" x2="18" y2="15" />
-              </svg>
-            </template>
-          </AppButton>
         </div>
 
         <AppButton
           variant="primary"
           size="md"
           class="action-btn-full"
-          :disabled="loading || pinInput.length < 4"
+          :disabled="loading || newPassword.length < 6 || confirmPassword.length < 6"
           :busy="loading"
-          @click="submitPin"
+          type="submit"
         >
-          Buka Studio
+          Simpan Sandi & Buka Studio
         </AppButton>
-      </div>
+      </form>
+
+      <!-- MODE 2: ENTRY KATA SANDI -->
+      <form v-else class="auth-form" @submit.prevent="submitLogin">
+        <div class="form-group">
+          <label class="form-label" for="entry-password-input">Kata Sandi Operator</label>
+          <div class="password-field-wrapper">
+            <input
+              id="entry-password-input"
+              ref="passwordInputRef"
+              v-model="passwordInput"
+              :type="showPassword ? 'text' : 'password'"
+              class="auth-text-input"
+              maxlength="128"
+              autocomplete="current-password"
+              placeholder="Masukkan kata sandi..."
+              autofocus
+              @input="clearErrors"
+            />
+            <button
+              type="button"
+              class="eye-toggle-btn"
+              tabindex="-1"
+              :title="showPassword ? 'Sembunyikan' : 'Perlihatkan'"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <AppButton
+          variant="primary"
+          size="md"
+          class="action-btn-full"
+          :disabled="loading || passwordInput.length < 6"
+          :busy="loading"
+          type="submit"
+        >
+          Masuk ke Studio
+        </AppButton>
+
+        <!-- Petunjuk Reset Sandi -->
+        <div class="reset-hint-box">
+          <span class="hint-text">
+            Lupa kata sandi? Hapus berkas <code>.aegis/auth.json</code> atau set <code>AEGIS_PASSWORD=sandiAnda</code> di berkas <code>.env</code>.
+          </span>
+        </div>
+      </form>
 
       <!-- Footer Info -->
       <div class="login-footer">
@@ -300,7 +291,7 @@ onUnmounted(() => {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          Sovereign Local PIN Authentication (.aegis/auth.json)
+          Sovereign Local Authentication (.aegis/auth.json / PBKDF2)
         </span>
       </div>
     </div>
@@ -414,16 +405,18 @@ onUnmounted(() => {
   color: var(--alert-err-text);
 }
 
-.setup-form {
+.auth-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
 }
 
 .form-label {
@@ -432,105 +425,72 @@ onUnmounted(() => {
   color: var(--secondary);
 }
 
-.pin-text-input {
+.password-field-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
-  padding: 10px 14px;
+}
+
+.auth-text-input {
+  width: 100%;
+  padding: 11px 38px 11px 14px;
   background: var(--input);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 14px;
-  font-family: var(--mono);
   outline: none;
   transition: border-color 0.15s ease;
   box-sizing: border-box;
 }
 
-.pin-text-input:focus {
+.auth-text-input:focus {
   border-color: var(--border-hover);
 }
 
-.entry-pad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-}
-
-.pin-indicator-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 0;
-}
-
-.pin-dots {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.pin-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border);
+.eye-toggle-btn {
+  position: absolute;
+  right: 10px;
   background: transparent;
-  transition: all 0.15s ease-in-out;
-}
-
-.pin-dot.filled {
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.15);
-}
-
-.pin-overflow-counter {
-  font-size: 11px;
+  border: none;
   color: var(--muted);
-  font-family: var(--mono);
-}
-
-.numpad-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-  max-width: 280px;
-}
-
-.numpad-btn {
-  height: 52px;
-  font-size: 18px;
-  font-weight: 600;
-  font-family: var(--mono);
+  cursor: pointer;
+  padding: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+  border-radius: 4px;
+  transition: color 0.12s ease;
+}
+
+.eye-toggle-btn:hover {
   color: var(--text);
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.numpad-btn:hover:not(:disabled) {
-  border-color: var(--border-hover);
-  background: var(--bg-hover);
-  color: var(--accent);
-}
-
-.numpad-action-btn {
-  font-size: 14px;
-  color: var(--secondary);
 }
 
 .action-btn-full {
   width: 100%;
   margin-top: 4px;
   height: 42px;
+}
+
+.reset-hint-box {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.reset-hint-box code {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10.5px;
 }
 
 .login-footer {

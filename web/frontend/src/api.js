@@ -973,24 +973,27 @@ export async function streamTerminalCommand(projectId, command, onChunk, signal 
   }
 }
 
-// --- Sovereign Local PIN & Identity Gateway --------------------------------
+// --- Sovereign Local Password & Identity Gateway ----------------------------
 export function getAuthStatus() {
   return request("/auth/status");
 }
 
-export function postPinLogin(pin) {
-  return request("/auth/pin", {
+export function postLogin(password) {
+  return request("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify({ password }),
   });
 }
 
-export function postPinSetup(pin, confirmPin) {
-  return request("/auth/pin/setup", {
+export function postSetup(password, confirmPassword) {
+  return request("/auth/setup", {
     method: "POST",
-    body: JSON.stringify({ pin, confirm_pin: confirmPin }),
+    body: JSON.stringify({ password, confirm_password: confirmPassword }),
   });
 }
+
+export const postPinLogin = postLogin;
+export const postPinSetup = postSetup;
 
 export function getAuthMe() {
   return request("/auth/me");

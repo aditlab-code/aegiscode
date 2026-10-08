@@ -17,8 +17,10 @@ from api import views
 
 urlpatterns = [
     path("health", views.health, name="health"),
-    # Sovereign Local PIN & Identity Gateway
+    # Sovereign Local Password & Identity Gateway
     path("auth/status", views.auth_status, name="auth_status"),
+    path("auth/login", views.auth_login, name="auth_login"),
+    path("auth/setup", views.auth_setup, name="auth_setup"),
     path("auth/pin", views.auth_pin_login, name="auth_pin_login"),
     path("auth/pin/setup", views.auth_pin_setup, name="auth_pin_setup"),
     path("auth/me", views.auth_me, name="auth_me"),

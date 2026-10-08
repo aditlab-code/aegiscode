@@ -1,6 +1,7 @@
-"""Tests for Sovereign Local PIN Auth and Stateless Session Token Management.
+"""Tests for Sovereign Local Password Auth and Stateless Session Token Management.
 
-Replaces legacy Google OAuth suite with local PIN cryptography and endpoint tests.
+Replaces legacy Google OAuth suite with local password cryptography and endpoint tests.
+Enforces minimum 6 characters password policy.
 """
 
 from __future__ import annotations
@@ -39,12 +40,12 @@ from django.http import HttpResponse
 import api.auth
 from api.auth import (
     create_aegis_session_token,
-    has_configured_pin,
-    hash_pin,
+    has_configured_password,
+    hash_password,
     require_auth,
-    set_pin,
+    set_password,
     verify_aegis_session_token,
-    verify_pin,
+    verify_password,
 )
 
 
@@ -55,50 +56,68 @@ def client():
 
 @pytest.fixture(autouse=True)
 def clean_pin_environment(tmp_path):
-    """Isolate auth.json and AEGIS_PIN for every test."""
+    """Isolate auth.json, AEGIS_PASSWORD, and AEGIS_PIN for every test."""
     temp_auth_file = tmp_path / "auth.json"
-    with patch("api.auth.AUTH_PIN_FILE", temp_auth_file), \
-         patch.dict(os.environ, {"AEGIS_PIN": ""}, clear=False):
-        yield temp_auth_file
+    real_auth_file = Path(settings.REPO_ROOT) / ".aegis" / "auth.json"
+    had_real = real_auth_file.exists()
+    real_content = real_auth_file.read_bytes() if had_real else None
+
+    try:
+        with patch("api.auth.AUTH_PIN_FILE", temp_auth_file), \
+             patch("api.auth.AUTH_PASSWORD_FILE", temp_auth_file), \
+             patch.dict(os.environ, {"AEGIS_PASSWORD": "", "AEGIS_PIN": ""}, clear=False):
+            yield temp_auth_file
+    finally:
+        # Guarantee no test artifact pollutes user's real .aegis/auth.json
+        if not had_real and real_auth_file.exists():
+            try:
+                real_auth_file.unlink()
+            except OSError:
+                pass
+        elif had_real and real_content is not None:
+            try:
+                real_auth_file.write_bytes(real_content)
+            except OSError:
+                pass
 
 
-def test_hash_and_verify_pin():
-    """Verify PBKDF2 hashing, unique salts, length constraints, and verification."""
-    salt_hex, hash_hex = hash_pin("123456")
+def test_hash_and_verify_password():
+    """Verify PBKDF2 hashing, unique salts, minimum 6 characters, and verification."""
+    salt_hex, hash_hex = hash_password("secret123")
     assert isinstance(salt_hex, str) and len(salt_hex) == 32
     assert isinstance(hash_hex, str) and len(hash_hex) == 64
 
     # Unique salts per generation
-    salt_2, hash_2 = hash_pin("123456")
+    salt_2, hash_2 = hash_password("secret123")
     assert salt_hex != salt_2
     assert hash_hex != hash_2
 
-    # Length constraints
+    # Length constraints (min 6 characters)
     with pytest.raises(ValueError):
-        hash_pin("123")  # Too short (<4)
+        hash_password("12345")  # Too short (<6)
     with pytest.raises(ValueError):
-        hash_pin("1234567890123")  # Too long (>12)
+        hash_password("a" * 129)  # Too long (>128)
 
     # Set and verify
-    assert set_pin("654321") is True
-    assert verify_pin("654321") is True
-    assert verify_pin("000000") is False
-    assert verify_pin("") is False
+    assert set_password("mypassword") is True
+    assert verify_password("mypassword") is True
+    assert verify_password("wrongpass") is False
+    assert verify_password("") is False
 
 
-def test_pin_env_override():
-    """Verify that AEGIS_PIN environment variable overrides or serves as fallback."""
-    with patch.dict(os.environ, {"AEGIS_PIN": "998877"}, clear=False):
-        assert has_configured_pin() is True
-        assert verify_pin("998877") is True
-        assert verify_pin("111111") is False
+def test_password_env_override():
+    """Verify that AEGIS_PASSWORD and AEGIS_PIN environment variables override or serve as fallback."""
+    with patch.dict(os.environ, {"AEGIS_PASSWORD": "envpassword123"}, clear=False):
+        assert has_configured_password() is True
+        assert verify_password("envpassword123") is True
+        assert verify_password("wrongpass") is False
 
 
-def test_pin_setup_endpoint(client, clean_pin_environment):
-    """POST /api/auth/pin/setup creates auth.json with 0600 permissions and issues session token."""
+def test_password_setup_endpoint(client, clean_pin_environment):
+    """POST /api/auth/setup creates auth.json with 0600 permissions and issues session token."""
     response = client.post(
-        "/api/auth/pin/setup",
-        data=json.dumps({"pin": "1234", "confirm_pin": "1234"}),
+        "/api/auth/setup",
+        data=json.dumps({"password": "securepass123", "confirm_password": "securepass123"}),
         content_type="application/json",
     )
     assert response.status_code == 200
@@ -119,48 +138,48 @@ def test_pin_setup_endpoint(client, clean_pin_environment):
     assert verified["sub"] == "local-operator"
 
 
-def test_pin_setup_mismatch(client):
-    """POST /api/auth/pin/setup with mismatched PIN returns HTTP 400."""
+def test_password_setup_mismatch(client):
+    """POST /api/auth/setup with mismatched password returns HTTP 400."""
     response = client.post(
-        "/api/auth/pin/setup",
-        data=json.dumps({"pin": "1234", "confirm_pin": "4321"}),
+        "/api/auth/setup",
+        data=json.dumps({"password": "secretpass1", "confirm_password": "secretpass2"}),
         content_type="application/json",
     )
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "PIN_MISMATCH"
+    assert response.json()["error"]["code"] == "PASSWORD_MISMATCH"
 
 
-def test_pin_setup_invalid_length(client):
-    """POST /api/auth/pin/setup with invalid length returns HTTP 400."""
+def test_password_setup_invalid_length(client):
+    """POST /api/auth/setup with password under 6 characters returns HTTP 400."""
     response = client.post(
-        "/api/auth/pin/setup",
-        data=json.dumps({"pin": "12", "confirm_pin": "12"}),
+        "/api/auth/setup",
+        data=json.dumps({"password": "12345", "confirm_password": "12345"}),
         content_type="application/json",
     )
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "INVALID_PIN_LENGTH"
+    assert response.json()["error"]["code"] == "INVALID_PASSWORD_LENGTH"
 
 
-def test_pin_setup_already_configured_rejected(client):
-    """POST /api/auth/pin/setup rejects reconfiguration when unauthenticated."""
-    assert set_pin("1234") is True
+def test_password_setup_already_configured_rejected(client):
+    """POST /api/auth/setup rejects reconfiguration when unauthenticated."""
+    assert set_password("initialpass") is True
 
     response = client.post(
-        "/api/auth/pin/setup",
-        data=json.dumps({"pin": "9999", "confirm_pin": "9999"}),
+        "/api/auth/setup",
+        data=json.dumps({"password": "newpass123", "confirm_password": "newpass123"}),
         content_type="application/json",
     )
     assert response.status_code == 403
-    assert response.json()["error"]["code"] == "PIN_ALREADY_CONFIGURED"
+    assert response.json()["error"]["code"] == "PASSWORD_ALREADY_CONFIGURED"
 
 
-def test_pin_login_endpoint_success(client):
-    """POST /api/auth/pin with correct PIN returns session JWT and user profile."""
-    assert set_pin("556677") is True
+def test_password_login_endpoint_success(client):
+    """POST /api/auth/login with correct password returns session JWT and user profile."""
+    assert set_password("correctpass123") is True
 
     response = client.post(
-        "/api/auth/pin",
-        data=json.dumps({"pin": "556677"}),
+        "/api/auth/login",
+        data=json.dumps({"password": "correctpass123"}),
         content_type="application/json",
     )
     assert response.status_code == 200
@@ -170,35 +189,35 @@ def test_pin_login_endpoint_success(client):
     assert data["user"]["email"] == "operator@aegis.local"
 
 
-def test_pin_login_endpoint_failure(client):
-    """POST /api/auth/pin with wrong PIN returns HTTP 401."""
-    assert set_pin("556677") is True
+def test_password_login_endpoint_failure(client):
+    """POST /api/auth/login with wrong password returns HTTP 401."""
+    assert set_password("correctpass123") is True
 
     response = client.post(
-        "/api/auth/pin",
-        data=json.dumps({"pin": "wrongpin"}),
+        "/api/auth/login",
+        data=json.dumps({"password": "wrongpassword"}),
         content_type="application/json",
     )
     assert response.status_code == 401
-    assert response.json()["error"]["code"] == "INVALID_PIN"
+    assert response.json()["error"]["code"] == "INVALID_PASSWORD"
 
 
 def test_auth_status_endpoint(client):
-    """GET /api/auth/status returns has_pin and authenticated states accurately."""
-    # 1. First run: no pin configured
+    """GET /api/auth/status returns has_password and authenticated states accurately."""
+    # 1. First run: no password configured
     resp1 = client.get("/api/auth/status")
     assert resp1.status_code == 200
     data1 = resp1.json()
     assert data1["configured"] is True
-    assert data1["has_pin"] is False
+    assert data1["has_password"] is False
     assert data1["authenticated"] is False
     assert data1["user"] is None
 
-    # 2. Pin configured, not authenticated
-    set_pin("1234")
+    # 2. Password configured, not authenticated
+    set_password("configuredpass")
     resp2 = client.get("/api/auth/status")
     data2 = resp2.json()
-    assert data2["has_pin"] is True
+    assert data2["has_password"] is True
     assert data2["authenticated"] is False
 
     # 3. Authenticated with session JWT
@@ -206,7 +225,7 @@ def test_auth_status_endpoint(client):
     client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {token}"
     resp3 = client.get("/api/auth/status")
     data3 = resp3.json()
-    assert data3["has_pin"] is True
+    assert data3["has_password"] is True
     assert data3["authenticated"] is True
     assert data3["user"]["sub"] == "local-operator"
 

@@ -190,3 +190,55 @@
   color: var(--ok, #10f09a);
   font-size: 9.5px;
 }
+
+/* Dev Server Port Chip Badge */
+.status-ports-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-dev-port {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-hover);
+  cursor: pointer;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.12s ease;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-dev-port:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.badge-dev-port .port-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.badge-port-label {
+  font-weight: 600;
+}
+
+.port-dismiss-btn {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  margin-left: 2px;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.port-dismiss-btn:hover {
+  color: var(--err);
+  background: var(--bg-hover);
+}

@@ -46,24 +46,24 @@ const workspaceGen = ref(0);
 const explorerRefresh = ref(0), queueRefresh = ref(0), config = ref({}), taskHistory = ref([]);
 const activeSessionId = ref("");
 
-// Sovereign Local PIN Authentication (PR-SEC-2)
+// Sovereign Local Password Authentication (PR-SEC-2)
 const {
   currentUser, authStatus, authLoading, authLoadingMessage, authError, authChecking,
-  isAuthenticated, handleLogout, loginWithPin, setupInitialPin, initAuth,
+  isAuthenticated, handleLogout, loginWithPassword, setupInitialPassword, initAuth,
 } = useAuth();
 
-async function handlePinSubmit(pin) {
+async function handlePasswordSubmit(password) {
   try {
-    await loginWithPin(pin);
+    await loginWithPassword(password);
     await refreshAllConfig();
   } catch (_) {
     // Error dikelola reaktif di authError
   }
 }
 
-async function handlePinSetup({ pin, confirmPin }) {
+async function handlePasswordSetup({ password, confirmPassword }) {
   try {
-    await setupInitialPin(pin, confirmPin);
+    await setupInitialPassword(password, confirmPassword);
     await refreshAllConfig();
   } catch (_) {
     // Error dikelola reaktif di authError
@@ -429,12 +429,15 @@ onBeforeUnmount(() => {
     </AppModal>
     <LoginOverlay
       v-if="!isAuthenticated && !authChecking"
-      :has-pin="authStatus?.has_pin ?? true"
+      :has-password="authStatus?.has_password ?? authStatus?.has_pin ?? false"
+      :has-pin="authStatus?.has_password ?? authStatus?.has_pin ?? false"
       :loading="authLoading"
       :loading-message="authLoadingMessage"
       :error="authError"
-      @submit-pin="handlePinSubmit"
-      @setup-pin="handlePinSetup"
+      @submit-password="handlePasswordSubmit"
+      @setup-password="handlePasswordSetup"
+      @submit-pin="handlePasswordSubmit"
+      @setup-pin="handlePasswordSetup"
       @clear-error="authError = ''"
     />
   </div>

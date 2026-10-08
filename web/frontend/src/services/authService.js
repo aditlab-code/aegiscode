@@ -8,6 +8,8 @@
 import { ref, computed } from "vue";
 import {
   getAuthStatus,
+  postLogin,
+  postSetup,
   postPinLogin,
   postPinSetup,
   getAuthMe,
@@ -119,10 +121,10 @@ export async function fetchAuthStatus() {
 }
 
 /**
- * Submit PIN to log in and store session JWT.
+ * Submit password to log in and store session JWT.
  */
-export async function loginWithPin(pin) {
-  const data = await postPinLogin(pin);
+export async function loginWithPassword(password) {
+  const data = await postLogin(password);
   if (data?.token) {
     setAuthToken(data.token);
     if (data.user) {
@@ -133,10 +135,10 @@ export async function loginWithPin(pin) {
 }
 
 /**
- * Setup initial PIN and store session JWT.
+ * Setup initial password and store session JWT.
  */
-export async function setupInitialPin(pin, confirmPin) {
-  const data = await postPinSetup(pin, confirmPin);
+export async function setupInitialPassword(password, confirmPassword) {
+  const data = await postSetup(password, confirmPassword);
   if (data?.token) {
     setAuthToken(data.token);
     if (data.user) {
@@ -146,6 +148,8 @@ export async function setupInitialPin(pin, confirmPin) {
   return data;
 }
 
+export const loginWithPin = loginWithPassword;
+export const setupInitialPin = setupInitialPassword;
 /**
  * Verify current session token with the backend.
  */
@@ -223,34 +227,34 @@ export function useAuth() {
     }
   }
 
-  async function handlePinLogin(pin) {
+  async function handlePasswordLogin(password) {
     authLoading.value = true;
-    authLoadingMessage.value = "Memverifikasi PIN...";
+    authLoadingMessage.value = "Memverifikasi kata sandi...";
     authError.value = "";
     try {
-      const res = await loginWithPin(pin);
+      const res = await loginWithPassword(password);
       currentUser.value = res.user;
       await refreshAuthStatus();
       return res;
     } catch (err) {
-      authError.value = err.message || "PIN yang dimasukkan salah.";
+      authError.value = err.message || "Kata sandi yang dimasukkan salah.";
       throw err;
     } finally {
       authLoading.value = false;
     }
   }
 
-  async function handlePinSetup(pin, confirmPin) {
+  async function handlePasswordSetup(password, confirmPassword) {
     authLoading.value = true;
-    authLoadingMessage.value = "Menyimpan PIN baru...";
+    authLoadingMessage.value = "Menyimpan kata sandi baru...";
     authError.value = "";
     try {
-      const res = await setupInitialPin(pin, confirmPin);
+      const res = await setupInitialPassword(password, confirmPassword);
       currentUser.value = res.user;
       await refreshAuthStatus();
       return res;
     } catch (err) {
-      authError.value = err.message || "Gagal mengatur PIN.";
+      authError.value = err.message || "Gagal mengatur kata sandi.";
       throw err;
     } finally {
       authLoading.value = false;
@@ -303,9 +307,10 @@ export function useAuth() {
     isAuthenticated,
     cleanUrlQuery,
     handleLogout,
-    loginWithPin: handlePinLogin,
-    setupInitialPin: handlePinSetup,
-    refreshAuthStatus,
+    loginWithPassword: handlePasswordLogin,
+    setupInitialPassword: handlePasswordSetup,
+    loginWithPin: handlePasswordLogin,
+    setupInitialPin: handlePasswordSetup,
     initAuth,
   };
 }

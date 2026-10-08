@@ -29,8 +29,8 @@ import jwt
 REPO_ROOT = getattr(settings, "REPO_ROOT", Path(__file__).resolve().parent.parent.parent.parent)
 EPHEMERAL_TOKEN_DIR = REPO_ROOT / ".aegis" / "run"
 EPHEMERAL_TOKEN_FILE = EPHEMERAL_TOKEN_DIR / "gateway.token"
-AUTH_PIN_FILE = REPO_ROOT / ".aegis" / "auth.json"
-
+AUTH_PASSWORD_FILE = REPO_ROOT / ".aegis" / "auth.json"
+AUTH_PIN_FILE = AUTH_PASSWORD_FILE
 _EPHEMERAL_TOKEN: Optional[str] = None
 
 
@@ -94,28 +94,35 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     # 2. Session JWT verification
     return verify_aegis_session_token(token)
 
-def hash_pin(pin: str, salt: Optional[bytes] = None) -> tuple[str, str]:
-    """Hash a PIN string with PBKDF2-HMAC-SHA256 (100,000 iterations).
+def hash_password(password: str, salt: Optional[bytes] = None) -> tuple[str, str]:
+    """Hash a password string with PBKDF2-HMAC-SHA256 (100,000 iterations).
 
-    Validates PIN length (4 to 12 characters).
+    Validates password length (minimum 6 characters, maximum 128 characters).
     Returns tuple of (salt_hex, hash_hex).
     """
-    if not isinstance(pin, str) or not (4 <= len(pin) <= 12):
-        raise ValueError("PIN harus berupa string dengan panjang 4-12 karakter.")
+    if not isinstance(password, str) or len(password) < 6:
+        raise ValueError("Kata sandi harus berupa string minimal 6 karakter.")
+    if len(password) > 128:
+        raise ValueError("Kata sandi maksimal 128 karakter.")
     if salt is None:
         salt = secrets.token_bytes(16)
-    hash_bytes = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, 100_000)
+    hash_bytes = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000)
     return salt.hex(), hash_bytes.hex()
 
 
-def has_configured_pin() -> bool:
-    """Check if a PIN has been configured via AEGIS_PIN or .aegis/auth.json."""
-    env_pin = getattr(settings, "AEGIS_PIN", "") or os.getenv("AEGIS_PIN", "")
-    if env_pin and env_pin.strip():
+def has_configured_password() -> bool:
+    """Check if a password has been configured via AEGIS_PASSWORD/AEGIS_PIN or .aegis/auth.json."""
+    env_pass = (
+        getattr(settings, "AEGIS_PASSWORD", "")
+        or os.getenv("AEGIS_PASSWORD", "")
+        or getattr(settings, "AEGIS_PIN", "")
+        or os.getenv("AEGIS_PIN", "")
+    )
+    if env_pass and env_pass.strip():
         return True
-    if AUTH_PIN_FILE.is_file():
+    if AUTH_PASSWORD_FILE.is_file():
         try:
-            with open(AUTH_PIN_FILE, "r", encoding="utf-8") as f:
+            with open(AUTH_PASSWORD_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             if isinstance(data, dict) and data.get("hash") and data.get("salt"):
                 return True
@@ -124,26 +131,31 @@ def has_configured_pin() -> bool:
     return False
 
 
-def verify_pin(pin: str) -> bool:
-    """Verify input PIN against AEGIS_PIN environment variable or .aegis/auth.json."""
-    if not pin or not isinstance(pin, str):
+def verify_password(password: str) -> bool:
+    """Verify input password against AEGIS_PASSWORD/AEGIS_PIN or .aegis/auth.json."""
+    if not password or not isinstance(password, str):
         return False
 
-    env_pin = getattr(settings, "AEGIS_PIN", "") or os.getenv("AEGIS_PIN", "")
-    if env_pin and env_pin.strip():
-        if hmac.compare_digest(pin, env_pin.strip()):
+    env_pass = (
+        getattr(settings, "AEGIS_PASSWORD", "")
+        or os.getenv("AEGIS_PASSWORD", "")
+        or getattr(settings, "AEGIS_PIN", "")
+        or os.getenv("AEGIS_PIN", "")
+    )
+    if env_pass and env_pass.strip():
+        if hmac.compare_digest(password, env_pass.strip()):
             return True
 
-    if AUTH_PIN_FILE.is_file():
+    if AUTH_PASSWORD_FILE.is_file():
         try:
-            with open(AUTH_PIN_FILE, "r", encoding="utf-8") as f:
+            with open(AUTH_PASSWORD_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             salt_hex = data.get("salt")
             stored_hash = data.get("hash")
             if not salt_hex or not stored_hash:
                 return False
             salt = bytes.fromhex(salt_hex)
-            computed_hash = hashlib.pbkdf2_hmac("sha256", pin.encode("utf-8"), salt, 100_000).hex()
+            computed_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 100_000).hex()
             return hmac.compare_digest(computed_hash, stored_hash)
         except Exception:
             return False
@@ -151,13 +163,15 @@ def verify_pin(pin: str) -> bool:
     return False
 
 
-def set_pin(pin: str) -> bool:
-    """Store hashed PIN securely in .aegis/auth.json with 0600 permissions."""
-    if not isinstance(pin, str) or not (4 <= len(pin) <= 12):
-        raise ValueError("PIN harus berupa string dengan panjang 4-12 karakter.")
+def set_password(password: str) -> bool:
+    """Store hashed password securely in .aegis/auth.json with 0600 permissions."""
+    if not isinstance(password, str) or len(password) < 6:
+        raise ValueError("Kata sandi harus berupa string minimal 6 karakter.")
+    if len(password) > 128:
+        raise ValueError("Kata sandi maksimal 128 karakter.")
 
-    salt_hex, hash_hex = hash_pin(pin)
-    target_dir = AUTH_PIN_FILE.parent
+    salt_hex, hash_hex = hash_password(password)
+    target_dir = AUTH_PASSWORD_FILE.parent
     target_dir.mkdir(parents=True, exist_ok=True)
 
     data = {
@@ -176,10 +190,10 @@ def set_pin(pin: str) -> bool:
                 os.chmod(temp_file, 0o600)
             except OSError:
                 pass
-        temp_file.replace(AUTH_PIN_FILE)
+        temp_file.replace(AUTH_PASSWORD_FILE)
         if os.name != "nt":
             try:
-                os.chmod(AUTH_PIN_FILE, 0o600)
+                os.chmod(AUTH_PASSWORD_FILE, 0o600)
             except OSError:
                 pass
     finally:
@@ -190,6 +204,13 @@ def set_pin(pin: str) -> bool:
                 pass
 
     return True
+
+
+# Backward compatibility aliases
+hash_pin = hash_password
+has_configured_pin = has_configured_password
+verify_pin = verify_password
+set_pin = set_password
 
 def create_aegis_session_token(
     user_info: Dict[str, Any],

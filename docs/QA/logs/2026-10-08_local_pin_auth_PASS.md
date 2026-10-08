@@ -19,17 +19,18 @@
 
 ## 2. Rincian Pengujian
 - **Backend Test Suite (`tests/test_pin_auth.py` & `tests/test_auth_boundary.py`)**:
-  - Hashing PBKDF2-HMAC-SHA256 (100.000 iterasi) unik per salt.
-  - Setup PIN pertama kali menulis atomik `.aegis/auth.json` izin `0600`.
-  - Verifikasi PIN benar menerbitkan session JWT dan user profile operator lokal.
-  - Verifikasi PIN salah ditolak HTTP 401 (`INVALID_PIN`).
-  - Endpoint status `GET /api/auth/status` mengembalikan `has_pin` dan `authenticated`.
+  - Hashing PBKDF2-HMAC-SHA256 (100.000 iterasi) unik per salt dengan kebijakan minimal 6 karakter.
+  - Setup kata sandi pertama kali menulis atomik `.aegis/auth.json` izin `0600`.
+  - Verifikasi kata sandi benar menerbitkan session JWT dan user profile operator lokal.
+  - Verifikasi kata sandi salah ditolak HTTP 401 (`INVALID_PASSWORD`).
+  - Validasi panjang kata sandi < 6 karakter ditolak HTTP 400 (`INVALID_PASSWORD_LENGTH`).
+  - Endpoint status `GET /api/auth/status` mengembalikan `has_password` dan `authenticated`.
   - Endpoint identitas `GET /api/auth/me` dan logout `POST /api/auth/logout`.
-  - Batas keamanan perimeter HTTP dan WebSocket terminal PTY (22 tes lulus).
 - **Frontend Test Suite (`web/frontend/src/authService.test.mjs` & `web/frontend/src/*.test.mjs`)**:
   - Penyimpanan token sesi di localStorage (`aegis_auth_token`).
   - Alur `fetchAuthStatus`, `loginWithPin`, `setupInitialPin`, dan `verifyCurrentSession`.
   - Pembersihan menyeluruh dependensi Google OAuth.
+  - Integrasi Safe Link Provider di Terminal (`TerminalView.vue`) untuk Opsi A: URL server web/dev (`http:`, `https:`) otomatis dapat diklik dan dibuka di tab terisolasi (`noopener,noreferrer` serta `opener = null`).
   - Seluruh 126 unit test frontend lulus 100%.
 - **Vite Production Build (`web/frontend/`)**:
   - Kompilasi bundling Vite sukses tanpa galat import (`✓ built in 16.46s`).

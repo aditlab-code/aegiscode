@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from "vue";
+import { usePortDiscovery } from "../../services/portDiscoveryService.js";
 
+const { discoveredPorts, openPortSafely, removeDiscoveredPort } = usePortDiscovery();
 const props = defineProps({
   cursor: {
     type: Object,
@@ -127,6 +129,32 @@ const branchTooltip = computed(() => {
         <span class="badge-dot">●</span>
         <span class="badge-text">Agent: {{ agentStatus?.label || "idle" }}</span>
       </span>
+
+      <!-- Discovered Active Dev Ports Chips -->
+      <div v-if="discoveredPorts.length > 0" class="status-ports-group">
+        <button
+          v-for="p in discoveredPorts"
+          :key="p.port"
+          type="button"
+          class="status-badge badge-dev-port"
+          :title="`Dev Server aktif di ${p.url}. Klik untuk membuka di peramban.`"
+          @click="openPortSafely(p.url)"
+        >
+          <svg class="port-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="2" y1="12" x2="22" y2="12" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          </svg>
+          <span class="badge-port-label">{{ p.label }}</span>
+          <span
+            class="port-dismiss-btn"
+            title="Tutup chip port"
+            @click.stop="removeDiscoveredPort(p.port)"
+          >
+            &times;
+          </span>
+        </button>
+      </div>
     </div>
 
     <!-- Center Section: Open Source MIT Copyright License -->

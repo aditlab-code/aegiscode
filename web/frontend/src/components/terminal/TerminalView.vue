@@ -17,6 +17,22 @@ let socket = null;
 let resizeObserver = null;
 let themeObserver = null;
 
+function openSafeTerminalLink(rawUrl) {
+  if (typeof window === "undefined" || !rawUrl) return;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      console.warn("Protokol tidak aman diblokir dari terminal:", parsed.protocol);
+      return;
+    }
+    const newWindow = window.open(parsed.href, "_blank", "noopener,noreferrer");
+    if (newWindow) {
+      newWindow.opener = null;
+    }
+  } catch (err) {
+    console.warn("Format URL terminal tidak valid:", err);
+  }
+}
 const TOKYO_NIGHT_STORM_TERMINAL = {
   background: "#101018",
   foreground: "#dedee9",
@@ -196,6 +212,34 @@ onMounted(async () => {
     // Initial fit
     fitAddon.fit();
 
+    // Safe Link Provider untuk URL server web/dev yang dapat diklik (Opsi A)
+    term.registerLinkProvider({
+      provideLinks(bufferLineNumber, callback) {
+        const line = term?.buffer?.active?.getLine(bufferLineNumber - 1);
+        if (!line) {
+          callback(undefined);
+          return;
+        }
+        const text = line.translateToString(true);
+        const urlRegex = /https?:\/\/[^\s\x1b"'\`<>()[\]{}]+[^\s\x1b"'\`<>()[\]{}.,:;!?]/g;
+        const links = [];
+        let match;
+        while ((match = urlRegex.exec(text)) !== null) {
+          const matchedUrl = match[0];
+          links.push({
+            text: matchedUrl,
+            range: {
+              start: { x: match.index + 1, y: bufferLineNumber },
+              end: { x: match.index + matchedUrl.length, y: bufferLineNumber },
+            },
+            activate(_event, uri) {
+              openSafeTerminalLink(uri || matchedUrl);
+            },
+          });
+        }
+        callback(links.length > 0 ? links : undefined);
+      },
+    });
     // Directly stream raw keystrokes to PTY
     term.onData((data) => {
       if (socket && socket.readyState === 1) {

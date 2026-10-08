@@ -1815,18 +1815,20 @@ def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
 
 
 # ---------------------------------------------------------------------------
-# Sovereign Local PIN & Identity Gateway
+# Sovereign Local Password & Identity Gateway
 # ---------------------------------------------------------------------------
 @require_http_methods(["GET"])
 def auth_status(request: HttpRequest) -> JsonResponse:
-    """Return local PIN configuration and authentication status."""
-    from api.auth import get_authenticated_user, has_configured_pin
+    """Return local password configuration and authentication status."""
+    from api.auth import get_authenticated_user, has_configured_password
 
     current_user = get_authenticated_user(request)
+    has_pass = has_configured_password()
     return _json_response(
         {
             "configured": True,
-            "has_pin": has_configured_pin(),
+            "has_password": has_pass,
+            "has_pin": has_pass,  # backward compatibility alias
             "authenticated": bool(current_user),
             "user": current_user,
         }
@@ -1835,25 +1837,25 @@ def auth_status(request: HttpRequest) -> JsonResponse:
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def auth_pin_login(request: HttpRequest) -> JsonResponse:
-    """Verify submitted local PIN and issue AegisCode session token."""
-    from api.auth import create_aegis_session_token, verify_pin
+def auth_login(request: HttpRequest) -> JsonResponse:
+    """Verify submitted local password and issue AegisCode session token."""
+    from api.auth import create_aegis_session_token, verify_password
 
     try:
         body = _parse_json_body(request)
     except Exception as exc:
         return _json_response({"error": {"code": "INVALID_BODY", "message": str(exc)}}, status=400)
 
-    pin = body.get("pin")
-    if not pin or not isinstance(pin, str):
+    password = body.get("password") or body.get("pin")
+    if not password or not isinstance(password, str):
         return _json_response(
-            {"error": {"code": "MISSING_PIN", "message": "PIN harus diisi."}},
+            {"error": {"code": "MISSING_PASSWORD", "message": "Kata sandi harus diisi."}},
             status=400,
         )
 
-    if not verify_pin(pin):
+    if not verify_password(password):
         return _json_response(
-            {"error": {"code": "INVALID_PIN", "message": "PIN yang dimasukkan salah."}},
+            {"error": {"code": "INVALID_PASSWORD", "message": "Kata sandi yang dimasukkan salah."}},
             status=401,
         )
 
@@ -1866,21 +1868,24 @@ def auth_pin_login(request: HttpRequest) -> JsonResponse:
     return _json_response({"token": token, "user": user_info})
 
 
+auth_pin_login = auth_login
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
-def auth_pin_setup(request: HttpRequest) -> JsonResponse:
-    """Setup initial PIN on first-run and issue AegisCode session token."""
+def auth_setup(request: HttpRequest) -> JsonResponse:
+    """Setup initial password on first-run and issue AegisCode session token."""
     from api.auth import (
         create_aegis_session_token,
         get_authenticated_user,
-        has_configured_pin,
-        set_pin,
+        has_configured_password,
+        set_password,
     )
 
     current_user = get_authenticated_user(request)
-    if has_configured_pin() and not current_user:
+    if has_configured_password() and not current_user:
         return _json_response(
-            {"error": {"code": "PIN_ALREADY_CONFIGURED", "message": "PIN sudah terkonfigurasi."}},
+            {"error": {"code": "PASSWORD_ALREADY_CONFIGURED", "message": "Kata sandi sudah terkonfigurasi."}},
             status=403,
         )
 
@@ -1889,31 +1894,37 @@ def auth_pin_setup(request: HttpRequest) -> JsonResponse:
     except Exception as exc:
         return _json_response({"error": {"code": "INVALID_BODY", "message": str(exc)}}, status=400)
 
-    pin = body.get("pin")
-    confirm_pin = body.get("confirm_pin") or body.get("confirmPin")
-    if not pin or not confirm_pin or not isinstance(pin, str) or not isinstance(confirm_pin, str):
+    password = body.get("password") or body.get("pin")
+    confirm_password = (
+        body.get("confirm_password")
+        or body.get("confirmPassword")
+        or body.get("confirm_pin")
+        or body.get("confirmPin")
+    )
+
+    if not password or not confirm_password or not isinstance(password, str) or not isinstance(confirm_password, str):
         return _json_response(
-            {"error": {"code": "MISSING_PIN", "message": "PIN dan konfirmasi PIN wajib diisi."}},
+            {"error": {"code": "MISSING_PASSWORD", "message": "Kata sandi dan konfirmasi wajib diisi."}},
             status=400,
         )
 
-    if pin != confirm_pin:
+    if password != confirm_password:
         return _json_response(
-            {"error": {"code": "PIN_MISMATCH", "message": "PIN dan konfirmasi PIN tidak cocok."}},
+            {"error": {"code": "PASSWORD_MISMATCH", "message": "Kata sandi dan konfirmasi tidak cocok."}},
             status=400,
         )
 
-    if not (4 <= len(pin) <= 12):
+    if len(password) < 6:
         return _json_response(
-            {"error": {"code": "INVALID_PIN_LENGTH", "message": "PIN harus memiliki panjang antara 4 hingga 12 karakter."}},
+            {"error": {"code": "INVALID_PASSWORD_LENGTH", "message": "Kata sandi minimal 6 karakter."}},
             status=400,
         )
 
     try:
-        set_pin(pin)
+        set_password(password)
     except Exception as exc:
         return _json_response(
-            {"error": {"code": "PIN_SAVE_FAILED", "message": f"Gagal menyimpan PIN: {exc}"}},
+            {"error": {"code": "PASSWORD_SAVE_FAILED", "message": f"Gagal menyimpan kata sandi: {exc}"}},
             status=500,
         )
 
@@ -1925,6 +1936,8 @@ def auth_pin_setup(request: HttpRequest) -> JsonResponse:
     token = create_aegis_session_token(user_info)
     return _json_response({"token": token, "user": user_info, "success": True})
 
+
+auth_pin_setup = auth_setup
 @require_http_methods(["GET"])
 def auth_me(request: HttpRequest) -> JsonResponse:
     """Return identity of authenticated user based on Bearer token."""

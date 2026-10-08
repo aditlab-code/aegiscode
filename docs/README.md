@@ -18,6 +18,7 @@ Dokumen di bawah ini merupakan fondasi spesifikasi teknis repositori:
 | **[docs/Gitmaster.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/Gitmaster.md)** | Panduan arsitektur Git multi-remote, isolasi kerahasiaan branch privat (master & release), dan alur rilis komunitas (main). |
 | **[docs/architecture/codegraph_migration_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/codegraph_migration_plan.md)** | Rencana migrasi deterministik dari pipeline vektor ke CodeGraph SQLite (`.aegis/codegraph.db`), skema relasi AST, dan 4 tools kanonik. |
 | **[docs/architecture/phase2_mvp_modularization_plan.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/phase2_mvp_modularization_plan.md)** | Rencana restrukturisasi MVP Fase 2 (Modularisasi Orchestrator) menjadi 3 PR mandiri tanpa siklus ulang. |
+| **[docs/architecture/security_architecture.md](file:///Users/aditwicaksono/Documents/Project-AI/AegisCode/docs/architecture/security_architecture.md)** | Arsitektur keamanan dan model otentikasi sovereign: Zero-Trust perimeter, PBKDF2-HMAC-SHA256 password lokal, isolasi token, dan terminal sandbox. |
 
 ---
 
