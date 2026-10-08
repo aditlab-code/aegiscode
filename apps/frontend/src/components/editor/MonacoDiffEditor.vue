@@ -156,10 +156,17 @@ async function mountDiffEditor(originalText, modifiedText) {
   originalModel = monaco.editor.createModel(originalText, language.value, origUri);
   modifiedModel = monaco.editor.createModel(modifiedText, language.value, modUri);
 
+  const preset = typeof document !== "undefined" ? document.documentElement.dataset.themePreset : "";
   const isLight =
     typeof document !== "undefined" &&
     document.documentElement.dataset.theme === "light";
   const userEditorOpts = toMonacoOptions(getStoredEditorSettings());
+
+  function resolveMonacoTheme(p, light) {
+    if (p === "high-contrast-dark") return "hc-black";
+    if (p === "high-contrast-light") return "hc-light";
+    return light ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME;
+  }
 
   if (diffEditor) {
     diffEditor.dispose();
@@ -170,7 +177,7 @@ async function mountDiffEditor(originalText, modifiedText) {
   diffEditor = monaco.editor.createDiffEditor(container.value, {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
-    theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
+    theme: resolveMonacoTheme(preset, isLight),
     originalEditable: false,
     readOnly: true,
     renderSideBySide: sideBySide.value,
@@ -194,14 +201,13 @@ async function mountDiffEditor(originalText, modifiedText) {
 
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     themeObserver = new MutationObserver(() => {
+      const p = document.documentElement.dataset.themePreset;
       const lightNow = document.documentElement.dataset.theme === "light";
-      monaco.editor.setTheme(
-        lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME
-      );
+      monaco.editor.setTheme(resolveMonacoTheme(p, lightNow));
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "data-theme-preset"],
     });
   }
 

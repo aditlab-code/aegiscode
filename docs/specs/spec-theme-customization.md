@@ -154,5 +154,5 @@ export function applyThemeConfig(config) {
 
 ---
 
-## Open Questions
-1. Apakah slider custom lebih disukai menggunakan format Hue slider (0–360° HSL) yang otomatis menghasilkan gradasi harmonis, atau input Color Picker standar HTML5 (`<input type="color">`) yang dilengkapi slider brightness/saturation?
+## Open Questions (Resolved)
+- **Format Slider Input**: Dipilih **Slider RGB (Red 0–255, Green 0–255, Blue 0–255)** per channel (Primary, Secondary, Accent). Komponen UI menyediakan 3 channel slider per warna dengan live swatch preview dan nilai hexadecimal/RGB yang sinkron secara real-time.

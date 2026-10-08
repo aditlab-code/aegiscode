@@ -18,6 +18,7 @@ import GlobalSettingsPanel from "../components/settings/GlobalSettingsPanel.vue"
 import AgentSettingsPanel from "../components/settings/AgentSettingsPanel.vue";
 import ExtensionManager from "../components/settings/ExtensionManager.vue";
 import EditorSettingsPanel from "../components/settings/EditorSettingsPanel.vue";
+import AppearanceSettingsPanel from "../components/settings/AppearanceSettingsPanel.vue";
 import AboutSettingsPanel from "../components/settings/AboutSettingsPanel.vue";
 import ProjectPolicyPanel from "../components/workspace/ProjectPolicyPanel.vue";
 import AppButton from "../components/ui/AppButton.vue";
@@ -90,6 +91,12 @@ const NAV_TABS = [
     label: "Text Editor",
     description: "Code editor typography and layout",
     icon: "M16 18l6-6-6-6M8 6l-6 6 6 6",
+  },
+  {
+    id: "appearance",
+    label: "Appearance & Themes",
+    description: "Curated presets, custom RGB sliders, and live preview",
+    icon: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c3.31 0 6-2.69 6-6 0-4.96-4.49-9-10-9zm-5.5 10c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9s1.5.67 1.5 1.5S7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z",
   },
   {
     id: "projects",
@@ -359,6 +366,11 @@ onBeforeUnmount(() => {
           <!-- Sub-Tab: Text Editor Settings -->
           <section v-else-if="currentTab === 'editor'" class="settings-tab-pane">
             <EditorSettingsPanel />
+          </section>
+
+          <!-- Sub-Tab: Appearance & Themes -->
+          <section v-else-if="currentTab === 'appearance'" class="settings-tab-pane">
+            <AppearanceSettingsPanel />
           </section>
 
           <!-- Sub-Tab 2: Global Settings -->

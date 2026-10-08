@@ -44,5 +44,6 @@
    4. Themes (Gruvbox Dark & Light)
    ============================================================================= */
 @import "./styles/themes/theme-light.css";
+@import "./styles/themes/theme-presets.css";
 @import "./styles/themes/wallpaper.css";
 

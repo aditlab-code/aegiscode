@@ -23,6 +23,7 @@ import {
 } from "../../api";
 import GlobalSettingsPanel from "./GlobalSettingsPanel.vue";
 import AgentSettingsPanel from "./AgentSettingsPanel.vue";
+import AppearanceSettingsPanel from "./AppearanceSettingsPanel.vue";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
 
@@ -482,6 +483,16 @@ watch(activeTab, (tab) => {
     </button>
     <button
       class="sv-tab"
+      :class="{ active: activeTab === 'appearance' }"
+      type="button"
+      role="tab"
+      :aria-selected="activeTab === 'appearance'"
+      @click="activeTab = 'appearance'"
+    >
+      Appearance
+    </button>
+    <button
+      class="sv-tab"
       :class="{ active: activeTab === 'agent' }"
       type="button"
       role="tab"
@@ -504,6 +515,9 @@ watch(activeTab, (tab) => {
 
   <!-- ================= GENERAL: Global Settings AETHER ================= -->
   <GlobalSettingsPanel v-if="activeTab === 'general'" />
+
+  <!-- ================= APPEARANCE: Theme & Appearance ================= -->
+  <AppearanceSettingsPanel v-else-if="activeTab === 'appearance'" />
 
   <!-- ================= AGENT: System Prompt Agent ================= -->
   <AgentSettingsPanel v-else-if="activeTab === 'agent'" />

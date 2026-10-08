@@ -232,16 +232,23 @@ async function initEditor() {
   if (disposed || !container.value) return;
   monaco = mod.getMonaco();
 
+  const preset = typeof document !== "undefined" ? document.documentElement.dataset.themePreset : "";
   const isLight =
     typeof document !== "undefined" &&
     document.documentElement.dataset.theme === "light";
   const userEditorOpts = toMonacoOptions(getStoredEditorSettings());
 
+  function resolveMonacoTheme(p, light) {
+    if (p === "high-contrast-dark") return "hc-black";
+    if (p === "high-contrast-light") return "hc-light";
+    return light ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME;
+  }
+
   editor = monaco.editor.create(container.value, {
     ...mod.EDITOR_OPTIONS,
     ...userEditorOpts,
     automaticLayout: true,
-    theme: isLight ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME,
+    theme: resolveMonacoTheme(preset, isLight),
     model: null,
   });
 
@@ -261,12 +268,13 @@ async function initEditor() {
 
   if (typeof MutationObserver !== "undefined" && typeof document !== "undefined") {
     themeObserver = new MutationObserver(() => {
+      const p = document.documentElement.dataset.themePreset;
       const lightNow = document.documentElement.dataset.theme === "light";
-      monaco.editor.setTheme(lightNow ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME);
+      monaco.editor.setTheme(resolveMonacoTheme(p, lightNow));
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "data-theme-preset"],
     });
   }
 

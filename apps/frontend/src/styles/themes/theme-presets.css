@@ -1,0 +1,360 @@
+/**
+ * AegisCode Theme Presets (Curated Themes)
+ * Supports:
+ * - Tokyo Night (Dark & Light)
+ * - Nordic / Nord (Dark & Light)
+ * - Atom One (Dark & Light)
+ * - High Contrast (Dark & Light)
+ */
+
+/* =============================================================================
+   1. Tokyo Night (Dark)
+   ============================================================================= */
+[data-theme-preset="tokyo-night-dark"] {
+  --bg: #1a1b26;
+  --panel: #1f2335;
+  --surface: #24283b;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #1f2335;
+  --bg-elev: #24283b;
+  --bg-card: var(--panel);
+  --bg-sidebar: #16161e;
+  --bg-drawer: #16161e;
+  --sidebar: rgba(22, 22, 30, 0.85);
+  --bg-deep: #13141c;
+  --bg-secondary: #1f2335;
+
+  --text: #c0caf5;
+  --text-dim: #9aa5ce;
+  --text-faint: #565f89;
+  --secondary: #9aa5ce;
+  --muted: #565f89;
+
+  --accent: #7aa2f7;
+  --accent-dim: #565f89;
+  --accent-soft: rgba(122, 162, 247, 0.18);
+  --accent-muted: #7aa2f7;
+  --accent-2: #bb9af7;
+  --accent-2-dim: #9d7cd8;
+  --selection: rgba(122, 162, 247, 0.25);
+
+  --border: rgba(122, 162, 247, 0.16);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(122, 162, 247, 0.45);
+  --line: rgba(255, 255, 255, 0.09);
+  --hover: rgba(255, 255, 255, 0.08);
+
+  --ok: #9ece6a;
+  --warn: #e0af68;
+  --err: #f7768e;
+}
+
+/* =============================================================================
+   2. Tokyo Night (Light)
+   ============================================================================= */
+[data-theme-preset="tokyo-night-light"] {
+  --bg: #d5d6db;
+  --panel: #e1e2e7;
+  --surface: #e9e9ed;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #cbccd1;
+  --bg-elev: #ffffff;
+  --bg-card: var(--panel);
+  --bg-sidebar: #cbccd1;
+  --bg-drawer: #cbccd1;
+  --sidebar: rgba(203, 204, 209, 0.85);
+  --bg-deep: #c0c1c7;
+  --bg-secondary: #dcddde;
+
+  --text: #343b58;
+  --text-dim: #565a6e;
+  --text-faint: #8990b3;
+  --secondary: #565a6e;
+  --muted: #8990b3;
+
+  --accent: #34548a;
+  --accent-dim: #29426f;
+  --accent-soft: rgba(52, 84, 138, 0.15);
+  --accent-muted: #34548a;
+  --accent-2: #5a4a78;
+  --accent-2-dim: #45375c;
+  --selection: rgba(52, 84, 138, 0.18);
+
+  --border: rgba(52, 84, 138, 0.18);
+  --border-soft: rgba(52, 84, 138, 0.1);
+  --border-subtle: rgba(52, 84, 138, 0.05);
+  --border-hover: rgba(52, 84, 138, 0.45);
+  --line: rgba(52, 84, 138, 0.12);
+  --hover: rgba(52, 84, 138, 0.06);
+
+  --ok: #485e30;
+  --warn: #8c6c3e;
+  --err: #8c4351;
+}
+
+/* =============================================================================
+   3. Nordic / Nord (Dark)
+   ============================================================================= */
+[data-theme-preset="nord-dark"] {
+  --bg: #2e3440;
+  --panel: #3b4252;
+  --surface: #434c5e;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #2e3440;
+  --bg-elev: #434c5e;
+  --bg-card: var(--panel);
+  --bg-sidebar: #242933;
+  --bg-drawer: #242933;
+  --sidebar: rgba(36, 41, 51, 0.88);
+  --bg-deep: #1e222a;
+  --bg-secondary: #353b49;
+
+  --text: #eceff4;
+  --text-dim: #d8dee9;
+  --text-faint: #4c566a;
+  --secondary: #e5e9f0;
+  --muted: #4c566a;
+
+  --accent: #88c0d0;
+  --accent-dim: #81a1c1;
+  --accent-soft: rgba(136, 192, 208, 0.18);
+  --accent-muted: #88c0d0;
+  --accent-2: #b48ead;
+  --accent-2-dim: #9a7293;
+  --selection: rgba(136, 192, 208, 0.22);
+
+  --border: rgba(136, 192, 208, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(136, 192, 208, 0.45);
+  --line: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.07);
+
+  --ok: #a3be8c;
+  --warn: #ebcb8b;
+  --err: #bf616a;
+}
+
+/* =============================================================================
+   4. Nordic / Nord (Light)
+   ============================================================================= */
+[data-theme-preset="nord-light"] {
+  --bg: #eceff4;
+  --panel: #e5e9f0;
+  --surface: #d8dee9;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #e2e6ed;
+  --bg-elev: #ffffff;
+  --bg-card: var(--panel);
+  --bg-sidebar: #e2e6ed;
+  --bg-drawer: #e2e6ed;
+  --sidebar: rgba(226, 230, 237, 0.88);
+  --bg-deep: #cbd2df;
+  --bg-secondary: #dde2ec;
+
+  --text: #2e3440;
+  --text-dim: #3b4252;
+  --text-faint: #7b88a1;
+  --secondary: #4c566a;
+  --muted: #7b88a1;
+
+  --accent: #5e81ac;
+  --accent-dim: #4c688d;
+  --accent-soft: rgba(94, 129, 172, 0.15);
+  --accent-muted: #5e81ac;
+  --accent-2: #b48ead;
+  --accent-2-dim: #9a7293;
+  --selection: rgba(94, 129, 172, 0.18);
+
+  --border: rgba(94, 129, 172, 0.18);
+  --border-soft: rgba(46, 52, 64, 0.1);
+  --border-subtle: rgba(46, 52, 64, 0.05);
+  --border-hover: rgba(94, 129, 172, 0.45);
+  --line: rgba(46, 52, 64, 0.1);
+  --hover: rgba(94, 129, 172, 0.06);
+
+  --ok: #678650;
+  --warn: #987834;
+  --err: #993b45;
+}
+
+/* =============================================================================
+   5. Atom One (Dark)
+   ============================================================================= */
+[data-theme-preset="atom-dark"] {
+  --bg: #282c34;
+  --panel: #21252b;
+  --surface: #2c313a;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #21252b;
+  --bg-elev: #2c313a;
+  --bg-card: var(--panel);
+  --bg-sidebar: #1e2227;
+  --bg-drawer: #1e2227;
+  --sidebar: rgba(30, 34, 39, 0.88);
+  --bg-deep: #1b1d23;
+  --bg-secondary: #242830;
+
+  --text: #abb2bf;
+  --text-dim: #828997;
+  --text-faint: #5c6370;
+  --secondary: #9da5b4;
+  --muted: #5c6370;
+
+  --accent: #61afef;
+  --accent-dim: #4d8cd1;
+  --accent-soft: rgba(97, 175, 239, 0.18);
+  --accent-muted: #61afef;
+  --accent-2: #c678dd;
+  --accent-2-dim: #ab5cc2;
+  --selection: rgba(97, 175, 239, 0.22);
+
+  --border: rgba(97, 175, 239, 0.16);
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-hover: rgba(97, 175, 239, 0.45);
+  --line: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.07);
+
+  --ok: #98c379;
+  --warn: #e5c07b;
+  --err: #e06c75;
+}
+
+/* =============================================================================
+   6. Atom One (Light)
+   ============================================================================= */
+[data-theme-preset="atom-light"] {
+  --bg: #fafafa;
+  --panel: #f0f0f0;
+  --surface: #e5e5e6;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #f0f0f0;
+  --bg-elev: #ffffff;
+  --bg-card: var(--panel);
+  --bg-sidebar: #f5f5f5;
+  --bg-drawer: #f5f5f5;
+  --sidebar: rgba(245, 245, 245, 0.9);
+  --bg-deep: #dbdbdc;
+  --bg-secondary: #e9e9ea;
+
+  --text: #383a42;
+  --text-dim: #696c77;
+  --text-faint: #a0a1a7;
+  --secondary: #696c77;
+  --muted: #a0a1a7;
+
+  --accent: #4078f2;
+  --accent-dim: #2f5ec4;
+  --accent-soft: rgba(64, 120, 242, 0.15);
+  --accent-muted: #4078f2;
+  --accent-2: #a626a4;
+  --accent-2-dim: #821c80;
+  --selection: rgba(64, 120, 242, 0.18);
+
+  --border: rgba(64, 120, 242, 0.18);
+  --border-soft: rgba(56, 58, 66, 0.1);
+  --border-subtle: rgba(56, 58, 66, 0.05);
+  --border-hover: rgba(64, 120, 242, 0.45);
+  --line: rgba(56, 58, 66, 0.1);
+  --hover: rgba(64, 120, 242, 0.06);
+
+  --ok: #50a14f;
+  --warn: #c18401;
+  --err: #e45649;
+}
+
+/* =============================================================================
+   7. High Contrast (Dark)
+   ============================================================================= */
+[data-theme-preset="high-contrast-dark"] {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --surface: #141414;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #050505;
+  --bg-elev: #1a1a1a;
+  --bg-card: var(--panel);
+  --bg-sidebar: #000000;
+  --bg-drawer: #000000;
+  --sidebar: #000000;
+  --bg-deep: #000000;
+  --bg-secondary: #101010;
+
+  --text: #ffffff;
+  --text-dim: #f0f0f0;
+  --text-faint: #d0d0d0;
+  --secondary: #ffffff;
+  --muted: #cccccc;
+
+  --accent: #00ffff;
+  --accent-dim: #00cccc;
+  --accent-soft: rgba(0, 255, 255, 0.25);
+  --accent-muted: #00ffff;
+  --accent-2: #ffff00;
+  --accent-2-dim: #cccc00;
+  --selection: rgba(0, 255, 255, 0.35);
+
+  --border: #ffffff;
+  --border-soft: rgba(255, 255, 255, 0.7);
+  --border-subtle: rgba(255, 255, 255, 0.4);
+  --border-hover: #00ffff;
+  --line: rgba(255, 255, 255, 0.7);
+  --hover: rgba(255, 255, 255, 0.18);
+
+  --ok: #00ff00;
+  --warn: #ffff00;
+  --err: #ff3333;
+}
+
+/* =============================================================================
+   8. High Contrast (Light)
+   ============================================================================= */
+[data-theme-preset="high-contrast-light"] {
+  --bg: #ffffff;
+  --panel: #f8f8f8;
+  --surface: #eeeeee;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-card: var(--panel);
+  --bg-sidebar: #ffffff;
+  --bg-drawer: #ffffff;
+  --sidebar: #ffffff;
+  --bg-deep: #e0e0e0;
+  --bg-secondary: #f0f0f0;
+
+  --text: #000000;
+  --text-dim: #1a1a1a;
+  --text-faint: #333333;
+  --secondary: #000000;
+  --muted: #333333;
+
+  --accent: #0000ee;
+  --accent-dim: #0000aa;
+  --accent-soft: rgba(0, 0, 238, 0.2);
+  --accent-muted: #0000ee;
+  --accent-2: #990000;
+  --accent-2-dim: #770000;
+  --selection: rgba(0, 0, 238, 0.25);
+
+  --border: #000000;
+  --border-soft: rgba(0, 0, 0, 0.7);
+  --border-subtle: rgba(0, 0, 0, 0.4);
+  --border-hover: #0000ee;
+  --line: rgba(0, 0, 0, 0.7);
+  --hover: rgba(0, 0, 0, 0.12);
+
+  --ok: #006600;
+  --warn: #885500;
+  --err: #cc0000;
+}
