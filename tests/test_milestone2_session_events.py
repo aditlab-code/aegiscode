@@ -96,3 +96,33 @@ def test_ai04_gateway_consult_rejects_empty_message_when_no_images():
             message="   ",
             images=None,
         )
+
+
+def test_terminal_event_deduplication_in_memory_store():
+    """InMemorySessionStore menolak penambahan terminal event duplikat untuk task_id yang sama."""
+    from agent_ai.session.store import InMemorySessionStore
+    from agent_ai.session.events import make_event, EventType
+
+    store = InMemorySessionStore()
+    evt1 = make_event(
+        event_type=EventType.TASK_COMPLETED,
+        session_id="s1",
+        task_id="task-123",
+        payload={"result": "OK"},
+    )
+    stored1 = store.append_event(evt1)
+    assert stored1.sequence == 1
+    assert len(store.get_events()) == 1
+
+    # Coba append event terminal kedua untuk task_id yang sama
+    evt2 = make_event(
+        event_type=EventType.TASK_FAILED,
+        session_id="s1",
+        task_id="task-123",
+        payload={"error": "Something failed"},
+    )
+    stored2 = store.append_event(evt2)
+    # Harus mengembalikan event terminal pertama dan tidak menambah sequence atau list
+    assert stored2.sequence == 1
+    assert stored2.event_type == EventType.TASK_COMPLETED
+    assert len(store.get_events()) == 1

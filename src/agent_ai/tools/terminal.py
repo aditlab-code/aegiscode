@@ -310,6 +310,35 @@ def _wait_bounded(process: "subprocess.Popen[Any]", seconds: float) -> None:
         pass
 
 
+def _find_posix_descendants(parent_pid: int) -> List[int]:
+    """Menemukan secara rekursif seluruh PID anak dan descendant untuk proses tertentu."""
+    descendants: List[int] = []
+    try:
+        out = subprocess.check_output(
+            ["pgrep", "-P", str(parent_pid)],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=0.5,
+        )
+        direct = [int(p.strip()) for p in out.strip().split() if p.strip().isdigit()]
+    except Exception:
+        try:
+            out = subprocess.check_output(
+                ["ps", "-o", "pid=", "--ppid", str(parent_pid)],
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=0.5,
+            )
+            direct = [int(p.strip()) for p in out.strip().split() if p.strip().isdigit()]
+        except Exception:
+            direct = []
+
+    for child in direct:
+        descendants.append(child)
+        descendants.extend(_find_posix_descendants(child))
+    return descendants
+
+
 def _kill_process_tree(process: "subprocess.Popen[Any]") -> None:
     """Hentikan proses beserta SELURUH descendant-nya (best-effort, bounded).
 
@@ -317,8 +346,8 @@ def _kill_process_tree(process: "subprocess.Popen[Any]") -> None:
     sehingga grandchild yang mewarisi pipe stdout/stderr ikut mati dan pipe
     segera tertutup. Ini menghilangkan penyebab hang permanen saat menunggu EOF.
 
-    POSIX: proses dijalankan pada session/process-group sendiri
-    (`start_new_session=True`) sehingga `os.killpg` membunuh seluruh grup.
+    POSIX: penghentian bertingkat (SIGTERM -> grace wait -> SIGKILL bertarget)
+    pada seluruh process group dan descendant PIDs untuk mencegah zombie processes.
 
     Selalu aman dipanggil: kegagalan terminasi tidak pernah melempar exception
     (fallback membunuh proses langsung).
@@ -341,8 +370,45 @@ def _kill_process_tree(process: "subprocess.Popen[Any]") -> None:
             pass
     else:
         try:
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-            return
+            pid = process.pid
+            child_pids = _find_posix_descendants(pid)
+            all_pids = {pid} | set(child_pids)
+            pgids = set()
+            for p in all_pids:
+                try:
+                    pgids.add(os.getpgid(p))
+                except (ProcessLookupError, OSError):
+                    pass
+
+            # Tahap 1 (Gentle): Kirim SIGTERM ke seluruh process group dan PID individu
+            for pgid in pgids:
+                try:
+                    os.killpg(pgid, signal.SIGTERM)
+                except (ProcessLookupError, OSError):
+                    pass
+            for p in all_pids:
+                try:
+                    os.kill(p, signal.SIGTERM)
+                except (ProcessLookupError, OSError):
+                    pass
+
+            # Tahap 2 (Grace Wait): Tunggu proses selesai dengan timeout 0.25s
+            try:
+                process.wait(timeout=0.25)
+                return
+            except subprocess.TimeoutExpired:
+                # Tahap 3 (Targeted Force Kill): Kirim SIGKILL ke seluruh process group dan turunan
+                for pgid in pgids:
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                for p in all_pids:
+                    try:
+                        os.kill(p, signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                return
         except Exception:  # noqa: BLE001 - fallback ke kill proses langsung
             pass
 
@@ -351,7 +417,6 @@ def _kill_process_tree(process: "subprocess.Popen[Any]") -> None:
         process.kill()
     except Exception:  # noqa: BLE001
         pass
-
 
 def _run_process(
     target: Any,

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -44,6 +45,7 @@ from agent_ai.runtime.lifecycle import (
     TaskLifecycleManager,
     TaskLifecycleState,
 )
+from tests.conftest import wait_for_condition
 from agent_ai.runtime.runtime import AgentRuntime, RuntimeProgress, RuntimeResult, RuntimeStatus
 from agent_ai.session.events import EventType, ExecutionEvent
 from agent_ai.session.store import InMemorySessionStore
@@ -146,7 +148,6 @@ def test_concurrent_scheduler_dispatch_executes_only_once() -> None:
         nonlocal execution_count
         with lock:
             execution_count += 1
-        time.sleep(0.02)
 
     service._run_task_inner = fake_run_task_inner  # type: ignore
 
@@ -162,9 +163,16 @@ def test_concurrent_scheduler_dispatch_executes_only_once() -> None:
         for f in futures:
             f.result()
 
-    # Beri waktu background thread selesai
-    time.sleep(0.1)
-
+    # Menunggu task dieksekusi dan mencapai status terminal secara deterministik
+    wait_for_condition(lambda: execution_count >= 1, timeout=3.0, interval=0.02)
+    wait_for_condition(
+        lambda: (
+            service.get_task(task_id).get("queue_state") == "done"
+            or service.get_task(task_id).get("status") in ("completed", "failed", "cancelled")
+        ),
+        timeout=3.0,
+        interval=0.02,
+    )
     assert execution_count == 1
     rec = service.get_task(task_id)
     # Setelah eksekusi slot dilepas dan queue_state menjadi done
@@ -466,3 +474,44 @@ def test_emergency_safety_ceiling_aborts_as_failed() -> None:
 
     abort_events = [p for et, p in events if et == "loop_safety_abort"]
     assert len(abort_events) == 1
+
+
+def test_execute_task_unexpected_crash_transitions_to_terminal_failed() -> None:
+    """Jika _run_task_inner crash atau melempar unhandled exception, task record
+    wajib ditransisikan ke status failed dan queue_state menjadi done tanpa menggantung.
+    """
+    service = GatewayService()
+    service.auto_execute = False
+
+    res = service.create_task("Tugas simulasi crash worker")
+    task_id = res["task_id"]
+
+    def crashing_run_task_inner(tid: str, token: CancellationToken) -> None:
+        raise RuntimeError("Fatal worker thread crash")
+
+    service._run_task_inner = crashing_run_task_inner  # type: ignore
+
+    token = CancellationToken()
+    with pytest.raises(RuntimeError, match="Fatal worker thread crash"):
+        service._execute_task(task_id, token)
+
+    rec = service.get_task(task_id)
+    assert rec["status"] == "failed"
+    assert rec["queue_state"] == "done"
+    assert "Task terminated unexpectedly" in rec.get("error", "")
+
+
+def test_kill_process_tree_tiered_sigterm_and_cleanup() -> None:
+    """_kill_process_tree menghentikan proses anak dan descendant tanpa exception."""
+    from agent_ai.tools.terminal import _kill_process_tree
+
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(10)"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    assert proc.poll() is None
+    _kill_process_tree(proc)
+    proc.wait(timeout=1.0)
+    assert proc.poll() is not None

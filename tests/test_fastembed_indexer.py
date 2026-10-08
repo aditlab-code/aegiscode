@@ -88,10 +88,10 @@ def test_semantic_indexer_incremental_lifecycle(mock_workspace):
 
     # 4. Modifikasi satu berkas (billing.py)
     billing_file = mock_workspace / "billing.py"
-    time.sleep(0.05)  # pastikan mtime bertambah
     content = billing_file.read_text(encoding="utf-8")
     billing_file.write_text(content + "\n# Modified comment line\n", encoding="utf-8")
-
+    new_time = billing_file.stat().st_mtime + 2.0
+    os.utime(str(billing_file), (new_time, new_time))
     assert indexer.is_stale() is True
 
     stats3 = indexer.run()

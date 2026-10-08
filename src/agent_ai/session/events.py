@@ -114,18 +114,21 @@ def make_event(
     status: Optional[str] = None,
     sequence: int = 0,
 ) -> ExecutionEvent:
-    """Bangun ExecutionEvent baru (event_id dibuat otomatis)."""
+    """Bangun ExecutionEvent baru (event_id dibuat otomatis dan payload disanitasi)."""
+    from agent_ai.core.observability import sanitize_event_payload
+
+    type_str = getattr(event_type, "value", str(event_type))
+    clean_payload = sanitize_event_payload(type_str, payload or {})
     return ExecutionEvent(
         event_id=new_event_id(),
         session_id=session_id,
         task_id=task_id,
         event_type=event_type,
         timestamp=timestamp if timestamp is not None else time.time(),
-        payload=dict(payload or {}),
+        payload=dict(clean_payload),
         sequence=sequence,
         status=status,
     )
-
 
 #: Peta status TaskLifecycle -> EventType (untuk bridge opsional).
 _STATUS_TO_EVENT: Dict[str, EventType] = {
