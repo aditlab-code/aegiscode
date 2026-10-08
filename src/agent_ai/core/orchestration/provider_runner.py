@@ -25,8 +25,15 @@ from agent_ai.core.provider_contract import sanitize_provider_response
 from agent_ai.reliability.models import DecisionAction, ReliabilityDecision
 from agent_ai.core.response import LLMResponse
 from agent_ai.projects.models import _now_iso
-from agent_ai.providers.base import GenerateOptions, Message, ProviderError, ToolDefinition
-
+from agent_ai.providers.base import (
+    GenerateOptions,
+    Message,
+    ProviderError,
+    ProviderErrorCategory,
+    ProviderEvent,
+    ProviderRequest,
+    ToolDefinition,
+)
 if TYPE_CHECKING:  # pragma: no cover
     from agent_ai.core.orchestrator import AgentOrchestrator
 
@@ -53,7 +60,7 @@ def redact_credentials(text: Any) -> str:
 
 def extract_partial_response(error: BaseException) -> Optional[str]:
     """Ambil partial response terakhir yang sudah diterima sebelum error."""
-    for attr in ("response_body", "partial_response", "partial", "body"):
+    for attr in ("raw_reference", "response_body", "partial_response", "partial", "body"):
         value = getattr(error, attr, None)
         if isinstance(value, str) and value.strip():
             return redact_credentials(value)
@@ -73,8 +80,18 @@ def is_permanent_error(exc: BaseException) -> bool:
     Error otentikasi, validasi schema, BadRequest 4xx (non-429), dan kegagalan
     serialisasi JSON tidak akan berhasil bila di-retry tanpa perubahan payload.
     """
-    if isinstance(exc, ProviderError) and not getattr(exc, "retryable", False):
-        return True
+    if isinstance(exc, ProviderError):
+        if not getattr(exc, "retryable", False):
+            return True
+        kategori = getattr(exc, "kategori", "")
+        if kategori in (
+            ProviderErrorCategory.AUTHENTICATION.value,
+            ProviderErrorCategory.NOT_FOUND.value,
+            ProviderErrorCategory.INVALID_REQUEST.value,
+            ProviderErrorCategory.CONFIGURATION.value,
+            ProviderErrorCategory.RESPONSE_MALFORMED.value,
+        ):
+            return True
     if isinstance(exc, (TypeError, ValueError)) and "serializ" in str(exc).lower():
         return True
     if any(
@@ -273,6 +290,34 @@ class ProviderRunner:
             default_model=self._model_name(),
         )
 
+    @staticmethod
+    def _invoke_provider_generate(
+        provider: Any,
+        messages: Any,
+        options: Any,
+        tools: Any,
+        tool_choice: Any,
+        request: ProviderRequest,
+    ) -> Any:
+        """Panggil provider.generate dengan fallback aman untuk mock/subclass lama."""
+        try:
+            return provider.generate(
+                messages=messages,
+                options=options,
+                tools=tools,
+                tool_choice=tool_choice,
+                request=request,
+            )
+        except TypeError as te:
+            if "request" in str(te) and ("unexpected" in str(te) or "keyword" in str(te)):
+                return provider.generate(
+                    messages=messages,
+                    options=options,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                )
+            raise
+
     def call_provider(
         self,
         *,
@@ -357,21 +402,37 @@ class ProviderRunner:
             else self.response_log
         )
 
+        provider_req = ProviderRequest(
+            model=call_options.model or getattr(provider, "model", "") or getattr(provider, "name", ""),
+            messages=messages,
+            tools=tools or None,
+            generation_options=call_options,
+            runtime_context={
+                "round_index": round_index,
+                "attempt": attempt,
+                "tool_choice": tool_choice.to_dict() if tool_choice else None,
+            },
+        )
+
         if response_log is None:
-            gen_result = provider.generate(
+            gen_result = self._invoke_provider_generate(
+                provider=provider,
                 messages=messages,
                 options=call_options,
                 tools=tools or None,
                 tool_choice=tool_choice,
+                request=provider_req,
             )
             return sanitize_provider_response(provider, gen_result)
 
         try:
-            gen_result = provider.generate(
+            gen_result = self._invoke_provider_generate(
+                provider=provider,
                 messages=messages,
                 options=call_options,
                 tools=tools or None,
                 tool_choice=tool_choice,
+                request=provider_req,
             )
             response: LLMResponse = sanitize_provider_response(provider, gen_result)
         except Exception as exc:  # noqa: BLE001

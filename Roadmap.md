@@ -120,11 +120,10 @@ Definition of done: Seluruh kebutuhan pencarian kode struktural ditangani determ
 
 ## 7. Fase 3: Normalisasi Boundary Provider
 
-- [ ] Skema kanonik `ProviderRequest` (model, messages, tools, generation_options, runtime_context), `ProviderEvent` (text, reasoning, tool_call, usage, error, done), `ProviderError` (kategori, retryable, provider, raw_reference).
+- [x] Skema kanonik `ProviderRequest` (model, messages, tools, generation_options, runtime_context), `ProviderEvent` (text, reasoning, tool_call, usage, error, done), `ProviderError` (kategori, retryable, provider, raw_reference).
 - [x] Wire JSON hanya di adapter; kanonisasi dialek tool terpusat di orkestrator (`normalize_canonical_tool_name`), adapter provider mendelegasikan ke orkestrator, payload `tool_called` memuat `canonical_tool`, dan frontend bersih dari hardcode mapping.
 - [x] Uji encoding/decoding nama tool, streaming text dan reasoning, respons kosong dan malformed.
 - [x] Retry hanya untuk error retryable; idle activity timeout & max execution cap pada streaming/reasoning (Antigravity Provider) mencegah task stuck `running`.
-- [ ] Fallback provider tidak menggandakan tool call; capability provider tercatat eksplisit.
 
 ## 8. Fase 4: Reliability Gate & Strict QA
 

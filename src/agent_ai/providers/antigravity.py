@@ -40,6 +40,7 @@ from agent_ai.providers.base import (
     Message,
     ProviderAPIError,
     ProviderNotConfiguredError,
+    ProviderRequest,
     ProviderUnavailableError,
     ToolChoice,
     ToolDefinition,
@@ -694,8 +695,16 @@ class AntigravityProvider(BaseProvider):
         options: Optional[GenerateOptions] = None,
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
     ) -> GenerateResult:
         """Kirim request ke Antigravity via agy CLI bridge atau HTTP API."""
+        if request is not None or (prompt or messages):
+            resolved = self._resolve_request(prompt, messages, options, tools, tool_choice, request)
+            messages = resolved.messages
+            options = resolved.generation_options or options
+            tools = resolved.tools if resolved.tools is not None else tools
+            prompt = None
+
         if not prompt and not messages:
             raise ValueError("Minimal salah satu dari 'prompt' atau 'messages' harus diisi.")
 

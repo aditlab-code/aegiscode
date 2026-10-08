@@ -21,6 +21,7 @@ from agent_ai.providers.base import (
     Message,
     ProviderAPIError,
     ProviderNotConfiguredError,
+    ProviderRequest,
     ProviderResponseError,
     ToolChoice,
     ToolDefinition,
@@ -411,10 +412,18 @@ class OpenAICompatibleProvider(BaseProvider):
         options: Optional[GenerateOptions] = None,
         tools: Optional[List[ToolDefinition]] = None,
         tool_choice: Optional[ToolChoice] = None,
+        request: Optional[ProviderRequest] = None,
     ) -> GenerateResult:
         """Hasilkan teks via endpoint /chat/completions."""
         self._require_config()
-        payload = self._build_payload(prompt, messages, options, tools, tool_choice)
+        resolved = self._resolve_request(prompt, messages, options, tools, tool_choice, request)
+        payload = self._build_payload(
+            prompt=None,
+            messages=resolved.messages,
+            options=resolved.generation_options,
+            tools=resolved.tools,
+            tool_choice=tool_choice,
+        )
         url = f"{self.config.base_url.rstrip('/')}/chat/completions"
         headers = self._build_headers()
 
