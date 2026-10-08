@@ -920,9 +920,16 @@ export function openEventStream({
 // onChunk(eventType, data) called per SSE event.
 // signal: optional AbortSignal (pass AbortController.signal for Ctrl+C support).
 export async function streamTerminalCommand(projectId, command, onChunk, signal = null) {
+  const authToken =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("aegis_auth_token")
+      : null;
   const fetchOpts = {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
     body: JSON.stringify({ project_id: projectId || "", command }),
   };
   if (signal) fetchOpts.signal = signal;

@@ -21,6 +21,7 @@ from pathlib import Path
 import secrets
 import time
 from typing import Any, Callable, Dict, Optional
+from urllib.parse import parse_qs, urlparse
 
 from django.conf import settings
 from django.http import HttpRequest, JsonResponse
@@ -246,6 +247,131 @@ def is_loopback_address(ip: Optional[str]) -> bool:
     return ip_clean in ("127.0.0.1", "::1", "localhost", "testserver", "testclient")
 
 
+def is_safe_origin(origin: Optional[str]) -> bool:
+    """Evaluasi apakah Origin atau Referer aman dan diizinkan mengakses Aegis gateway.
+
+    Memblokir serangan cross-origin CSRF/drive-by dari web eksternal (evil.com)
+    dan sandbox iframe exploit (Origin 'null'). Mengizinkan loopback, localhost,
+    ALLOWED_HOSTS, dan skema desktop tauri.
+    """
+    if not origin:
+        return True
+
+    origin_clean = origin.strip()
+    if not origin_clean:
+        return True
+
+    if origin_clean.lower() == "null":
+        return False
+
+    parsed = urlparse(origin_clean)
+    if parsed.scheme.lower() == "tauri":
+        return True
+
+    origin_host = (parsed.hostname or "").lower()
+    if not origin_host:
+        return False
+
+    allowed_hosts = [h.lower() for h in getattr(settings, "ALLOWED_HOSTS", [])]
+    if "*" in allowed_hosts:
+        return True
+
+    if origin_host in allowed_hosts:
+        return True
+
+    if is_loopback_address(origin_host):
+        return True
+
+    if origin_host == "tauri.localhost":
+        return True
+
+    return False
+
+
+def validate_cross_origin_boundary(request: HttpRequest) -> tuple[bool, str]:
+    """Validasi batas asal dan fetch metadata anti-CSRF pada request HTTP mutatif.
+
+    Memeriksa Sec-Fetch-Site, Origin, dan fallback Referer pada metode mutatif
+    (POST, PUT, PATCH, DELETE). Request yang lolos ditandai pada
+    request._origin_boundary_verified = True.
+    """
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return True, ""
+
+    # 1. Pemeriksaan Sec-Fetch-Site (Fetch Metadata)
+    sec_fetch_site = (
+        request.headers.get("Sec-Fetch-Site")
+        or request.META.get("HTTP_SEC_FETCH_SITE", "")
+    ).strip().lower()
+    if sec_fetch_site == "cross-site":
+        return False, "Cross-site request rejected by Sec-Fetch-Site policy."
+
+    # 2. Pemeriksaan Origin
+    origin = (
+        request.headers.get("Origin")
+        or request.META.get("HTTP_ORIGIN", "")
+    ).strip()
+    if origin:
+        if not is_safe_origin(origin):
+            return False, f"Cross-origin request rejected: Origin '{origin}' is not allowed."
+
+    # 3. Fallback Pemeriksaan Referer jika Origin kosong
+    else:
+        referer = (
+            request.headers.get("Referer")
+            or request.META.get("HTTP_REFERER", "")
+        ).strip()
+        if referer:
+            if not is_safe_origin(referer):
+                return False, f"Cross-origin request rejected: Referer '{referer}' is not allowed."
+
+    request._origin_boundary_verified = True
+    return True, ""
+
+
+def require_origin_boundary(view_func: Callable) -> Callable:
+    """Decorator to enforce cross-origin boundary and anti-CSRF policy on mutating views."""
+
+    @functools.wraps(view_func)
+    def _wrapped(request: HttpRequest, *args: Any, **kwargs: Any) -> Any:
+        if not getattr(request, "_origin_boundary_verified", False):
+            is_valid, reason = validate_cross_origin_boundary(request)
+            if not is_valid:
+                return JsonResponse(
+                    {
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": reason,
+                        }
+                    },
+                    status=403,
+                )
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
+class CrossOriginAntiCsrfMiddleware:
+    """Middleware enforcing cross-origin boundary and anti-CSRF check on /api/ mutations."""
+
+    def __init__(self, get_response: Callable[[HttpRequest], Any]) -> None:
+        self.get_response = get_response
+
+    def __call__(self, request: HttpRequest) -> Any:
+        if request.path.startswith("/api/") and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            is_valid, reason = validate_cross_origin_boundary(request)
+            if not is_valid:
+                return JsonResponse(
+                    {
+                        "error": {
+                            "code": "FORBIDDEN",
+                            "message": reason,
+                        }
+                    },
+                    status=403,
+                )
+        return self.get_response(request)
+
 def is_auth_required_for_request(request: HttpRequest) -> bool:
     """Evaluasi apakah request ini wajib diautentikasi.
 
@@ -266,20 +392,8 @@ def verify_websocket_auth(scope: Dict[str, Any]) -> tuple[bool, str, Optional[Di
     origin = origin_bytes.decode("utf-8") if origin_bytes else ""
 
     # 1. Validasi Origin bila header origin dikirim browser
-    if origin:
-        from urllib.parse import urlparse
-
-        parsed_origin = urlparse(origin)
-        origin_host = parsed_origin.hostname or ""
-        allowed_hosts = list(getattr(settings, "ALLOWED_HOSTS", []))
-        is_origin_allowed = (
-            origin_host in allowed_hosts
-            or is_loopback_address(origin_host)
-            or "*" in allowed_hosts
-        )
-        if not is_origin_allowed:
-            return False, f"Origin '{origin}' tidak diizinkan.", None
-
+    if origin and not is_safe_origin(origin):
+        return False, f"Origin '{origin}' tidak diizinkan.", None
     # 2. Periksa IP client
     client_info = scope.get("client")
     client_ip = client_info[0] if (client_info and len(client_info) > 0) else ""
@@ -289,7 +403,6 @@ def verify_websocket_auth(scope: Dict[str, Any]) -> tuple[bool, str, Optional[Di
     token = ""
     query_string = scope.get("query_string", b"").decode("utf-8")
     if query_string:
-        from urllib.parse import parse_qs
 
         qs_dict = parse_qs(query_string)
         token_list = qs_dict.get("token")

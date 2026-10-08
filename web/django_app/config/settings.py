@@ -129,6 +129,7 @@ CHANNEL_LAYERS = {
 MIDDLEWARE = [
     *(["django.middleware.security.SecurityMiddleware"] if IS_PRODUCTION else []),
     "django.middleware.common.CommonMiddleware",
+    "api.auth.CrossOriginAntiCsrfMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

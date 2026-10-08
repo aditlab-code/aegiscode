@@ -135,12 +135,12 @@ Stop-gate sebelum Fase 5:
 3. Gate 3: tanpa uji flaky (ganti `time.sleep()` dengan polling berbatas waktu), diverifikasi independen oleh `thor-tester`, dicatat di `docs/QA/logs/`.
 
 Syarat tambahan:
-- [ ] Semua test P0 lulus dua kali berturut-turut.
-- [ ] Zero proses zombie (SIGTERM lalu SIGKILL bertarget) dan zero task stuck `running`.
-- [ ] Tidak ada duplicate terminal event; queue, history, reasoning konsisten setelah reload.
-- [ ] Hygiene frontend: refCount `monacoModelRegistry`, buffer event maksimum 500 dengan deduplikasi.
-- [ ] Tidak ada kredensial pada log atau payload event; workspace luar proyek tidak berubah tanpa approval.
-- [ ] Dokumentasi instalasi berhasil diikuti dari mesin bersih.
+- [x] Semua test P0 lulus dua kali berturut-turut.
+- [x] Zero proses zombie (SIGTERM lalu SIGKILL bertarget) dan zero task stuck `running`.
+- [x] Tidak ada duplicate terminal event; queue, history, reasoning konsisten setelah reload.
+- [x] Hygiene frontend: refCount `monacoModelRegistry`, buffer event maksimum 500 dengan deduplikasi.
+- [x] Tidak ada kredensial pada log atau payload event; workspace luar proyek tidak berubah tanpa approval.
+- [x] Dokumentasi instalasi berhasil diikuti dari mesin bersih.
 
 ### 8.2 Hardening Keamanan Browser Runner & Isolasi Zero-Trust (Track PR-SEC)
 
@@ -150,7 +150,7 @@ Fase ini memitigasi risiko keamanan arsitektural pada antarmuka peramban lokal (
 |---|---|---|:---:|
 | PR-SEC-1 | **Eliminasi Loopback Bypass & Ephemeral Secret Handshake**: Hapus bypass tanpa token untuk `127.0.0.1` pada `api/auth.py` (`is_auth_required_for_request`). Generate ephemeral handshake secret di `.aegis/run/gateway.token` (permissions `0600`) saat startup Django Gateway; inject otomatis ke bootstrap Vite/Vue. | Semua request HTTP/WebSocket wajib token valid meski dari `127.0.0.1`; bypass tanpa token ditolak (401/4001) | [x] Selesai |
 | PR-SEC-2 | **Eliminasi Google Auth & Implementasi Sovereign Local Password Auth**: Hapus dependensi Google OAuth dari backend dan frontend; implementasi autentikasi lokal berbasis kata sandi (PBKDF2-HMAC-SHA256 pada `.aegis/auth.json`, minimal 6 karakter), modal input sandi `LoginOverlay.vue`, dan API endpoint status/login/setup sandi (`/api/auth/login`, `/api/auth/setup`). | Setup sandi menulis `.aegis/auth.json` (0600); login benar menerbitkan JWT sesi; salah ditolak 401; sandi < 6 karakter ditolak 400; zero residu Google OAuth | [x] Selesai |
-| PR-SEC-2b | **Cross-Origin Boundary & Anti-CSRF Rest Endpoints**: Validasi ketat header `Origin` dan `Sec-Fetch-Site` untuk seluruh endpoint mutatif (`POST /api/terminal/run`, `POST /api/tasks`, `POST /api/projects`, `POST /api/sessions`). Cabut `@csrf_exempt` blanket pada endpoint eksekusi terminal dan manajemen tugas. | Request lintas-asal dari situs eksternal (`evil.com`) ditolak 403 Forbidden; zero cross-origin command execution | [ ] Direncanakan |
+| PR-SEC-2b | **Cross-Origin Boundary & Anti-CSRF Rest Endpoints**: Validasi ketat header `Origin` dan `Sec-Fetch-Site` untuk seluruh endpoint mutatif (`POST /api/terminal/run`, `POST /api/tasks`, `POST /api/projects`, `POST /api/sessions`). Cabut `@csrf_exempt` blanket pada endpoint eksekusi terminal dan manajemen tugas. | Request lintas-asal dari situs eksternal (`evil.com`) ditolak 403 Forbidden; zero cross-origin command execution | [x] Selesai |
 | PR-SEC-3 | **Workspace Execution Sandboxing & Path Traversal Guard**: Kunci working directory dan path resolusi di `views.py:terminal_run` dan `tools/terminal.py` agar terkunci strictly di dalam project root workspace aktif. Tolak traversal (`../`) dan eksekusi di root OS tanpa persetujuan eksplisit HITL. | Subprocess execution terkunci di workspace boundary; percobaan traversal melempar ValidationError | [ ] Direncanakan |
 | PR-SEC-4 | **Content-Security-Policy (CSP) & Perlindungan XSS Token**: Konfigurasi header CSP ketat pada `SecurityMiddleware` untuk mencegah injeksi skrip peramban yang dapat mengakses token di `localStorage`. Audit sanitasi rendering Monaco dan Markdown parser. | Audit XSS lulus; header CSP aktif tanpa inline-eval tak tepercaya; token terproteksi dari kebocoran skrip | [ ] Direncanakan |
 

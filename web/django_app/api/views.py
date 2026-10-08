@@ -18,7 +18,7 @@ from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from api.auth import require_auth
+from api.auth import require_auth, require_origin_boundary
 from api.services import GatewayError, GatewayService, get_service
 from api.streaming import EventSubscription, sse_stream
 
@@ -294,7 +294,7 @@ def llm_model_detail(
     return _json_response(record)
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["GET", "POST"])
 @_handle
 def projects(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -907,7 +907,7 @@ def active_project(request: HttpRequest, service: GatewayService) -> JsonRespons
     return _json_response({"active_project": service.set_active_project(project_id)})
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["GET", "POST"])
 @require_auth
 @_handle
@@ -965,7 +965,8 @@ def task_approvals(request: HttpRequest, service: GatewayService) -> JsonRespons
     return _json_response({"approvals": service.list_approvals(task_id=task_id)})
 
 
-@csrf_exempt
+@require_origin_boundary
+@require_auth
 @require_http_methods(["POST"])
 @_handle
 def task_approval_resolve(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -989,7 +990,8 @@ def get_task(request: HttpRequest, service: GatewayService, task_id: str) -> Jso
     return _json_response(service.get_task(task_id))
 
 
-@csrf_exempt
+@require_origin_boundary
+@require_auth
 @require_http_methods(["POST"])
 @_handle
 def cancel_task(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
@@ -1018,7 +1020,7 @@ def task_queue(request: HttpRequest, service: GatewayService) -> JsonResponse:
     return _json_response({"tasks": service.list_queue(project_id=project_id)})
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_queue_disable(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
@@ -1030,7 +1032,7 @@ def task_queue_disable(request: HttpRequest, service: GatewayService, task_id: s
     return _json_response(service.set_queue_state(task_id, "disabled"))
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_queue_enable(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
@@ -1038,7 +1040,7 @@ def task_queue_enable(request: HttpRequest, service: GatewayService, task_id: st
     return _json_response(service.set_queue_state(task_id, "pending"))
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_queue_move(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
@@ -1051,7 +1053,7 @@ def task_queue_move(request: HttpRequest, service: GatewayService, task_id: str)
     return _json_response({"tasks": service.move_task(task_id, direction)})
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_queue_remove(request: HttpRequest, service: GatewayService, task_id: str) -> JsonResponse:
@@ -1062,7 +1064,7 @@ def task_queue_remove(request: HttpRequest, service: GatewayService, task_id: st
     return _json_response(service.remove_task(task_id))
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_queue_clear(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -1090,7 +1092,7 @@ def task_history(request: HttpRequest, service: GatewayService) -> JsonResponse:
     return _json_response({"tasks": service.list_task_history(project_id=project_id)})
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @_handle
 def task_history_clear(request: HttpRequest, service: GatewayService) -> JsonResponse:
@@ -1524,7 +1526,7 @@ def consultant_session_detail(
 # ---------------------------------------------------------------------------
 # Unified Threaded Session API (Unified Threaded Session Architecture)
 # ---------------------------------------------------------------------------
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["GET", "POST"])
 @require_auth
 @_handle
@@ -1604,7 +1606,7 @@ def session_detail_view(
     return _json_response({"deleted": True, "session_id": session_id})
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @require_auth
 @_handle
@@ -1644,7 +1646,7 @@ def session_turns_view(
     return _json_response(res, status=201)
 
 
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @require_auth
 @_handle
@@ -1719,7 +1721,7 @@ def events(request: HttpRequest) -> StreamingHttpResponse:
 # ---------------------------------------------------------------------------
 # Terminal: POST /api/terminal/run — stream command output as SSE
 # ---------------------------------------------------------------------------
-@csrf_exempt
+@require_origin_boundary
 @require_http_methods(["POST"])
 @require_auth
 def terminal_run(request: HttpRequest) -> StreamingHttpResponse:
