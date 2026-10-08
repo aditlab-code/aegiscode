@@ -171,3 +171,96 @@ class ProjectStore:
         with self._lock, self._connect() as conn:
             conn.execute("DELETE FROM app_state WHERE key = 'active_project_id'")
             conn.commit()
+
+    # ------------------------------------------------------------------ #
+    # Operational mode state (ask vs agents)
+    # ------------------------------------------------------------------ #
+    def get_operational_mode(self, default: str = "ask") -> str:
+        """Ambil operational mode saat ini ('ask' atau 'agents')."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = 'operational_mode'"
+            ).fetchone()
+        return row["value"] if row and row["value"] else default
+
+    def set_operational_mode(self, mode: str) -> str:
+        """Simpan operational mode ('ask' atau 'agents').
+
+        Raises:
+            ValueError: jika mode bukan 'ask' atau 'agents'.
+        """
+        clean_mode = str(mode).strip().lower()
+        if clean_mode not in ("ask", "agents"):
+            raise ValueError(f"Operational mode tidak valid: '{mode}'. Harus 'ask' atau 'agents'.")
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('operational_mode', ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (clean_mode,),
+            )
+            conn.commit()
+        return clean_mode
+
+    # ------------------------------------------------------------------ #
+    # Active LLM provider state
+    # ------------------------------------------------------------------ #
+    def get_active_provider(self) -> Optional[str]:
+        """Ambil active provider id (None bila tidak ada)."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = 'active_provider_id'"
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_active_provider(self, provider_id: str) -> None:
+        """Simpan active provider id."""
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('active_provider_id', ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (provider_id,),
+            )
+            conn.commit()
+
+    # ------------------------------------------------------------------ #
+    # Active LLM model state
+    # ------------------------------------------------------------------ #
+    def get_active_model(self) -> Optional[str]:
+        """Ambil active model id/name (None bila tidak ada)."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = 'active_model_id'"
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_active_model(self, model_name: str) -> None:
+        """Simpan active model id/name."""
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('active_model_id', ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (model_name.strip(),),
+            )
+            conn.commit()
+
+    # ------------------------------------------------------------------ #
+    # Active Skill state
+    # ------------------------------------------------------------------ #
+    def get_active_skill(self) -> Optional[str]:
+        """Ambil active skill name (None bila tidak ada)."""
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = 'active_skill'"
+            ).fetchone()
+        return row["value"] if row else None
+
+    def set_active_skill(self, skill_name: str) -> None:
+        """Simpan active skill name."""
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('active_skill', ?)"
+                " ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (skill_name.strip(),),
+            )
+            conn.commit()
+

@@ -17,6 +17,7 @@ import ProjectPolicyPanel from "./components/workspace/ProjectPolicyPanel.vue";
 import AppCommandPalette from "./components/ui/AppCommandPalette.vue";
 import AppModal from "./components/ui/AppModal.vue";
 import AppButton from "./components/ui/AppButton.vue";
+import ApprovalModal from "./components/ui/ApprovalModal.vue";
 import LoginOverlay from "./components/workspace/LoginOverlay.vue";
 import { useAuth } from "./services/authService.js";
 import {
@@ -25,6 +26,8 @@ import {
   deleteTaskHistory,
   getConfig,
   getLLMProviders,
+  getOperationalMode,
+  listApprovals,
 } from "./api.js";
 import { createResponsiveState } from "./services/responsiveService.js";
 import { createThemeState } from "./services/themeService.js";
@@ -40,6 +43,7 @@ const themeState = createThemeState(), responsive = createResponsiveState();
 const activeNav = ref("explorer"), settingsOpen = ref(false), settingsTab = ref("providers");
 const commandPaletteOpen = ref(false), commandPaletteMode = ref("commands");
 const closeConfirmOpen = ref(false), stopConfirmOpen = ref(false), policyProject = ref(null);
+const approvalModalOpen = ref(false), pendingApproval = ref(null), operationalMode = ref("ask");
 const workbenchRef = ref(null);
 const notice = ref(""), error = ref(""), cursorPos = ref({ ln: 1, col: 1 }), activeLanguage = ref("Vue 3");
 const workspaceGen = ref(0);
@@ -142,7 +146,7 @@ const {
   startHealthCheck,
   closeConnection,
 } = useServerConnection({
-  onEvent: (evt) => handleEvent(evt),
+  onEvent: (evt) => handleRootEvent(evt),
 });
 
 // Composable 3: Task Lifecycle
@@ -206,6 +210,44 @@ const {
   settingsOpen,
   llmProviders,
 });
+
+function handleRootEvent(evt) {
+  if (!evt || !evt.event_type) return;
+  if (evt.event_type === "approval_requested") {
+    const payload = evt.data || evt.payload || evt;
+    pendingApproval.value = payload;
+    approvalModalOpen.value = true;
+  } else if (evt.event_type === "approval_resolved") {
+    const payload = evt.data || evt.payload || evt;
+    const resId = payload.request_id || payload.id;
+    if (!resId || resId === pendingApproval.value?.request_id) {
+      pendingApproval.value = null;
+      approvalModalOpen.value = false;
+    }
+  } else if (evt.event_type === "mode_updated") {
+    const payload = evt.data || evt.payload || evt;
+    const modeVal = payload.mode || payload;
+    if (typeof modeVal === "string" && ["ask", "agents"].includes(modeVal.toLowerCase())) {
+      operationalMode.value = modeVal.toLowerCase();
+    }
+  }
+  handleEvent(evt);
+}
+
+async function syncOperationalState() {
+  try {
+    const modeRes = await getOperationalMode();
+    if (modeRes?.mode) operationalMode.value = modeRes.mode;
+  } catch (_) {}
+  try {
+    const appRes = await listApprovals();
+    if (Array.isArray(appRes?.approvals) && appRes.approvals.length > 0) {
+      pendingApproval.value = appRes.approvals[0];
+      approvalModalOpen.value = true;
+    }
+  } catch (_) {}
+}
+
 const activeProvider = computed(() => llmProviders.value.find((p) => p.id === selectedProviderInstanceId.value) || null);
 const activeProviderLabel = computed(() => activeProvider.value?.name || config.value.provider || "");
 const activeModelLabel = computed(() => activeProvider.value?.models?.find((x) => x.id === selectedModelId.value)?.model_name || config.value.model || "");
@@ -296,7 +338,7 @@ function onKeyDown(e) {
   } else if (matchesShortcut(e, "Cmd+,") || matchesShortcut(e, "Ctrl+,")) {
     e.preventDefault(); workbenchRef.value?.openSettings?.("providers");
   } else if (e.key === "Escape") {
-    commandPaletteOpen.value = settingsOpen.value = closeConfirmOpen.value = stopConfirmOpen.value = false;
+    commandPaletteOpen.value = settingsOpen.value = closeConfirmOpen.value = stopConfirmOpen.value = approvalModalOpen.value = false;
     reportTaskId.value = ""; policyProject.value = null;
   }
 }
@@ -304,8 +346,9 @@ function onKeyDown(e) {
 onMounted(async () => {
   responsive.bindResizeListener();
   if (typeof window !== "undefined") window.addEventListener("keydown", onKeyDown);
-  connectStream((evt) => handleEvent(evt));
-  startHealthCheck(5000, (evt) => handleEvent(evt));
+  connectStream((evt) => handleRootEvent(evt));
+  startHealthCheck(5000, (evt) => handleRootEvent(evt));
+  await syncOperationalState();
   await loadActiveProject();
   await loadProjects();
   await refreshAllConfig();
@@ -401,8 +444,10 @@ onBeforeUnmount(() => {
       <AppStatusBar
         :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
         :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
+        :operational-mode="operationalMode"
         :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
         @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
+        @mode-changed="(m) => { operationalMode = m; }"
       />
     </div>
 
@@ -427,6 +472,12 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </AppModal>
+    <ApprovalModal
+      v-model="approvalModalOpen"
+      :approval="pendingApproval"
+      @close="approvalModalOpen = false"
+      @resolved="() => { pendingApproval = null; approvalModalOpen = false; }"
+    />
     <LoginOverlay
       v-if="!isAuthenticated && !authChecking"
       :has-password="authStatus?.has_password ?? authStatus?.has_pin ?? false"

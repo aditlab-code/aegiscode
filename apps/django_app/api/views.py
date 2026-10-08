@@ -907,6 +907,30 @@ def active_project(request: HttpRequest, service: GatewayService) -> JsonRespons
     return _json_response({"active_project": service.set_active_project(project_id)})
 
 
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+@_handle
+def mode_view(request: HttpRequest, service: GatewayService) -> JsonResponse:
+    """Operational mode endpoint (ask vs agents).
+
+    GET  -> {"status": "ok", "mode": "ask" | "agents"}
+    POST -> {"status": "ok", "mode": "ask" | "agents"}
+    """
+    if request.method == "GET":
+        return _json_response({"status": "ok", "mode": service.get_operational_mode()})
+
+    body = _parse_json_body(request)
+    mode = body.get("mode")
+    if not mode:
+        from api.services import ValidationError
+
+        raise ValidationError("Field 'mode' wajib diisi.")
+
+    updated = service.set_operational_mode(str(mode).strip().lower())
+    return _json_response({"status": "ok", "mode": updated})
+
+
+
 @require_origin_boundary
 @require_http_methods(["GET", "POST"])
 @require_auth

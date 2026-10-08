@@ -27,6 +27,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from agent_ai.core.cancel import CancellationToken
@@ -557,6 +558,154 @@ class GatewayService:
                 "task": task_rec,
             }
 
+    def get_or_create_active_unified_session(
+        self, project_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Ambil sesi terpadu aktif terbaru, atau buat sesi baru bila belum ada."""
+        pid = project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception:
+                pid = None
+        sessions = self.list_unified_sessions(project_id=pid)
+        if sessions:
+            return sessions[0]
+        return self.create_unified_session(project_id=pid, title="Unified Session")
+
+    def _get_skill_directive(self, skill_name: str) -> Optional[str]:
+        """Menghasilkan instruksi direktif untuk steering respons LLM berdasarkan skill aktif."""
+        clean_name = (skill_name or "").strip().lower()
+        directives = {
+            "interview-me": (
+                "[ACTIVE SKILL: interview-me]\n"
+                "You are operating under the 'interview-me' skill.\n"
+                "Instructions:\n"
+                "1. Ask exactly ONE clarifying question at a time to drill down into the user's intent.\n"
+                "2. Provide your best guess/recommendation alongside the question.\n"
+                "3. Format your response cleanly:\n"
+                "   Q: <Your clarifying question>\n"
+                "   GUESS: <Your educated hypothesis or recommended approach>\n"
+                "4. Do not start implementing or generating full code yet until intent is clear.\n"
+                "Reply in Indonesian or the language used by the user."
+            ),
+            "spec-driven-development": (
+                "[ACTIVE SKILL: spec-driven-development]\n"
+                "Focus on defining structured specifications, functional requirements, and acceptance criteria before implementation."
+            ),
+            "planning-and-task-breakdown": (
+                "[ACTIVE SKILL: planning-and-task-breakdown]\n"
+                "Break down the request into an ordered, testable, and step-by-step task breakdown."
+            ),
+            "incremental-implementation": (
+                "[ACTIVE SKILL: incremental-implementation]\n"
+                "Focus on small, vertical, verifiable increments. Implement one slice at a time."
+            ),
+            "test-driven-development": (
+                "[ACTIVE SKILL: test-driven-development]\n"
+                "Follow TDD rules: Red-Green-Refactor loop. Ensure tests are defined before writing code."
+            ),
+            "code-review-and-quality": (
+                "[ACTIVE SKILL: code-review-and-quality]\n"
+                "Conduct a 5-axis code review: Correctness, Readability, Architecture, Security, Performance."
+            ),
+            "code-simplification": (
+                "[ACTIVE SKILL: code-simplification]\n"
+                "Focus on simplifying code structure, eliminating dead code, and improving readability without altering behavior."
+            ),
+            "shipping-and-launch": (
+                "[ACTIVE SKILL: shipping-and-launch]\n"
+                "Focus on pre-launch readiness, deployment safety, rollback strategies, and operational checklists."
+            ),
+        }
+        return directives.get(clean_name)
+
+    def dispatch_remote_turn(
+        self,
+        content: str,
+        *,
+        session_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        project_id: Optional[str] = None,
+        skill_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Eksekusi satu giliran dari antarmuka remote (Telegram) dengan konteks aktif."""
+        pid = project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception:
+                pid = None
+
+        sid = session_id
+        if not sid:
+            active_sess = self.get_or_create_active_unified_session(project_id=pid)
+            sid = active_sess.get("session_id") or active_sess.get("id")
+
+        eff_mode = mode or self.get_operational_mode() or "ask"
+        active_provider = self.get_active_provider()
+        active_model = self.get_active_model()
+        active_skill = skill_name or self.get_active_skill()
+
+        effective_content = str(content)
+        if active_skill and not effective_content.startswith("[ACTIVE SKILL:"):
+            directive = self._get_skill_directive(active_skill)
+            if directive:
+                effective_content = f"{directive}\n\n[User Message]:\n{effective_content}"
+
+        return self.create_unified_turn(
+            session_id=str(sid),
+            content=effective_content,
+            mode=str(eff_mode),
+            provider_instance_id=active_provider,
+            model_id=active_model,
+            project_id=pid,
+        )
+
+    def delegate_session_to_agent_task(
+        self,
+        session_id: str,
+        *,
+        project_id: Optional[str] = None,
+        custom_task_prompt: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Delegasikan hasil sesi (misal wawancara interview-me) menjadi Task resmi di IDE mode agents."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError(f"Session '{session_id}' tidak ditemukan.")
+
+        pid = project_id or sess.project_id
+        turns = sess.turns or []
+
+        # Ekstrak intisari instruksi dari giliran sebelumnya
+        task_prompt = custom_task_prompt
+        if not task_prompt:
+            context_pieces = []
+            for t in reversed(turns):
+                if t.content and t.content.strip():
+                    context_pieces.insert(0, f"[{t.role.upper()}]: {t.content.strip()}")
+                if len(context_pieces) >= 4:
+                    break
+
+            if context_pieces:
+                task_prompt = (
+                    "Implementasikan kesepakatan dan hasil analisis berikut ke dalam codebase:\n\n"
+                    + "\n\n".join(context_pieces)
+                )
+            else:
+                task_prompt = "Eksekusi tugas berdasarkan hasil diskusi sesi sebelumnya."
+
+        return self.create_unified_turn(
+            session_id=session_id,
+            content=task_prompt,
+            mode="agent",
+            provider_instance_id=self.get_active_provider(),
+            model_id=self.get_active_model(),
+            project_id=pid,
+        )
+
     @property
     def github_backup_service(self) -> Any:
         """GithubBackupService (lazy) — fitur OPTIONAL per project.
@@ -893,7 +1042,7 @@ class GatewayService:
         return {"deleted": True, "id": model_id}
 
     # ---- Test Connection ----
-    def test_llm_provider(self, provider_id: str) -> Dict[str, Any]:
+    def test_llm_provider(self, provider_id: str, model_name: Optional[str] = None) -> Dict[str, Any]:
         """Test koneksi ke provider instance.
 
         Melakukan request HTTP ringan ke endpoint provider untuk memverifikasi
@@ -910,7 +1059,10 @@ class GatewayService:
             # Nilai api_key diperlukan untuk benar-benar memanggil endpoint;
             # `include_api_key` default True sehingga jalur ini identik dengan
             # yang dipakai Consultant & Agent Runtime (SATU resolver).
-            resolved = self.llm_config_service.resolve_runtime_config(provider_id)
+            target_model = model_name or self.get_active_model()
+            resolved = self.llm_config_service.resolve_runtime_config(
+                provider_id, model_name=target_model
+            )
             provider = build_provider_from_config(resolved)
         except Exception as exc:
             raise ValidationError(str(exc)) from exc
@@ -1234,6 +1386,340 @@ class GatewayService:
         """Close Project: hapus active project state (project tetap tersimpan)."""
         self.project_store.clear_active_project()
         return {"active_project": None}
+
+    # ------------------------------------------------------------------ #
+    # Operational mode & Provider Runtime State (M1 & M2)
+    # ------------------------------------------------------------------ #
+    def get_operational_mode(self) -> str:
+        """Ambil operational mode saat ini ('ask' atau 'agents')."""
+        return self.project_store.get_operational_mode()
+
+    def set_operational_mode(self, mode: str) -> str:
+        """Set operational mode ('ask' atau 'agents')."""
+        updated = self.project_store.set_operational_mode(mode)
+        try:
+            from agent_ai.session.events import EventType
+            event_type = getattr(EventType, "MODE_UPDATED", "mode_updated")
+            self._emit("global", event_type, payload={"mode": updated})
+        except Exception:
+            pass
+        return updated
+
+    def get_active_provider(self) -> Optional[str]:
+        """Ambil ID provider aktif dari store."""
+        return self.project_store.get_active_provider()
+
+    def set_active_provider(self, provider_id: str) -> None:
+        """Set provider aktif di store."""
+        self.project_store.set_active_provider(provider_id)
+
+    def get_active_repository_info(self) -> Dict[str, Any]:
+        """Ambil metadata dan status Git dari repositori aktif."""
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        active = self.get_active_project()
+        if active and active.get("path"):
+            root = Path(active["path"])
+            name = active.get("name") or root.name
+        else:
+            root = Path(__file__).resolve().parents[3]
+            name = root.name
+
+        facade = GitRepositoryFacade(root=root)
+        is_repo = facade.is_repository()
+        branch = "-"
+        last_commit = "-"
+        uncommitted_changes = 0
+        is_dirty = False
+
+        if is_repo:
+            branch = facade.current_branch() or "HEAD"
+            try:
+                commits = facade.log(limit=1)
+                if commits and len(commits) > 0:
+                    last_commit = f"{commits[0].short_hash} {commits[0].subject}"
+            except Exception:
+                pass
+
+            try:
+                status = facade.status()
+                if status:
+                    uncommitted_changes = len(status.files)
+                    is_dirty = not status.clean
+            except Exception:
+                pass
+
+        return {
+            "name": name,
+            "root": str(root),
+            "branch": branch,
+            "last_commit": last_commit,
+            "uncommitted_changes": uncommitted_changes,
+            "is_dirty": is_dirty,
+            "is_repo": is_repo,
+        }
+
+    def get_subagents_fleet(self) -> List[Dict[str, Any]]:
+        """Daftar subagen Olympus (6 personas) dan status lifecycle terkininya."""
+        from agent_ai.runtime.olympus_workflow import load_lifecycle_state
+
+        active = self.get_active_project()
+        root = Path(active["path"]) if active and active.get("path") else Path(__file__).resolve().parents[3]
+
+        try:
+            lifecycle = load_lifecycle_state(root)
+            active_persona = lifecycle.active_persona
+        except Exception:
+            active_persona = "zeus-orchestrator"
+
+        olympus_personas = [
+            {
+                "persona_id": "zeus-orchestrator",
+                "name": "Zeus Orchestrator",
+                "role": "Orchestrator & Ship Master",
+            },
+            {
+                "persona_id": "athena-planner",
+                "name": "Athena Planner",
+                "role": "Architect & Spec Planner",
+            },
+            {
+                "persona_id": "hephaestus-coder",
+                "name": "Hephaestus Coder",
+                "role": "Core Implementer & Builder",
+            },
+            {
+                "persona_id": "heracles-tester",
+                "name": "Heracles Tester",
+                "role": "Verification & QA Tester",
+            },
+            {
+                "persona_id": "hermes-scout",
+                "name": "Hermes Scout",
+                "role": "Explorer & Fast Scout",
+            },
+            {
+                "persona_id": "themis-reviewer",
+                "name": "Themis Reviewer",
+                "role": "Quality & Security Reviewer",
+            },
+        ]
+
+        fleet = []
+        for agent in olympus_personas:
+            p_id = agent["persona_id"]
+            is_active = (p_id == active_persona)
+            status = "Active" if is_active else "Standby"
+            fleet.append({
+                "persona_id": p_id,
+                "name": agent["name"],
+                "role": agent["role"],
+                "status": status,
+                "is_active": is_active,
+            })
+        return fleet
+
+    def get_providers_status(self) -> List[Dict[str, Any]]:
+        """Daftar provider LLM terkonfigurasi dengan status aktif."""
+        providers = []
+        try:
+            raw_providers = self.list_llm_providers()
+        except Exception:
+            raw_providers = []
+
+        active_id = self.get_active_provider()
+        if not active_id and raw_providers:
+            # Standar Antigravity: prioritaskan provider Antigravity
+            antigravity_p = next(
+                (p for p in raw_providers if p.get("provider_type") == "antigravity" or "antigravity" in str(p.get("name", "")).lower()),
+                None
+            )
+            if antigravity_p:
+                active_id = str(antigravity_p.get("instance_id") or antigravity_p.get("id") or "")
+            else:
+                first_p = raw_providers[0]
+                active_id = str(first_p.get("instance_id") or first_p.get("id") or "")
+
+        if not raw_providers:
+            # Fallback katalog default sistem Antigravity
+            return [
+                {
+                    "id": "c34bd3e5098e4cf08a716d0a8a44c714",
+                    "name": "Google Antigravity",
+                    "provider_type": "antigravity",
+                    "model": "gemini-3.1-pro-high",
+                    "is_active": True,
+                },
+                {
+                    "id": "openai-default",
+                    "name": "OpenAI",
+                    "provider_type": "openai",
+                    "model": "gpt-4o",
+                    "is_active": False,
+                },
+                {
+                    "id": "anthropic-default",
+                    "name": "Anthropic",
+                    "provider_type": "anthropic",
+                    "model": "claude-3-5-sonnet",
+                    "is_active": False,
+                },
+                {
+                    "id": "ollama-default",
+                    "name": "Ollama Local",
+                    "provider_type": "ollama",
+                    "model": "llama3.2",
+                    "is_active": False,
+                },
+            ]
+
+        active_model = self.get_active_model()
+        for p in raw_providers:
+            pid = str(p.get("instance_id") or p.get("id") or "")
+            pname = str(p.get("instance_name") or p.get("name") or pid)
+            is_active = bool(active_id and pid == active_id)
+            models = p.get("models", [])
+            primary_model = (active_model if (is_active and active_model) else None) or p.get("model") or (models[0].get("model_name") if models else "default")
+            providers.append({
+                "id": pid,
+                "name": pname,
+                "provider_type": p.get("provider_type", ""),
+                "model": primary_model,
+                "is_active": is_active,
+            })
+        return providers
+
+    def test_active_provider(self) -> Dict[str, Any]:
+        """Test konektivitas ke provider LLM aktif dan ukur latensi (ms)."""
+        active_id = self.get_active_provider()
+        providers = self.get_providers_status()
+        if not providers:
+            return {
+                "status": "error",
+                "message": "Tidak ada LLM provider yang terkonfigurasi.",
+                "latency_ms": 0.0,
+            }
+
+        target = None
+        if active_id:
+            target = next((p for p in providers if p["id"] == active_id), None)
+        if not target and providers:
+            # Prioritaskan Google Antigravity
+            target = next((p for p in providers if p.get("provider_type") == "antigravity" or "antigravity" in p.get("name", "").lower()), providers[0])
+            active_id = target["id"]
+
+        provider_name = target["name"] if target else "Unknown"
+        active_model = self.get_active_model()
+        model_name = (active_model if target and target.get("is_active") else None) or target.get("model") or active_model or "default"
+
+        t0 = time.perf_counter()
+        try:
+            test_res = self.test_llm_provider(active_id, model_name=model_name)
+            t1 = time.perf_counter()
+            latency_ms = round((t1 - t0) * 1000, 1)
+
+            if test_res.get("status") == "ok":
+                return {
+                    "status": "ok",
+                    "provider": provider_name,
+                    "model": model_name,
+                    "latency_ms": latency_ms,
+                    "detail": test_res.get("detail", "OK"),
+                }
+            else:
+                return {
+                    "status": "error",
+                    "provider": provider_name,
+                    "model": model_name,
+                    "latency_ms": latency_ms,
+                    "detail": test_res.get("detail", "Connection test failed"),
+                }
+        except Exception as exc:
+            t1 = time.perf_counter()
+            latency_ms = round((t1 - t0) * 1000, 1)
+            return {
+                "status": "error",
+                "provider": provider_name,
+                "model": model_name,
+                "latency_ms": latency_ms,
+                "detail": str(exc),
+            }
+
+    def get_active_model(self) -> Optional[str]:
+        """Ambil nama/id model aktif."""
+        return self.project_store.get_active_model()
+
+    def set_active_model(self, model_name: str) -> None:
+        """Simpan model aktif."""
+        self.project_store.set_active_model(model_name)
+
+    def get_models_for_provider(self, provider_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar model yang terkonfigurasi untuk provider tertentu."""
+        pid = provider_id or self.get_active_provider()
+        try:
+            raw_providers = self.list_llm_providers()
+        except Exception:
+            raw_providers = []
+
+        target_provider = None
+        if pid:
+            target_provider = next(
+                (p for p in raw_providers if str(p.get("instance_id") or p.get("id")) == str(pid)
+                 or str(p.get("provider_type", "")).lower() == str(pid).lower()
+                 or str(p.get("name", "")).lower() == str(pid).lower()),
+                None
+            )
+        if not target_provider and raw_providers:
+            target_provider = next((p for p in raw_providers if p.get("provider_type") == "antigravity"), raw_providers[0])
+
+        active_model = self.get_active_model()
+        models = []
+        if target_provider:
+            raw_models = target_provider.get("models", [])
+            for idx, rm in enumerate(raw_models):
+                mname = rm.get("model_name", "")
+                is_active = (active_model == mname) if active_model else (idx == 0)
+                models.append({
+                    "id": rm.get("id", mname),
+                    "name": mname,
+                    "is_active": is_active,
+                })
+
+        if not models:
+            defaults = ["claude-sonnet-4-6", "claude-opus-4-6", "gemini-3.8-flash-medium", "gemini-3.1-pro-high"]
+            for idx, dm in enumerate(defaults):
+                models.append({
+                    "id": dm,
+                    "name": dm,
+                    "is_active": (active_model == dm) if active_model else (idx == 0),
+                })
+        return models
+
+    def get_active_skill(self) -> Optional[str]:
+        """Ambil skill aktif."""
+        return self.project_store.get_active_skill()
+
+    def set_active_skill(self, skill_name: str) -> None:
+        """Simpan skill aktif."""
+        self.project_store.set_active_skill(skill_name)
+
+    def get_available_skills(self) -> List[Dict[str, Any]]:
+        """Daftar resmi skills AegisCode."""
+        active_skill = self.get_active_skill()
+        skills = [
+            {"id": "spec-driven-development", "name": "Spec-Driven Dev", "description": "Tulis spesifikasi sebelum coding"},
+            {"id": "planning-and-task-breakdown", "name": "Plan & Breakdown", "description": "Pecah tugas ke unit terukur"},
+            {"id": "incremental-implementation", "name": "Incremental Build", "description": "Eksekusi slice per slice"},
+            {"id": "test-driven-development", "name": "Test-Driven Dev", "description": "Kembangkan logika dengan TDD"},
+            {"id": "code-review-and-quality", "name": "Code Review", "description": "Evaluasi kualitas multi-dimensi"},
+            {"id": "code-simplification", "name": "Code Simplifier", "description": "Sederhanakan kode tanpa ubah perilaku"},
+            {"id": "interview-me", "name": "Interview Me", "description": "Ekstraksi kebutuhan mendalam"},
+            {"id": "shipping-and-launch", "name": "Ship & Launch", "description": "Persiapan rilis dan verifikasi akhir"},
+        ]
+        for s in skills:
+            s["is_active"] = bool(active_skill and active_skill == s["id"])
+        return skills
+
 
     def open_active_project_in_explorer(self) -> Dict[str, Any]:
         """Buka Windows Explorer pada path ACTIVE PROJECT (bukan arbitrary path).
@@ -2825,12 +3311,29 @@ class GatewayService:
         """Bangun gate approval terikat ke satu task/session (untuk TaskExecutor).
 
         Gate dipanggil pada execution thread saat sebuah action butuh approval:
-        ia menahan eksekusi, memancarkan `approval_requested`, lalu menunggu
-        keputusan user (bounded timeout; timeout -> DENY, tidak pernah auto-allow).
+        pada mode 'agents', eksekusi di-auto-allow non-blocking dan memancarkan audit log;
+        pada mode 'ask', eksekusi menahan dan menunggu keputusan user.
         """
         from agent_ai.permission.approval import make_approval_gate
 
-        return make_approval_gate(self._approvals, task_id=task_id, session_id=session_id)
+        def _audit_sink(payload: Dict[str, Any]) -> None:
+            try:
+                self._emit(
+                    session_id,
+                    "agent_observation",
+                    task_id=task_id,
+                    payload={"audit_log": payload, "type": "auto_approval_audit"},
+                )
+            except Exception:
+                pass
+
+        return make_approval_gate(
+            self._approvals,
+            task_id=task_id,
+            session_id=session_id,
+            mode_getter=self.get_operational_mode,
+            audit_sink=_audit_sink,
+        )
 
     def _run_accepts(self, param: str) -> bool:
         """True bila ``task_executor.run`` menerima keyword ``param``.

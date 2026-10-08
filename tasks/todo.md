@@ -1,37 +1,31 @@
-# Daftar Tugas Atomik (Todo): Kustomisasi Tema IDE AEGIS
+# Tasks: Telegram Remote Skill Delegation Bridge to IDE Agents
 
-- [x] Task 1: Buat stylesheet `theme-presets.css` dan daftarkan di `styles.css`
-  - Acceptance: Variabel CSS terdefinisi untuk seluruh curated preset: Tokyo Night (Dark/Light), Nord (Dark/Light), Atom (Dark/Light), dan High Contrast (Dark/Light).
-  - Verify: `npm --prefix apps/frontend run build`.
-  - Files: `apps/frontend/src/styles/themes/theme-presets.css`, `apps/frontend/src/styles.css`.
+- [x] Task 1: Delegation Button in `TelegramStreamRelay` (`src/agent_ai/runtime/telegram/stream_relay.py`)
+  - Acceptance: `finalize_with_delegation(text, session_id)` mengirim pesan final dengan inline button `[🚀 Delegasikan ke Agen IDE]` ber-callback `agent:delegate:<session_id>`.
+  - Verify: Test memverifikasi `edit_message_text` dipanggil dengan `reply_markup` tombol delegasi.
+  - Files: `src/agent_ai/runtime/telegram/stream_relay.py`
 
-- [x] Task 2: Perluas `themeService.js` dengan engine preset, slider RGB kustom, dan sinkronisasi Monaco
-  - Acceptance: Fungsi `setPreset()`, `setCustomColors()`, `applyThemeConfig()`, `resetTheme()`, dan `createThemeState()` mendukung preset dan custom RGB slider dengan reaktivitas instan dan backward-compatibility penuh.
-  - Verify: `node --check apps/frontend/src/services/themeService.js`.
-  - Files: `apps/frontend/src/services/themeService.js`.
+- [x] Task 2: Delegation Callback Router in `TelegramUpdateHandler` (`src/agent_ai/runtime/telegram/handler.py`)
+  - Acceptance: Handler mendeteksi callback `agent:delegate:<session_id>`, memanggil `on_agent_delegate()`, dan mengonfirmasi callback query dengan notifikasi pop-up.
+  - Verify: Test memverifikasi `on_agent_delegate` dipanggil dengan `session_id` dan `chat_id`.
+  - Files: `src/agent_ai/runtime/telegram/handler.py`
 
-- [x] Task 3: Tulis unit test suite di `apps/frontend/tests/themeService.test.mjs`
-  - Acceptance: Menguji inisialisasi default, pemilihan curated preset, kalkulasi slider RGB, persistensi storage, reset default, dan backward compatibility dengan suite `services.test.mjs`.
-  - Verify: `node --test apps/frontend/tests/themeService.test.mjs apps/frontend/tests/services.test.mjs`.
-  - Files: `apps/frontend/tests/themeService.test.mjs`.
+- [x] Task 3: Backend Delegation Service in `GatewayService` (`apps/django_app/api/services.py`)
+  - Acceptance: `delegate_session_to_agent_task(session_id)` mengambil intisari pesan giliran dari sesi aktif dan membuat `Task` resmi dengan mode `agents` di IDE.
+  - Verify: Test memverifikasi pemanggilan `create_task()` mengembalikan `task_id` yang valid.
+  - Files: `apps/django_app/api/services.py`
 
-- [x] Task 4: Bangun komponen UI `AppearanceSettingsPanel.vue`
-  - Acceptance: Merender kartu curated presets, selector base Dark/Light, 3-channel slider RGB (Red, Green, Blue: 0–255) per warna (Primary, Secondary, Accent), live swatch preview, dan tombol reset.
-  - Verify: `npm --prefix apps/frontend run build`.
-  - Files: `apps/frontend/src/components/settings/AppearanceSettingsPanel.vue`.
+- [x] Task 4: Async Delegation Execution & Observability in `TelegramCompanion` (`src/agent_ai/runtime/telegram/companion.py`)
+  - Acceptance: `handle_agent_delegate()` menjalankan delegasi di background daemon thread, mengupdate status streaming relay, memantau task hingga selesai, dan merelay diff/laporan akhir.
+  - Verify: Test memverifikasi worker delegasi memanggil service dan menyelesaikan stream relay.
+  - Files: `src/agent_ai/runtime/telegram/companion.py`
 
-- [x] Task 5: Integrasikan tab Appearance / Theme ke dalam `SettingsView.vue`
-  - Acceptance: Tab "Appearance" muncul di navigasi SettingsView, me-render `AppearanceSettingsPanel`, dan perubahan warna langsung memantulkan live preview ke seluruh UI shell.
-  - Verify: `npm --prefix apps/frontend run build`.
-  - Files: `apps/frontend/src/components/settings/SettingsView.vue`.
+- [x] Task 5: Dedicated Test Suite (`tests/test_telegram_companion/test_delegation_bridge.py`)
+  - Acceptance: Berkas test baru berisi pengujian komprehensif untuk seluruh alur delegasi (relay button, handler routing, service delegation, async worker) tanpa redundansi dengan tes lama.
+  - Verify: `rtk pytest tests/test_telegram_companion/test_delegation_bridge.py` lulus 100%.
+  - Files: `tests/test_telegram_companion/test_delegation_bridge.py`
 
-- [x] Task 6: Verifikasi menyeluruh end-to-end dan regression testing
-  - Acceptance: Seluruh 130 unit tests frontend lulus tanpa error, build bundle Vite bersih, transisi tema lancar.
-  - Verify: `npm --prefix apps/frontend test && npm --prefix apps/frontend run build`.
-  - Files: Seluruh berkas terkait.
-
-- [x] Task 7: Koreksi Pemetaan CSS Variables & Desain Unified Panel
-  - Acceptance: Primary color terhubung ke `--accent`, `--primary`, `--border-hover`, `--selection`; Secondary color terhubung ke `--secondary`, `--text-dim`, `--muted`, `--btn-outline-muted`; struktur komponen `AppearanceSettingsPanel.vue` diselaraskan ke `<AppCard variant="panel" class="settings-panel">` dengan header action dan zero emoji (100% inline SVG).
-  - Verify: `npm --prefix apps/frontend test && npm --prefix apps/frontend run build`.
-  - Files: `apps/frontend/src/services/themeService.js`, `apps/frontend/src/components/settings/AppearanceSettingsPanel.vue`.
-
+- [x] Task 6: Daemon Restart & Live Verification
+  - Acceptance: Daemon berjalan stabil di background; siap menerima wawancara dan mendelegasikan tugas ke agen IDE.
+  - Verify: Bot aktif dan merespons interaksi.
+  - Files: Runtime daemon

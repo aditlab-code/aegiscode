@@ -1,8 +1,14 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { usePortDiscovery } from "../../services/portDiscoveryService.js";
+import { useTelegramCompanion } from "../../services/telegramService.js";
+import { getOperationalMode, setOperationalMode } from "../../api.js";
+import TelegramPairingPopover from "./TelegramPairingPopover.vue";
 
 const { discoveredPorts, openPortSafely, removeDiscoveredPort } = usePortDiscovery();
+const showTelegramPopover = ref(false);
+const { status: telegramStatus, checkTelegramStatus } = useTelegramCompanion();
+
 const props = defineProps({
   cursor: {
     type: Object,
@@ -69,9 +75,73 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  operationalMode: {
+    type: String,
+    default: "",
+  },
 });
 
-const emit = defineEmits(["toggle-dock", "open-git"]);
+const emit = defineEmits(["toggle-dock", "open-git", "mode-changed"]);
+
+const operationalMode = ref(props.operationalMode || "ask");
+const isTogglingMode = ref(false);
+
+watch(() => props.operationalMode, (newVal) => {
+  if (newVal) {
+    operationalMode.value = newVal;
+  }
+});
+
+async function fetchMode() {
+  try {
+    const res = await getOperationalMode();
+    if (res?.mode) {
+      operationalMode.value = res.mode;
+    }
+  } catch (_) {
+    // Graceful fallback to default
+  }
+}
+
+async function toggleMode() {
+  if (isTogglingMode.value) return;
+  const nextMode = operationalMode.value === "agents" ? "ask" : "agents";
+  isTogglingMode.value = true;
+  try {
+    const res = await setOperationalMode(nextMode);
+    if (res?.mode) {
+      operationalMode.value = res.mode;
+    } else {
+      operationalMode.value = nextMode;
+    }
+    emit("mode-changed", operationalMode.value);
+  } catch (err) {
+    console.error("Failed to toggle operational mode:", err);
+  } finally {
+    isTogglingMode.value = false;
+  }
+}
+
+function onModeUpdatedEvent(e) {
+  const modeVal = e.detail?.mode || e.detail?.data?.mode || e.detail?.payload?.mode || e.detail;
+  if (typeof modeVal === "string" && ["ask", "agents"].includes(modeVal.toLowerCase())) {
+    operationalMode.value = modeVal.toLowerCase();
+  }
+}
+
+onMounted(() => {
+  checkTelegramStatus();
+  fetchMode();
+  if (typeof window !== "undefined") {
+    window.addEventListener("aegis:mode_updated", onModeUpdatedEvent);
+  }
+});
+
+onUnmounted(() => {
+  if (typeof window !== "undefined") {
+    window.removeEventListener("aegis:mode_updated", onModeUpdatedEvent);
+  }
+});
 
 const branchTooltip = computed(() => {
   if (!props.gitBranchInfo?.current) return "Git Source Control";
@@ -129,6 +199,35 @@ const branchTooltip = computed(() => {
         <span class="badge-dot">●</span>
         <span class="badge-text">Agent: {{ agentStatus?.label || "idle" }}</span>
       </span>
+
+      <!-- Operational Mode Badge (Ask ⏸️ vs Agents ⚡) -->
+      <button
+        type="button"
+        class="status-badge badge-operational-mode"
+        :class="operationalMode === 'agents' ? 'badge-mode-agents' : 'badge-mode-ask'"
+        :title="`Operational Mode: ${operationalMode === 'agents' ? 'Agents (Autonomous ⚡)' : 'Ask (HITL Confirmation ⏸️)'}. Klik untuk beralih mode.`"
+        :disabled="isTogglingMode"
+        @click="toggleMode"
+      >
+        <span class="badge-dot">●</span>
+        <span class="badge-text">
+          Mode: {{ operationalMode === 'agents' ? 'Agents ⚡' : 'Ask ⏸️' }}
+        </span>
+      </button>
+
+      <!-- Telegram Remote Companion Badge -->
+      <button
+        type="button"
+        class="status-badge badge-telegram"
+        :class="telegramStatus?.is_paired ? 'badge-telegram-paired' : (telegramStatus?.configured ? 'badge-telegram-ready' : 'badge-telegram-off')"
+        title="Telegram Remote Companion (Klik untuk pairing QR / status)"
+        @click="showTelegramPopover = true"
+      >
+        <span class="badge-dot">●</span>
+        <span class="badge-text">
+          Companion: {{ telegramStatus?.is_paired ? 'Active' : (telegramStatus?.configured ? 'Pairing' : 'Off') }}
+        </span>
+      </button>
 
       <!-- Discovered Active Dev Ports Chips -->
       <div v-if="discoveredPorts.length > 0" class="status-ports-group">
@@ -206,5 +305,30 @@ const branchTooltip = computed(() => {
       </span>
     </div>
   </footer>
+
+  <TelegramPairingPopover
+    v-if="showTelegramPopover"
+    @close="showTelegramPopover = false"
+  />
 </template>
+
+<style scoped>
+.badge-operational-mode {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
+  transition: all 0.15s ease;
+}
+.badge-operational-mode:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-focus, rgba(255, 255, 255, 0.2));
+}
+.badge-mode-agents .badge-dot {
+  color: #38bdf8;
+}
+.badge-mode-ask .badge-dot {
+  color: var(--warn, #e5a00d);
+}
+</style>
+
 

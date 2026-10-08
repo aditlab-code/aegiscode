@@ -596,13 +596,16 @@ class LLMConfigService:
 
         matched_model_config: Optional[ModelConfig] = None
         if model_id is not None:
-            model = self._require_model(model_id)
-            if model.provider_id != instance.id:
-                raise LLMConfigValidationError(
-                    f"Model '{model_id}' bukan milik provider instance '{instance_id}'."
-                )
-            matched_model_config = model
-            selected_model = model.model_name
+            model = self.store.get_model(model_id) or self.store.find_model_by_name(instance.id, model_id)
+            if model is not None:
+                if model.provider_id != instance.id:
+                    raise LLMConfigValidationError(
+                        f"Model '{model_id}' bukan milik provider instance '{instance_id}'."
+                    )
+                matched_model_config = model
+                selected_model = model.model_name
+            else:
+                selected_model = model_id
         elif model_name is not None:
             selected_model = model_name
             matched_model_config = self.store.find_model_by_name(instance.id, model_name)

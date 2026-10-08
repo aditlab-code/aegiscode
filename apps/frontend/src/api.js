@@ -541,6 +541,21 @@ export function resolveApproval(requestId, allow) {
   });
 }
 
+// --- Mode Operasional (Ask vs Agents) -------------------------------------
+// GET /api/mode -> { status: "ok", mode: "ask" | "agents" }
+export function getOperationalMode() {
+  return request("/mode");
+}
+
+// POST /api/mode -> { mode: "ask" | "agents" }
+export function setOperationalMode(mode) {
+  return request("/mode", {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  });
+}
+
+
 // Minta penghentian task (cooperative cancellation: Agent loop berhenti di
 // safe boundary lalu mencatat CANCELLED ke `.aegis/log`).
 export function cancelTask(taskId) {
@@ -856,6 +871,7 @@ export const KNOWN_SSE_EVENTS = Object.freeze([
   "change_detected",
   "approval_requested",
   "approval_resolved",
+  "mode_updated",
   "task_completed",
   "task_failed",
   "task_cancelled",
@@ -1025,3 +1041,18 @@ export function runProjectLint(projectId, filePath = null, scope = "file") {
 }
 
 
+
+// --- Telegram Remote Companion -------------------------------------------
+export function getTelegramStatus() {
+  return request("/telegram/status");
+}
+
+export function getTelegramPairingQr() {
+  return request("/telegram/pairing-qr");
+}
+
+export function postTelegramUnlink() {
+  return request("/telegram/unlink", {
+    method: "POST",
+  });
+}

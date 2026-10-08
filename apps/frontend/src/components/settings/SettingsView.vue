@@ -24,6 +24,7 @@ import {
 import GlobalSettingsPanel from "./GlobalSettingsPanel.vue";
 import AgentSettingsPanel from "./AgentSettingsPanel.vue";
 import AppearanceSettingsPanel from "./AppearanceSettingsPanel.vue";
+import RemoteCompanionSettings from "./RemoteCompanionSettings.vue";
 import AppButton from "../ui/AppButton.vue";
 import AppCard from "../ui/AppCard.vue";
 
@@ -511,6 +512,16 @@ watch(activeTab, (tab) => {
     >
       Providers
     </button>
+    <button
+      class="sv-tab"
+      :class="{ active: activeTab === 'companion' }"
+      type="button"
+      role="tab"
+      :aria-selected="activeTab === 'companion'"
+      @click="activeTab = 'companion'"
+    >
+      Companion
+    </button>
   </div>
 
   <!-- ================= GENERAL: Global Settings AETHER ================= -->
@@ -521,6 +532,9 @@ watch(activeTab, (tab) => {
 
   <!-- ================= AGENT: System Prompt Agent ================= -->
   <AgentSettingsPanel v-else-if="activeTab === 'agent'" />
+
+  <!-- ================= COMPANION: Remote Telegram Companion ================= -->
+  <RemoteCompanionSettings v-else-if="activeTab === 'companion'" />
 
   <!-- ================= PROVIDERS: LLM Config AETHER ================= -->
   <template v-else>

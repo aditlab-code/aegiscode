@@ -14,6 +14,7 @@ from __future__ import annotations
 from django.urls import path
 
 from api import views
+from api import telegram_views
 
 urlpatterns = [
     path("health", views.health, name="health"),
@@ -217,6 +218,7 @@ urlpatterns = [
     ),
     path("projects/<str:project_id>", views.delete_project, name="delete_project"),
     path("active-project", views.active_project, name="active_project"),
+    path("mode", views.mode_view, name="operational_mode"),
     path("open-in-explorer", views.open_in_explorer, name="open_in_explorer"),
     path("reveal-in-explorer", views.reveal_in_explorer, name="reveal_in_explorer"),
     path("delete-entry", views.delete_entry, name="delete_entry"),
@@ -302,4 +304,8 @@ urlpatterns = [
     path("server/terminate", views.server_terminate, name="server_terminate"),
     # Skills Catalog API (Dynamic Addy Osmani skills discovery)
     path("skills/catalog", views.skills_catalog, name="skills_catalog"),
+    # Telegram Remote Companion API
+    path("telegram/status", telegram_views.telegram_status, name="telegram_status"),
+    path("telegram/pairing-qr", telegram_views.telegram_pairing_qr, name="telegram_pairing_qr"),
+    path("telegram/unlink", telegram_views.telegram_unlink, name="telegram_unlink"),
 ]

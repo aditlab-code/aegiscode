@@ -710,6 +710,10 @@ class AntigravityProvider(BaseProvider):
 
         tool_defs = self._build_tool_definitions(tools) if tools else []
         model = (options and options.model) or self.config.model or "gemini-3.8-flash-medium"
+        if model in ("claude-opus-4-6", "claude-opus", "opus"):
+            model = "claude-opus-4-6-thinking"
+        elif model in ("claude-sonnet-4-6-thinking", "claude-sonnet"):
+            model = "claude-sonnet-4-6"
 
         cli = self._resolve_cli_path()
         if cli:
