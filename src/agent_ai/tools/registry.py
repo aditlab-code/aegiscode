@@ -292,7 +292,8 @@ def build_registry(
 
     for tool in build_skill_tools(root=resolved, include_lifecycle=True):
         reg.register(tool)
-    # Execution Policy Escalation Tool (Agent):
+
+    # Decommissioned Execution Policy Escalation Tool (backward-compatible stub):
     from agent_ai.tools.policy import RequestPolicyEscalationTool
 
     reg.register(RequestPolicyEscalationTool(escalator=policy_escalator))

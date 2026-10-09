@@ -324,32 +324,16 @@ class TelegramUpdateHandler:
         self.bot_client.send_message(chat_id=chat_id, text=repo_text, **kwargs)
 
     def _handle_mode(self, chat_id: int, user_id: int, text: str, args: str) -> None:
-        arg = args.lower().strip()
-        if arg:
-            if arg in ("ask", "agents"):
-                if self.set_mode:
-                    self.set_mode(arg)
-                mode_display = "Ask ⏸️ (Perlu Konfirmasi)" if arg == "ask" else "Agents ⚡ (Otonom Penuh)"
-                desc = (
-                    "Agen akan meminta persetujuan sebelum menjalankan aksi kritis."
-                    if arg == "ask"
-                    else "Agen akan mengeksekusi aksi secara mandiri dan mengirimkan ringkasan audit log."
-                )
-                confirm_text = (
-                    f"✅ <b>Mode Operasional Diperbarui!</b>\n\n"
-                    f"Mode saat ini: <b>{mode_display}</b>\n\n"
-                    f"{desc}"
-                )
-                self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
-            else:
-                self.bot_client.send_message(
-                    chat_id=chat_id,
-                    text="❌ <b>Mode Tidak Valid!</b>\nGunakan <code>/aegis_mode ask</code> atau <code>/aegis_mode agents</code>.",
-                )
-        else:
-            current_mode = self.get_mode().lower() if self.get_mode else "ask"
-            mode_text, keyboard = render_mode_view(current_mode)
-            self.bot_client.send_message(chat_id=chat_id, text=mode_text, reply_markup=keyboard)
+        if self.set_mode:
+            self.set_mode("agents")
+        mode_display = "Agents ⚡ (Otonom Penuh)"
+        desc = "Agen mengeksekusi seluruh aksi secara mandiri dengan audit streaming real-time."
+        confirm_text = (
+            f"✅ <b>Mode Operasional:</b>\n\n"
+            f"Mode saat ini: <b>{mode_display}</b>\n\n"
+            f"{desc}"
+        )
+        self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
 
     def _handle_chat(self, chat_id: int, user_id: int, text: str, args: str) -> None:
         clean_instruction = args.strip()
@@ -729,32 +713,24 @@ class TelegramUpdateHandler:
         message: Dict[str, Any],
         data: str,
     ) -> None:
-        target_mode = data[len("mode:set:"):].lower().strip()
-        if target_mode in ("ask", "agents"):
-            if self.set_mode:
-                self.set_mode(target_mode)
-            label = "Ask ⏸️" if target_mode == "ask" else "Agents ⚡"
-            self.bot_client.answer_callback_query(
-                callback_query_id=cb_id,
-                text=f"Mode diubah ke: {label}",
+        if self.set_mode:
+            self.set_mode("agents")
+        self.bot_client.answer_callback_query(
+            callback_query_id=cb_id,
+            text="Mode permanen: Agents ⚡ (Otonom)",
+        )
+        if chat_id and message_id:
+            updated_text = (
+                "⚙️ <b>Kontrol Mode Operasional:</b>\n\n"
+                "✅ Mode aktif saat ini: <b>Agents ⚡ (Otonom Penuh)</b>\n\n"
+                "Aksi kritis dieksekusi secara otonom mandiri dengan audit log streaming."
             )
-            if chat_id and message_id:
-                desc = (
-                    "Aksi kritis akan meminta konfirmasi user."
-                    if target_mode == "ask"
-                    else "Aksi dijalankan otonom dengan audit log."
-                )
-                updated_text = (
-                    f"⚙️ <b>Kontrol Mode Operasional:</b>\n\n"
-                    f"✅ Mode aktif saat ini: <b>{label}</b>\n\n"
-                    f"{desc}"
-                )
-                self.bot_client.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=updated_text,
-                    reply_markup=None,
-                )
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=updated_text,
+                reply_markup=None,
+            )
 
     def _handle_config_cb(
         self,

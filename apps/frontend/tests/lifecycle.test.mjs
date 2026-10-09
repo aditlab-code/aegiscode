@@ -1,24 +1,8 @@
-// Regression test (Node built-in `assert`, TANPA framework/dependency baru)
-// untuk logika lifecycle UI (planning/inspecting/editing/running/validating/
-// completed) yang diturunkan dari event `phase_changed` (activity phase Task 1)
-// + status task.
-//
-// Mengunci perilaku yang diminta Task 2:
-//   - task_started            -> Planning aktif
-//   - phase_changed inspecting-> Inspecting
-//   - phase_changed editing   -> Editing
-//   - phase_changed running   -> Running
-//   - phase_changed validating-> Validating
-//   - task_completed          -> Completed (terminal)
-//   - current phase boleh mundur; milestone tetap `done`
-//   - failed/cancelled        -> BUKAN Completed, tetap di aktivitas terakhir
-//   - nilai internal runtime (replan/provider_fallback) DIABAIKAN
-//
-// Jalankan: node apps/frontend/src/lifecycle.test.mjs
-
 import assert from "node:assert/strict";
 import {
   VALIDATING_STEP,
+  VERIFYING_STEP,
+  OLYMPUS_PHASES,
   activityPhaseIndex,
   addMilestone,
   buildLifecycleStates,
@@ -26,26 +10,41 @@ import {
   lifecycleFromEvents,
 } from "../src/lifecycle.js";
 
-// Nama step (sama dengan LIFECYCLE_STEPS di App.vue) — untuk assertion berlabel.
-const STEPS = ["Planning", "Inspecting", "Editing", "Running", "Validating", "Completed"];
-const P = ""; // pending = tanpa class (template menampilkan nomor step)
+const STEPS = OLYMPUS_PHASES;
+const P = "";
 const D = "done";
 const A = "active";
 
 // --- activityPhaseIndex / isActivityPhase -----------------------------------
-assert.equal(activityPhaseIndex("planning"), 0);
-assert.equal(activityPhaseIndex("INSPECTING"), 1);
-assert.equal(activityPhaseIndex(" editing "), 2);
-assert.equal(activityPhaseIndex("running"), 3);
-assert.equal(activityPhaseIndex("validating"), 4);
-// Nilai internal lama BUKAN activity phase -> tidak menggerakkan lifecycle.
+assert.equal(activityPhaseIndex("define"), 0);
+assert.equal(activityPhaseIndex("DEFINE"), 0);
+assert.equal(activityPhaseIndex("plan"), 1);
+assert.equal(activityPhaseIndex("PLAN"), 1);
+assert.equal(activityPhaseIndex("build"), 2);
+assert.equal(activityPhaseIndex("BUILD"), 2);
+assert.equal(activityPhaseIndex("verify"), 3);
+assert.equal(activityPhaseIndex("VERIFY"), 3);
+assert.equal(activityPhaseIndex("review"), 4);
+assert.equal(activityPhaseIndex("REVIEW"), 4);
+assert.equal(activityPhaseIndex("ship"), 5);
+assert.equal(activityPhaseIndex("SHIP"), 5);
+
+// Aliases
+assert.equal(activityPhaseIndex("planning"), 1);
+assert.equal(activityPhaseIndex("inspecting"), 2);
+assert.equal(activityPhaseIndex("editing"), 2);
+assert.equal(activityPhaseIndex("validating"), 3);
+assert.equal(activityPhaseIndex("completed"), 5);
+
+// Internal non-phases
 assert.equal(activityPhaseIndex("replan"), -1);
 assert.equal(activityPhaseIndex("provider_fallback"), -1);
 assert.equal(activityPhaseIndex(""), -1);
 assert.equal(activityPhaseIndex(null), -1);
-assert.equal(isActivityPhase("editing"), true);
+assert.equal(isActivityPhase("build"), true);
 assert.equal(isActivityPhase("replan"), false);
-assert.equal(VALIDATING_STEP, 4);
+assert.equal(VALIDATING_STEP, 3);
+assert.equal(VERIFYING_STEP, 3);
 
 // --- addMilestone (immutable, unik, terurut) --------------------------------
 assert.deepEqual(addMilestone([], 2), [2]);
@@ -53,7 +52,6 @@ assert.deepEqual(addMilestone([2], 2), [2], "tidak duplikat");
 assert.deepEqual(addMilestone([3, 1], 2), [1, 2, 3], "terurut");
 assert.deepEqual(addMilestone([], 9), [], "index di luar rentang diabaikan");
 
-// --- Helper: bangun state sambil melacak milestone ---------------------------
 function lifecycle(status = "running") {
   let milestones = [];
   let currentPhase = "";
@@ -88,115 +86,88 @@ const expectStates = (steps, expected) => {
   return steps;
 };
 
-// --- Acceptance 1..6 --------------------------------------------------------
-// task_started -> Planning (diwakili set phase planning).
+// --- Acceptance 1..6: Olympus Progression -----------------------------------
+// task_started -> DEFINE
 {
   const lc = lifecycle();
-  lc.step("planning");
+  lc.step("define");
   expectStates(lc.render(), [A, P, P, P, P, P]);
 }
 
-// phase_changed inspecting -> Inspecting, Planning jadi milestone done.
+// phase_changed plan -> PLAN, DEFINE jadi milestone done.
 {
   const lc = lifecycle();
-  lc.step("planning");
-  lc.step("inspecting");
+  lc.step("define");
+  lc.step("plan");
   expectStates(lc.render(), [D, A, P, P, P, P]);
 }
 
-// phase_changed editing -> Editing.
+// phase_changed build -> BUILD.
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing"].forEach(lc.step);
+  ["define", "plan", "build"].forEach(lc.step);
   expectStates(lc.render(), [D, D, A, P, P, P]);
 }
 
-// phase_changed running -> Running.
+// phase_changed verify -> VERIFY.
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running"].forEach(lc.step);
+  ["define", "plan", "build", "verify"].forEach(lc.step);
   expectStates(lc.render(), [D, D, D, A, P, P]);
 }
 
-// phase_changed validating -> Validating.
+// phase_changed review -> REVIEW.
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running", "validating"].forEach(lc.step);
+  ["define", "plan", "build", "verify", "review"].forEach(lc.step);
   expectStates(lc.render(), [D, D, D, D, A, P]);
 }
 
-// task_completed -> Completed (terminal), semua step done.
+// task_completed -> SHIP (terminal), seluruh step done.
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running", "validating"].forEach(lc.step);
+  ["define", "plan", "build", "verify", "review"].forEach(lc.step);
   lc.setStatus("completed");
   expectStates(lc.render(), [D, D, D, D, D, A]);
 }
 
-// --- Acceptance 7/8: current phase boleh mundur, milestone tetap done -------
-// Inspecting -> Editing -> Inspecting (Case 3).
+// --- Acceptance 7/8: Current phase boleh mundur, milestone tetap done --------
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "inspecting"].forEach(lc.step);
+  ["define", "plan", "build", "plan"].forEach(lc.step);
   const steps = lc.render();
   expectStates(steps, [D, A, D, P, P, P]);
-  assert.equal(steps[2], D, `Editing (${STEPS[2]}) tetap milestone done`);
+  assert.equal(steps[2], D, `BUILD (${STEPS[2]}) tetap milestone done saat kembali ke PLAN`);
 }
 
-// Editing -> Running -> Validating -> Editing (Case 4).
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running", "validating", "editing"].forEach(lc.step);
-  expectStates(lc.render(), [D, D, A, D, D, P]);
+  ["define", "plan", "build", "verify", "build"].forEach(lc.step);
+  expectStates(lc.render(), [D, D, A, D, P, P]);
 }
 
-// "Running lalu kembali Inspecting": Running tetap done.
+// --- Acceptance 9/10: Failed & cancelled BUKAN Completed / SHIP --------------
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running", "inspecting"].forEach(lc.step);
-  expectStates(lc.render(), [D, A, D, D, P, P]);
-}
-
-// Case 2: Planning -> Editing (langsung, tanpa Inspecting).
-{
-  const lc = lifecycle();
-  lc.step("planning");
-  lc.step("editing");
-  expectStates(lc.render(), [D, P, A, P, P, P]);
-}
-
-// Case 1: task_started -> Planning, lalu langsung inspecting.
-{
-  const lc = lifecycle();
-  lc.step("planning");
-  assert.equal(lc.render()[0], A);
-  lc.step("inspecting");
-  expectStates(lc.render(), [D, A, P, P, P, P]);
-}
-
-// --- Acceptance 9/10: failed & cancelled BUKAN Completed --------------------
-{
-  const lc = lifecycle();
-  ["planning", "inspecting", "editing"].forEach(lc.step);
+  ["define", "plan", "build"].forEach(lc.step);
   lc.setStatus("failed");
   const steps = lc.render();
   expectStates(steps, [D, D, A, P, P, P]);
-  assert.notEqual(steps[5], A, "Failed TIDAK menampilkan Completed");
+  assert.notEqual(steps[5], A, "Failed TIDAK menampilkan SHIP");
 }
 {
   const lc = lifecycle();
-  ["planning", "inspecting", "editing", "running"].forEach(lc.step);
+  ["define", "plan", "build", "verify"].forEach(lc.step);
   lc.setStatus("cancelled");
   const steps = lc.render();
   expectStates(steps, [D, D, D, A, P, P]);
-  assert.notEqual(steps[5], A, "Cancelled TIDAK menampilkan Completed");
+  assert.notEqual(steps[5], A, "Cancelled TIDAK menampilkan SHIP");
 }
 
 // --- Acceptance 11: runtime.phase internal tidak menggerakkan lifecycle ------
 {
   const lc = lifecycle();
-  ["planning", "editing"].forEach(lc.step);
-  // Nilai internal (replan/provider_fallback) tidak diklasifikasi -> diabaikan.
+  ["define", "build"].forEach(lc.step);
   lc.step("replan");
   lc.step("provider_fallback");
   expectStates(lc.render(), [D, P, A, P, P, P]);
@@ -207,7 +178,7 @@ expectStates(
   buildLifecycleStates({ hasTask: false, status: "idle", currentPhase: "", milestones: [] }),
   [P, P, P, P, P, P]
 );
-// Task running tanpa phase apa pun -> Planning (fallback aman).
+// Task running tanpa phase -> DEFINE (fallback aman).
 expectStates(
   buildLifecycleStates({ hasTask: true, status: "running", currentPhase: "", milestones: [] }),
   [A, P, P, P, P, P]
@@ -217,14 +188,14 @@ expectStates(
 {
   const events = [
     { event: "task_started", data: {} },
-    { event: "phase_changed", data: { phase: "inspecting" } },
-    { event: "phase_changed", data: { phase: "editing" } },
-    { event: "phase_changed", data: { phase: "running" } },
+    { event: "phase_changed", data: { phase: "plan" } },
+    { event: "phase_changed", data: { phase: "build" } },
+    { event: "phase_changed", data: { phase: "verify" } },
     { event: "task_failed", data: {} },
   ];
   const { milestones, currentPhase } = lifecycleFromEvents(events);
   assert.deepEqual(milestones, [0, 1, 2, 3]);
-  assert.equal(currentPhase, "running");
+  assert.equal(currentPhase, "verify");
   const steps = buildLifecycleStates({
     hasTask: true,
     status: "failed",
@@ -236,29 +207,14 @@ expectStates(
   assert.notEqual(steps[5], A);
 }
 
-// Event validation existing (validation_started) -> milestone Validating.
+// Validation started -> verify
 {
   const { milestones, currentPhase } = lifecycleFromEvents([
     { event: "task_started", data: {} },
     { event: "validation_started", data: {} },
   ]);
-  assert.deepEqual(milestones, [0, 4]);
-  assert.equal(currentPhase, "planning");
+  assert.deepEqual(milestones, [0, 3]);
+  assert.equal(currentPhase, "verify");
 }
 
-// Event tool_called (mis. view_file/bash) TIDAK menimpa currentPhase dari phase_changed.
-{
-  const events = [
-    { event: "task_started", data: {} },
-    { event: "phase_changed", data: { phase: "inspecting" } },
-    { event: "tool_called", data: { tool: "view_file", canonical_tool: "read_file" } },
-    { event: "phase_changed", data: { phase: "editing" } },
-    { event: "tool_called", data: { tool: "replace_file_content", canonical_tool: "edit_file" } },
-  ];
-  const { milestones, currentPhase } = lifecycleFromEvents(events);
-  assert.deepEqual(milestones, [0, 1, 2]);
-  assert.equal(currentPhase, "editing", "tool_called tidak boleh menimpa editing menjadi running");
-}
-console.log(
-  "[OK] lifecycle: phase_changed -> 6 step; milestone tetap done saat mundur; completed/failed/cancelled benar."
-);
+console.log("[OK] lifecycle: Olympus autonomous workflow (DEFINE..SHIP) tests passed!");

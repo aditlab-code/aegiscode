@@ -1,13 +1,12 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import AgentDrawerPanel from "../drawer/AgentDrawerPanel.vue";
-import ConsultantChat from "../drawer/ConsultantChat.vue";
 
 const props = defineProps({
   activeTab: {
     type: String,
     default: "agents",
-    validator: (v) => ["agents", "ask", "activity", "consultant"].includes(v),
+    validator: (v) => ["agents", "activity"].includes(v),
   },
   task: {
     type: Object,
@@ -109,14 +108,6 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  consultantOpen: {
-    type: Boolean,
-    default: false,
-  },
-  consultantProps: {
-    type: Object,
-    default: () => ({}),
-  },
   providers: {
     type: Array,
     default: () => [],
@@ -152,23 +143,14 @@ const emit = defineEmits([
   "request-stop",
   "submit-task",
   "open-settings",
-  "run-consultant-task",
-  "consultant-event",
+  "open-file",
   "apply-to-editor",
   "update:provider-instance-id",
   "update:model-id",
   "update:mode",
-  "update:active-session-id",
 ]);
 
 const agentPanelRef = ref(null);
-
-const isAgentsTab = computed(() => props.activeTab === "agents" || props.activeTab === "activity");
-const isAskTab = computed(() => props.activeTab === "ask" || props.activeTab === "consultant");
-
-function setTab(tab) {
-  emit("update:activeTab", tab);
-}
 
 function focusPrompt() {
   agentPanelRef.value?.focusPrompt?.();
@@ -191,7 +173,7 @@ defineExpose({
 
 <template>
   <aside class="app-right-drawer" aria-label="AI Assistant Panel">
-    <!-- Header with Aegis Assistant Branding, Dual-Tab Switcher & Close Button -->
+    <!-- Header with Aegis Assistant Branding & Close Button -->
     <div class="right-drawer-header">
       <div class="rd-header-title-box">
         <svg class="rd-sparkle-ico" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -199,33 +181,6 @@ defineExpose({
         </svg>
         <span class="rd-main-title">Aegis Assistant</span>
         <span class="rd-badge-pill">ACTIVE</span>
-      </div>
-
-      <div class="right-drawer-tabs" role="tablist">
-        <button
-          type="button"
-          class="rd-tab-btn"
-          :class="{ active: isAgentsTab }"
-          role="tab"
-          :aria-selected="isAgentsTab"
-          aria-label="Agent Activity"
-          title="Agent: autonomous task execution"
-          @click="setTab(activeTab === 'activity' ? 'activity' : 'agents')"
-        >
-          <span class="rd-tab-title">Agent</span>
-        </button>
-        <button
-          type="button"
-          class="rd-tab-btn"
-          :class="{ active: isAskTab }"
-          role="tab"
-          :aria-selected="isAskTab"
-          aria-label="Consultant Chat"
-          title="Ask: Quick or Deep project consultation"
-          @click="setTab(activeTab === 'consultant' ? 'consultant' : 'ask')"
-        >
-          <span class="rd-tab-title">Ask</span>
-        </button>
       </div>
 
       <div class="rd-header-actions">
@@ -256,9 +211,7 @@ defineExpose({
 
     <!-- Body Area -->
     <div class="right-drawer-body">
-      <!-- 1. Agent Activity Tab -->
       <AgentDrawerPanel
-        v-if="isAgentsTab"
         ref="agentPanelRef"
         :task="task"
         :task-history="taskHistory"
@@ -296,41 +249,19 @@ defineExpose({
         @request-stop="emit('request-stop')"
         @submit-task="emit('submit-task', $event)"
         @open-settings="emit('open-settings', $event)"
+        @open-file="emit('open-file', $event)"
         @update:provider-instance-id="emit('update:provider-instance-id', $event)"
         @update:model-id="emit('update:model-id', $event)"
         @update:mode="emit('update:mode', $event)"
       />
-
-      <!-- 2. Consultant Chat Tab -->
-      <div v-else-if="isAskTab" class="rd-consultant-view">
-        <ConsultantChat
-          :embedded="true"
-          v-bind="consultantProps"
-          @close="emit('close')"
-          @run-task="emit('run-consultant-task', $event)"
-          @stop-task="emit('request-stop', $event)"
-          @consultant-event="emit('consultant-event', $event)"
-          @apply-to-editor="emit('apply-to-editor', $event)"
-          @open-settings="emit('open-settings', $event)"
-          @update:provider-instance-id="emit('update:provider-instance-id', $event)"
-          @update:model-id="emit('update:model-id', $event)"
-          @update:active-session-id="emit('update:active-session-id', $event)"
-        />
-      </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
-.rd-tab-title {
-  font-weight: 500;
-}
-.rd-tab-sub {
-  font-size: 11px;
-  color: var(--text-faint);
-  opacity: 0.8;
-}
-.rd-tab-btn.active .rd-tab-sub {
-  color: var(--text-dim);
+.rd-main-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
 }
 </style>

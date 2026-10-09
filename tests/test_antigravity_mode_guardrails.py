@@ -19,19 +19,12 @@ from agent_ai.tools.filesystem import ReadFileTool
 
 
 def test_format_antigravity_policy_directive() -> None:
-    """Pastikan direktif memuat larangan log dan batas per mode."""
-    fast_dir = _format_antigravity_policy_directive("fast")
-    assert ".aegis/log/" in fast_dir
-    assert "FAST" in fast_dir
-    assert "SURGICAL RESOLUTION" in fast_dir
-
-    balanced_dir = _format_antigravity_policy_directive("balanced")
-    assert ".aegis/log/" in balanced_dir
-    assert "BALANCED" in balanced_dir
-
-    deep_dir = _format_antigravity_policy_directive("deep")
-    assert ".aegis/log/" in deep_dir
-    assert "DEEP" in deep_dir
+    """Pastikan direktif memuat larangan log dan direktif otonom."""
+    dir_text = _format_antigravity_policy_directive("agents")
+    assert ".aegis/log/" in dir_text
+    assert "AUTONOMOUS EXPLORATION DIRECTIVES" in dir_text
+    assert "NATURAL EXPLORATION" in dir_text
+    assert "CONFIDENT REFACTORING" in dir_text
 
 
 def test_antigravity_generate_injects_policy_directive(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,9 +51,9 @@ def test_antigravity_generate_injects_policy_directive(monkeypatch: pytest.Monke
     assert res.text == "OK"
     assert len(captured_cmd) == 1
     prompt_str = captured_cmd[0][2]
-    assert "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:" in prompt_str
+    assert "CRITICAL WORKSPACE SAFETY & AUTONOMOUS EXPLORATION DIRECTIVES:" in prompt_str
     assert ".aegis/log/" in prompt_str
-    assert "EXECUTION MODE: FAST" in prompt_str
+    assert "AUTONOMOUS EXPLORATION" in prompt_str
 
 
 def test_streaming_circuit_breaker_blocks_log_file(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -225,17 +218,14 @@ def test_read_file_tool_rejects_log_directories(tmp_path: Path) -> None:
 
 
 def test_format_antigravity_policy_directive_redundant_read_directive() -> None:
-    """Verifikasi direktif pencegahan re-read redundan tercakup dalam prompt."""
+    """Verifikasi direktif otonom dan refactoring tercakup dalam prompt."""
     directive = _format_antigravity_policy_directive("balanced")
-    expected_phrase = (
-        "Do NOT re-read the same source file repeatedly. "
-        "Once you have read a file, utilize its content immediately and proceed with your implementation."
-    )
-    assert expected_phrase in directive
+    assert "CONFIDENT REFACTORING" in directive
+    assert "NATURAL EXPLORATION" in directive
 
 
 def test_redundant_reread_warning_injected_after_two_reads(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifikasi bahwa pembacaan berkas > 2 kali tanpa mutasi memicu event warning."""
+    """Verifikasi bahwa pembacaan berkas > 2 kali tanpa mutasi TIDAK memutus eksekusi atau menginjeksi warning."""
     cfg = AntigravityConfig(cli_path="/bin/agy_mock")
     p = AntigravityProvider(config=cfg)
     monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
@@ -346,19 +336,16 @@ def test_redundant_reread_warning_injected_after_two_reads(monkeypatch: pytest.M
     res = p.generate(prompt="Lakukan perbaikan", options=opts)
 
     assert res.text == "Perbaikan selesai"
-    # Verifikasi event warning dipancarkan untuk read ke-3
+    # Verifikasi TIDAK ADA event warning yang dipancarkan
     warning_events = [data for ev, data in emitted_events if ev == "warning"]
-    assert len(warning_events) == 1
-    assert warning_events[0]["target"] == "src/target.ts"
-    assert warning_events[0]["read_count"] == 3
-    assert "PERINGATAN REDUNDANSI" in warning_events[0]["message"]
+    assert len(warning_events) == 0
 
-    # Verifikasi observation_received menyertakan injeksi guardrail pada read ke-3
+    # Verifikasi observation_received TIDAK menyertakan teks guardrail
     observations = [data for ev, data in emitted_events if ev == "observation_received"]
     assert len(observations) == 3
     assert "[SISTEM GUARDRAIL]" not in observations[0]["content"]
     assert "[SISTEM GUARDRAIL]" not in observations[1]["content"]
-    assert "[SISTEM GUARDRAIL]" in observations[2]["content"]
+    assert "[SISTEM GUARDRAIL]" not in observations[2]["content"]
 
 
 def test_redundant_reread_reset_on_file_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -462,8 +449,8 @@ def test_redundant_reread_reset_on_file_mutation(monkeypatch: pytest.MonkeyPatch
     assert len(warning_events) == 0
 
 
-def test_redundant_search_query_circuit_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifikasi bahwa pencarian dengan parameter identik berulang 4x memicu circuit breaker."""
+def test_redundant_search_query_no_circuit_breaker(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifikasi bahwa pencarian dengan parameter identik berulang kali TIDAK memicu circuit breaker."""
     cfg = AntigravityConfig(cli_path="/bin/agy_mock")
     p = AntigravityProvider(config=cfg)
     monkeypatch.setattr(p, "_resolve_cli_path", lambda: "/bin/agy_mock")
@@ -485,6 +472,15 @@ def test_redundant_search_query_circuit_breaker(monkeypatch: pytest.MonkeyPatch)
                 }) + "\n"
                 for i in range(1, 5)
             ]
+            self.lines.append(
+                json.dumps({
+                    "event": "step_update",
+                    "step_update": {
+                        "step_type": "agent_response",
+                        "text_delta": "Pencarian selesai",
+                    },
+                }) + "\n"
+            )
             self.stdout = self
             self.stderr = self
 
@@ -499,7 +495,10 @@ def test_redundant_search_query_circuit_breaker(monkeypatch: pytest.MonkeyPatch)
         def kill(self) -> None:
             self.killed = True
 
-        def wait(self) -> int:
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout: Any = None) -> int:
             return 0
 
         def read(self) -> str:
@@ -509,12 +508,10 @@ def test_redundant_search_query_circuit_breaker(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(subprocess, "Popen", lambda *args, **kwargs: fake_proc)
 
     opts = GenerateOptions(extra={"event_sink": lambda ev, d: None, "mode": "balanced"})
-    with pytest.raises(ProviderAPIError) as exc_info:
-        p.generate(prompt="Cari simbol", options=opts)
+    res = p.generate(prompt="Cari simbol", options=opts)
 
-    assert exc_info.value.status_code == 429
-    assert "Circuit Breaker Loop Terpicu" in str(exc_info.value)
-    assert fake_proc.killed is True
+    assert res.text == "Pencarian selesai"
+    assert fake_proc.killed is False
 
 
 def test_antigravity_cancellation_kills_process(monkeypatch: pytest.MonkeyPatch) -> None:

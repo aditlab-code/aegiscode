@@ -24,15 +24,14 @@ const error = ref("");
 const notice = ref("");
 
 // Nilai AKTUAL dari backend (sumber kebenaran tampilan; bukan nilai lokal UI).
-const actual = ref({ system_prompt: "", default_system_prompt: "", default_mode: "balanced" });
+const actual = ref({ system_prompt: "", default_system_prompt: "" });
 // Draft editor (diisi dari `actual` setiap kali load/save).
 const draft = ref("");
-const draftMode = ref("balanced");
 
 const maxChars = 200000;
 
 const dirty = computed(
-  () => draft.value !== actual.value.system_prompt || draftMode.value !== actual.value.default_mode
+  () => draft.value !== actual.value.system_prompt
 );
 const charCount = computed(() => draft.value.length);
 const canSave = computed(
@@ -50,10 +49,8 @@ function applyActual(settings) {
   actual.value = {
     system_prompt: agent.system_prompt || "",
     default_system_prompt: agent.default_system_prompt || "",
-    default_mode: agent.default_mode || "balanced",
   };
   draft.value = actual.value.system_prompt;
-  draftMode.value = actual.value.default_mode;
 }
 
 async function load() {
@@ -161,27 +158,6 @@ onMounted(load);
           <span v-else class="as-clean">tersimpan</span>
         </div>
 
-        <!-- Mode selector on Settings -> Agent -->
-        <div class="as-row as-mode-row">
-          <div class="as-label">
-            <div class="as-name">Default Execution Mode</div>
-            <div class="as-help">
-              Preferensi strategi eksekusi untuk task baru. Task dapat mengubah mode sebelum dijalankan; effective mode tetap ditentukan oleh Agent Policy System.
-            </div>
-          </div>
-          <div class="as-control">
-            <select v-model="draftMode" class="input-a" :disabled="busy">
-              <option value="fast">Fast</option>
-              <option value="balanced">Balanced</option>
-              <option value="deep">Deep</option>
-            </select>
-          </div>
-        </div>
-        <div class="as-mode-help">
-          <div><strong>Fast</strong> — Strategi cepat untuk perubahan kecil</div>
-          <div><strong>Balanced</strong> — Strategi default AEGIS untuk pekerjaan umum</div>
-          <div><strong>Deep</strong> — Strategi analisis mendalam untuk perubahan kompleks</div>
-        </div>
 
         <div class="as-actions">
           <AppButton variant="ghost" size="sm" :disabled="busy" @click="restoreDefault">

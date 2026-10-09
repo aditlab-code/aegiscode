@@ -397,6 +397,7 @@ defineExpose({
           :active-file="editorFacade.activeFile.value" @close="toggleAssistant(false)" @open-composer="assistantFacade.handleOpenAgentComposer"
           @request-stop="emit('request-stop')" @submit-task="emit('submit-task', $event)" @open-settings="emit('open-settings', $event)"
           @open-report="emit('open-report', $event)" @copy-activity="emit('copy-activity')"
+          @open-file="(f) => editorFacade.handleOpenFile(f, 'pane1')"
           @run-consultant-task="assistantFacade.handleRunConsultantTask" @consultant-event="assistantFacade.handleConsultantEvent"
           @apply-to-editor="editorFacade.handleApplyToEditor" @update:provider-instance-id="emit('update:provider-instance-id', $event)"
           @update:model-id="emit('update:model-id', $event)" @update:mode="emit('update:mode', $event)"

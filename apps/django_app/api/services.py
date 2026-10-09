@@ -642,7 +642,7 @@ class GatewayService:
             active_sess = self.get_or_create_active_unified_session(project_id=pid)
             sid = active_sess.get("session_id") or active_sess.get("id")
 
-        eff_mode = mode or self.get_operational_mode() or "ask"
+        eff_mode = mode or self.get_operational_mode() or "agents"
         # Normalisasi: create_unified_turn hanya menerima "agent" (bukan "agents")
         if str(eff_mode).strip().lower() == "agents":
             eff_mode = "agent"

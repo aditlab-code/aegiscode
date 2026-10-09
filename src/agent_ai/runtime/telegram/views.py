@@ -158,28 +158,15 @@ def render_repo_view(
     return "\n".join(lines), {"inline_keyboard": buttons}
 
 
-def render_mode_view(current_mode: str) -> Tuple[str, Dict[str, Any]]:
-    """Menampilkan status mode aktif (Ask ⏸️ vs Agents ⚡) dan tombol pemilih."""
-    mode_normalized = current_mode.lower().strip()
-    is_ask = mode_normalized == "ask"
-    mode_label = "Ask ⏸️ (Perlu Konfirmasi)" if is_ask else "Agents ⚡ (Otonom Penuh)"
-
+def render_mode_view(current_mode: str = "agents") -> Tuple[str, Dict[str, Any]]:
+    """Menampilkan status mode aktif yang telah ditetapkan secara permanen ke Agents Mode ⚡."""
     text = (
         "⚙️ <b>Kontrol Mode Operasional AegisCode:</b>\n\n"
-        f"Mode saat ini: <b>{mode_label}</b>\n\n"
-        "• <b>Ask Mode ⏸️:</b> Agen berkonsultasi dan meminta konfirmasi sebelum eksekusi kritis.\n"
-        "• <b>Agents Mode ⚡:</b> Agen mengeksekusi tugas secara otonom mandiri dengan audit streaming.\n\n"
-        "Pilih mode di bawah atau ketik langsung <code>/aegis_mode ask</code> / <code>/aegis_mode agents</code>:"
+        "Mode saat ini: <b>Agents ⚡ (Otonom Penuh)</b>\n\n"
+        "• <b>Agents Mode ⚡:</b> Agen mengeksekusi tugas secara otonom mandiri dengan audit streaming real-time.\n"
+        "Sistem telah dikonsolidasi secara permanen dalam mode otonom penuh."
     )
-
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": f"{'⭐ ' if is_ask else ''}Ask Mode ⏸️", "callback_data": "mode:set:ask"},
-                {"text": f"{'⭐ ' if not is_ask else ''}Agents Mode ⚡", "callback_data": "mode:set:agents"},
-            ]
-        ]
-    }
+    keyboard = {"inline_keyboard": []}
     return text, keyboard
 
 
