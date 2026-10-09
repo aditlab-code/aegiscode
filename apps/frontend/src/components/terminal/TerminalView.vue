@@ -85,7 +85,26 @@ function getActiveTerminalTheme() {
   if (typeof document !== "undefined" && document.documentElement) {
     const isLight = document.documentElement.dataset?.theme === "light" ||
                     document.documentElement.getAttribute("data-theme") === "light";
-    return isLight ? TOKYO_NIGHT_LIGHT_TERMINAL : TOKYO_NIGHT_STORM_TERMINAL;
+    const baseTheme = isLight ? TOKYO_NIGHT_LIGHT_TERMINAL : TOKYO_NIGHT_STORM_TERMINAL;
+    try {
+      const cs = window.getComputedStyle(document.documentElement);
+      const bg = cs.getPropertyValue("--bg").trim();
+      const text = cs.getPropertyValue("--text").trim();
+      const accent = cs.getPropertyValue("--accent").trim();
+      if (bg && text && accent) {
+        return {
+          ...baseTheme,
+          background: bg,
+          foreground: text,
+          cursor: accent,
+          cursorAccent: bg,
+          selectionBackground: isLight ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.18)",
+          black: bg,
+          white: text,
+        };
+      }
+    } catch (_) {}
+    return baseTheme;
   }
   return TOKYO_NIGHT_STORM_TERMINAL;
 }
@@ -263,7 +282,7 @@ onMounted(async () => {
       });
       themeObserver.observe(document.documentElement, {
         attributes: true,
-        attributeFilter: ["data-theme"],
+        attributeFilter: ["data-theme", "data-theme-preset"],
       });
     }
 

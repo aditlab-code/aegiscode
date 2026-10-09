@@ -49,9 +49,11 @@ test("themeService: RGB math and clamping helpers", () => {
 
 test("themeService: Curated presets catalog completeness", () => {
   assert.ok(Array.isArray(PRESET_CATALOG));
-  assert.ok(PRESET_CATALOG.length >= 8);
+  assert.equal(PRESET_CATALOG.length, 10);
 
   const ids = PRESET_CATALOG.map((p) => p.id);
+  assert.ok(ids.includes(CURATED_PRESETS.DEFAULT_DARK));
+  assert.ok(ids.includes(CURATED_PRESETS.DEFAULT_LIGHT));
   assert.ok(ids.includes(CURATED_PRESETS.TOKYO_NIGHT_DARK));
   assert.ok(ids.includes(CURATED_PRESETS.TOKYO_NIGHT_LIGHT));
   assert.ok(ids.includes(CURATED_PRESETS.NORD_DARK));
@@ -65,22 +67,62 @@ test("themeService: Curated presets catalog completeness", () => {
     assert.ok(preset.name, `Preset ${preset.id} must have a name`);
     assert.ok(preset.foundation === "dark" || preset.foundation === "light");
     assert.ok(preset.preview.primary.startsWith("#"));
+    assert.ok(preset.preview.secondary.startsWith("#"));
+    assert.ok(preset.preview.accent.startsWith("#"));
+    assert.ok(preset.preview.bg.startsWith("#"));
+    assert.ok(preset.preview.surface.startsWith("#"));
   }
 });
 
-test("themeService: Default configuration and storage fallback", () => {
+test("themeService: Default configuration and migration from legacy custom format", () => {
   const def = getDefaultThemeConfig();
-  assert.equal(def.mode, THEME_MODES.PRESET);
+  assert.equal(def.preset, CURATED_PRESETS.DEFAULT_DARK);
   assert.equal(def.foundation, BASE_FOUNDATIONS.DARK);
-  assert.ok(def.customColors.primary);
-  assert.ok(def.customColors.secondary);
-  assert.ok(def.customColors.accent);
+
+  const mockStorage = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => mockStorage.get(k) || null,
+      setItem: (k, v) => mockStorage.set(k, String(v)),
+      removeItem: (k) => mockStorage.delete(k),
+    },
+  };
+
+  try {
+    // 1. Fallback when storage is empty
+    const storedDefault = getStoredThemeConfig();
+    assert.equal(storedDefault.preset, CURATED_PRESETS.DEFAULT_DARK);
+    assert.equal(storedDefault.foundation, BASE_FOUNDATIONS.DARK);
+
+    // 2. Migration: legacy custom mode JSON in localStorage should gracefully map to valid preset
+    mockStorage.set(THEME_CONFIG_KEY, JSON.stringify({
+      mode: "custom",
+      foundation: "light",
+      customColors: { primary: { r: 10, g: 20, b: 30 } },
+    }));
+    const migratedLight = getStoredThemeConfig();
+    assert.equal(migratedLight.preset, CURATED_PRESETS.DEFAULT_LIGHT);
+    assert.equal(migratedLight.foundation, BASE_FOUNDATIONS.LIGHT);
+
+    // 3. Migration: legacy single key "dark" / "light"
+    mockStorage.delete(THEME_CONFIG_KEY);
+    mockStorage.set(THEME_KEY, "light");
+    const legacyLight = getStoredThemeConfig();
+    assert.equal(legacyLight.preset, CURATED_PRESETS.DEFAULT_LIGHT);
+    assert.equal(legacyLight.foundation, BASE_FOUNDATIONS.LIGHT);
+  } finally {
+    delete globalThis.window;
+  }
 });
 
-test("themeService: Full browser lifecycle with presets and custom sliders", () => {
+test("themeService: Full browser lifecycle with unified template presets", () => {
   const mockStorage = new Map();
   const mockDataset = {};
   const mockStyleProperties = new Map();
+
+  // Add dummy stale properties to test cleanup
+  mockStyleProperties.set("--accent", "#ffffff");
+  mockStyleProperties.set("--bg", "#000000");
 
   globalThis.window = {
     localStorage: {
@@ -102,13 +144,16 @@ test("themeService: Full browser lifecycle with presets and custom sliders", () 
   };
 
   try {
-    // 1. Inisialisasi awal tanpa storage
-    const state = createThemeState();
+    // 1. Initial creation
+    const state = createThemeState(true);
     assert.equal(state.isDark.value, true);
     assert.equal(mockDataset.theme, "dark");
-    assert.equal(state.themeConfig.mode, THEME_MODES.PRESET);
+    assert.equal(mockDataset.themePreset, CURATED_PRESETS.DEFAULT_DARK);
+    // Stale inline properties must be cleared on applyThemeConfig
+    assert.equal(mockStyleProperties.has("--accent"), false);
+    assert.equal(mockStyleProperties.has("--bg"), false);
 
-    // 2. Pilih preset Tokyo Night Dark
+    // 2. Select Tokyo Night Dark
     state.setPreset(CURATED_PRESETS.TOKYO_NIGHT_DARK);
     assert.equal(state.themeConfig.preset, CURATED_PRESETS.TOKYO_NIGHT_DARK);
     assert.equal(state.themeConfig.foundation, "dark");
@@ -116,7 +161,7 @@ test("themeService: Full browser lifecycle with presets and custom sliders", () 
     assert.equal(mockDataset.theme, "dark");
     assert.ok(mockStorage.has(THEME_CONFIG_KEY));
 
-    // 3. Pilih preset Nord Light
+    // 3. Select Nord Light
     state.setPreset(CURATED_PRESETS.NORD_LIGHT);
     assert.equal(state.themeConfig.preset, CURATED_PRESETS.NORD_LIGHT);
     assert.equal(state.themeConfig.foundation, "light");
@@ -124,42 +169,30 @@ test("themeService: Full browser lifecycle with presets and custom sliders", () 
     assert.equal(mockDataset.theme, "light");
     assert.equal(state.isDark.value, false);
 
-    // 4. Pilih High Contrast Dark
+    // 4. Select High Contrast Dark
     state.setPreset(CURATED_PRESETS.HIGH_CONTRAST_DARK);
+    assert.equal(state.themeConfig.preset, CURATED_PRESETS.HIGH_CONTRAST_DARK);
     assert.equal(mockDataset.themePreset, CURATED_PRESETS.HIGH_CONTRAST_DARK);
     assert.equal(mockDataset.theme, "dark");
-
-    // 5. Beralih ke Mode Custom
-    state.setCustomMode();
-    assert.equal(state.themeConfig.mode, THEME_MODES.CUSTOM);
-    assert.equal(mockDataset.themeMode, "custom");
-    assert.equal(mockDataset.themePreset, undefined);
-
-    // Ubah foundation custom ke Light
-    state.setCustomFoundation("light");
-    assert.equal(state.themeConfig.foundation, "light");
-    assert.equal(mockDataset.theme, "light");
-
-    // Atur slider custom RGB untuk primary, secondary, accent
-    state.updateCustomColor("accent", { r: 255, g: 64, b: 128 });
-    state.updateCustomColor("primary", { r: 32, g: 128, b: 240 });
-    state.updateCustomColor("secondary", { r: 80, g: 90, b: 100 });
-
-    assert.equal(mockStyleProperties.get("--accent"), "#2080f0");
-    assert.equal(mockStyleProperties.get("--primary"), "#2080f0");
-    assert.equal(mockStyleProperties.get("--secondary"), "#505a64");
-    assert.equal(mockStyleProperties.get("--text-dim"), "#505a64");
-    assert.equal(mockStyleProperties.get("--accent-2"), "#ff4080");
-    assert.equal(mockStyleProperties.get("--accent-soft"), "rgba(32, 128, 240, 0.16)");
-
-    // 6. Reset to default
-    state.resetTheme();
-    assert.equal(state.themeConfig.mode, THEME_MODES.PRESET);
-    assert.equal(state.themeConfig.foundation, "dark");
     assert.equal(state.isDark.value, true);
-    // Custom inline styles must be cleaned up on reset
-    assert.equal(mockStyleProperties.has("--accent"), false);
-    assert.equal(mockStyleProperties.has("--accent-dim"), false);
+
+    // 5. Reset to default
+    state.resetTheme();
+    assert.equal(state.themeConfig.preset, CURATED_PRESETS.DEFAULT_DARK);
+    assert.equal(state.themeConfig.foundation, "dark");
+    assert.equal(mockDataset.themePreset, CURATED_PRESETS.DEFAULT_DARK);
+    assert.equal(mockDataset.theme, "dark");
+    assert.equal(state.isDark.value, true);
+
+    // 6. Test shared reactive singleton across components
+    const firstInstance = createThemeState();
+    const secondInstance = createThemeState();
+    assert.equal(firstInstance, secondInstance, "createThemeState must return shared singleton instance");
+
+    // 7. Toggle wallpaper
+    const initialWp = state.isWallpaperEnabled.value;
+    state.toggleWallpaper();
+    assert.equal(state.isWallpaperEnabled.value, !initialWp);
   } finally {
     delete globalThis.window;
     delete globalThis.document;

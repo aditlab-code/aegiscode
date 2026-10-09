@@ -162,9 +162,17 @@ async function mountDiffEditor(originalText, modifiedText) {
     document.documentElement.dataset.theme === "light";
   const userEditorOpts = toMonacoOptions(getStoredEditorSettings());
 
+  const KNOWN_MONACO_PRESETS = [
+    "tokyo-night-dark", "tokyo-night-light",
+    "nord-dark", "nord-light",
+    "atom-dark", "atom-light",
+    "default-dark", "default-light",
+  ];
+
   function resolveMonacoTheme(p, light) {
     if (p === "high-contrast-dark") return "hc-black";
     if (p === "high-contrast-light") return "hc-light";
+    if (p && KNOWN_MONACO_PRESETS.includes(p)) return p;
     return light ? mod.AEGIS_LIGHT_THEME : mod.AEGIS_THEME;
   }
 

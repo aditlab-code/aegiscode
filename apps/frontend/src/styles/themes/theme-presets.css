@@ -8,6 +8,117 @@
  */
 
 /* =============================================================================
+   Core Shell & Workbench Token Mappings for All Presets
+   Ensures that every part of the Aegis IDE (Navbar, Activity Bar, Sidebar,
+   Editor Tab Bar, Breadcrumbs, Terminal, Assistant, Borders, etc.) adapts
+   seamlessly to whichever theme preset is selected.
+   ============================================================================= */
+[data-theme-preset] {
+  --chrome: var(--bg-secondary);
+  --rail: var(--bg-sidebar);
+  --sidebar: var(--bg-sidebar);
+  --editor: var(--bg);
+  --tabs: var(--bg-surface);
+  --assistant: var(--bg-drawer);
+  --terminal: var(--bg);
+  --edge: var(--border);
+  --line: var(--border-soft);
+  --inset: var(--bg-deep);
+  --glass-editor-bg: var(--bg);
+  --glass-header-bg: var(--bg-header);
+  --glass-panel-bg: var(--panel);
+  --glass-border: var(--border);
+}
+
+/* =============================================================================
+   0a. Aegis Orbit (Default Dark)
+   ============================================================================= */
+[data-theme-preset="default-dark"] {
+  --bg: #181922;
+  --panel: #1f202c;
+  --surface: #292a36;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #21222e;
+  --bg-elev: #292a36;
+  --bg-card: var(--panel);
+  --bg-sidebar: #171822;
+  --bg-drawer: #171822;
+  --sidebar: rgba(23, 24, 34, 0.85);
+  --bg-deep: #15161f;
+  --bg-secondary: #1d1e28;
+
+  --text: #dedee9;
+  --text-dim: #bcbcca;
+  --text-faint: #a29eaf;
+  --secondary: #bcbcca;
+  --muted: #a29eaf;
+
+  --accent: #b5a1ed;
+  --accent-dim: #9d7cd8;
+  --accent-soft: rgba(181, 161, 237, 0.16);
+  --accent-muted: #b5a1ed;
+  --accent-2: #c1a4df;
+  --accent-2-dim: #9d7cd8;
+  --selection: rgba(181, 161, 237, 0.16);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-soft: rgba(255, 255, 255, 0.06);
+  --border-subtle: rgba(255, 255, 255, 0.03);
+  --border-hover: rgba(181, 161, 237, 0.45);
+  --line: rgba(255, 255, 255, 0.07);
+  --hover: rgba(255, 255, 255, 0.06);
+
+  --ok: #a2c9a3;
+  --warn: #e0af68;
+  --err: #f7768e;
+}
+
+/* =============================================================================
+   0b. Aegis Orbit Light (Default Light)
+   ============================================================================= */
+[data-theme-preset="default-light"] {
+  --bg: #eae5f4;
+  --panel: #f5f3fa;
+  --surface: #f5f3fa;
+  --bg-panel: var(--panel);
+  --bg-surface: var(--surface);
+  --bg-header: #e8e4f1;
+  --bg-elev: #ffffff;
+  --bg-card: var(--panel);
+  --bg-sidebar: #eeeaf5;
+  --bg-drawer: #eeeaf5;
+  --sidebar: rgba(238, 234, 245, 0.88);
+  --bg-deep: #dcd7e8;
+  --bg-secondary: #e4dfea;
+
+  --text: #333044;
+  --text-dim: #555168;
+  --text-faint: #736b82;
+  --secondary: #555168;
+  --muted: #736b82;
+
+  --accent: #8261bb;
+  --accent-dim: #6d4fa3;
+  --accent-soft: rgba(130, 97, 187, 0.13);
+  --accent-muted: #8261bb;
+  --accent-2: #9a60ad;
+  --accent-2-dim: #7c488e;
+  --selection: rgba(130, 97, 187, 0.13);
+
+  --border: rgba(73, 64, 97, 0.12);
+  --border-soft: rgba(73, 64, 97, 0.08);
+  --border-subtle: rgba(73, 64, 97, 0.05);
+  --border-hover: rgba(130, 97, 187, 0.45);
+  --line: rgba(73, 64, 97, 0.1);
+  --hover: rgba(101, 85, 120, 0.06);
+
+  --ok: #628c5a;
+  --warn: #9a7638;
+  --err: #a63f4f;
+}
+
+/* =============================================================================
    1. Tokyo Night (Dark)
    ============================================================================= */
 [data-theme-preset="tokyo-night-dark"] {
@@ -145,33 +256,33 @@
 [data-theme-preset="nord-light"] {
   --bg: #eceff4;
   --panel: #e5e9f0;
-  --surface: #d8dee9;
+  --surface: #e5e9f0;
   --bg-panel: var(--panel);
   --bg-surface: var(--surface);
-  --bg-header: #e2e6ed;
+  --bg-header: #e5e9f0;
   --bg-elev: #ffffff;
   --bg-card: var(--panel);
-  --bg-sidebar: #e2e6ed;
-  --bg-drawer: #e2e6ed;
-  --sidebar: rgba(226, 230, 237, 0.88);
-  --bg-deep: #cbd2df;
-  --bg-secondary: #dde2ec;
+  --bg-sidebar: #e5e9f0;
+  --bg-drawer: #e5e9f0;
+  --sidebar: rgba(229, 233, 240, 0.9);
+  --bg-deep: #d8dee9;
+  --bg-secondary: #e5e9f0;
 
   --text: #2e3440;
-  --text-dim: #3b4252;
+  --text-dim: #4c566a;
   --text-faint: #7b88a1;
-  --secondary: #4c566a;
+  --secondary: #81a1c1;
   --muted: #7b88a1;
 
   --accent: #5e81ac;
   --accent-dim: #4c688d;
   --accent-soft: rgba(94, 129, 172, 0.15);
   --accent-muted: #5e81ac;
-  --accent-2: #b48ead;
-  --accent-2-dim: #9a7293;
+  --accent-2: #88c0d0;
+  --accent-2-dim: #81a1c1;
   --selection: rgba(94, 129, 172, 0.18);
 
-  --border: rgba(94, 129, 172, 0.18);
+  --border: rgba(94, 129, 172, 0.22);
   --border-soft: rgba(46, 52, 64, 0.1);
   --border-subtle: rgba(46, 52, 64, 0.05);
   --border-hover: rgba(94, 129, 172, 0.45);
@@ -320,8 +431,8 @@
    ============================================================================= */
 [data-theme-preset="high-contrast-light"] {
   --bg: #ffffff;
-  --panel: #f8f8f8;
-  --surface: #eeeeee;
+  --panel: #f2f2f2;
+  --surface: #f2f2f2;
   --bg-panel: var(--panel);
   --bg-surface: var(--surface);
   --bg-header: #ffffff;
@@ -331,20 +442,20 @@
   --bg-drawer: #ffffff;
   --sidebar: #ffffff;
   --bg-deep: #e0e0e0;
-  --bg-secondary: #f0f0f0;
+  --bg-secondary: #f2f2f2;
 
   --text: #000000;
   --text-dim: #1a1a1a;
   --text-faint: #333333;
-  --secondary: #000000;
+  --secondary: #990000;
   --muted: #333333;
 
   --accent: #0000ee;
   --accent-dim: #0000aa;
-  --accent-soft: rgba(0, 0, 238, 0.2);
+  --accent-soft: rgba(0, 0, 238, 0.18);
   --accent-muted: #0000ee;
-  --accent-2: #990000;
-  --accent-2-dim: #770000;
+  --accent-2: #008800;
+  --accent-2-dim: #006600;
   --selection: rgba(0, 0, 238, 0.25);
 
   --border: #000000;
@@ -354,7 +465,7 @@
   --line: rgba(0, 0, 0, 0.7);
   --hover: rgba(0, 0, 0, 0.12);
 
-  --ok: #006600;
+  --ok: #008800;
   --warn: #885500;
-  --err: #cc0000;
+  --err: #990000;
 }

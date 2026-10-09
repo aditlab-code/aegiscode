@@ -12,7 +12,9 @@ export function escapeHtml(value) {
   return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // Inline Markdown: `code`, **bold**, *italic*, [link](url).
@@ -23,7 +25,7 @@ export function inlineMarkdown(text) {
   out = out.replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, href) => {
     const rawUrl = href.trim().replace(/&amp;/g, "&");
-    if (/^(https?:\/\/|mailto:|#|\/)/i.test(rawUrl)) {
+    if (/^(https?:\/\/|mailto:|#|(?!\/\/)\/)/i.test(rawUrl)) {
       const isExternal = /^https?:\/\//i.test(rawUrl);
       const targetRel = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
       return `<a class="md-link" href="${escapeHtml(rawUrl)}"${targetRel}>${label}</a>`;

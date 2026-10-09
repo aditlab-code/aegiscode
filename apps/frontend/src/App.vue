@@ -386,7 +386,6 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="ide-root"
-    :data-theme="themeState.isDark.value ? 'dark' : 'light'"
     :class="[`tier-${responsive.tier.value}`]"
   >
     <div class="ide-window" :class="[`tier-${responsive.tier.value}`]">

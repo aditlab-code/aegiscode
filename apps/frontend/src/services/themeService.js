@@ -9,9 +9,11 @@ export const THEMES = Object.freeze({
   LIGHT: "light",
 });
 
+/**
+ * @deprecated All themes are now unified as template presets.
+ */
 export const THEME_MODES = Object.freeze({
   PRESET: "preset",
-  CUSTOM: "custom",
 });
 
 export const BASE_FOUNDATIONS = Object.freeze({
@@ -39,7 +41,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Aegis",
     variant: "dark",
     foundation: BASE_FOUNDATIONS.DARK,
-    preview: { primary: "#b5a1ed", secondary: "#bcbcca", bg: "#181922" },
+    preview: { primary: "#b5a1ed", secondary: "#bcbcca", accent: "#c1a4df", bg: "#181922", surface: "#1f202c" },
   },
   {
     id: CURATED_PRESETS.DEFAULT_LIGHT,
@@ -47,7 +49,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Aegis",
     variant: "light",
     foundation: BASE_FOUNDATIONS.LIGHT,
-    preview: { primary: "#8261bb", secondary: "#555168", bg: "#eae5f4" },
+    preview: { primary: "#8261bb", secondary: "#555168", accent: "#9a60ad", bg: "#eae5f4", surface: "#f5f3fa" },
   },
   {
     id: CURATED_PRESETS.TOKYO_NIGHT_DARK,
@@ -55,7 +57,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Tokyo Night",
     variant: "dark",
     foundation: BASE_FOUNDATIONS.DARK,
-    preview: { primary: "#7aa2f7", secondary: "#bb9af7", bg: "#1a1b26" },
+    preview: { primary: "#7aa2f7", secondary: "#bb9af7", accent: "#7dcfff", bg: "#1a1b26", surface: "#24283b" },
   },
   {
     id: CURATED_PRESETS.TOKYO_NIGHT_LIGHT,
@@ -63,7 +65,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Tokyo Night",
     variant: "light",
     foundation: BASE_FOUNDATIONS.LIGHT,
-    preview: { primary: "#34548a", secondary: "#5a4a78", bg: "#d5d6db" },
+    preview: { primary: "#34548a", secondary: "#565a6e", accent: "#5a4a78", bg: "#d5d6db", surface: "#e9e9ed" },
   },
   {
     id: CURATED_PRESETS.NORD_DARK,
@@ -71,7 +73,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Nord",
     variant: "dark",
     foundation: BASE_FOUNDATIONS.DARK,
-    preview: { primary: "#88c0d0", secondary: "#81a1c1", bg: "#2e3440" },
+    preview: { primary: "#88c0d0", secondary: "#e5e9f0", accent: "#b48ead", bg: "#2e3440", surface: "#3b4252" },
   },
   {
     id: CURATED_PRESETS.NORD_LIGHT,
@@ -79,7 +81,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Nord",
     variant: "light",
     foundation: BASE_FOUNDATIONS.LIGHT,
-    preview: { primary: "#5e81ac", secondary: "#81a1c1", bg: "#eceff4" },
+    preview: { primary: "#5e81ac", secondary: "#81a1c1", accent: "#88c0d0", bg: "#eceff4", surface: "#e5e9f0" },
   },
   {
     id: CURATED_PRESETS.ATOM_DARK,
@@ -87,7 +89,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Atom One",
     variant: "dark",
     foundation: BASE_FOUNDATIONS.DARK,
-    preview: { primary: "#61afef", secondary: "#c678dd", bg: "#282c34" },
+    preview: { primary: "#61afef", secondary: "#9da5b4", accent: "#c678dd", bg: "#282c34", surface: "#21252b" },
   },
   {
     id: CURATED_PRESETS.ATOM_LIGHT,
@@ -95,7 +97,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "Atom One",
     variant: "light",
     foundation: BASE_FOUNDATIONS.LIGHT,
-    preview: { primary: "#4078f2", secondary: "#a626a4", bg: "#fafafa" },
+    preview: { primary: "#4078f2", secondary: "#696c77", accent: "#a626a4", bg: "#fafafa", surface: "#f0f0f0" },
   },
   {
     id: CURATED_PRESETS.HIGH_CONTRAST_DARK,
@@ -103,7 +105,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "High Contrast",
     variant: "dark",
     foundation: BASE_FOUNDATIONS.DARK,
-    preview: { primary: "#00ffff", secondary: "#ffff00", bg: "#000000" },
+    preview: { primary: "#00ffff", secondary: "#ffffff", accent: "#ffff00", bg: "#000000", surface: "#0a0a0a" },
   },
   {
     id: CURATED_PRESETS.HIGH_CONTRAST_LIGHT,
@@ -111,7 +113,7 @@ export const PRESET_CATALOG = Object.freeze([
     family: "High Contrast",
     variant: "light",
     foundation: BASE_FOUNDATIONS.LIGHT,
-    preview: { primary: "#0000ee", secondary: "#990000", bg: "#ffffff" },
+    preview: { primary: "#0000ee", secondary: "#990000", accent: "#008800", bg: "#ffffff", surface: "#f2f2f2" },
   },
 ]);
 
@@ -164,25 +166,10 @@ export function hexToRgb(hex) {
  * @returns {string}
  */
 export function rgbaString(rgb, alpha = 1) {
-  if (!rgb) return `rgba(0, 0, 0, ${alpha})`;
-  return `rgba(${clampRgb(rgb.r)}, ${clampRgb(rgb.g)}, ${clampRgb(rgb.b)}, ${alpha})`;
+  const a = typeof alpha === "number" && !Number.isNaN(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+  if (!rgb) return `rgba(0, 0, 0, ${a})`;
+  return `rgba(${clampRgb(rgb.r)}, ${clampRgb(rgb.g)}, ${clampRgb(rgb.b)}, ${a})`;
 }
-
-/**
- * Default color channels for custom mode
- */
-export const DEFAULT_CUSTOM_COLORS = Object.freeze({
-  dark: {
-    primary: { r: 181, g: 161, b: 237 },    // #b5a1ed
-    secondary: { r: 188, g: 188, b: 202 },  // #bcbcca
-    accent: { r: 193, g: 164, b: 223 },     // #c1a4df
-  },
-  light: {
-    primary: { r: 130, g: 97, b: 187 },     // #8261bb
-    secondary: { r: 85, g: 81, b: 104 },    // #555168
-    accent: { r: 154, g: 96, b: 173 },      // #9a60ad
-  },
-});
 
 /**
  * Default initial theme configuration
@@ -190,19 +177,14 @@ export const DEFAULT_CUSTOM_COLORS = Object.freeze({
  */
 export function getDefaultThemeConfig() {
   return {
-    mode: THEME_MODES.PRESET,
     preset: CURATED_PRESETS.DEFAULT_DARK,
     foundation: BASE_FOUNDATIONS.DARK,
-    customColors: {
-      primary: { ...DEFAULT_CUSTOM_COLORS.dark.primary },
-      secondary: { ...DEFAULT_CUSTOM_COLORS.dark.secondary },
-      accent: { ...DEFAULT_CUSTOM_COLORS.dark.accent },
-    },
   };
 }
 
 /**
  * Read the full persisted theme configuration safely across browser and SSR.
+ * Automatically migrates legacy or custom format to a valid curated preset.
  * @returns {object}
  */
 export function getStoredThemeConfig() {
@@ -216,38 +198,15 @@ export function getStoredThemeConfig() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
-        let foundation = parsed.foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
-        if (legacy === THEMES.LIGHT) foundation = BASE_FOUNDATIONS.LIGHT;
-        else if (legacy === THEMES.DARK) foundation = BASE_FOUNDATIONS.DARK;
-
-        let preset = typeof parsed.preset === "string" ? parsed.preset : CURATED_PRESETS.DEFAULT_DARK;
-        if (preset === CURATED_PRESETS.DEFAULT_DARK && foundation === BASE_FOUNDATIONS.LIGHT) {
-          preset = CURATED_PRESETS.DEFAULT_LIGHT;
-        } else if (preset === CURATED_PRESETS.DEFAULT_LIGHT && foundation === BASE_FOUNDATIONS.DARK) {
-          preset = CURATED_PRESETS.DEFAULT_DARK;
-        }
+        const foundation = parsed.foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
+        const matchedPreset = PRESET_CATALOG.find((p) => p.id === parsed.preset);
+        const preset = matchedPreset
+          ? matchedPreset.id
+          : (foundation === BASE_FOUNDATIONS.LIGHT ? CURATED_PRESETS.DEFAULT_LIGHT : CURATED_PRESETS.DEFAULT_DARK);
 
         return {
-          mode: parsed.mode === THEME_MODES.CUSTOM ? THEME_MODES.CUSTOM : THEME_MODES.PRESET,
           preset,
-          foundation,
-          customColors: {
-            primary: {
-              r: clampRgb(parsed.customColors?.primary?.r ?? DEFAULT_CUSTOM_COLORS.dark.primary.r),
-              g: clampRgb(parsed.customColors?.primary?.g ?? DEFAULT_CUSTOM_COLORS.dark.primary.g),
-              b: clampRgb(parsed.customColors?.primary?.b ?? DEFAULT_CUSTOM_COLORS.dark.primary.b),
-            },
-            secondary: {
-              r: clampRgb(parsed.customColors?.secondary?.r ?? DEFAULT_CUSTOM_COLORS.dark.secondary.r),
-              g: clampRgb(parsed.customColors?.secondary?.g ?? DEFAULT_CUSTOM_COLORS.dark.secondary.g),
-              b: clampRgb(parsed.customColors?.secondary?.b ?? DEFAULT_CUSTOM_COLORS.dark.secondary.b),
-            },
-            accent: {
-              r: clampRgb(parsed.customColors?.accent?.r ?? DEFAULT_CUSTOM_COLORS.dark.accent.r),
-              g: clampRgb(parsed.customColors?.accent?.g ?? DEFAULT_CUSTOM_COLORS.dark.accent.g),
-              b: clampRgb(parsed.customColors?.accent?.b ?? DEFAULT_CUSTOM_COLORS.dark.accent.b),
-            },
-          },
+          foundation: matchedPreset ? matchedPreset.foundation : foundation,
         };
       }
     }
@@ -255,7 +214,6 @@ export function getStoredThemeConfig() {
     // Fallback: check legacy single theme key ("dark" | "light")
     if (legacy === THEMES.LIGHT) {
       return {
-        ...fallback,
         preset: CURATED_PRESETS.DEFAULT_LIGHT,
         foundation: BASE_FOUNDATIONS.LIGHT,
       };
@@ -273,16 +231,32 @@ export function getStoredThemeConfig() {
 export function saveThemeConfig(config) {
   if (typeof window === "undefined" || !window.localStorage) return;
   try {
-    window.localStorage.setItem(THEME_CONFIG_KEY, JSON.stringify(config));
-    // Keep legacy key updated
-    window.localStorage.setItem(THEME_KEY, config.foundation || THEMES.DARK);
+    const payload = {
+      preset: config.preset || CURATED_PRESETS.DEFAULT_DARK,
+      foundation: config.foundation || BASE_FOUNDATIONS.DARK,
+    };
+    window.localStorage.setItem(THEME_CONFIG_KEY, JSON.stringify(payload));
+    window.localStorage.setItem(THEME_KEY, payload.foundation);
   } catch (_) {
     // Ignore storage errors in restricted contexts
   }
 }
 
 /**
- * Apply full theme configuration to document DOM (datasets and CSS variables).
+ * Properties to clean from root.style when setting presets to ensure zero style leakage
+ */
+const STALE_INLINE_PROPS = [
+  "--accent", "--accent-muted", "--primary", "--accent-soft", "--border-hover", "--selection",
+  "--secondary", "--text-dim", "--muted", "--text-faint", "--btn-outline-muted", "--border-soft",
+  "--accent-2", "--accent-dim", "--accent-2-dim", "--accent-2-soft", "--accent-2-bright",
+  "--bg", "--bg-deep", "--bg-code", "--editor", "--terminal", "--glass-editor-bg",
+  "--surface", "--panel", "--bg-surface", "--bg-panel", "--bg-card", "--bg-elev",
+  "--bg-secondary", "--bg-sidebar", "--sidebar", "--bg-header", "--bg-drawer",
+  "--rail", "--chrome", "--glass-header-bg", "--glass-panel-bg",
+];
+
+/**
+ * Apply full theme configuration to document DOM (datasets).
  * SSR-safe.
  * @param {object} config
  */
@@ -290,67 +264,23 @@ export function applyThemeConfig(config) {
   if (typeof document === "undefined" || !document.documentElement) return;
   const root = document.documentElement;
   const foundation = config.foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
+  const preset = config.preset || (foundation === BASE_FOUNDATIONS.LIGHT ? CURATED_PRESETS.DEFAULT_LIGHT : CURATED_PRESETS.DEFAULT_DARK);
 
-  // Set foundation on dataset
+  // Set foundation and preset on dataset
   if (root.dataset) {
     root.dataset.theme = foundation;
-    root.dataset.themeMode = config.mode;
-    if (config.mode === THEME_MODES.PRESET && config.preset) {
-      root.dataset.themePreset = config.preset;
-    } else {
-      delete root.dataset.themePreset;
-    }
+    root.dataset.themePreset = preset;
+    delete root.dataset.themeMode;
   } else {
     root.setAttribute("data-theme", foundation);
-    root.setAttribute("data-theme-mode", config.mode);
-    if (config.mode === THEME_MODES.PRESET && config.preset) {
-      root.setAttribute("data-theme-preset", config.preset);
-    } else {
-      root.removeAttribute("data-theme-preset");
-    }
+    root.setAttribute("data-theme-preset", preset);
+    root.removeAttribute("data-theme-mode");
   }
 
-  // Handle CSS variable overrides
-  if (root.style) {
-    if (config.mode === THEME_MODES.CUSTOM && config.customColors) {
-      const { primary, secondary, accent } = config.customColors;
-      const primaryHex = rgbToHex(primary);
-      const secondaryHex = rgbToHex(secondary);
-      const accentHex = rgbToHex(accent);
-
-      if (typeof root.style.setProperty === "function") {
-        // 1. Primary Colors (Interactive buttons, active states, branding highlights)
-        root.style.setProperty("--accent", primaryHex);
-        root.style.setProperty("--accent-muted", primaryHex);
-        root.style.setProperty("--primary", primaryHex);
-        root.style.setProperty("--accent-soft", rgbaString(primary, 0.16));
-        root.style.setProperty("--border-hover", rgbaString(primary, 0.4));
-        root.style.setProperty("--selection", rgbaString(primary, 0.22));
-
-        // 2. Secondary Colors (Muted text, passive borders, subtle chrome)
-        root.style.setProperty("--secondary", secondaryHex);
-        root.style.setProperty("--text-dim", secondaryHex);
-        root.style.setProperty("--muted", rgbaString(secondary, 0.75));
-        root.style.setProperty("--btn-outline-muted", rgbaString(secondary, 0.35));
-        root.style.setProperty("--border-soft", rgbaString(secondary, 0.2));
-
-        // 3. Accent Colors (Secondary accent, tags, badge highlights)
-        root.style.setProperty("--accent-2", accentHex);
-        root.style.setProperty("--accent-dim", accentHex);
-        root.style.setProperty("--accent-2-dim", accentHex);
-        root.style.setProperty("--accent-2-soft", rgbaString(accent, 0.18));
-        root.style.setProperty("--accent-2-bright", accentHex);
-      }
-    } else if (typeof root.style.removeProperty === "function") {
-      // Clear inline custom overrides to let preset or base theme stylesheet rules take effect
-      const customProps = [
-        "--accent", "--accent-muted", "--primary", "--accent-soft", "--border-hover", "--selection",
-        "--secondary", "--text-dim", "--muted", "--btn-outline-muted", "--border-soft",
-        "--accent-2", "--accent-dim", "--accent-2-dim", "--accent-2-soft", "--accent-2-bright",
-      ];
-      for (const prop of customProps) {
-        root.style.removeProperty(prop);
-      }
+  // Clear any leftover inline custom overrides so preset CSS takes pure effect
+  if (root.style && typeof root.style.removeProperty === "function") {
+    for (const prop of STALE_INLINE_PROPS) {
+      root.style.removeProperty(prop);
     }
   }
 }
@@ -382,8 +312,7 @@ export function applyTheme(theme) {
   const updated = {
     ...current,
     foundation,
-    // if using default preset, keep it aligned with foundation
-    preset: current.mode === THEME_MODES.PRESET && (current.preset === CURATED_PRESETS.DEFAULT_DARK || current.preset === CURATED_PRESETS.DEFAULT_LIGHT)
+    preset: current.preset === CURATED_PRESETS.DEFAULT_DARK || current.preset === CURATED_PRESETS.DEFAULT_LIGHT
       ? (foundation === BASE_FOUNDATIONS.LIGHT ? CURATED_PRESETS.DEFAULT_LIGHT : CURATED_PRESETS.DEFAULT_DARK)
       : current.preset,
   };
@@ -455,22 +384,25 @@ export function initWallpaper(fallback = true) {
   return enabled;
 }
 
+let sharedThemeState = null;
+
 /**
  * Create reactive theme and wallpaper state for components.
+ * Returns a shared reactive singleton by default so that all components (e.g. App.vue and AppearanceSettingsPanel)
+ * stay in perfect synchronization without requiring full page reloads.
+ * @param {boolean} [forceNew=false]
  */
-export function createThemeState() {
+export function createThemeState(forceNew = false) {
+  if (sharedThemeState && !forceNew) {
+    return sharedThemeState;
+  }
+
   const initialConfig = getStoredThemeConfig();
   applyThemeConfig(initialConfig);
 
   const themeConfig = reactive({
-    mode: initialConfig.mode,
     preset: initialConfig.preset,
     foundation: initialConfig.foundation,
-    customColors: {
-      primary: { ...initialConfig.customColors.primary },
-      secondary: { ...initialConfig.customColors.secondary },
-      accent: { ...initialConfig.customColors.accent },
-    },
   });
 
   const isDark = computed(() => themeConfig.foundation === BASE_FOUNDATIONS.DARK);
@@ -478,18 +410,16 @@ export function createThemeState() {
   const isWallpaperEnabled = ref(initialWallpaper);
 
   function persist() {
-    saveThemeConfig(themeConfig);
     applyThemeConfig(themeConfig);
+    saveThemeConfig(themeConfig);
   }
 
   function setTheme(theme) {
     themeConfig.foundation = theme === THEMES.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
-    if (themeConfig.mode === THEME_MODES.PRESET) {
-      if (themeConfig.preset === CURATED_PRESETS.DEFAULT_DARK && theme === THEMES.LIGHT) {
-        themeConfig.preset = CURATED_PRESETS.DEFAULT_LIGHT;
-      } else if (themeConfig.preset === CURATED_PRESETS.DEFAULT_LIGHT && theme === THEMES.DARK) {
-        themeConfig.preset = CURATED_PRESETS.DEFAULT_DARK;
-      }
+    if (themeConfig.preset === CURATED_PRESETS.DEFAULT_DARK && theme === THEMES.LIGHT) {
+      themeConfig.preset = CURATED_PRESETS.DEFAULT_LIGHT;
+    } else if (themeConfig.preset === CURATED_PRESETS.DEFAULT_LIGHT && theme === THEMES.DARK) {
+      themeConfig.preset = CURATED_PRESETS.DEFAULT_DARK;
     }
     persist();
   }
@@ -500,42 +430,16 @@ export function createThemeState() {
 
   function setPreset(presetId) {
     const found = PRESET_CATALOG.find((p) => p.id === presetId);
-    themeConfig.mode = THEME_MODES.PRESET;
-    themeConfig.preset = presetId;
-    if (found) {
-      themeConfig.foundation = found.foundation;
-    }
-    persist();
-  }
-
-  function setCustomMode() {
-    themeConfig.mode = THEME_MODES.CUSTOM;
-    persist();
-  }
-
-  function setCustomFoundation(foundation) {
-    themeConfig.mode = THEME_MODES.CUSTOM;
-    themeConfig.foundation = foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
-    persist();
-  }
-
-  function updateCustomColor(channel, colorObj) {
-    if (!themeConfig.customColors[channel]) return;
-    themeConfig.mode = THEME_MODES.CUSTOM;
-    themeConfig.customColors[channel].r = clampRgb(colorObj.r);
-    themeConfig.customColors[channel].g = clampRgb(colorObj.g);
-    themeConfig.customColors[channel].b = clampRgb(colorObj.b);
+    if (!found) return;
+    themeConfig.preset = found.id;
+    themeConfig.foundation = found.foundation;
     persist();
   }
 
   function resetTheme() {
     const def = getDefaultThemeConfig();
-    themeConfig.mode = def.mode;
     themeConfig.preset = def.preset;
     themeConfig.foundation = def.foundation;
-    themeConfig.customColors.primary = { ...def.customColors.primary };
-    themeConfig.customColors.secondary = { ...def.customColors.secondary };
-    themeConfig.customColors.accent = { ...def.customColors.accent };
     persist();
   }
 
@@ -548,19 +452,21 @@ export function createThemeState() {
     setWallpaper(!isWallpaperEnabled.value);
   }
 
-  return {
+  const instance = {
     isDark,
     themeConfig,
     setTheme,
     toggleTheme,
     setPreset,
-    setCustomMode,
-    setCustomFoundation,
-    updateCustomColor,
     resetTheme,
     isWallpaperEnabled,
     setWallpaper,
     toggleWallpaper,
     PRESET_CATALOG,
   };
+
+  if (!forceNew) {
+    sharedThemeState = instance;
+  }
+  return instance;
 }

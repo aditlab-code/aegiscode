@@ -155,6 +155,160 @@ export function getMonaco() {
       },
     });
 
+    // Tokyo Night Dark
+    monaco.editor.defineTheme("tokyo-night-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "565f89", fontStyle: "italic" },
+        { token: "keyword", foreground: "bb9af7" },
+        { token: "string", foreground: "9ece6a" },
+        { token: "number", foreground: "ff9e64" },
+        { token: "function", foreground: "7aa2f7" },
+        { token: "variable", foreground: "c0caf5" },
+        { token: "delimiter", foreground: "9aa5ce" },
+      ],
+      colors: {
+        "editor.background": "#1a1b26",
+        "editor.foreground": "#c0caf5",
+        "editorGutter.background": "#1a1b26",
+        "editorLineNumber.foreground": "#565f89",
+        "editorLineNumber.activeForeground": "#7aa2f7",
+        "editor.selectionBackground": "#7aa2f726",
+        "minimap.background": "#16161e",
+        "editorWidget.background": "#1f2335",
+      },
+    });
+
+    // Tokyo Night Light
+    monaco.editor.defineTheme("tokyo-night-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "8990b3", fontStyle: "italic" },
+        { token: "keyword", foreground: "5a4a78" },
+        { token: "string", foreground: "485e30" },
+        { token: "number", foreground: "8c6c3e" },
+        { token: "function", foreground: "34548a" },
+        { token: "variable", foreground: "343b58" },
+        { token: "delimiter", foreground: "565a6e" },
+      ],
+      colors: {
+        "editor.background": "#d5d6db",
+        "editor.foreground": "#343b58",
+        "editorGutter.background": "#d5d6db",
+        "editorLineNumber.foreground": "#8990b3",
+        "editorLineNumber.activeForeground": "#34548a",
+        "editor.selectionBackground": "#34548a26",
+        "minimap.background": "#cbccd1",
+        "editorWidget.background": "#e1e2e7",
+      },
+    });
+
+    // Nordic Dark
+    monaco.editor.defineTheme("nord-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "4c566a", fontStyle: "italic" },
+        { token: "keyword", foreground: "81a1c1" },
+        { token: "string", foreground: "a3be8c" },
+        { token: "number", foreground: "b48ead" },
+        { token: "function", foreground: "88c0d0" },
+        { token: "variable", foreground: "eceff4" },
+        { token: "delimiter", foreground: "d8dee9" },
+      ],
+      colors: {
+        "editor.background": "#2e3440",
+        "editor.foreground": "#eceff4",
+        "editorGutter.background": "#2e3440",
+        "editorLineNumber.foreground": "#4c566a",
+        "editorLineNumber.activeForeground": "#88c0d0",
+        "editor.selectionBackground": "#88c0d026",
+        "minimap.background": "#242933",
+        "editorWidget.background": "#3b4252",
+      },
+    });
+
+    // Nordic Light
+    monaco.editor.defineTheme("nord-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "7b88a1", fontStyle: "italic" },
+        { token: "keyword", foreground: "81a1c1" },
+        { token: "string", foreground: "678650" },
+        { token: "number", foreground: "b48ead" },
+        { token: "function", foreground: "5e81ac" },
+        { token: "variable", foreground: "2e3440" },
+        { token: "delimiter", foreground: "4c566a" },
+      ],
+      colors: {
+        "editor.background": "#eceff4",
+        "editor.foreground": "#2e3440",
+        "editorGutter.background": "#eceff4",
+        "editorLineNumber.foreground": "#7b88a1",
+        "editorLineNumber.activeForeground": "#5e81ac",
+        "editor.selectionBackground": "#5e81ac26",
+        "minimap.background": "#e5e9f0",
+        "editorWidget.background": "#e5e9f0",
+      },
+    });
+
+    // Atom One Dark
+    monaco.editor.defineTheme("atom-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "5c6370", fontStyle: "italic" },
+        { token: "keyword", foreground: "c678dd" },
+        { token: "string", foreground: "98c379" },
+        { token: "number", foreground: "d19a66" },
+        { token: "function", foreground: "61afef" },
+        { token: "variable", foreground: "abb2bf" },
+        { token: "delimiter", foreground: "828997" },
+      ],
+      colors: {
+        "editor.background": "#282c34",
+        "editor.foreground": "#abb2bf",
+        "editorGutter.background": "#282c34",
+        "editorLineNumber.foreground": "#5c6370",
+        "editorLineNumber.activeForeground": "#61afef",
+        "editor.selectionBackground": "#61afef26",
+        "minimap.background": "#1e2227",
+        "editorWidget.background": "#21252b",
+      },
+    });
+
+    // Atom One Light
+    monaco.editor.defineTheme("atom-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "a0a1a7", fontStyle: "italic" },
+        { token: "keyword", foreground: "a626a4" },
+        { token: "string", foreground: "50a14f" },
+        { token: "number", foreground: "c18401" },
+        { token: "function", foreground: "4078f2" },
+        { token: "variable", foreground: "383a42" },
+        { token: "delimiter", foreground: "696c77" },
+      ],
+      colors: {
+        "editor.background": "#fafafa",
+        "editor.foreground": "#383a42",
+        "editorGutter.background": "#fafafa",
+        "editorLineNumber.foreground": "#a0a1a7",
+        "editorLineNumber.activeForeground": "#4078f2",
+        "editor.selectionBackground": "#4078f226",
+        "minimap.background": "#f0f0f0",
+        "editorWidget.background": "#f0f0f0",
+      },
+    });
+
+    // Default aliases
+    monaco.editor.defineTheme("default-dark", { base: "vs-dark", inherit: true, rules: [], colors: { "editor.background": "#181922" } });
+    monaco.editor.defineTheme("default-light", { base: "vs", inherit: true, rules: [], colors: { "editor.background": "#eae5f4" } });
+
     if (monaco.languages && monaco.languages.json && monaco.languages.json.jsonDefaults) {
       monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
         validate: true,
