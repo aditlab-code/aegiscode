@@ -5,6 +5,7 @@ import os
 import threading
 import time
 import uuid
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from agent_ai.permission.approval import (
@@ -106,6 +107,10 @@ class TelegramCompanion:
         self._custom_get_skills = get_skills
         self._custom_set_active_skill = set_active_skill
         self._custom_get_active_skill = get_active_skill
+        self._custom_facade = None
+        self._custom_get_changed_files = None
+        self._custom_list_projects = None
+        self._custom_set_active_project = None
 
         self.handler = TelegramUpdateHandler(
             bot_client=self.bot_client,
@@ -117,6 +122,12 @@ class TelegramCompanion:
             on_agent_delegate=self.handle_agent_delegate,
             get_runtime_status=self.get_runtime_status,
             get_repo_info=self.get_repo_info,
+            get_changed_files=self.get_changed_files,
+            on_repo_accept=self.accept_repo_changes,
+            on_repo_discard=self.discard_repo_changes,
+            on_repo_init=self.init_repo,
+            list_projects=self.list_projects,
+            set_active_project=self.set_active_project,
             get_mode=self.get_mode,
             set_mode=self.set_mode,
             get_agents=self.get_agents,
@@ -130,6 +141,133 @@ class TelegramCompanion:
             get_active_skill=self.get_active_skill,
             gate=self.gate,
         )
+
+    def list_projects(self) -> List[Dict[str, Any]]:
+        if getattr(self, "_custom_list_projects", None):
+            return self._custom_list_projects()
+        svc = _get_gateway_service()
+        if svc and hasattr(svc, "project_store"):
+            try:
+                return svc.project_store.list_projects()
+            except Exception as exc:
+                logger.warning("Error list_projects: %s", exc)
+        return []
+
+    def set_active_project(self, project_id: str) -> bool:
+        if getattr(self, "_custom_set_active_project", None):
+            return self._custom_set_active_project(project_id)
+        svc = _get_gateway_service()
+        if svc:
+            try:
+                if hasattr(svc, "set_active_project"):
+                    svc.set_active_project(project_id)
+                    return True
+                if hasattr(svc, "project_store"):
+                    svc.project_store.set_active_project(project_id)
+                    return True
+            except Exception as exc:
+                logger.warning("Error set_active_project: %s", exc)
+        return False
+
+    def init_repo(self) -> Dict[str, Any]:
+        facade = getattr(self, "_custom_facade", None)
+        if not facade:
+            svc = _get_gateway_service()
+            active = svc.get_active_project() if svc else None
+            if not active or not active.get("path"):
+                return {"ok": False, "error": "Tidak ada project aktif di Aegis IDE."}
+            from agent_ai.git.repository import GitRepositoryFacade
+            facade = GitRepositoryFacade(root=Path(active["path"]))
+        return facade.init()
+
+    def get_changed_files(self) -> List[Dict[str, Any]]:
+        if getattr(self, "_custom_facade", None):
+            return self._custom_facade.get_changed_files_summary()
+        if getattr(self, "_custom_get_changed_files", None):
+            return self._custom_get_changed_files()
+        svc = _get_gateway_service()
+        active = svc.get_active_project() if svc else None
+        if not active or not active.get("path"):
+            return []
+        from agent_ai.git.repository import GitRepositoryFacade
+        facade = GitRepositoryFacade(root=Path(active["path"]))
+        if not facade.is_repository():
+            return []
+        try:
+            return facade.get_changed_files_summary()
+        except Exception as exc:
+            logger.warning("Error get_changed_files_summary: %s", exc)
+            return []
+
+    def discard_repo_changes(self) -> Dict[str, Any]:
+        facade = getattr(self, "_custom_facade", None)
+        if not facade:
+            svc = _get_gateway_service()
+            active = svc.get_active_project() if svc else None
+            if not active or not active.get("path"):
+                return {"ok": False, "error": "Tidak ada project aktif di Aegis IDE."}
+            from agent_ai.git.repository import GitRepositoryFacade
+            facade = GitRepositoryFacade(root=Path(active["path"]))
+        if not facade.is_repository():
+            return {"ok": False, "error": "Project aktif bukan repositori Git."}
+        try:
+            res = facade.discard(None)
+            ok = res.get("ok", True) if isinstance(res, dict) else bool(res)
+            return {"ok": ok, "message": "Semua perubahan berhasil dibatalkan."}
+        except Exception as exc:
+            logger.error("Error discard_repo_changes: %s", exc)
+            return {"ok": False, "error": str(exc)}
+
+    def _generate_commit_message(self, changes: List[Dict[str, Any]]) -> str:
+        summary_lines = [f"- {c.get('path')} ({c.get('status')}, {c.get('lines')} line)" for c in changes]
+        summary_text = "\n".join(summary_lines)
+        prompt = (
+            f"Berdasarkan daftar perubahan Git berikut:\n{summary_text}\n\n"
+            "Tuliskan TEPAT SATU BARIS conventional commit message yang singkat dan jelas (contoh: 'feat: update repo' atau 'fix: broken imports'). "
+            "Keluarkan HANYA pesan commit tanpa tanda kutip atau penjelasan tambahan."
+        )
+        svc = _get_gateway_service()
+        if svc:
+            try:
+                turn_res = svc.dispatch_remote_turn(content=prompt, mode="ask")
+                raw_msg = turn_res.get("response", "").strip()
+                clean = raw_msg.splitlines()[0].strip().strip('"`')
+                if clean:
+                    return clean
+            except Exception as exc:
+                logger.warning("Gagal men-generate commit message via LLM: %s", exc)
+        primary = changes[0]["path"] if changes else "files"
+        return f"chore: update {primary} and related files"
+
+    def accept_repo_changes(self) -> Dict[str, Any]:
+        facade = getattr(self, "_custom_facade", None)
+        if not facade:
+            svc = _get_gateway_service()
+            active = svc.get_active_project() if svc else None
+            if not active or not active.get("path"):
+                return {"ok": False, "error": "Tidak ada project aktif di Aegis IDE."}
+            from agent_ai.git.repository import GitRepositoryFacade
+            facade = GitRepositoryFacade(root=Path(active["path"]))
+        if not facade.is_repository():
+            return {"ok": False, "error": "Project aktif bukan repositori Git."}
+
+        changes = facade.get_changed_files_summary()
+        if not changes:
+            return {"ok": False, "error": "Tidak ada perubahan berkas untuk di-commit."}
+
+        msg = self._generate_commit_message(changes)
+        try:
+            commit_res = facade.commit(message=msg, stage_all=True)
+            if commit_res.get("ok"):
+                return {
+                    "ok": True,
+                    "commit": commit_res.get("commit", "HEAD"),
+                    "message": msg,
+                }
+            return {"ok": False, "error": commit_res.get("error", "Gagal commit")}
+        except Exception as exc:
+            logger.error("Error accept_repo_changes commit: %s", exc)
+            return {"ok": False, "error": str(exc)}
 
     def get_repo_info(self) -> Dict[str, Any]:
         if self._custom_get_repo_info:

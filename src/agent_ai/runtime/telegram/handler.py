@@ -15,6 +15,7 @@ from agent_ai.runtime.telegram.views import (
     render_mode_view,
     render_model_list_view,
     render_ping_result_view,
+    render_project_selector_view,
     render_provider_list_view,
     render_repo_view,
     render_skill_selected_view,
@@ -48,6 +49,12 @@ class TelegramUpdateHandler:
         get_active_skill: Optional[Callable[[], Optional[str]]] = None,
         on_prompt_retry: Optional[Callable[[str, int], bool]] = None,
         on_agent_delegate: Optional[Callable[[str, int], bool]] = None,
+        get_changed_files: Optional[Callable[[], List[Dict[str, Any]]]] = None,
+        on_repo_accept: Optional[Callable[..., Dict[str, Any]]] = None,
+        on_repo_discard: Optional[Callable[..., Dict[str, Any]]] = None,
+        on_repo_init: Optional[Callable[[], Dict[str, Any]]] = None,
+        list_projects: Optional[Callable[[], List[Dict[str, Any]]]] = None,
+        set_active_project: Optional[Callable[[str], bool]] = None,
         gate: Optional[TelegramContextGate] = None,
     ) -> None:
         self.bot_client = bot_client
@@ -57,6 +64,12 @@ class TelegramUpdateHandler:
         self.on_steer_command = on_steer_command
         self.get_runtime_status = get_runtime_status
         self.get_repo_info = get_repo_info
+        self.get_changed_files = get_changed_files
+        self.on_repo_accept = on_repo_accept
+        self.on_repo_discard = on_repo_discard
+        self.on_repo_init = on_repo_init
+        self.list_projects = list_projects
+        self.set_active_project = set_active_project
         self.get_mode = get_mode
         self.set_mode = set_mode
         self.get_agents = get_agents
@@ -85,6 +98,11 @@ class TelegramUpdateHandler:
 
         # Router Callback Interaktif berdasarkan Prefix
         self._callback_router: List[tuple[str, Callable[[str, Optional[int], Optional[int], Dict[str, Any], str], None]]] = [
+            ("repo:accept", self._handle_repo_accept_cb),
+            ("repo:discard", self._handle_repo_discard_cb),
+            ("repo:init", self._handle_repo_init_cb),
+            ("repo:switch_project", self._handle_repo_switch_project_cb),
+            ("project:select:", self._handle_project_select_cb),
             ("hitl:", self._handle_hitl_cb),
             ("mode:", self._handle_mode_cb),
             ("config:", self._handle_config_cb),
@@ -177,15 +195,27 @@ class TelegramUpdateHandler:
 
     def _handle_repo(self, chat_id: int, user_id: int, text: str, args: str) -> None:
         info = self.get_repo_info() if self.get_repo_info else {
-            "name": "AegisCode",
-            "root": "N/A",
-            "branch": "main",
-            "last_commit": "HEAD",
+            "has_active_project": False,
+            "name": "-",
+            "root": "-",
+            "branch": "-",
+            "last_commit": "-",
             "uncommitted_changes": 0,
             "is_dirty": False,
+            "is_repo": False,
         }
-        repo_text = render_repo_view(info)
-        self.bot_client.send_message(chat_id=chat_id, text=repo_text)
+        if not info.get("has_active_project", True):
+            projects = self.list_projects() if self.list_projects else []
+            selector_text, keyboard = render_project_selector_view(projects)
+            self.bot_client.send_message(chat_id=chat_id, text=selector_text, reply_markup=keyboard)
+            return
+
+        changed_files = self.get_changed_files() if self.get_changed_files else info.get("changed_files", [])
+        repo_text, keyboard = render_repo_view(info, changed_files=changed_files)
+        if keyboard:
+            self.bot_client.send_message(chat_id=chat_id, text=repo_text, reply_markup=keyboard)
+        else:
+            self.bot_client.send_message(chat_id=chat_id, text=repo_text)
 
     def _handle_mode(self, chat_id: int, user_id: int, text: str, args: str) -> None:
         arg = args.lower().strip()
@@ -358,6 +388,137 @@ class TelegramUpdateHandler:
 
         # Callback tidak dikenal
         self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Aksi tidak dikenal.")
+
+    def _handle_repo_accept_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Memproses commit...")
+
+        res = self.on_repo_accept() if self.on_repo_accept else {"ok": False, "error": "Handler accept tidak tersedia."}
+        if res.get("ok"):
+            commit_hash = res.get("commit", "HEAD")
+            commit_msg = res.get("message", "")
+            done_text = (
+                "✅ <b>Perubahan Berhasil Di-commit!</b>\n\n"
+                f"• <b>Commit Hash:</b> <code>{commit_hash}</code>\n"
+                f"• <b>Pesan Commit:</b> <i>{commit_msg}</i>"
+            )
+        else:
+            err = res.get("error", "Terjadi kesalahan saat commit.")
+            done_text = f"❌ <b>Gagal Menyimpan Perubahan</b>\n\n<i>Detail:</i> {err}"
+
+        if chat_id and message_id:
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=done_text,
+                reply_markup=None,
+            )
+
+    def _handle_repo_discard_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Membatalkan perubahan...")
+
+        res = self.on_repo_discard() if self.on_repo_discard else {"ok": False, "error": "Handler discard tidak tersedia."}
+        if res.get("ok"):
+            done_text = "🗑️ <b>Seluruh Perubahan Dibatalkan</b>\n\nWorking directory telah di-reset dan bersih kembali."
+        else:
+            err = res.get("error", "Terjadi kesalahan saat membatalkan perubahan.")
+            done_text = f"❌ <b>Gagal Membatalkan Perubahan</b>\n\n<i>Detail:</i> {err}"
+
+        if chat_id and message_id:
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=done_text,
+                reply_markup=None,
+            )
+
+    def _handle_repo_init_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Menginisialisasi Git...")
+        res = self.on_repo_init() if self.on_repo_init else {"ok": False, "error": "Handler init tidak tersedia."}
+        if res.get("ok"):
+            info = self.get_repo_info() if self.get_repo_info else {}
+            changed_files = self.get_changed_files() if self.get_changed_files else []
+            repo_text, keyboard = render_repo_view(info, changed_files=changed_files)
+            done_text = f"✅ <b>Git Berhasil Diinisialisasi!</b>\n\n{repo_text}"
+            if chat_id and message_id:
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=done_text,
+                    reply_markup=keyboard,
+                )
+        else:
+            err = res.get("error", "Gagal inisialisasi git.")
+            if chat_id and message_id:
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=f"❌ <b>Gagal Inisialisasi Git</b>\n\n<i>Detail:</i> {err}",
+                    reply_markup=None,
+                )
+
+    def _handle_repo_switch_project_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Memuat daftar project...")
+        projects = self.list_projects() if self.list_projects else []
+        text, keyboard = render_project_selector_view(projects)
+        if chat_id and message_id:
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                reply_markup=keyboard,
+            )
+
+    def _handle_project_select_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        project_id = data[len("project:select:"):].strip()
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Mengaktifkan project...")
+        if self.set_active_project:
+            self.set_active_project(project_id)
+
+        info = self.get_repo_info() if self.get_repo_info else {}
+        changed_files = self.get_changed_files() if self.get_changed_files else []
+        repo_text, keyboard = render_repo_view(info, changed_files=changed_files)
+        if chat_id and message_id:
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=repo_text,
+                reply_markup=keyboard,
+            )
 
     def _handle_hitl_cb(
         self,

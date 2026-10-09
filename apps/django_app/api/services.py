@@ -1423,16 +1423,24 @@ class GatewayService:
         self.project_store.set_active_provider(provider_id)
 
     def get_active_repository_info(self) -> Dict[str, Any]:
-        """Ambil metadata dan status Git dari repositori aktif."""
+        """Ambil metadata dan status Git dari repositori aktif di Aegis IDE."""
         from agent_ai.git.repository import GitRepositoryFacade
 
         active = self.get_active_project()
-        if active and active.get("path"):
-            root = Path(active["path"])
-            name = active.get("name") or root.name
-        else:
-            root = Path(__file__).resolve().parents[3]
-            name = root.name
+        if not active or not active.get("path"):
+            return {
+                "has_active_project": False,
+                "name": "-",
+                "root": "-",
+                "branch": "-",
+                "last_commit": "-",
+                "uncommitted_changes": 0,
+                "is_dirty": False,
+                "is_repo": False,
+            }
+
+        root = Path(active["path"])
+        name = active.get("name") or root.name
 
         facade = GitRepositoryFacade(root=root)
         is_repo = facade.is_repository()
@@ -1459,6 +1467,8 @@ class GatewayService:
                 pass
 
         return {
+            "has_active_project": True,
+            "project_id": active.get("id"),
             "name": name,
             "root": str(root),
             "branch": branch,

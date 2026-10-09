@@ -1,26 +1,31 @@
-# Tasks: IDE Real-Time Synchronization for Remote Task Delegation
+# Task Breakdown: Aegis IDE Active Project Binding for `/repo`
 
-- [ ] Task 1: Auto-Bind Active Project in `delegate_session_to_agent_task` (`apps/django_app/api/services.py`)
-  - Acceptance: `delegate_session_to_agent_task` otomatis menggunakan `project_store.get_active_project_id()` jika `sess.project_id` kosong.
-  - Verify: Test memverifikasi `project_id` pada task yang dihasilkan cocok dengan project aktif.
+- [x] Task 1: Enforce strict active project in `apps/django_app/api/services.py`
+  - Acceptance: `get_active_repository_info()` tidak lagi memiliki fallback ke `parents[3]`. Jika tidak ada project aktif, mengembalikan `{"has_active_project": False, "is_repo": False}`. Jika ada, menargetkan path project aktif.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/test_repo_review.py -k test_get_active_repository_info_strict -v`
   - Files: `apps/django_app/api/services.py`
 
-- [ ] Task 2: Frontend SSE Event Reactivity in `useTaskLifecycle.js`
-  - Acceptance: `useTaskLifecycle.js` menangani event `task_created` dengan memperbarui `queueRefresh` dan `refreshTaskHistory()`.
-  - Verify: Inspeksi kode `processEventCore`.
-  - Files: `apps/frontend/src/composables/useTaskLifecycle.js`
+- [x] Task 2: Implement `get_changed_files_summary()` on `GitRepositoryFacade` in `src/agent_ai/git/repository.py`
+  - Acceptance: `get_changed_files_summary()` tersedia di `GitRepositoryFacade`, mengembalikan `[]` jika bukan repo git atau clean, dan mengembalikan `[{"path": str, "lines": int, "status": str}]` jika ada perubahan.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/test_repo_review.py -k test_get_changed_files_summary -v`
+  - Files: `src/agent_ai/git/repository.py`
 
-- [ ] Task 3: Threads Panel Refresh & Auto-Focus Agents Tab
-  - Acceptance: `ThreadsHistoryPanel.vue` memuat ulang daftar thread saat task baru tiba, dan `WorkbenchView.vue` membuka drawer serta mengarahkan fokus ke tab 'agents' saat remote task running terdeteksi.
-  - Verify: Inspeksi kode `ThreadsHistoryPanel.vue` dan `WorkbenchView.vue`.
-  - Files: `apps/frontend/src/components/sidebar/ThreadsHistoryPanel.vue`, `apps/frontend/src/pages/WorkbenchView.vue`
+- [x] Task 3: Views for Project Selector, Non-Git Repo, and Switcher in `src/agent_ai/runtime/telegram/views.py`
+  - Acceptance: `render_project_selector_view` merender daftar project dengan tombol `project:select:<id>`. `render_repo_view` menampilkan tombol `[⚙️ Inisialisasi Git]` jika non-git, dan selalu menyertakan tombol `[🔄 Ganti Project]`.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/test_repo_review.py -k test_render_views -v`
+  - Files: `src/agent_ai/runtime/telegram/views.py`
 
-- [ ] Task 4: Dedicated Backend Test Suite
-  - Acceptance: File `tests/test_telegram_companion/test_delegation_ide_sync.py` memvalidasi auto-binding project ID dan delegasi tanpa redundansi dengan tes lama.
-  - Verify: `rtk pytest tests/test_telegram_companion/test_delegation_ide_sync.py` lulus 100%.
-  - Files: `tests/test_telegram_companion/test_delegation_ide_sync.py`
+- [x] Task 4: Companion Logic & Active Project Binding in `src/agent_ai/runtime/telegram/companion.py`
+  - Acceptance: `companion.py` memiliki method `list_projects()`, `set_active_project()`, `init_repo()`, dan membatasi `get_changed_files()`, `accept_repo_changes()`, `discard_repo_changes()` strictly pada path project aktif.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/test_repo_review.py -k test_companion_project_binding -v`
+  - Files: `src/agent_ai/runtime/telegram/companion.py`
 
-- [ ] Task 5: Full Regression Testing & Daemon Restart
-  - Acceptance: Seluruh test suite (`rtk pytest tests/test_telegram_companion/`) lulus 100%, daemon restart berhasil.
-  - Verify: `rtk pytest tests/test_telegram_companion/` -> 100% pass, log daemon aktif.
-  - Files: Runtime daemon
+- [x] Task 5: Handler Command Routing & Callbacks in `src/agent_ai/runtime/telegram/handler.py`
+  - Acceptance: `/repo` mengarahkan ke project selector jika tidak ada project aktif. Callbacks `repo:init`, `repo:switch_project`, dan `project:select:` terdaftar dan berfungsi dengan baik.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/test_repo_review.py -k test_handler_project_switcher -v`
+  - Files: `src/agent_ai/runtime/telegram/handler.py`
+
+- [x] Task 6: Comprehensive Test Suite & Regression Verification in `tests/test_telegram_companion/test_repo_review.py`
+  - Acceptance: Seluruh skenario (tanpa active project, switch project, non-git init, accept/discard pada active project) lulus 100%, dan test suite eksisting lulus tanpa regresi.
+  - Verify: `./venv/bin/pytest tests/test_telegram_companion/ -v`
+  - Files: `tests/test_telegram_companion/test_repo_review.py`

@@ -54,25 +54,108 @@ DEFAULT_SKILLS = [
 ]
 
 
-def render_repo_view(info: Dict[str, Any]) -> str:
-    """Menampilkan nama proyek, root path, branch git, last commit, dan status perubahan."""
+def render_project_selector_view(projects: List[Dict[str, Any]]) -> Tuple[str, Dict[str, Any]]:
+    """Menampilkan menu pemilihan project aktif dari database Aegis IDE."""
+    if not projects:
+        text = (
+            "📁 <b>Project di Aegis IDE:</b>\n\n"
+            "⚠️ Belum ada project yang tersimpan di Aegis IDE Workstation.\n"
+            "Silakan buat atau buka project terlebih dahulu melalui antarmuka IDE Aegis."
+        )
+        return text, {"inline_keyboard": []}
+
+    text = (
+        "📁 <b>Pilih Project Aktif di Aegis IDE:</b>\n\n"
+        "Silakan pilih salah satu project di bawah untuk ditinjau status repositori dan perubahannya:"
+    )
+    buttons = []
+    for p in projects:
+        pid = p.get("id") or p.get("project_id", "")
+        name = p.get("name") or "Unnamed Project"
+        buttons.append([{"text": f"📁 {name}", "callback_data": f"project:select:{pid}"}])
+
+    return text, {"inline_keyboard": buttons}
+
+
+def render_repo_view(
+    info: Dict[str, Any],
+    changed_files: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[str, Optional[Dict[str, Any]]]:
+    """Menampilkan nama proyek, root path, branch git, last commit, status perubahan, serta tombol aksi."""
+    if not info.get("has_active_project", True):
+        text = (
+            "📁 <b>Informasi Repositori Aegis IDE:</b>\n\n"
+            "⚠️ <i>Belum ada project yang aktif di Aegis IDE.</i>\n\n"
+            "Tekan tombol di bawah untuk memilih project yang ingin ditinjau:"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "📁 Pilih Project", "callback_data": "repo:switch_project"}]
+            ]
+        }
+        return text, keyboard
+
     name = info.get("name", "AegisCode")
     root = info.get("root", "-")
+
+    if not info.get("is_repo", True):
+        text = (
+            "📁 <b>Informasi Repositori Aktif:</b>\n\n"
+            f"• <b>Nama Proyek:</b> <code>{name}</code>\n"
+            f"• <b>Root Path:</b> <code>{root}</code>\n"
+            "• <b>Status Git:</b> ⚠️ <i>Belum diinisialisasi sebagai repositori Git (.git belum ada).</i>\n\n"
+            "Tekan tombol di bawah untuk menginisialisasi Git atau ganti project:"
+        )
+        keyboard = {
+            "inline_keyboard": [
+                [{"text": "⚙️ Inisialisasi Git", "callback_data": "repo:init"}],
+                [{"text": "🔄 Ganti Project", "callback_data": "repo:switch_project"}],
+            ]
+        }
+        return text, keyboard
+
     branch = info.get("branch", "-")
     last_commit = info.get("last_commit", "-")
     uncommitted = info.get("uncommitted_changes", 0)
-    is_dirty = info.get("is_dirty", False) or uncommitted > 0
+    is_dirty = info.get("is_dirty", False) or uncommitted > 0 or bool(changed_files)
 
-    dirty_str = f"⚠️ {uncommitted} perubahan belum di-commit" if is_dirty else "Clean (bersih)"
+    files = changed_files if changed_files is not None else info.get("changed_files", [])
 
-    return (
-        "📁 <b>Informasi Repositori Aktif:</b>\n\n"
-        f"• <b>Nama Proyek:</b> <code>{name}</code>\n"
-        f"• <b>Root Path:</b> <code>{root}</code>\n"
-        f"• <b>Branch Git:</b> <code>{branch}</code>\n"
-        f"• <b>Commit Terakhir:</b> <code>{last_commit}</code>\n"
-        f"• <b>Status Perubahan:</b> {dirty_str}"
+    dirty_str = (
+        f"⚠️ {uncommitted or len(files)} perubahan belum di-commit"
+        if is_dirty
+        else "Clean (tidak ada perubahan berkas)"
     )
+
+    lines = [
+        "📁 <b>Informasi Repositori Aktif:</b>\n",
+        f"• <b>Nama Proyek:</b> <code>{name}</code>",
+        f"• <b>Root Path:</b> <code>{root}</code>",
+        f"• <b>Branch Git:</b> <code>{branch}</code>",
+        f"• <b>Commit Terakhir:</b> <code>{last_commit}</code>",
+        f"• <b>Status Perubahan:</b> {dirty_str}",
+    ]
+
+    buttons = []
+    if files:
+        lines.append("\n<b>Daftar Berkas Berubah:</b>")
+        for f in files:
+            path = f.get("path", "")
+            file_lines = f.get("lines", 0)
+            status = f.get("status", "M")
+            lines.append(f"• <code>{path} {file_lines} line {status}</code>")
+
+        lines.append("\nPilih aksi untuk seluruh perubahan:")
+        buttons.append([
+            {"text": "✅ Accept Perubahan", "callback_data": "repo:accept"},
+            {"text": "🗑️ Discard Perubahan", "callback_data": "repo:discard"},
+        ])
+
+    buttons.append([
+        {"text": "🔄 Ganti Project", "callback_data": "repo:switch_project"}
+    ])
+
+    return "\n".join(lines), {"inline_keyboard": buttons}
 
 
 def render_mode_view(current_mode: str) -> Tuple[str, Dict[str, Any]]:

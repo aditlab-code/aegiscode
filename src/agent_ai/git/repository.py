@@ -256,6 +256,60 @@ class GitRepositoryFacade:
             "staged": is_staged,
         }
 
+    def get_changed_files_summary(self) -> List[Dict[str, Any]]:
+        """Dapatkan ringkasan berkas yang berubah dengan format path, total lines, dan status (M, A, D)."""
+        if not self.is_repository():
+            return []
+
+        st = self.status()
+        if not st or st.clean:
+            return []
+
+        diff_list = self.diff()
+        diff_by_path = {d.path: d for d in diff_list}
+
+        results: List[Dict[str, Any]] = []
+        for f in st.files:
+            raw_stat = (f.status or "").strip().upper()
+            path = f.path
+
+            # Tentukan status ringkas: M, A, D
+            if f.untracked or "A" in raw_stat or "??" in raw_stat:
+                code = "A"
+            elif "D" in raw_stat:
+                code = "D"
+            else:
+                code = "M"
+
+            # Hitung jumlah baris
+            diff_item = diff_by_path.get(path)
+            lines = 0
+            if diff_item:
+                if code == "D":
+                    lines = diff_item.deletions
+                elif code == "A":
+                    lines = diff_item.additions
+                else:
+                    lines = diff_item.additions + diff_item.deletions
+            else:
+                # File untracked atau belum ada di numstat
+                if code == "A":
+                    try:
+                        resolved = self._resolve(path)
+                        if resolved.exists() and resolved.is_file():
+                            text = resolved.read_text(encoding="utf-8", errors="replace")
+                            lines = len(text.splitlines())
+                    except Exception:
+                        lines = 0
+
+            results.append({
+                "path": path,
+                "lines": lines,
+                "status": code,
+            })
+
+        return results
+
     def discard(self, file_path: Optional[str] = None) -> Dict[str, Any]:
         """Tolak / buang perubahan pada file tertentu atau seluruh repository."""
         if not self.is_repository():
