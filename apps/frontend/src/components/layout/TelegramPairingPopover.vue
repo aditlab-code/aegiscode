@@ -91,11 +91,52 @@ async function handleUnlink() {
               <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
           </div>
-          <h4>Bot Token Belum Diatur</h4>
-          <p>
-            Untuk mengaktifkan pendamping jarak jauh, buat bot di <b>@BotFather</b> lalu tambahkan ke <code>.env</code>:
-          </p>
-          <pre class="env-snippet">TELEGRAM_BOT_TOKEN="your_bot_token_here"</pre>
+          <h4>Bot Token Belum Dikonfigurasi</h4>
+
+          <!-- Warning Banner Config .env -->
+          <div class="alert-banner warning-banner">
+            <div class="warning-header">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <strong>Perhatian: Konfigurasi .env Diperlukan</strong>
+            </div>
+            <p class="warning-text">
+              Bot Companion tidak dapat diaktifkan sebelum Anda memasukkan <code>TELEGRAM_BOT_TOKEN</code> dan ID Telegram terdaftar di berkas <code>.env</code>.
+            </p>
+          </div>
+
+          <!-- BotFather Step-by-Step Guide -->
+          <div class="botfather-guide">
+            <h5 class="guide-title">Panduan Pembuatan Bot via @BotFather:</h5>
+            <ol class="guide-steps">
+              <li>
+                Buka aplikasi Telegram, cari <b>@BotFather</b> resmi atau kunjungi
+                <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" class="link-external">t.me/BotFather</a>.
+              </li>
+              <li>
+                Kirim perintah <code>/newbot</code> dan tentukan nama serta <i>username</i> bot (wajib berakhiran <code>_bot</code>).
+              </li>
+              <li>
+                Salin <b>HTTP API Token</b> yang diberikan oleh BotFather.
+              </li>
+              <li>
+                Ketahui ID Telegram Anda (misal via bot <b>@userinfobot</b>).
+              </li>
+              <li>
+                Buka file <code>.env</code> di root proyek dan tambahkan baris konfigurasi berikut:
+              </li>
+            </ol>
+            <pre class="env-snippet">TELEGRAM_BOT_TOKEN="your_bot_token_here"
+TELEGRAM_ALLOWED_USER_IDS="123456789"
+# Atau whitelist berdasarkan username:
+# TELEGRAM_ALLOWED_USERNAMES="your_username"</pre>
+            <p class="guide-footer-note">
+              Simpan file <code>.env</code> dan restart server AegisCode untuk mulai menggunakan bot.
+            </p>
+          </div>
         </div>
 
         <!-- 2. Kondisi: Akun Sudah Terhubung (Paired) -->
@@ -152,7 +193,7 @@ async function handleUnlink() {
 
             <div v-if="qrData.deep_link" class="actions-group">
               <a :href="qrData.deep_link" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-inner">
-                <span>Buka di Telegram</span>
+                <span>Buka di Telegram / Web</span>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                   <polyline points="15 3 21 3 21 9"/>
@@ -168,8 +209,13 @@ async function handleUnlink() {
 
         <!-- 3. Kondisi: Siap Pairing (Menampilkan QR Code) -->
         <div v-else class="state-container state-pairing">
+          <div class="poller-status-chip status-chip-active">
+            <span class="chip-dot">●</span>
+            <span>Bot Poller Aktif (Menunggu scan pairing)</span>
+          </div>
+
           <p class="qr-instructions">
-            Pindai QR code ini dengan kamera ponsel untuk menghubungkan akun Telegram Anda secara instan:
+            Pindai QR code ini dengan kamera ponsel atau buka Telegram langsung untuk menghubungkan akun secara instan:
           </p>
 
           <div class="qr-display-box">
@@ -179,7 +225,7 @@ async function handleUnlink() {
 
           <div v-if="qrData.deep_link" class="actions-group">
             <a :href="qrData.deep_link" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-inner">
-              <span>Buka di Telegram</span>
+              <span>Buka di Telegram / Web</span>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                 <polyline points="15 3 21 3 21 9"/>
@@ -210,14 +256,99 @@ async function handleUnlink() {
 
 .telegram-popover-card {
   width: 90%;
-  max-width: 420px;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
-  overflow: hidden;
   color: var(--text);
   font-family: inherit;
+}
+
+.alert-banner {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 12px;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.error-banner {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--err);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.warning-banner {
+  background: rgba(250, 204, 21, 0.12);
+  color: var(--text);
+  border: 1px solid rgba(250, 204, 21, 0.25);
+}
+
+.warning-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.warning-text {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.botfather-guide {
+  width: 100%;
+  text-align: left;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+.guide-title {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.guide-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.guide-steps li {
+  margin-bottom: 5px;
+}
+
+.link-external {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.link-external:hover {
+  filter: brightness(1.15);
+}
+
+.guide-footer-note {
+  margin: 8px 0 0 0;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
 }
 
 .popover-header {

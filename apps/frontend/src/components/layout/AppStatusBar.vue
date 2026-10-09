@@ -6,7 +6,82 @@ import TelegramPairingPopover from "./TelegramPairingPopover.vue";
 
 const { discoveredPorts, openPortSafely, removeDiscoveredPort } = usePortDiscovery();
 const showTelegramPopover = ref(false);
-const { status: telegramStatus, checkTelegramStatus } = useTelegramCompanion();
+const {
+  status: telegramStatus,
+  checkTelegramStatus,
+  startTelegramPoller,
+  stopTelegramPoller,
+  isToggling,
+  activeNotification,
+  dismissTelegramNotification,
+} = useTelegramCompanion();
+
+let notificationTimer = null;
+
+function triggerToastDismiss() {
+  if (notificationTimer) clearTimeout(notificationTimer);
+  notificationTimer = setTimeout(() => {
+    dismissTelegramNotification();
+  }, 3500);
+}
+
+async function handleTelegramToggle() {
+  if (isToggling.value) return;
+
+  // 1. Jika belum dikonfigurasi di .env -> buka modal edukasi instruksi
+  if (!telegramStatus.value?.configured) {
+    showTelegramPopover.value = true;
+    return;
+  }
+
+  // 2. Jika sedang berjalan aktif -> matikan poller (toggle off), jangan buka modal
+  if (telegramStatus.value?.is_running) {
+    await stopTelegramPoller();
+    triggerToastDismiss();
+    return;
+  }
+
+  // 3. Jika standby & sudah terhubung (paired) -> nyalakan poller (toggle on), jangan buka modal
+  if (telegramStatus.value?.is_paired) {
+    await startTelegramPoller();
+    triggerToastDismiss();
+    return;
+  }
+
+  // 4. Jika standby & belum terhubung -> nyalakan poller (idle on pairing) & buka modal QR
+  await startTelegramPoller();
+  showTelegramPopover.value = true;
+  triggerToastDismiss();
+}
+
+const telegramBadgeText = computed(() => {
+  if (isToggling.value) return "Companion: ...";
+  if (!telegramStatus.value?.configured) return "Companion: Off";
+  if (!telegramStatus.value?.is_running) {
+    return telegramStatus.value?.is_paired ? "Companion: Standby" : "Companion: Standby";
+  }
+  return telegramStatus.value?.is_paired ? "Companion: Active" : "Companion: Pairing";
+});
+
+const telegramBadgeTitle = computed(() => {
+  if (!telegramStatus.value?.configured) {
+    return "Telegram Companion Belum Dikonfigurasi (Klik untuk panduan setup BotFather & konfigurasi .env)";
+  }
+  if (telegramStatus.value?.is_running) {
+    return telegramStatus.value?.is_paired
+      ? "Telegram Companion Aktif Mendengarkan (Klik untuk mematikan bot)"
+      : "Telegram Companion Menunggu Pairing (Klik untuk mematikan bot)";
+  }
+  return telegramStatus.value?.is_paired
+    ? "Telegram Companion Standby (Klik untuk menyalakan bot langsung)"
+    : "Telegram Companion Standby (Klik untuk membuka QR pairing & menyalakan bot)";
+});
+
+const telegramBadgeClass = computed(() => {
+  if (!telegramStatus.value?.configured) return "badge-telegram-off";
+  if (!telegramStatus.value?.is_running) return "badge-telegram-ready";
+  return telegramStatus.value?.is_paired ? "badge-telegram-paired" : "badge-telegram-idle";
+});
 
 const props = defineProps({
   cursor: {
@@ -100,15 +175,35 @@ const branchTooltip = computed(() => {
       <button
         type="button"
         class="status-badge badge-telegram"
-        :class="telegramStatus?.is_paired && telegramStatus?.is_running ? 'badge-telegram-paired' : (telegramStatus?.is_paired ? 'badge-telegram-idle' : (telegramStatus?.configured ? 'badge-telegram-ready' : 'badge-telegram-off'))"
-        :title="telegramStatus?.is_running ? 'Telegram Companion Aktif (Bot poller berjalan mendengarkan chat)' : 'Telegram Companion Standby (Klik untuk buka modal & aktifkan bot)'"
-        @click="showTelegramPopover = true"
+        :class="telegramBadgeClass"
+        :title="telegramBadgeTitle"
+        :disabled="isToggling"
+        @click="handleTelegramToggle"
       >
         <span class="badge-dot">●</span>
-        <span class="badge-text">
-          Companion: {{ !telegramStatus?.configured ? 'Off' : (!telegramStatus?.is_paired ? 'Pairing' : (telegramStatus?.is_running ? 'Active' : 'Standby')) }}
-        </span>
+        <span class="badge-text">{{ telegramBadgeText }}</span>
       </button>
+
+      <!-- Status Bar Telegram Toast Notification -->
+      <transition name="status-toast-fade">
+        <div
+          v-if="activeNotification"
+          class="status-toast-pill"
+          :class="`toast-${activeNotification.type}`"
+          role="status"
+        >
+          <span class="status-toast-text">{{ activeNotification.message }}</span>
+          <button
+            type="button"
+            class="status-toast-close"
+            title="Tutup notifikasi"
+            aria-label="Tutup notifikasi"
+            @click="dismissTelegramNotification"
+          >
+            &times;
+          </button>
+        </div>
+      </transition>
 
       <!-- Discovered Active Dev Ports Chips -->
       <div v-if="discoveredPorts.length > 0" class="status-ports-group">
@@ -181,13 +276,20 @@ const branchTooltip = computed(() => {
 </template>
 
 <style scoped>
+.app-footer {
+  position: relative;
+}
 .badge-telegram {
   cursor: pointer;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
   transition: all 0.15s ease;
 }
-.badge-telegram:hover {
+.badge-telegram:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.badge-telegram:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--border-focus, rgba(255, 255, 255, 0.2));
 }
@@ -202,6 +304,54 @@ const branchTooltip = computed(() => {
 }
 .badge-telegram-off .badge-dot {
   color: var(--text-faint);
+}
+
+.status-toast-pill {
+  position: absolute;
+  bottom: 28px;
+  left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 1000;
+  pointer-events: auto;
+}
+.status-toast-pill.toast-success {
+  border-left: 3px solid var(--ok);
+}
+.status-toast-pill.toast-info {
+  border-left: 3px solid var(--accent);
+}
+.status-toast-pill.toast-error {
+  border-left: 3px solid var(--err);
+}
+.status-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 13px;
+  line-height: 1;
+}
+.status-toast-close:hover {
+  color: var(--text);
+}
+.status-toast-fade-enter-active,
+.status-toast-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.status-toast-fade-enter-from,
+.status-toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
 }
 </style>
 

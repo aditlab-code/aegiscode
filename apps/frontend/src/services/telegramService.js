@@ -24,6 +24,20 @@ const qrData = ref({
 
 const loading = ref(false);
 const error = ref("");
+const isToggling = ref(false);
+const activeNotification = ref(null);
+
+export function setTelegramNotification(message, type = "info") {
+  activeNotification.value = {
+    message,
+    type,
+    id: Date.now(),
+  };
+}
+
+export function dismissTelegramNotification() {
+  activeNotification.value = null;
+}
 
 export async function checkTelegramStatus() {
   try {
@@ -57,6 +71,7 @@ export async function unlinkTelegramUser() {
   try {
     await postTelegramUnlink();
     await checkTelegramStatus();
+    setTelegramNotification("Hubungan akun Telegram berhasil diputuskan", "info");
     return true;
   } catch (err) {
     error.value = err.message || "Gagal memutuskan hubungan Telegram";
@@ -67,6 +82,10 @@ export async function unlinkTelegramUser() {
 }
 
 export async function startTelegramPoller() {
+  if (isToggling.value) {
+    return false;
+  }
+  isToggling.value = true;
   loading.value = true;
   error.value = "";
   try {
@@ -75,16 +94,23 @@ export async function startTelegramPoller() {
       status.value.is_running = res.is_running;
     }
     await checkTelegramStatus();
+    setTelegramNotification("Telegram Companion aktif mendengarkan", "success");
     return true;
   } catch (err) {
     error.value = err.message || "Gagal mengaktifkan bot poller";
+    setTelegramNotification(error.value, "error");
     return false;
   } finally {
     loading.value = false;
+    isToggling.value = false;
   }
 }
 
 export async function stopTelegramPoller() {
+  if (isToggling.value) {
+    return false;
+  }
+  isToggling.value = true;
   loading.value = true;
   error.value = "";
   try {
@@ -93,12 +119,15 @@ export async function stopTelegramPoller() {
       status.value.is_running = res.is_running;
     }
     await checkTelegramStatus();
+    setTelegramNotification("Telegram Companion dinonaktifkan (Standby)", "info");
     return true;
   } catch (err) {
     error.value = err.message || "Gagal menghentikan bot poller";
+    setTelegramNotification(error.value, "error");
     return false;
   } finally {
     loading.value = false;
+    isToggling.value = false;
   }
 }
 
@@ -108,6 +137,10 @@ export function useTelegramCompanion() {
     qrData,
     loading,
     error,
+    isToggling,
+    activeNotification,
+    setTelegramNotification,
+    dismissTelegramNotification,
     checkTelegramStatus,
     fetchTelegramPairingQr,
     unlinkTelegramUser,
