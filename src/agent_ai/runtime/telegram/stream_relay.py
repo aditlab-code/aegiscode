@@ -50,8 +50,11 @@ class TelegramStreamRelay:
                     chat_id=self.chat_id,
                     text=initial_status,
                 )
-                if isinstance(res, dict) and res.get("result"):
-                    self.message_id = res["result"].get("message_id")
+                if isinstance(res, dict):
+                    if "message_id" in res:
+                        self.message_id = res["message_id"]
+                    elif "result" in res and isinstance(res["result"], dict):
+                        self.message_id = res["result"].get("message_id")
                     logger.debug("StreamRelay: pesan awal terkirim, message_id=%s", self.message_id)
             except Exception as e:
                 logger.error("StreamRelay: GAGAL mengirim pesan awal ke chat_id=%s: %s", self.chat_id, e)

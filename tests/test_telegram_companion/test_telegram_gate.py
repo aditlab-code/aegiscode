@@ -207,15 +207,28 @@ def test_command_dispatcher_config_llm():
     bot = MagicMock()
     sec = MagicMock(is_authorized=MagicMock(return_value=True))
     pairing = MagicMock()
+    set_provider_spy = MagicMock()
+    set_model_spy = MagicMock()
+    test_provider_spy = MagicMock(return_value={"status": "ok", "provider": "Google Antigravity", "latency_ms": 35.5})
 
     handler = TelegramUpdateHandler(
         bot_client=bot,
         security_manager=sec,
         pairing_manager=pairing,
-        get_providers=lambda: [{"id": "antigravity", "name": "Google Antigravity", "is_active": True}],
-        get_models=lambda pid=None: [{"id": "gemini-3.1-pro-high", "name": "gemini-3.1-pro-high", "is_active": True}],
+        get_providers=lambda: [
+            {"id": "antigravity", "name": "Google Antigravity", "is_active": True},
+            {"id": "opencode", "name": "OpenCode Zen", "is_active": False},
+        ],
+        set_provider=set_provider_spy,
+        get_models=lambda pid=None: [
+            {"id": "gemini-3.1-pro-high", "name": "gemini-3.1-pro-high", "is_active": True},
+            {"id": "gemini-2.5-flash", "name": "gemini-2.5-flash", "is_active": False},
+        ],
+        set_active_model=set_model_spy,
+        test_provider=test_provider_spy,
     )
 
+    # 1. Bare /config_llm
     handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm"}})
     assert bot.send_message.called
     text = bot.send_message.call_args[1]["text"]
@@ -225,6 +238,61 @@ def test_command_dispatcher_config_llm():
     assert markup["inline_keyboard"][0][0]["callback_data"] == "config:providers"
     assert markup["inline_keyboard"][0][1]["callback_data"] == "config:models"
     assert markup["inline_keyboard"][1][0]["callback_data"] == "config:ping"
+
+    # 2. Aliases /config and /llm
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config"}})
+    assert bot.send_message.called
+    assert "Google Antigravity" in bot.send_message.call_args[1]["text"]
+
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/llm"}})
+    assert bot.send_message.called
+    assert "Google Antigravity" in bot.send_message.call_args[1]["text"]
+
+    # 3. /config_llm providers (list)
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm providers"}})
+    assert bot.send_message.called
+    text_p = bot.send_message.call_args[1]["text"]
+    assert "Daftar LLM Provider" in text_p
+    assert "Google Antigravity" in text_p
+    assert "OpenCode Zen" in text_p
+
+    # 4. /config_llm provider <id> (switch)
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm provider opencode"}})
+    set_provider_spy.assert_called_with("opencode")
+    assert bot.send_message.called
+    text_set_p = bot.send_message.call_args[1]["text"]
+    assert "Provider LLM Diperbarui" in text_set_p
+    assert "opencode" in text_set_p
+
+    # 5. /config_llm models (list)
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm models"}})
+    assert bot.send_message.called
+    text_m = bot.send_message.call_args[1]["text"]
+    assert "Daftar Model" in text_m
+    assert "gemini-3.1-pro-high" in text_m
+
+    # 6. /config_llm model <id> (switch)
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm model gemini-2.5-flash"}})
+    set_model_spy.assert_called_with("gemini-2.5-flash")
+    assert bot.send_message.called
+    text_set_m = bot.send_message.call_args[1]["text"]
+    assert "Model LLM Diperbarui" in text_set_m
+    assert "gemini-2.5-flash" in text_set_m
+
+    # 7. /config_llm ping (test connection)
+    bot.reset_mock()
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/config_llm ping"}})
+    test_provider_spy.assert_called()
+    assert bot.send_message.called
+    text_ping = bot.send_message.call_args[1]["text"]
+    assert "35.5" in text_ping or "ms" in text_ping
+
 
 
 def test_command_dispatcher_aegis_chat_and_skill_template():
@@ -304,6 +372,23 @@ def test_command_dispatcher_status_and_agents():
     text = bot.send_message.call_args[1]["text"]
     assert "Zeus Orchestrator" in text
     assert "Ship Master" in text
+
+
+def test_command_dispatcher_help_includes_config_llm():
+    bot = MagicMock()
+    sec = MagicMock(is_authorized=MagicMock(return_value=True))
+    pairing = MagicMock()
+
+    handler = TelegramUpdateHandler(
+        bot_client=bot,
+        security_manager=sec,
+        pairing_manager=pairing,
+    )
+
+    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/help"}})
+    assert bot.send_message.called
+    text = bot.send_message.call_args[1]["text"]
+    assert "/config_llm" in text
 
 
 # =============================================================================

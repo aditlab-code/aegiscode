@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import logging
 import os
 import threading
@@ -638,33 +639,45 @@ class TelegramCompanion:
         return True
 
     def execute_remote_turn_async(self, instruction: str, chat_id: int) -> None:
-        """Jalankan turn pada sesi terpadu secara asinkron menggunakan executor mandiri."""
+        """Jalankan turn pada sesi terpadu secara asinkron dengan kontrol Gate id_task ketat."""
         turn_id = f"TURN-{uuid.uuid4().hex[:8]}"
         mode = self.get_mode().lower()
 
+        # Daftarkan id_task aktif ke Gate sebelum memicu thread
+        self.gate.register_task(chat_id, turn_id)
+
         def _worker():
-            svc = _get_gateway_service()
-            if not svc:
-                logger.error("[TURN-THREAD] Turn %s failed: GatewayService unavailable", turn_id)
+            try:
+                svc = _get_gateway_service()
+                if not svc:
+                    logger.error("[TURN-THREAD] Turn %s failed: GatewayService unavailable", turn_id)
+                    self.bot_client.send_message(
+                        chat_id=chat_id,
+                        text="❌ <b>Layanan Gateway Aegis tidak tersedia.</b>",
+                    )
+                    return
+
+                if mode == "ask":
+                    ask_executor = AskModeTurnExecutor(
+                        bot_client=self.bot_client,
+                        gate=self.gate,
+                        get_active_skill=self.get_active_skill,
+                    )
+                    ask_executor.execute(instruction, chat_id, svc)
+                else:
+                    agents_executor = AgentsModeTurnExecutor(
+                        bot_client=self.bot_client,
+                        gate=self.gate,
+                    )
+                    agents_executor.execute(instruction, chat_id, svc)
+            except Exception as ex:
+                logger.error("[TURN-THREAD] Turn %s unhandled exception: %s", turn_id, ex, exc_info=True)
                 self.bot_client.send_message(
                     chat_id=chat_id,
-                    text="❌ <b>Layanan Gateway Aegis tidak tersedia.</b>",
+                    text=f"❌ <b>Terjadi kesalahan saat mengeksekusi instruksi:</b> {html.escape(str(ex))}",
                 )
-                return
-
-            if mode == "ask":
-                ask_executor = AskModeTurnExecutor(
-                    bot_client=self.bot_client,
-                    gate=self.gate,
-                    get_active_skill=self.get_active_skill,
-                )
-                ask_executor.execute(instruction, chat_id, svc)
-            else:
-                agents_executor = AgentsModeTurnExecutor(
-                    bot_client=self.bot_client,
-                    gate=self.gate,
-                )
-                agents_executor.execute(instruction, chat_id, svc)
+            finally:
+                self.gate.complete_task(chat_id, turn_id)
 
         t = threading.Thread(target=_worker, name=f"TurnThread-{turn_id}", daemon=True)
         t.start()
@@ -704,8 +717,7 @@ class TelegramCompanion:
         if not self.bot_token:
             logger.warning("TELEGRAM_BOT_TOKEN belum disetel.")
             return False
-        self.bot_client.start_polling(self.handler.handle_update)
-        return True
+        return bool(self.bot_client.start_polling(self.handler.handle_update))
 
     def stop(self) -> None:
         """Hentikan background companion."""

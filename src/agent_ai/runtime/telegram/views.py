@@ -104,7 +104,7 @@ def render_repo_view(
             f"• <b>Nama Proyek:</b> <code>{name}</code>\n"
             f"• <b>Root Path:</b> <code>{root}</code>\n"
             "• <b>Status Git:</b> ⚠️ <i>Belum diinisialisasi sebagai repositori Git (.git belum ada).</i>\n\n"
-            "Tekan tombol di bawah untuk menginisialisasi Git atau ganti project:"
+            "Tekan tombol di bawah untuk menginisialisasi Git atau ganti project (atau ketik <code>/repo init</code>):"
         )
         keyboard = {
             "inline_keyboard": [
@@ -145,7 +145,7 @@ def render_repo_view(
             status = f.get("status", "M")
             lines.append(f"• <code>{path} {file_lines} line {status}</code>")
 
-        lines.append("\nPilih aksi untuk seluruh perubahan:")
+        lines.append("\nPilih aksi untuk seluruh perubahan (atau ketik <code>/repo accept</code> / <code>/repo discard</code>):")
         buttons.append([
             {"text": "✅ Accept Perubahan", "callback_data": "repo:accept"},
             {"text": "🗑️ Discard Perubahan", "callback_data": "repo:discard"},
@@ -169,7 +169,7 @@ def render_mode_view(current_mode: str) -> Tuple[str, Dict[str, Any]]:
         f"Mode saat ini: <b>{mode_label}</b>\n\n"
         "• <b>Ask Mode ⏸️:</b> Agen berkonsultasi dan meminta konfirmasi sebelum eksekusi kritis.\n"
         "• <b>Agents Mode ⚡:</b> Agen mengeksekusi tugas secara otonom mandiri dengan audit streaming.\n\n"
-        "Pilih mode yang diinginkan di bawah:"
+        "Pilih mode di bawah atau ketik langsung <code>/aegis_mode ask</code> / <code>/aegis_mode agents</code>:"
     )
 
     keyboard = {
@@ -197,7 +197,13 @@ def render_config_llm_view(
         f"• <b>Provider Aktif:</b> <code>{active_provider or 'Belum dipilih'}</code>\n"
         f"• <b>Model Aktif:</b> <code>{active_model or 'Default'}</code>\n"
         f"• <b>Status Gateway:</b> {status_icon} {status_text}\n\n"
-        "Gunakan menu interaktif di bawah untuk mengelola koneksi AI:"
+        "<b>Perintah Teks 1-Alur:</b>\n"
+        "• <code>/config_llm providers</code> - Daftar seluruh provider\n"
+        "• <code>/config_llm provider &lt;id&gt;</code> - Pilih/ganti provider\n"
+        "• <code>/config_llm models</code> - Daftar model provider aktif\n"
+        "• <code>/config_llm model &lt;nama&gt;</code> - Pilih/ganti model aktif\n"
+        "• <code>/config_llm ping</code> - Uji latensi koneksi\n\n"
+        "Atau gunakan tombol interaktif di bawah:"
     )
 
     keyboard = {
@@ -239,7 +245,7 @@ def render_provider_list_view(providers: List[Dict[str, Any]]) -> Tuple[str, Dic
     text = (
         "🔌 <b>Daftar LLM Provider:</b>\n\n"
         + "\n".join(lines)
-        + "\n\nPilih provider aktif di bawah:"
+        + "\n\nPilih provider di bawah atau ketik <code>/config_llm provider &lt;id&gt;</code>:"
     )
     return text, {"inline_keyboard": buttons}
 
@@ -270,7 +276,7 @@ def render_model_list_view(
     text = (
         f"🧠 <b>Daftar Model {header}:</b>\n\n"
         + "\n".join(lines)
-        + "\n\nPilih model yang ingin diaktifkan:"
+        + f"\n\nPilih model di bawah atau ketik <code>/config_llm model &lt;nama&gt;</code>:"
     )
     return text, {"inline_keyboard": buttons}
 
@@ -361,17 +367,20 @@ def render_skill_selected_view(
 
 
 def render_help_view() -> str:
-    """Teks panduan resmi yang menonjolkan 5 perintah utama AegisCode Companion."""
+    """Teks panduan resmi perintah teks linier AegisCode Companion (Zero-Callback)."""
     return (
-        "🛡️ <b>AegisCode Mobile Companion Bot:</b>\n\n"
-        "<b>5 Perintah Utama:</b>\n"
+        "🛡️ <b>AegisCode Mobile Companion Bot (1 Alur Linier):</b>\n\n"
+        "<b>Perintah Operasional Utama:</b>\n"
         "• <code>/repo</code> - Status repositori, branch aktif, commit, & status perubahan.\n"
-        "• <code>/aegis_mode</code> [ask|agents] - Beralih antara mode Ask (HITL konfirmasi) vs Agents (otonom).\n"
-        "• <code>/aegis_chat &lt;pesan&gt;</code> - Arahkan agen dengan prompt bebas atau tampilkan template skill pemandu.\n"
-        "• <code>/config_llm</code> - Panel terpadu LLM (list provider, ganti model, test ping latensi).\n"
-        "• <code>/help</code> - Menampilkan panduan ringkas ini.\n\n"
-        "<b>Perintah Operasional Tambahan:</b>\n"
+        "• <code>/repo accept</code> - Commit seluruh perubahan dengan pesan LLM.\n"
+        "• <code>/repo discard</code> - Batalkan seluruh perubahan berkas.\n"
+        "• <code>/repo init</code> - Inisialisasi Git pada proyek aktif.\n"
+        "• <code>/mode</code> [ask|agents] - Beralih antara mode Ask (konfirmasi) vs Agents (otonom).\n"
+        "• <code>/config_llm</code> - Konfigurasi LLM (pilih provider, model, & uji ping latensi).\n"
+        "• <code>/allow &lt;req_id&gt;</code> - Setujui permintaan tindakan kritis HITL.\n"
+        "• <code>/deny &lt;req_id&gt;</code> - Tolak permintaan tindakan kritis HITL.\n"
         "• <code>/status</code> - Status gateway runtime dan branch git.\n"
-        "• <code>/agents</code> - Pantau status armada subagen Olympus.\n\n"
-        "<i>Tips: Anda juga bisa langsung mengetik pesan teks apa pun tanpa awalan '/' untuk berkonsultasi atau mengarahkan agen.</i>"
+        "• <code>/agents</code> - Pantau status armada subagen Olympus Fleet.\n"
+        "• <code>/help</code> - Menampilkan panduan ringkas ini.\n\n"
+        "<i>Tips: Anda dapat langsung mengetik instruksi coding apa pun tanpa awalan '/' untuk berkonsultasi atau mengeksekusi tugas.</i>"
     )

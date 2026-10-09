@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 import os
+import threading
 from dataclasses import asdict
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -14,6 +13,7 @@ _security_manager: TelegramSecurityManager | None = None
 _pairing_manager: PairingManager | None = None
 _cached_bot_username: str | None = None
 _companion: TelegramCompanion | None = None
+_companion_lock = threading.RLock()
 
 def get_security_manager() -> TelegramSecurityManager:
     global _security_manager
@@ -34,13 +34,14 @@ def get_companion() -> TelegramCompanion | None:
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     if not token:
         return None
-    if _companion is None:
-        _companion = TelegramCompanion(
-            bot_token=token,
-            security_manager=get_security_manager(),
-            pairing_manager=get_pairing_manager(),
-        )
-    return _companion
+    with _companion_lock:
+        if _companion is None:
+            _companion = TelegramCompanion(
+                bot_token=token,
+                security_manager=get_security_manager(),
+                pairing_manager=get_pairing_manager(),
+            )
+        return _companion
 def get_bot_username(token: str) -> str:
     global _cached_bot_username
     if _cached_bot_username:
@@ -75,13 +76,15 @@ def telegram_status(request):
     bot_username = get_bot_username(token)
 
     paired_user_data = asdict(status.paired_user) if status.paired_user else None
+    comp = get_companion()
+    is_running = bool(comp and comp.bot_client and comp.bot_client.is_polling())
 
     return JsonResponse({
         "configured": True,
         "is_paired": status.is_paired,
         "bot_username": bot_username,
         "paired_user": paired_user_data,
-        "is_running": bool(_companion and _companion.bot_client and _companion.bot_client.is_polling()),
+        "is_running": is_running,
     })
 
 
@@ -95,9 +98,10 @@ def telegram_pairing_qr(request):
         )
 
     # Pastikan companion bot aktif mendengarkan saat QR code digenerate
-    comp = get_companion()
-    if comp and not (comp.bot_client and comp.bot_client.is_polling()):
-        comp.start()
+    with _companion_lock:
+        comp = get_companion()
+        if comp and not (comp.bot_client and comp.bot_client.is_polling()):
+            comp.start()
 
     bot_username = get_bot_username(token)
     if not bot_username:
@@ -123,12 +127,13 @@ def telegram_unlink(request):
 
     sec = get_security_manager()
     success = sec.unlink()
-    global _companion
-    if _companion:
-        try:
-            _companion.stop()
-        except Exception:
-            pass
+    with _companion_lock:
+        global _companion
+        if _companion:
+            try:
+                _companion.stop()
+            except Exception:
+                pass
     return JsonResponse({"success": success})
 
 
@@ -138,15 +143,16 @@ def telegram_start_poller(request):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    comp = get_companion()
-    if not comp:
-        return JsonResponse(
-            {"error": "TELEGRAM_BOT_TOKEN belum disetel di .env", "is_running": False},
-            status=400,
-        )
+    with _companion_lock:
+        comp = get_companion()
+        if not comp:
+            return JsonResponse(
+                {"error": "TELEGRAM_BOT_TOKEN belum disetel di .env", "is_running": False},
+                status=400,
+            )
 
-    success = comp.start()
-    is_running = bool(comp.bot_client and comp.bot_client.is_polling())
+        success = comp.start()
+        is_running = bool(comp.bot_client and comp.bot_client.is_polling())
     return JsonResponse({"success": success, "is_running": is_running})
 
 
@@ -156,7 +162,8 @@ def telegram_stop_poller(request):
     if request.method != "POST":
         return JsonResponse({"error": "Method not allowed"}, status=405)
 
-    global _companion
-    if _companion:
-        _companion.stop()
+    with _companion_lock:
+        global _companion
+        if _companion:
+            _companion.stop()
     return JsonResponse({"success": True, "is_running": False})

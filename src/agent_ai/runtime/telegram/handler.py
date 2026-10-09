@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
@@ -85,18 +86,22 @@ class TelegramUpdateHandler:
         self.on_agent_delegate = on_agent_delegate
         self.gate = gate
 
-        # Router Perintah Resmi
+        # Router Perintah Resmi (1 Alur Linier Teks Murni)
         self._command_router: Dict[str, Callable[[int, int, str, str], None]] = {
             "/repo": self._handle_repo,
             "/aegis_mode": self._handle_mode,
+            "/allow": self._handle_allow,
+            "/deny": self._handle_deny,
             "/aegis_chat": self._handle_chat,
             "/config_llm": self._handle_config_llm,
+            "/config": self._handle_config_llm,
+            "/llm": self._handle_config_llm,
             "/help": self._handle_help,
             "/status": self._handle_status,
             "/agents": self._handle_agents,
         }
 
-        # Router Callback Interaktif berdasarkan Prefix
+        # Router Callback Interaktif (Legacy Fallback)
         self._callback_router: List[tuple[str, Callable[[str, Optional[int], Optional[int], Dict[str, Any], str], None]]] = [
             ("repo:accept", self._handle_repo_accept_cb),
             ("repo:discard", self._handle_repo_discard_cb),
@@ -112,9 +117,18 @@ class TelegramUpdateHandler:
             ("prompt:retry:", self._handle_retry_cb),
             ("agent:delegate:", self._handle_delegate_cb),
         ]
+        self._handled_update_ids: deque[int] = deque(maxlen=2000)
+        self._handled_callback_ids: deque[str] = deque(maxlen=2000)
 
     def handle_update(self, update: Dict[str, Any]) -> None:
-        """Proses satu update dari Telegram Bot API."""
+        """Proses satu update dari Telegram Bot API dengan proteksi idempotensi."""
+        update_id = update.get("update_id")
+        if update_id is not None:
+            if update_id in self._handled_update_ids:
+                logger.warning("TelegramUpdateHandler: duplikasi update_id %s diabaikan.", update_id)
+                return
+            self._handled_update_ids.append(update_id)
+
         if "message" in update:
             self._handle_message(update["message"])
         elif "callback_query" in update:
@@ -163,16 +177,36 @@ class TelegramUpdateHandler:
                     )
                     return
 
-        # 2. Pemeriksaan Otorisasi Pengguna (Zero-Trust Whitelist)
+        # 2. Pemeriksaan Pintu Gerbang (Gate: Auth & Active id_task Check)
         sender_username = from_user.get("username")
-        if not self.security_manager.is_authorized(user_id, username=sender_username):
-            deny_text = (
-                "⛔ <b>Akses Ditolak</b>\n\n"
-                "Akun Anda tidak terdaftar dalam whitelist AegisCode. "
-                "Silakan pindai QR code pairing resmi dari layar IDE atau terminal Anda."
-            )
-            self.bot_client.send_message(chat_id=chat_id, text=deny_text)
-            return
+        if self.gate:
+            decision = self.gate.gate_inbound_turn(chat_id, text, username=sender_username)
+            if not decision.allowed:
+                if decision.reason == "Unauthorized user":
+                    deny_text = (
+                        "⛔ <b>Akses Ditolak</b>\n\n"
+                        "Akun Anda tidak terdaftar dalam whitelist AegisCode. "
+                        "Silakan pindai QR code pairing resmi dari layar IDE atau terminal Anda."
+                    )
+                    self.bot_client.send_message(chat_id=chat_id, text=deny_text)
+                    return
+                elif decision.reason == "Task is currently running":
+                    busy_text = (
+                        "⏳ <b>Agen Sedang Menjalankan Tugas</b>\n\n"
+                        f"Task <code>{decision.active_task_id or 'aktif'}</code> sedang berjalan di workstation IDE.\n"
+                        "Harap tunggu hingga proses selesai sebelum mengirimkan perintah atau instruksi baru."
+                    )
+                    self.bot_client.send_message(chat_id=chat_id, text=busy_text)
+                    return
+        else:
+            if not self.security_manager.is_authorized(user_id, username=sender_username):
+                deny_text = (
+                    "⛔ <b>Akses Ditolak</b>\n\n"
+                    "Akun Anda tidak terdaftar dalam whitelist AegisCode. "
+                    "Silakan pindai QR code pairing resmi dari layar IDE atau terminal Anda."
+                )
+                self.bot_client.send_message(chat_id=chat_id, text=deny_text)
+                return
 
         # 3. Router Perintah & Pesan
         if text.startswith("/"):
@@ -193,7 +227,76 @@ class TelegramUpdateHandler:
     # COMMAND HANDLERS
     # =========================================================================
 
+    def _handle_allow(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        req_id = args.strip()
+        if not req_id:
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text="⚠️ <b>Format Perintah Salah:</b> Gunakan <code>/allow &lt;req_id&gt;</code> (contoh: <code>/allow req-1</code>).",
+            )
+            return
+        if self.on_hitl_action:
+            self.on_hitl_action("allow", req_id)
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text=f"✅ <b>Persetujuan Dicatat: ALLOW</b> untuk permintaan <code>{req_id}</code>.",
+            )
+        else:
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text="⚠️ Approval coordinator belum terhubung.",
+            )
+
+    def _handle_deny(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        req_id = args.strip()
+        if not req_id:
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text="⚠️ <b>Format Perintah Salah:</b> Gunakan <code>/deny &lt;req_id&gt;</code> (contoh: <code>/deny req-1</code>).",
+            )
+            return
+        if self.on_hitl_action:
+            self.on_hitl_action("deny", req_id)
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text=f"❌ <b>Tindakan Ditolak: DENY</b> untuk permintaan <code>{req_id}</code>.",
+            )
+        else:
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text="⚠️ Approval coordinator belum terhubung.",
+            )
+
     def _handle_repo(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        subcmd = args.strip().lower()
+
+        if subcmd == "accept":
+            if self.on_repo_accept:
+                res = self.on_repo_accept()
+                msg = res.get("message") or "Perubahan berhasil di-commit ke repositori."
+                self.bot_client.send_message(chat_id=chat_id, text=f"✅ <b>Accept Berhasil:</b>\n{msg}")
+            else:
+                self.bot_client.send_message(chat_id=chat_id, text="⚠️ Layanan accept repo belum tersedia.")
+            return
+
+        if subcmd == "discard":
+            if self.on_repo_discard:
+                res = self.on_repo_discard()
+                msg = res.get("message") or "Perubahan berkas berhasil dibatalkan."
+                self.bot_client.send_message(chat_id=chat_id, text=f"🗑️ <b>Discard Berhasil:</b>\n{msg}")
+            else:
+                self.bot_client.send_message(chat_id=chat_id, text="⚠️ Layanan discard repo belum tersedia.")
+            return
+
+        if subcmd == "init":
+            if self.on_repo_init:
+                res = self.on_repo_init()
+                msg = res.get("message") or "Repositori Git berhasil diinisialisasi."
+                self.bot_client.send_message(chat_id=chat_id, text=f"⚙️ <b>Init Berhasil:</b>\n{msg}")
+            else:
+                self.bot_client.send_message(chat_id=chat_id, text="⚠️ Layanan init repo belum tersedia.")
+            return
+
         info = self.get_repo_info() if self.get_repo_info else {
             "has_active_project": False,
             "name": "-",
@@ -206,16 +309,19 @@ class TelegramUpdateHandler:
         }
         if not info.get("has_active_project", True):
             projects = self.list_projects() if self.list_projects else []
-            selector_text, keyboard = render_project_selector_view(projects)
-            self.bot_client.send_message(chat_id=chat_id, text=selector_text, reply_markup=keyboard)
+            selector_text, selector_kb = render_project_selector_view(projects)
+            kwargs = {}
+            if selector_kb:
+                kwargs["reply_markup"] = selector_kb
+            self.bot_client.send_message(chat_id=chat_id, text=selector_text, **kwargs)
             return
 
         changed_files = self.get_changed_files() if self.get_changed_files else info.get("changed_files", [])
-        repo_text, keyboard = render_repo_view(info, changed_files=changed_files)
-        if keyboard:
-            self.bot_client.send_message(chat_id=chat_id, text=repo_text, reply_markup=keyboard)
-        else:
-            self.bot_client.send_message(chat_id=chat_id, text=repo_text)
+        repo_text, repo_kb = render_repo_view(info, changed_files=changed_files)
+        kwargs = {}
+        if repo_kb:
+            kwargs["reply_markup"] = repo_kb
+        self.bot_client.send_message(chat_id=chat_id, text=repo_text, **kwargs)
 
     def _handle_mode(self, chat_id: int, user_id: int, text: str, args: str) -> None:
         arg = args.lower().strip()
@@ -257,6 +363,63 @@ class TelegramUpdateHandler:
             self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=keyboard)
 
     def _handle_config_llm(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        raw_args = args.strip()
+        parts = raw_args.split(maxsplit=1)
+        subcmd = parts[0].lower() if parts else ""
+        subarg = parts[1].strip() if len(parts) > 1 else ""
+
+        # 1. Subperintah List / Set Provider: /config_llm providers | /config_llm provider <id>
+        if subcmd in ("providers", "provider"):
+            if not subarg:
+                providers = self.get_providers() if self.get_providers else []
+                view_text, kb = render_provider_list_view(providers)
+                self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=kb)
+                return
+            else:
+                target_p = subarg
+                if self.set_provider:
+                    self.set_provider(target_p)
+                confirm_text = (
+                    f"✅ <b>Provider LLM Diperbarui!</b>\n\n"
+                    f"⭐ Provider aktif saat ini: <code>{target_p}</code>\n\n"
+                    f"Ketik <code>/config_llm models</code> untuk melihat daftar model yang didukung."
+                )
+                self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
+                return
+
+        # 2. Subperintah List / Set Model: /config_llm models | /config_llm model <nama>
+        if subcmd in ("models", "model"):
+            if not subarg:
+                providers = self.get_providers() if self.get_providers else []
+                active_p_id = next((p.get("id") or p.get("name") for p in providers if p.get("is_active")), None)
+                models = self.get_models(active_p_id) if self.get_models else []
+                view_text, kb = render_model_list_view(models, provider_id=active_p_id)
+                self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=kb)
+                return
+            else:
+                target_m = subarg
+                if self.set_active_model:
+                    self.set_active_model(target_m)
+                confirm_text = (
+                    f"🧠 <b>Model LLM Diperbarui!</b>\n\n"
+                    f"✅ Model aktif saat ini: <code>{target_m}</code>"
+                )
+                self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
+                return
+
+        # 3. Subperintah Ping / Test: /config_llm ping | /config_llm test
+        if subcmd in ("ping", "test"):
+            res = self.test_provider() if self.test_provider else {
+                "status": "ok",
+                "provider": "Default",
+                "model": "Default",
+                "latency_ms": 42.0,
+            }
+            view_text, kb = render_ping_result_view(res)
+            self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=kb)
+            return
+
+        # 4. Ringkasan Utama Konfigurasi LLM (Tanpa argumen atau overview)
         providers = self.get_providers() if self.get_providers else []
         active_provider_name = ""
         for p in providers:
@@ -370,6 +533,12 @@ class TelegramUpdateHandler:
 
         if not user_id or not cb_id:
             return
+
+        cb_key = f"{cb_id}:{data}"
+        if cb_key in self._handled_callback_ids:
+            logger.warning("TelegramUpdateHandler: duplikasi callback_query %s diabaikan.", cb_key)
+            return
+        self._handled_callback_ids.append(cb_key)
 
         # Otorisasi Callback
         sender_username = from_user.get("username")
