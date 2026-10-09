@@ -23,8 +23,9 @@ Untuk melindungi kekayaan intelektual (prompt agen otonom, strategi internal, da
 ├───────────────────────────────────────────────────────┤    ├───────────────────────────────────────────────────────┤
 │ • Branch 'master': Pusat pengembangan fitur harian    │    │ • Branch 'main': Rilis komunitas sumber terbuka       │
 │ • Branch 'release': Kerangka bundel desktop native    │    │ • Akses: Publik (siapa saja dapat melihat/clone)      │
-│ • Berkas: Memuat docs/, AGENTS.md, Roadmap.md         │    │ • Berkas: DILARANG ada docs/, AGENTS.md, Roadmap.md   │
-│ • Akses: Privat (Hanya pengembang internal)           │    │ • Filosofi: Bring Your Own Key (BYOK)                 │
+│ • Berkas: Memuat docs/, AGENTS.md, Roadmap.md         │    │ • Berkas Publik: Memuat wiki/, README.md              │
+│ • Akses: Privat (Hanya pengembang internal)           │    │ • Berkas Privat: DILARANG ada docs/, AGENTS, Roadmap  │
+│                                                       │    │ • Filosofi: Bring Your Own Key (BYOK)                 │
 └───────────────────────────────────────────────────────┘    └───────────────────────────────────────────────────────┘
 ```
 
@@ -32,7 +33,7 @@ Untuk melindungi kekayaan intelektual (prompt agen otonom, strategi internal, da
 
 | Nama Remote | URL Repositori | Status Privasi | Branch yang Dikelola |
 | :--- | :--- | :---: | :--- |
-| **`origin`** | `https://github.com/aditlab-code/aegiscode.git` | **Publik** | HANYA `main` (Edisi Komunitas) |
+| **`origin`** | `https://github.com/aditlab-code/aegiscode.git` | **Publik** | HANYA `main` (Edisi Komunitas & `wiki/`) |
 | **`dev`** | `https://github.com/aditlab-code/aegiscode-dev.git` | **Privat** | `master` (Fitur & Docs) dan `release` (Bundel) |
 | **`fork`** | `https://github.com/aditlab-code/aether-agent.git` | Privat | Cadangan arsip lawas upstream |
 
@@ -49,10 +50,12 @@ Untuk melindungi kekayaan intelektual (prompt agen otonom, strategi internal, da
 ### 2.2. Branch `main` (Community Publish Edition)
 - **Status Akses**: Publik (Tersinkronisasi ke `origin/main`).
 - **Tujuan**: Rilis terbuka bagi komunitas pengembang dengan filosofi **Bring Your Own Key (BYOK)**.
-- **Larangan Ketat**: Dilarang keras memuat folder `docs/`, `AGENTS.md`, maupun `Roadmap.md` di tingkat root.
-- **Berkas yang Diizinkan di Root**: Hanya berkas `README.md` versi komunitas (berisi panduan instalasi lokal, penggunaan API key sendiri, dan aturan kontribusi).
+- **Larangan Ketat**: Dilarang keras memuat folder `docs/`, `AGENTS.md`, maupun `Roadmap.md` privat internal di tingkat root.
+- **Berkas Dokumentasi Komunitas yang Diizinkan**:
+  - `README.md`: Panduan pengenalan komunitas, instalasi cepat, dan panduan kontribusi.
+  - Direktori `wiki/`: Dokumentasi resmi komunitas publik (`Home.md`, `Guide.md`, `Features.md`, `Roadmap.md`, `Releases.md`).
 - **Prosedur Kontribusi**: Seluruh kontribusi komunitas dari luar wajib melalui pembukaan Issue dan Pull Request (PR) terisolasi.
-- **Mekanisme Filtrasi**: Menggunakan konfigurasi `.gitattributes` (`export-ignore`) agar dokumen internal tidak pernah terekspos dalam arsip rilis.
+- **Mekanisme Filtrasi**: Menggunakan konfigurasi `.gitattributes` (`export-ignore`) agar dokumen privat internal (`docs/`, `AGENTS.md`, `Roadmap.md`) tidak pernah terekspos dalam arsip rilis publik.
 
 ### 2.3. Branch `release` (Enterprise MVP Bundle)
 - **Status Akses**: Privat (Tersinkronisasi ke `dev/release`).
@@ -90,14 +93,15 @@ git checkout main
 # Perubahan kode digabungkan secara selektif atau rebase
 git merge master --no-commit
 
-# 3. Pastikan berkas terlarang tetap terhapus dari working tree main
+# 3. Pastikan berkas privat internal dihapus dari working tree main
+# PENTING: Folder wiki/ dan README.md TETAP DIPERTAHANKAN untuk komunitas!
 git rm -rf docs AGENTS.md Roadmap.md 2>/dev/null || true
 
-# 4. Pastikan README.md komunitas tetap utuh
-git checkout HEAD -- README.md
+# 4. Pastikan README.md dan folder wiki/ komunitas tetap utuh
+git checkout HEAD -- README.md wiki/ 2>/dev/null || true
 
 # 5. Commit dan push ke remote origin publik
-git commit -m "chore: rilis sinkronisasi edisi komunitas"
+git commit -m "chore: rilis sinkronisasi edisi komunitas v0.2.05"
 git push origin main
 
 # 6. Kembali ke branch master
@@ -152,7 +156,7 @@ Jika kontributor komunitas mengajukan Pull Request di repositori publik `origin`
 ```text
 Local Branch   Tracking Remote   Visibilitas   Fungsi
 ────────────   ───────────────   ───────────   ────────────────────────────────────────
-main           origin/main       Publik        Edisi Komunitas Sumber Terbuka (BYOK)
+main           origin/main       Publik        Edisi Komunitas Sumber Terbuka (BYOK) + wiki/
 master         dev/master        Privat        Pusat Fitur, Aturan Agen, & Dokumen Inti
 release        dev/release       Privat        Kerangka Pemaketan Desktop Native Tauri
 ```
