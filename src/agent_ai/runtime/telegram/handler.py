@@ -1,17 +1,30 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from agent_ai.runtime.telegram.bot_client import TelegramBotClient
+from agent_ai.runtime.telegram.gate import TelegramContextGate
 from agent_ai.runtime.telegram.pairing import PairingManager
 from agent_ai.runtime.telegram.security import TelegramSecurityManager
+from agent_ai.runtime.telegram.views import (
+    DEFAULT_SKILLS,
+    render_chat_templates_view,
+    render_config_llm_view,
+    render_help_view,
+    render_mode_view,
+    render_model_list_view,
+    render_ping_result_view,
+    render_provider_list_view,
+    render_repo_view,
+    render_skill_selected_view,
+)
 
 logger = logging.getLogger("agent_ai.runtime.telegram.handler")
 
 
 class TelegramUpdateHandler:
-    """Router pesan dan callback query Telegram Companion."""
+    """Router pesan dan callback query Telegram Companion berbasis Command & Callback Dispatcher."""
 
     def __init__(
         self,
@@ -19,7 +32,7 @@ class TelegramUpdateHandler:
         security_manager: TelegramSecurityManager,
         pairing_manager: PairingManager,
         on_hitl_action: Optional[Callable[[str, str], None]] = None,
-        on_steer_command: Optional[Callable[[str], None]] = None,
+        on_steer_command: Optional[Callable[..., None]] = None,
         get_runtime_status: Optional[Callable[[], str]] = None,
         get_repo_info: Optional[Callable[[], Dict[str, Any]]] = None,
         get_mode: Optional[Callable[[], str]] = None,
@@ -35,7 +48,8 @@ class TelegramUpdateHandler:
         get_active_skill: Optional[Callable[[], Optional[str]]] = None,
         on_prompt_retry: Optional[Callable[[str, int], bool]] = None,
         on_agent_delegate: Optional[Callable[[str, int], bool]] = None,
-    ):
+        gate: Optional[TelegramContextGate] = None,
+    ) -> None:
         self.bot_client = bot_client
         self.security_manager = security_manager
         self.pairing_manager = pairing_manager
@@ -56,6 +70,30 @@ class TelegramUpdateHandler:
         self.get_active_skill = get_active_skill
         self.on_prompt_retry = on_prompt_retry
         self.on_agent_delegate = on_agent_delegate
+        self.gate = gate
+
+        # Router Perintah Resmi
+        self._command_router: Dict[str, Callable[[int, int, str, str], None]] = {
+            "/repo": self._handle_repo,
+            "/aegis_mode": self._handle_mode,
+            "/aegis_chat": self._handle_chat,
+            "/config_llm": self._handle_config_llm,
+            "/help": self._handle_help,
+            "/status": self._handle_status,
+            "/agents": self._handle_agents,
+        }
+
+        # Router Callback Interaktif berdasarkan Prefix
+        self._callback_router: List[tuple[str, Callable[[str, Optional[int], Optional[int], Dict[str, Any], str], None]]] = [
+            ("hitl:", self._handle_hitl_cb),
+            ("mode:", self._handle_mode_cb),
+            ("config:", self._handle_config_cb),
+            ("provider:", self._handle_provider_cb),
+            ("model:", self._handle_model_cb),
+            ("skill:", self._handle_skill_cb),
+            ("prompt:retry:", self._handle_retry_cb),
+            ("agent:delegate:", self._handle_delegate_cb),
+        ]
 
     def handle_update(self, update: Dict[str, Any]) -> None:
         """Proses satu update dari Telegram Bot API."""
@@ -118,293 +156,178 @@ class TelegramUpdateHandler:
             self.bot_client.send_message(chat_id=chat_id, text=deny_text)
             return
 
-        # 3. Router Perintah Pengguna Terotorisasi
-        first_token = text.split()[0].lower() if text else ""
-        cmd = first_token.split("@")[0]
-
-        if cmd == "/status":
-            status_text = (
-                self.get_runtime_status()
-                if self.get_runtime_status
-                else "🟢 AegisCode Aktif dan Siap."
-            )
-            self.bot_client.send_message(chat_id=chat_id, text=status_text)
-        elif cmd == "/repo":
-            if self.get_repo_info:
-                info = self.get_repo_info()
-            else:
-                info = {
-                    "name": "AegisCode",
-                    "root": "N/A",
-                    "branch": "main",
-                    "last_commit": "HEAD",
-                    "uncommitted_changes": 0,
-                    "is_dirty": False,
-                }
-            name = info.get("name", "AegisCode")
-            root = info.get("root", "-")
-            branch = info.get("branch", "-")
-            last_commit = info.get("last_commit", "-")
-            uncommitted = info.get("uncommitted_changes", 0)
-            dirty_str = f"⚠️ {uncommitted} perubahan belum di-commit" if uncommitted > 0 or info.get("is_dirty") else "Clean (bersih)"
-
-            repo_text = (
-                "📁 <b>Repositori Aktif:</b>\n\n"
-                f"• <b>Nama Proyek:</b> <code>{name}</code>\n"
-                f"• <b>Root Path:</b> <code>{root}</code>\n"
-                f"• <b>Branch Git:</b> <code>{branch}</code>\n"
-                f"• <b>Commit Terakhir:</b> <code>{last_commit}</code>\n"
-                f"• <b>Status Perubahan:</b> {dirty_str}"
-            )
-            self.bot_client.send_message(chat_id=chat_id, text=repo_text)
-        elif cmd == "/mode":
+        # 3. Router Perintah & Pesan
+        if text.startswith("/"):
             parts = text.split(maxsplit=1)
-            arg = parts[1].strip().lower() if len(parts) > 1 else ""
+            cmd = parts[0].lower().split("@")[0]
+            args = parts[1].strip() if len(parts) > 1 else ""
 
-            if arg:
-                if arg in ("ask", "agents"):
-                    if self.set_mode:
-                        self.set_mode(arg)
-                    mode_display = "Ask ⏸️ (Perlu Konfirmasi)" if arg == "ask" else "Agents ⚡ (Otonom Penuh)"
-                    confirm_text = (
-                        f"✅ <b>Mode Operasional Diperbarui!</b>\n\n"
-                        f"Mode saat ini: <b>{mode_display}</b>\n\n"
-                        + ("Agen akan meminta persetujuan sebelum menjalankan aksi kritis."
-                           if arg == "ask" else
-                           "Agen akan mengeksekusi aksi secara mandiri dan mengirimkan ringkasan audit log.")
-                    )
-                    self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
-                else:
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text="❌ <b>Mode Tidak Valid!</b>\nGunakan <code>/mode ask</code> atau <code>/mode agents</code>.",
-                    )
+            handler = self._command_router.get(cmd)
+            if handler:
+                handler(chat_id, user_id, text, args)
             else:
-                current_mode = self.get_mode().lower() if self.get_mode else "ask"
-                current_label = "Ask ⏸️ (Konfirmasi)" if current_mode == "ask" else "Agents ⚡ (Otonom)"
-                mode_menu_text = (
-                    "⚙️ <b>Kontrol Mode Operasional:</b>\n\n"
-                    f"Mode saat ini: <b>{current_label}</b>\n\n"
-                    "• <b>Ask Mode ⏸️:</b> Membutuhkan konfirmasi pengguna untuk eksekusi kritis.\n"
-                    "• <b>Agents Mode ⚡:</b> Eksekusi otonom mandiri dengan audit log ke Telegram.\n\n"
-                    "Pilih mode di bawah ini atau ketik <code>/mode ask</code> / <code>/mode agents</code>:"
-                )
-                keyboard = {
-                    "inline_keyboard": [
-                        [
-                            {"text": "Mode: Ask ⏸️", "callback_data": "mode:set:ask"},
-                            {"text": "Mode: Agents ⚡", "callback_data": "mode:set:agents"},
-                        ]
-                    ]
-                }
-                self.bot_client.send_message(chat_id=chat_id, text=mode_menu_text, reply_markup=keyboard)
-        elif cmd == "/agents":
-            agents = self.get_agents() if self.get_agents else []
-            if not agents:
-                agents = [
-                    {"name": "Zeus Orchestrator", "role": "Orchestrator & Ship Master", "status": "Standby"},
-                    {"name": "Athena Planner", "role": "Architect & Spec Planner", "status": "Active"},
-                    {"name": "Hephaestus Coder", "role": "Core Implementer & Builder", "status": "Standby"},
-                    {"name": "Heracles Tester", "role": "Verification & QA Tester", "status": "Standby"},
-                    {"name": "Hermes Scout", "role": "Explorer & Fast Scout", "status": "Standby"},
-                    {"name": "Themis Reviewer", "role": "Quality & Security Reviewer", "status": "Standby"},
-                ]
-
-            agent_lines = []
-            for a in agents:
-                status_icon = "🟢" if a.get("status") == "Active" or a.get("is_active") else "⚪"
-                status_text = a.get("status", "Standby")
-                agent_lines.append(
-                    f"{status_icon} <b>{a.get('name')}</b> ({status_text})\n"
-                    f"   <i>Peran:</i> {a.get('role', '-')}"
-                )
-
-            agents_text = (
-                "🏛️ <b>Armada Subagen Olympus (Olympus Fleet):</b>\n\n"
-                + "\n\n".join(agent_lines)
-            )
-            self.bot_client.send_message(chat_id=chat_id, text=agents_text)
-        elif cmd == "/provider":
-            parts = text.split(maxsplit=1)
-            arg = parts[1].strip() if len(parts) > 1 else ""
-
-            if arg:
-                if self.set_provider:
-                    self.set_provider(arg)
-                models = self.get_models(arg) if self.get_models else []
-                if models:
-                    m_buttons = [[{"text": f"{'⭐ ' if m.get('is_active') else ''}{m.get('name')}", "callback_data": f"model:set:{m.get('name')}"}] for m in models]
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text=f"✅ <b>Provider LLM Aktif Diubah:</b> <code>{arg}</code>\n\nSilakan pilih model yang ingin digunakan:",
-                        reply_markup={"inline_keyboard": m_buttons},
-                    )
-                else:
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text=f"✅ <b>Provider LLM Aktif Diubah:</b> <code>{arg}</code>",
-                    )
-            else:
-                providers = self.get_providers() if self.get_providers else []
-                if not providers:
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text="ℹ️ Belum ada LLM provider yang terdaftar di sistem.",
-                    )
-                else:
-                    lines = []
-                    buttons = []
-                    for p in providers:
-                        is_active = p.get("is_active", False)
-                        p_name = p.get("name") or p.get("id")
-                        p_id = p.get("id")
-                        active_mark = "⭐ (Aktif)" if is_active else ""
-                        lines.append(f"• <b>{p_name}</b> {active_mark}\n  <i>ID:</i> <code>{p_id}</code> | <i>Model:</i> <code>{p.get('model', 'default')}</code>")
-                        btn_text = f"{'⭐ ' if is_active else ''}{p_name}"
-                        buttons.append([{"text": btn_text, "callback_data": f"provider:set:{p_id}"}])
-
-                    provider_text = (
-                        "🤖 <b>Daftar LLM Provider:</b>\n\n"
-                        + "\n".join(lines) + "\n\n"
-                        "Pilih provider aktif melalui tombol di bawah atau ketik <code>/provider &lt;id&gt;</code>:"
-                    )
-                    keyboard = {"inline_keyboard": buttons}
-                    self.bot_client.send_message(chat_id=chat_id, text=provider_text, reply_markup=keyboard)
-        elif cmd == "/model":
-            parts = text.split(maxsplit=1)
-            arg = parts[1].strip() if len(parts) > 1 else ""
-
-            if arg:
-                if self.set_active_model:
-                    self.set_active_model(arg)
-                self.bot_client.send_message(
-                    chat_id=chat_id,
-                    text=f"✅ <b>Model LLM Diperbarui!</b>\n\nModel aktif saat ini: <code>{arg}</code>",
-                )
-            else:
-                models = self.get_models() if self.get_models else []
-                if not models:
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text="ℹ️ Tidak ada model yang terdaftar untuk provider aktif saat ini.",
-                    )
-                else:
-                    lines = []
-                    buttons = []
-                    for m in models:
-                        is_active = m.get("is_active", False)
-                        m_name = m.get("name") or m.get("id")
-                        active_mark = "⭐ (Aktif)" if is_active else ""
-                        lines.append(f"• <code>{m_name}</code> {active_mark}")
-                        btn_text = f"{'⭐ ' if is_active else ''}{m_name}"
-                        buttons.append([{"text": btn_text, "callback_data": f"model:set:{m_name}"}])
-
-                    model_text = (
-                        "🧠 <b>Daftar Model Terkonfigurasi di IDE:</b>\n\n"
-                        + "\n".join(lines) + "\n\n"
-                        "Pilih model aktif melalui tombol di bawah atau ketik <code>/model &lt;nama_model&gt;</code>:"
-                    )
-                    keyboard = {"inline_keyboard": buttons}
-                    self.bot_client.send_message(chat_id=chat_id, text=model_text, reply_markup=keyboard)
-        elif cmd == "/skills":
-            parts = text.split(maxsplit=1)
-            arg = parts[1].strip() if len(parts) > 1 else ""
-
-            if arg:
-                if self.set_active_skill:
-                    self.set_active_skill(arg)
-                self.bot_client.send_message(
-                    chat_id=chat_id,
-                    text=f"🎯 <b>Active Skill Diperbarui!</b>\n\nSkill aktif saat ini: <code>{arg}</code>",
-                )
-            else:
-                skills = self.get_skills() if self.get_skills else []
-                if not skills:
-                    self.bot_client.send_message(
-                        chat_id=chat_id,
-                        text="ℹ️ Belum ada skills yang terdaftar di sistem.",
-                    )
-                else:
-                    lines = []
-                    buttons = []
-                    for s in skills:
-                        is_active = s.get("is_active", False)
-                        s_id = s.get("id")
-                        s_name = s.get("name") or s_id
-                        desc = s.get("description", "")
-                        active_mark = "⭐ (Aktif)" if is_active else ""
-                        lines.append(f"• <b>{s_name}</b> {active_mark}\n  <i>{desc}</i>")
-                        btn_text = f"{'⭐ ' if is_active else ''}{s_name}"
-                        buttons.append([{"text": btn_text, "callback_data": f"skill:set:{s_id}"}])
-
-                    skills_text = (
-                        "🎯 <b>Daftar Skills Resmi AegisCode:</b>\n\n"
-                        + "\n\n".join(lines) + "\n\n"
-                        "Pilih skill aktif di bawah untuk memandu instruksi agen selanjutnya:"
-                    )
-                    keyboard = {"inline_keyboard": buttons}
-                    self.bot_client.send_message(chat_id=chat_id, text=skills_text, reply_markup=keyboard)
-        elif cmd == "/testprovider":
-            self.bot_client.send_message(chat_id=chat_id, text="🔄 Menguji konektivitas ke LLM provider aktif...")
-            res = self.test_provider() if self.test_provider else {"status": "ok", "provider": "OpenCode", "model": "zen", "latency_ms": 45.2}
-            status = res.get("status", "ok")
-            provider = res.get("provider", "Unknown")
-            model = res.get("model", "default")
-            latency = res.get("latency_ms", 0.0)
-
-            if status == "ok":
-                result_text = (
-                    "✅ <b>Uji Konektivitas Berhasil!</b>\n\n"
-                    f"• <b>Provider:</b> <code>{provider}</code>\n"
-                    f"• <b>Model:</b> <code>{model}</code>\n"
-                    f"• <b>Status:</b> OK (200)\n"
-                    f"• <b>Latensi Respons:</b> <b>{latency:.1f} ms</b>"
-                )
-            else:
-                detail = res.get("detail") or res.get("message", "Unknown error")
-                result_text = (
-                    "❌ <b>Uji Konektivitas Gagal!</b>\n\n"
-                    f"• <b>Provider:</b> <code>{provider}</code>\n"
-                    f"• <b>Model:</b> <code>{model}</code>\n"
-                    f"• <b>Status:</b> ERROR\n"
-                    f"• <b>Latensi:</b> {latency:.1f} ms\n"
-                    f"• <b>Detail:</b> <i>{detail}</i>"
-                )
-            self.bot_client.send_message(chat_id=chat_id, text=result_text)
-        elif cmd == "/help":
-            help_text = (
-                "<b>AegisCode Mobile Companion:</b>\n\n"
-                "• <code>/status</code> - Cek status aktif agen & branch git\n"
-                "• <code>/repo</code> - Informasi detail repositori & status git\n"
-                "• <code>/mode</code> [ask|agents] - Kontrol mode HITL vs Otonom\n"
-                "• <code>/agents</code> - Lihat armada subagen Olympus aktif\n"
-                "• <code>/skills</code> - Pilih skill aktif untuk memandu agen\n"
-                "• <code>/provider</code> - Kelola & pilih LLM provider aktif\n"
-                "• <code>/model</code> - Pilih model LLM terkonfigurasi di IDE\n"
-                "• <code>/testprovider</code> - Uji koneksi & latensi LLM provider\n"
-                "• <code>/steer &lt;pesan&gt;</code> - Beri instruksi pengarah ke Agen\n"
-                "• Tombol persetujuan [Approve]/[Reject] akan otomatis muncul saat agen butuh konfirmasi HITL."
-            )
-            self.bot_client.send_message(chat_id=chat_id, text=help_text)
+                self._handle_unknown_command(chat_id, cmd)
         else:
-            # Perintah teks bebas / steering
-            clean_instruction = text
-            if cmd == "/steer":
-                parts = text.split(maxsplit=1)
-                clean_instruction = parts[1].strip() if len(parts) > 1 else ""
+            # Pesan teks bebas langsung diarahkan ke chat turn
+            self._handle_chat(chat_id, user_id, text, args=text)
 
-            if clean_instruction and self.on_steer_command:
-                try:
-                    self.on_steer_command(clean_instruction, chat_id=chat_id)
-                except TypeError:
-                    self.on_steer_command(clean_instruction)
-            elif clean_instruction:
-                logger.warning("on_steer_command tidak terkonfigurasi pada handler.")
+    # =========================================================================
+    # COMMAND HANDLERS
+    # =========================================================================
+
+    def _handle_repo(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        info = self.get_repo_info() if self.get_repo_info else {
+            "name": "AegisCode",
+            "root": "N/A",
+            "branch": "main",
+            "last_commit": "HEAD",
+            "uncommitted_changes": 0,
+            "is_dirty": False,
+        }
+        repo_text = render_repo_view(info)
+        self.bot_client.send_message(chat_id=chat_id, text=repo_text)
+
+    def _handle_mode(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        arg = args.lower().strip()
+        if arg:
+            if arg in ("ask", "agents"):
+                if self.set_mode:
+                    self.set_mode(arg)
+                mode_display = "Ask ⏸️ (Perlu Konfirmasi)" if arg == "ask" else "Agents ⚡ (Otonom Penuh)"
+                desc = (
+                    "Agen akan meminta persetujuan sebelum menjalankan aksi kritis."
+                    if arg == "ask"
+                    else "Agen akan mengeksekusi aksi secara mandiri dan mengirimkan ringkasan audit log."
+                )
+                confirm_text = (
+                    f"✅ <b>Mode Operasional Diperbarui!</b>\n\n"
+                    f"Mode saat ini: <b>{mode_display}</b>\n\n"
+                    f"{desc}"
+                )
+                self.bot_client.send_message(chat_id=chat_id, text=confirm_text)
             else:
                 self.bot_client.send_message(
                     chat_id=chat_id,
-                    text="ℹ️ Kirim pesan teks untuk memberi instruksi ke agen atau ketik /status.",
+                    text="❌ <b>Mode Tidak Valid!</b>\nGunakan <code>/aegis_mode ask</code> atau <code>/aegis_mode agents</code>.",
                 )
+        else:
+            current_mode = self.get_mode().lower() if self.get_mode else "ask"
+            mode_text, keyboard = render_mode_view(current_mode)
+            self.bot_client.send_message(chat_id=chat_id, text=mode_text, reply_markup=keyboard)
+
+    def _handle_chat(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        clean_instruction = args.strip()
+        if clean_instruction:
+            self._dispatch_turn(chat_id, clean_instruction)
+        else:
+            # Tanpa argumen: tampilkan menu template skills pemandu
+            active_skill = self.get_active_skill() if self.get_active_skill else None
+            skills = self.get_skills() if self.get_skills else DEFAULT_SKILLS
+            view_text, keyboard = render_chat_templates_view(active_skill=active_skill, skills=skills)
+            self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=keyboard)
+
+    def _handle_config_llm(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        providers = self.get_providers() if self.get_providers else []
+        active_provider_name = ""
+        for p in providers:
+            if p.get("is_active"):
+                active_provider_name = p.get("name") or p.get("id", "")
+                break
+        if not active_provider_name and providers:
+            active_provider_name = providers[0].get("name") or providers[0].get("id", "")
+
+        models = self.get_models() if self.get_models else []
+        active_model_name = ""
+        for m in models:
+            if m.get("is_active"):
+                active_model_name = m.get("name") or m.get("id", "")
+                break
+        if not active_model_name and models:
+            active_model_name = models[0].get("name") or models[0].get("id", "")
+
+        view_text, keyboard = render_config_llm_view(
+            active_provider=active_provider_name or "Default",
+            active_model=active_model_name or "Default",
+            is_ready=True,
+        )
+        self.bot_client.send_message(chat_id=chat_id, text=view_text, reply_markup=keyboard)
+
+    def _handle_help(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        help_text = render_help_view()
+        self.bot_client.send_message(chat_id=chat_id, text=help_text)
+
+    def _handle_status(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        status_text = (
+            self.get_runtime_status()
+            if self.get_runtime_status
+            else "🟢 AegisCode Aktif dan Siap."
+        )
+        self.bot_client.send_message(chat_id=chat_id, text=status_text)
+
+    def _handle_agents(self, chat_id: int, user_id: int, text: str, args: str) -> None:
+        agents = self.get_agents() if self.get_agents else []
+        if not agents:
+            agents = [
+                {"name": "Zeus Orchestrator", "role": "Orchestrator & Ship Master", "status": "Standby"},
+                {"name": "Athena Planner", "role": "Architect & Spec Planner", "status": "Active"},
+                {"name": "Hephaestus Coder", "role": "Core Implementer & Builder", "status": "Standby"},
+                {"name": "Heracles Tester", "role": "Verification & QA Tester", "status": "Standby"},
+                {"name": "Hermes Scout", "role": "Explorer & Fast Scout", "status": "Standby"},
+                {"name": "Themis Reviewer", "role": "Quality & Security Reviewer", "status": "Standby"},
+            ]
+
+        agent_lines = []
+        for a in agents:
+            status_icon = "🟢" if a.get("status") == "Active" or a.get("is_active") else "⚪"
+            status_text = a.get("status", "Standby")
+            agent_lines.append(
+                f"{status_icon} <b>{a.get('name')}</b> ({status_text})\n"
+                f"   <i>Peran:</i> {a.get('role', '-')}"
+            )
+
+        agents_text = (
+            "🏛️ <b>Armada Subagen Olympus (Olympus Fleet):</b>\n\n"
+            + "\n\n".join(agent_lines)
+        )
+        self.bot_client.send_message(chat_id=chat_id, text=agents_text)
+
+    def _handle_unknown_command(self, chat_id: int, cmd: str) -> None:
+        legacy_cmds = {"/provider", "/mode", "/steer", "/skills", "/model", "/testprovider"}
+        if cmd in legacy_cmds:
+            msg = (
+                f"⚠️ <b>Perintah <code>{cmd}</code> Telah Diperbarui</b>\n\n"
+                "Untuk menyederhanakan interaksi, AegisCode menggunakan 5 perintah terpadu:\n"
+                "• <code>/repo</code> - Status repositori & git\n"
+                "• <code>/aegis_mode</code> - Ganti mode Ask ⏸️ atau Agents ⚡\n"
+                "• <code>/aegis_chat</code> - Konsultasi & template skill terpandu\n"
+                "• <code>/config_llm</code> - Kelola provider, model, dan uji ping latensi\n"
+                "• <code>/help</code> - Panduan lengkap\n\n"
+                "Ketik <code>/help</code> untuk panduan lengkap."
+            )
+        else:
+            msg = (
+                f"❌ <b>Perintah Tidak Dikenal:</b> <code>{cmd}</code>\n\n"
+                "Gunakan <code>/help</code> untuk melihat daftar perintah resmi yang tersedia."
+            )
+        self.bot_client.send_message(chat_id=chat_id, text=msg)
+
+    def _dispatch_turn(self, chat_id: int, instruction: str) -> None:
+        if not self.on_steer_command:
+            logger.warning("on_steer_command tidak terkonfigurasi pada handler.")
+            self.bot_client.send_message(
+                chat_id=chat_id,
+                text="⚠️ Layanan agen belum terhubung untuk menerima instruksi.",
+            )
+            return
+
+        try:
+            self.on_steer_command(instruction, chat_id=chat_id)
+        except TypeError:
+            self.on_steer_command(instruction)
+
+    # =========================================================================
+    # CALLBACK QUERY HANDLERS
+    # =========================================================================
 
     def _handle_callback_query(self, cb: Dict[str, Any]) -> None:
         cb_id = cb.get("id")
@@ -428,107 +351,73 @@ class TelegramUpdateHandler:
             )
             return
 
-        # Format data: hitl:<allow|deny>:<approval_id>
-        if data.startswith("hitl:"):
-            parts = data.split(":", 2)
-            if len(parts) == 3:
-                action = parts[1].lower()
-                approval_id = parts[2]
-
-                if self.on_hitl_action:
-                    self.on_hitl_action(action, approval_id)
-
-                status_label = "✅ DISETUJUI (ALLOWED)" if action == "allow" else "❌ DITOLAK (DENIED)"
-                self.bot_client.answer_callback_query(
-                    callback_query_id=cb_id,
-                    text=f"Persetujuan dicatat: {action.upper()}",
-                )
-
-                if chat_id and message_id:
-                    orig_text = message.get("text", "")
-                    updated_text = f"{orig_text}\n\n<b>Status:</b> {status_label}"
-                    self.bot_client.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=updated_text,
-                        reply_markup=None,  # Hapus tombol setelah diputuskan
-                    )
+        for prefix, handler in self._callback_router:
+            if data.startswith(prefix):
+                handler(cb_id, chat_id, message_id, message, data)
                 return
 
-        # Format data: mode:set:<mode>
-        elif data.startswith("mode:set:"):
-            target_mode = data[len("mode:set:"):].lower().strip()
-            if target_mode in ("ask", "agents"):
-                if self.set_mode:
-                    self.set_mode(target_mode)
-                label = "Ask ⏸️" if target_mode == "ask" else "Agents ⚡"
-                self.bot_client.answer_callback_query(
-                    callback_query_id=cb_id,
-                    text=f"Mode diubah ke: {label}",
+        # Callback tidak dikenal
+        self.bot_client.answer_callback_query(callback_query_id=cb_id, text="Aksi tidak dikenal.")
+
+    def _handle_hitl_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        parts = data.split(":", 2)
+        if len(parts) == 3:
+            action = parts[1].lower()
+            approval_id = parts[2]
+
+            if self.on_hitl_action:
+                self.on_hitl_action(action, approval_id)
+
+            status_label = "✅ DISETUJUI (ALLOWED)" if action == "allow" else "❌ DITOLAK (DENIED)"
+            self.bot_client.answer_callback_query(
+                callback_query_id=cb_id,
+                text=f"Persetujuan dicatat: {action.upper()}",
+            )
+
+            if chat_id and message_id:
+                orig_text = message.get("text", "")
+                updated_text = f"{orig_text}\n\n<b>Status:</b> {status_label}"
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=updated_text,
+                    reply_markup=None,
                 )
-                if chat_id and message_id:
-                    updated_text = (
-                        f"⚙️ <b>Kontrol Mode Operasional:</b>\n\n"
-                        f"✅ Mode aktif saat ini: <b>{label}</b>\n\n"
-                        + ("Aksi kritis akan meminta konfirmasi user." if target_mode == "ask" else "Aksi dijalankan otonom dengan audit log.")
-                    )
-                    self.bot_client.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=updated_text,
-                        reply_markup=None,
-                    )
-            return
 
-        # Format data: provider:set:<provider_id>
-        elif data.startswith("provider:set:"):
-            provider_id = data[len("provider:set:"):].strip()
-            if self.set_provider:
-                self.set_provider(provider_id)
+    def _handle_mode_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        target_mode = data[len("mode:set:"):].lower().strip()
+        if target_mode in ("ask", "agents"):
+            if self.set_mode:
+                self.set_mode(target_mode)
+            label = "Ask ⏸️" if target_mode == "ask" else "Agents ⚡"
             self.bot_client.answer_callback_query(
                 callback_query_id=cb_id,
-                text=f"Provider aktif diubah ke: {provider_id}",
+                text=f"Mode diubah ke: {label}",
             )
             if chat_id and message_id:
-                models = self.get_models(provider_id) if self.get_models else []
-                if models:
-                    m_buttons = [[{"text": f"{'⭐ ' if m.get('is_active') else ''}{m.get('name')}", "callback_data": f"model:set:{m.get('name')}"}] for m in models]
-                    updated_text = (
-                        f"🤖 <b>LLM Provider Diperbarui:</b> <code>{provider_id}</code>\n\n"
-                        "Silakan pilih model aktif di bawah ini:"
-                    )
-                    self.bot_client.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=updated_text,
-                        reply_markup={"inline_keyboard": m_buttons},
-                    )
-                else:
-                    updated_text = (
-                        f"🤖 <b>LLM Provider Diperbarui</b>\n\n"
-                        f"⭐ Provider aktif saat ini: <code>{provider_id}</code>"
-                    )
-                    self.bot_client.edit_message_text(
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        text=updated_text,
-                        reply_markup=None,
-                    )
-            return
-
-        # Format data: model:set:<model_name>
-        elif data.startswith("model:set:"):
-            model_name = data[len("model:set:"):].strip()
-            if self.set_active_model:
-                self.set_active_model(model_name)
-            self.bot_client.answer_callback_query(
-                callback_query_id=cb_id,
-                text=f"Model aktif diubah ke: {model_name}",
-            )
-            if chat_id and message_id:
+                desc = (
+                    "Aksi kritis akan meminta konfirmasi user."
+                    if target_mode == "ask"
+                    else "Aksi dijalankan otonom dengan audit log."
+                )
                 updated_text = (
-                    f"🧠 <b>Model LLM Diperbarui!</b>\n\n"
-                    f"✅ Model aktif saat ini: <code>{model_name}</code>"
+                    f"⚙️ <b>Kontrol Mode Operasional:</b>\n\n"
+                    f"✅ Mode aktif saat ini: <b>{label}</b>\n\n"
+                    f"{desc}"
                 )
                 self.bot_client.edit_message_text(
                     chat_id=chat_id,
@@ -536,76 +425,235 @@ class TelegramUpdateHandler:
                     text=updated_text,
                     reply_markup=None,
                 )
-            return
 
-        # Format data: skill:set:<skill_name>
-        elif data.startswith("skill:set:"):
-            skill_name = data[len("skill:set:"):].strip()
-            if self.set_active_skill:
-                self.set_active_skill(skill_name)
+    def _handle_config_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        action = data[len("config:"):].strip()
+
+        if action == "main":
+            self.bot_client.answer_callback_query(callback_query_id=cb_id)
+            if chat_id and message_id:
+                providers = self.get_providers() if self.get_providers else []
+                active_p = next((p.get("name") or p.get("id") for p in providers if p.get("is_active")), "Default")
+                models = self.get_models() if self.get_models else []
+                active_m = next((m.get("name") or m.get("id") for m in models if m.get("is_active")), "Default")
+
+                view_text, kb = render_config_llm_view(active_p, active_m, is_ready=True)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+        elif action == "providers":
+            self.bot_client.answer_callback_query(callback_query_id=cb_id)
+            if chat_id and message_id:
+                providers = self.get_providers() if self.get_providers else []
+                view_text, kb = render_provider_list_view(providers)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+        elif action == "models":
+            self.bot_client.answer_callback_query(callback_query_id=cb_id)
+            if chat_id and message_id:
+                models = self.get_models() if self.get_models else []
+                view_text, kb = render_model_list_view(models)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+        elif action == "ping":
             self.bot_client.answer_callback_query(
                 callback_query_id=cb_id,
-                text=f"Skill aktif diubah ke: {skill_name}",
+                text="⚡ Menguji konektivitas LLM...",
             )
             if chat_id and message_id:
+                res = self.test_provider() if self.test_provider else {"status": "ok", "provider": "OpenCode", "model": "zen", "latency_ms": 42.0}
+                view_text, kb = render_ping_result_view(res)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+        elif action == "skills":
+            self.bot_client.answer_callback_query(callback_query_id=cb_id)
+            if chat_id and message_id:
+                active_skill = self.get_active_skill() if self.get_active_skill else None
+                skills = self.get_skills() if self.get_skills else DEFAULT_SKILLS
+                view_text, kb = render_chat_templates_view(active_skill=active_skill, skills=skills)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+
+    def _handle_provider_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        provider_id = data[len("provider:set:"):].strip()
+        if self.set_provider:
+            self.set_provider(provider_id)
+        self.bot_client.answer_callback_query(
+            callback_query_id=cb_id,
+            text=f"Provider aktif diubah ke: {provider_id}",
+        )
+        if chat_id and message_id:
+            models = self.get_models(provider_id) if self.get_models else []
+            if models:
+                view_text, kb = render_model_list_view(models, provider_id=provider_id)
+                self.bot_client.edit_message_text(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=view_text,
+                    reply_markup=kb,
+                )
+            else:
                 updated_text = (
-                    f"🎯 <b>Active Skill Diperbarui!</b>\n\n"
-                    f"⭐ Skill aktif saat ini: <code>{skill_name}</code>\n\n"
-                    "Instruksi agen selanjutnya akan dipandu oleh skill ini."
+                    f"🤖 <b>LLM Provider Diperbarui</b>\n\n"
+                    f"⭐ Provider aktif saat ini: <code>{provider_id}</code>"
                 )
                 self.bot_client.edit_message_text(
                     chat_id=chat_id,
                     message_id=message_id,
                     text=updated_text,
-                    reply_markup=None,
+                    reply_markup={"inline_keyboard": [[{"text": "🔙 Kembali ke Config", "callback_data": "config:main"}]]},
                 )
-            return
 
-        # Format data: prompt:retry:<cache_id>
-        elif data.startswith("prompt:retry:"):
-            cache_id = data[len("prompt:retry:"):].strip()
-            if self.on_prompt_retry:
-                handled = self.on_prompt_retry(cache_id, chat_id or user_id)
-                if handled:
-                    self.bot_client.answer_callback_query(
-                        callback_query_id=cb_id,
-                        text="🔄 Mencoba kembali instruksi...",
-                    )
-                else:
-                    self.bot_client.answer_callback_query(
-                        callback_query_id=cb_id,
-                        text="⚠️ Cache percobaan ulang sudah kedaluwarsa.",
-                        show_alert=True,
-                    )
+    def _handle_model_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        model_name = data[len("model:set:"):].strip()
+        if self.set_active_model:
+            self.set_active_model(model_name)
+        self.bot_client.answer_callback_query(
+            callback_query_id=cb_id,
+            text=f"Model aktif diubah ke: {model_name}",
+        )
+        if chat_id and message_id:
+            updated_text = (
+                f"🧠 <b>Model LLM Diperbarui!</b>\n\n"
+                f"✅ Model aktif saat ini: <code>{model_name}</code>"
+            )
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=updated_text,
+                reply_markup={"inline_keyboard": [[{"text": "🔙 Kembali ke Config", "callback_data": "config:main"}]]},
+            )
+
+    def _handle_skill_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        skill_id = data[len("skill:set:"):].strip()
+        if self.set_active_skill:
+            self.set_active_skill(skill_id)
+        self.bot_client.answer_callback_query(
+            callback_query_id=cb_id,
+            text=f"Skill diaktifkan: {skill_id}",
+        )
+        if chat_id and message_id:
+            # Cari nama skill & template dari DEFAULT_SKILLS
+            skills = self.get_skills() if self.get_skills else DEFAULT_SKILLS
+            found = next((s for s in skills if s.get("id") == skill_id), None)
+            skill_name = found.get("name", skill_id) if found else skill_id
+            template_prompt = (
+                found.get("template")
+                if found and found.get("template")
+                else f"Gunakan skill {skill_name} untuk membantu saya mengerjakan: <tulis kebutuhan>"
+            )
+
+            view_text, kb = render_skill_selected_view(skill_id, skill_name, template_prompt)
+            self.bot_client.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=view_text,
+                reply_markup=kb,
+            )
+
+    def _handle_retry_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        cache_id = data[len("prompt:retry:"):].strip()
+        target_chat = chat_id or (message.get("from", {}).get("id"))
+        if self.on_prompt_retry and target_chat:
+            handled = self.on_prompt_retry(cache_id, target_chat)
+            if handled:
+                self.bot_client.answer_callback_query(
+                    callback_query_id=cb_id,
+                    text="🔄 Mencoba kembali instruksi...",
+                )
             else:
                 self.bot_client.answer_callback_query(
                     callback_query_id=cb_id,
-                    text="Fitur retry belum tersedia.",
+                    text="⚠️ Cache percobaan ulang sudah kedaluwarsa.",
                     show_alert=True,
                 )
-            return
+        else:
+            self.bot_client.answer_callback_query(
+                callback_query_id=cb_id,
+                text="Fitur retry belum tersedia.",
+                show_alert=True,
+            )
 
-        # Format data: agent:delegate:<session_id>
-        elif data.startswith("agent:delegate:"):
-            sess_id = data[len("agent:delegate:"):].strip()
-            if self.on_agent_delegate:
-                handled = self.on_agent_delegate(sess_id, chat_id or user_id)
-                if handled:
-                    self.bot_client.answer_callback_query(
-                        callback_query_id=cb_id,
-                        text="🚀 Tugas berhasil didelegasikan ke Agen IDE!",
-                    )
-                else:
-                    self.bot_client.answer_callback_query(
-                        callback_query_id=cb_id,
-                        text="⚠️ Sesi tidak ditemukan atau gagal didelegasikan.",
-                        show_alert=True,
-                    )
+    def _handle_delegate_cb(
+        self,
+        cb_id: str,
+        chat_id: Optional[int],
+        message_id: Optional[int],
+        message: Dict[str, Any],
+        data: str,
+    ) -> None:
+        sess_id = data[len("agent:delegate:"):].strip()
+        target_chat = chat_id or (message.get("from", {}).get("id"))
+        if self.on_agent_delegate and target_chat:
+            handled = self.on_agent_delegate(sess_id, target_chat)
+            if handled:
+                self.bot_client.answer_callback_query(
+                    callback_query_id=cb_id,
+                    text="🚀 Tugas berhasil didelegasikan ke Agen IDE!",
+                )
             else:
                 self.bot_client.answer_callback_query(
                     callback_query_id=cb_id,
-                    text="Fitur delegasi belum tersedia.",
+                    text="⚠️ Sesi tidak ditemukan atau gagal didelegasikan.",
                     show_alert=True,
                 )
-            return
-
+        else:
+            self.bot_client.answer_callback_query(
+                callback_query_id=cb_id,
+                text="Fitur delegasi belum tersedia.",
+                show_alert=True,
+            )

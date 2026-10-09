@@ -219,13 +219,13 @@ const branchTooltip = computed(() => {
       <button
         type="button"
         class="status-badge badge-telegram"
-        :class="telegramStatus?.is_paired ? 'badge-telegram-paired' : (telegramStatus?.configured ? 'badge-telegram-ready' : 'badge-telegram-off')"
-        title="Telegram Remote Companion (Klik untuk pairing QR / status)"
+        :class="telegramStatus?.is_paired && telegramStatus?.is_running ? 'badge-telegram-paired' : (telegramStatus?.is_paired ? 'badge-telegram-idle' : (telegramStatus?.configured ? 'badge-telegram-ready' : 'badge-telegram-off'))"
+        :title="telegramStatus?.is_running ? 'Telegram Companion Aktif (Bot poller berjalan mendengarkan chat)' : 'Telegram Companion Standby (Klik untuk buka modal & aktifkan bot)'"
         @click="showTelegramPopover = true"
       >
         <span class="badge-dot">●</span>
         <span class="badge-text">
-          Companion: {{ telegramStatus?.is_paired ? 'Active' : (telegramStatus?.configured ? 'Pairing' : 'Off') }}
+          Companion: {{ !telegramStatus?.configured ? 'Off' : (!telegramStatus?.is_paired ? 'Pairing' : (telegramStatus?.is_running ? 'Active ⚡' : 'Standby ⏸️')) }}
         </span>
       </button>
 
@@ -328,6 +328,29 @@ const branchTooltip = computed(() => {
 }
 .badge-mode-ask .badge-dot {
   color: var(--warn, #e5a00d);
+}
+
+.badge-telegram {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
+  transition: all 0.15s ease;
+}
+.badge-telegram:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-focus, rgba(255, 255, 255, 0.2));
+}
+.badge-telegram-paired .badge-dot {
+  color: #22c55e;
+}
+.badge-telegram-idle .badge-dot {
+  color: #facc15;
+}
+.badge-telegram-ready .badge-dot {
+  color: #38bdf8;
+}
+.badge-telegram-off .badge-dot {
+  color: var(--text-faint, #6a6880);
 }
 </style>
 

@@ -11,7 +11,17 @@ const {
   checkTelegramStatus,
   fetchTelegramPairingQr,
   unlinkTelegramUser,
+  startTelegramPoller,
+  stopTelegramPoller,
 } = useTelegramCompanion();
+
+async function handleTogglePoller() {
+  if (status.value.is_running) {
+    await stopTelegramPoller();
+  } else {
+    await startTelegramPoller();
+  }
+}
 
 let pollInterval = null;
 
@@ -90,10 +100,38 @@ async function handleUnlink() {
           <p class="connected-info">
             Akun Telegram: <b>@{{ status.paired_user?.username || status.paired_user?.first_name || status.paired_user?.user_id }}</b>
           </p>
+          <!-- Poller Control Card -->
+          <div class="poller-control-card">
+            <div class="poller-status-header">
+              <span class="poller-label">Status Bot Poller:</span>
+              <span class="poller-badge" :class="status.is_running ? 'poller-running' : 'poller-stopped'">
+                <span class="dot">●</span>
+                {{ status.is_running ? "Aktif (Mendengarkan Chat)" : "Nonaktif (Standby)" }}
+              </span>
+            </div>
+            <p class="poller-hint">
+              {{ status.is_running
+                ? "Bot sedang berjalan dan siap merespons perintah / chat Anda secara langsung."
+                : "Bot sedang berhenti. Klik tombol di bawah untuk mulai mendengarkan pesan Telegram."
+              }}
+            </p>
+            <button
+              type="button"
+              class="btn"
+              :class="status.is_running ? 'btn-stop-poller' : 'btn-start-poller'"
+              :disabled="loading"
+              @click="handleTogglePoller"
+            >
+              <span v-if="loading">Memproses...</span>
+              <span v-else-if="status.is_running">⏹️ Hentikan Poller Bot</span>
+              <span v-else>▶️ Aktifkan Poller Bot</span>
+            </button>
+          </div>
+
           <p class="description">
             Ponsel Anda akan bergetar dan menerima pesan saat agen membutuhkan keputusan persetujuan (*Human-in-the-Loop*).
           </p>
-          <button type="button" class="btn btn-danger" :disabled="loading" @click="handleUnlink">
+          <button type="button" class="btn btn-danger btn-unlink" :disabled="loading" @click="handleUnlink">
             Putuskan Hubungan
           </button>
         </div>
@@ -115,6 +153,28 @@ async function handleUnlink() {
             </a>
             <button type="button" class="btn btn-secondary" :disabled="loading" @click="handleRefreshQr">
               Perbarui QR
+            </button>
+          </div>
+
+          <!-- Poller Control Card (saat pairing) -->
+          <div class="poller-control-card">
+            <div class="poller-status-header">
+              <span class="poller-label">Status Bot Poller:</span>
+              <span class="poller-badge" :class="status.is_running ? 'poller-running' : 'poller-stopped'">
+                <span class="dot">●</span>
+                {{ status.is_running ? "Aktif (Mendengarkan)" : "Nonaktif (Standby)" }}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="btn"
+              :class="status.is_running ? 'btn-stop-poller' : 'btn-start-poller'"
+              :disabled="loading"
+              @click="handleTogglePoller"
+            >
+              <span v-if="loading">Memproses...</span>
+              <span v-else-if="status.is_running">⏹️ Hentikan Poller Bot</span>
+              <span v-else>▶️ Aktifkan Poller Bot</span>
             </button>
           </div>
         </div>
@@ -298,5 +358,89 @@ async function handleUnlink() {
 
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.3);
+}
+
+.poller-control-card {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.poller-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.poller-label {
+  color: var(--text-muted, #a6adc8);
+  font-weight: 500;
+}
+
+.poller-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.poller-badge.poller-running {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+}
+
+.poller-badge.poller-stopped {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted, #94a3b8);
+}
+
+.poller-badge .dot {
+  font-size: 8px;
+  line-height: 1;
+}
+
+.poller-hint {
+  font-size: 11.5px;
+  color: var(--text-muted, #a6adc8);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.btn-start-poller {
+  background: #16a34a;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.btn-start-poller:hover {
+  background: #15803d;
+}
+
+.btn-stop-poller {
+  background: rgba(234, 179, 8, 0.15);
+  color: #facc15;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  font-weight: 600;
+  padding: 8px 12px;
+}
+
+.btn-stop-poller:hover {
+  background: rgba(234, 179, 8, 0.25);
+}
+
+.btn-unlink {
+  margin-top: 6px;
 }
 </style>

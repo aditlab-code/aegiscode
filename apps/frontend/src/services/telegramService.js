@@ -3,6 +3,8 @@ import {
   getTelegramStatus,
   getTelegramPairingQr,
   postTelegramUnlink,
+  postTelegramStartPoller,
+  postTelegramStopPoller,
 } from "../api.js";
 
 const status = ref({
@@ -10,6 +12,7 @@ const status = ref({
   is_paired: false,
   bot_username: "",
   paired_user: null,
+  is_running: false,
 });
 
 const qrData = ref({
@@ -63,6 +66,42 @@ export async function unlinkTelegramUser() {
   }
 }
 
+export async function startTelegramPoller() {
+  loading.value = true;
+  error.value = "";
+  try {
+    const res = await postTelegramStartPoller();
+    if (res?.is_running !== undefined) {
+      status.value.is_running = res.is_running;
+    }
+    await checkTelegramStatus();
+    return true;
+  } catch (err) {
+    error.value = err.message || "Gagal mengaktifkan bot poller";
+    return false;
+  } finally {
+    loading.value = false;
+  }
+}
+
+export async function stopTelegramPoller() {
+  loading.value = true;
+  error.value = "";
+  try {
+    const res = await postTelegramStopPoller();
+    if (res?.is_running !== undefined) {
+      status.value.is_running = res.is_running;
+    }
+    await checkTelegramStatus();
+    return true;
+  } catch (err) {
+    error.value = err.message || "Gagal menghentikan bot poller";
+    return false;
+  } finally {
+    loading.value = false;
+  }
+}
+
 export function useTelegramCompanion() {
   return {
     status,
@@ -72,5 +111,7 @@ export function useTelegramCompanion() {
     checkTelegramStatus,
     fetchTelegramPairingQr,
     unlinkTelegramUser,
+    startTelegramPoller,
+    stopTelegramPoller,
   };
 }

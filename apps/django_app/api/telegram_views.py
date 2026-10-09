@@ -6,13 +6,14 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from agent_ai.runtime.telegram.bot_client import TelegramBotClient
+from agent_ai.runtime.telegram.companion import TelegramCompanion
 from agent_ai.runtime.telegram.pairing import PairingManager, generate_qr_svg
 from agent_ai.runtime.telegram.security import TelegramSecurityManager
 
 _security_manager: TelegramSecurityManager | None = None
 _pairing_manager: PairingManager | None = None
 _cached_bot_username: str | None = None
-
+_companion: TelegramCompanion | None = None
 
 def get_security_manager() -> TelegramSecurityManager:
     global _security_manager
@@ -28,6 +29,18 @@ def get_pairing_manager() -> PairingManager:
     return _pairing_manager
 
 
+def get_companion() -> TelegramCompanion | None:
+    global _companion
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if not token:
+        return None
+    if _companion is None:
+        _companion = TelegramCompanion(
+            bot_token=token,
+            security_manager=get_security_manager(),
+            pairing_manager=get_pairing_manager(),
+        )
+    return _companion
 def get_bot_username(token: str) -> str:
     global _cached_bot_username
     if _cached_bot_username:
@@ -54,6 +67,7 @@ def telegram_status(request):
             "is_paired": False,
             "bot_username": "",
             "paired_user": None,
+            "is_running": False,
         })
 
     sec = get_security_manager()
@@ -67,6 +81,7 @@ def telegram_status(request):
         "is_paired": status.is_paired,
         "bot_username": bot_username,
         "paired_user": paired_user_data,
+        "is_running": bool(_companion and _companion.bot_client and _companion.bot_client.is_polling()),
     })
 
 
@@ -104,3 +119,33 @@ def telegram_unlink(request):
     sec = get_security_manager()
     success = sec.unlink()
     return JsonResponse({"success": success})
+
+
+@csrf_exempt
+def telegram_start_poller(request):
+    """POST /api/telegram/start-poller: Aktifkan background companion bot secara eksplisit."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    comp = get_companion()
+    if not comp:
+        return JsonResponse(
+            {"error": "TELEGRAM_BOT_TOKEN belum disetel di .env", "is_running": False},
+            status=400,
+        )
+
+    success = comp.start()
+    is_running = bool(comp.bot_client and comp.bot_client.is_polling())
+    return JsonResponse({"success": success, "is_running": is_running})
+
+
+@csrf_exempt
+def telegram_stop_poller(request):
+    """POST /api/telegram/stop-poller: Hentikan background companion bot secara eksplisit."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    global _companion
+    if _companion:
+        _companion.stop()
+    return JsonResponse({"success": True, "is_running": False})

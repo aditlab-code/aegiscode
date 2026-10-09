@@ -1056,3 +1056,15 @@ export function postTelegramUnlink() {
     method: "POST",
   });
 }
+
+export function postTelegramStartPoller() {
+  return request("/telegram/start-poller", {
+    method: "POST",
+  });
+}
+
+export function postTelegramStopPoller() {
+  return request("/telegram/stop-poller", {
+    method: "POST",
+  });
+}

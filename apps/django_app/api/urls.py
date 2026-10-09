@@ -308,4 +308,6 @@ urlpatterns = [
     path("telegram/status", telegram_views.telegram_status, name="telegram_status"),
     path("telegram/pairing-qr", telegram_views.telegram_pairing_qr, name="telegram_pairing_qr"),
     path("telegram/unlink", telegram_views.telegram_unlink, name="telegram_unlink"),
+    path("telegram/start-poller", telegram_views.telegram_start_poller, name="telegram_start_poller"),
+    path("telegram/stop-poller", telegram_views.telegram_stop_poller, name="telegram_stop_poller"),
 ]

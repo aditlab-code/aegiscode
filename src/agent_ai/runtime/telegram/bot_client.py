@@ -124,19 +124,23 @@ class TelegramBotClient:
         """Daftarkan menu perintah '/' bot agar muncul di tombol menu Telegram."""
         if commands is None:
             commands = [
-                {"command": "status", "description": "Cek status aktif agen dan gateway"},
-                {"command": "repo", "description": "Inspeksi repositori & git branch aktif"},
-                {"command": "mode", "description": "Ganti mode HITL (ask vs agents)"},
+                {"command": "repo", "description": "Status repositori, branch aktif & commit"},
+                {"command": "aegis_mode", "description": "Ganti mode Ask (konfirmasi) vs Agents (otonom)"},
+                {"command": "aegis_chat", "description": "Arahkan agen atau pilih template skills"},
+                {"command": "config_llm", "description": "Konfigurasi LLM (provider, model, test ping)"},
+                {"command": "help", "description": "Panduan resmi perintah Aegis Companion"},
+                {"command": "status", "description": "Status gateway runtime & branch git"},
                 {"command": "agents", "description": "Lihat armada subagen Olympus aktif"},
-                {"command": "skills", "description": "Pilih active skill pemandu agen"},
-                {"command": "provider", "description": "Pilih/ganti provider LLM aktif"},
-                {"command": "model", "description": "Pilih model LLM terkonfigurasi di IDE"},
-                {"command": "testprovider", "description": "Uji latensi koneksi provider aktif"},
-                {"command": "steer", "description": "Kirim instruksi pengarah ke Agen"},
-                {"command": "help", "description": "Panduan penggunaan Aegis Companion"},
             ]
         res = self._post("setMyCommands", {"commands": commands}, request_timeout=10)
         return bool(res.get("ok", False))
+
+    def get_my_commands(self) -> List[Dict[str, str]]:
+        """Ambil daftar menu perintah bot yang terdaftar di Telegram."""
+        res = self._post("getMyCommands", {}, request_timeout=10)
+        if res.get("ok"):
+            return res.get("result", [])
+        return []
 
     def start_polling(self, on_update: Callable[[Dict[str, Any]], None]) -> None:
         """Jalankan background long-polling loop di daemon thread."""
