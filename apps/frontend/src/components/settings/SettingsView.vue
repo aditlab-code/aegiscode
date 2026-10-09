@@ -1187,11 +1187,6 @@ watch(activeTab, (tab) => {
   background: var(--inset, rgba(0, 0, 0, 0.25));
 }
 
-[data-theme="light"] .sv-config-grid {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
-}
-
 .sv-config-row {
   display: flex;
   align-items: center;
@@ -1202,10 +1197,6 @@ watch(activeTab, (tab) => {
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--line);
-}
-
-[data-theme="light"] .sv-config-row {
-  border-bottom-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .sv-config-row:last-child {

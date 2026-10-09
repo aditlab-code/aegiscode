@@ -236,7 +236,7 @@ html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
 html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
   border-radius: var(--radius-sm, 6px);
   background: var(--inset, rgba(0, 0, 0, 0.25)) !important;
-  border: 1px solid var(--line, #1e1e2c) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -245,7 +245,7 @@ html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
 html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
 html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
   background: var(--hover, rgba(255, 255, 255, 0.05)) !important;
-  border-color: var(--accent, #a78bfa) !important;
+  border-color: var(--accent) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -255,7 +255,7 @@ html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
   background: rgba(0, 0, 0, 0.02) !important;
-  border: 1px solid var(--line, rgba(73, 64, 97, 0.1)) !important;
+  border: 1px solid var(--line) !important;
   box-shadow: none !important;
 }
 
@@ -264,7 +264,7 @@ html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
 [data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
   background: var(--hover, rgba(101, 85, 120, 0.04)) !important;
-  border-color: var(--accent, #8261bb) !important;
+  border-color: var(--accent) !important;
   box-shadow: none !important;
   transform: none !important;
 }

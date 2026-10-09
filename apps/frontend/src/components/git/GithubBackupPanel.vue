@@ -843,7 +843,7 @@ watch(
                     :cy="cp.cy"
                     :r="cp.r"
                     :fill="cp.color"
-                    stroke="var(--bg-deep, #14121b)"
+                    stroke="var(--bg-deep)"
                     stroke-width="2"
                   />
                 </svg>
@@ -1134,14 +1134,14 @@ watch(
   line-height: 1.4;
 }
 .sc-alert.ok {
-  background: rgba(45, 125, 78, 0.15);
-  border: 1px solid var(--accent, #2d7d4e);
-  color: #86efac;
+  background: var(--hover);
+  border: 1px solid var(--ok);
+  color: var(--ok);
 }
 .sc-alert.err {
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #fca5a5;
+  background: var(--hover);
+  border: 1px solid var(--err);
+  color: var(--err);
 }
 .sc-alert-close {
   background: transparent;
@@ -1175,11 +1175,11 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--text-normal, #e2e8f0);
+  color: var(--text);
 }
 
 .sc-non-repo-ico {
-  color: var(--warning, #f59e0b);
+  color: var(--warn);
   flex-shrink: 0;
 }
 
@@ -1192,7 +1192,7 @@ watch(
   margin: 0;
   font-size: 11.5px;
   line-height: 1.45;
-  color: var(--text-faint, #94a3b8);
+  color: var(--text-faint);
 }
 
 .sc-non-repo-actions {
@@ -1203,8 +1203,8 @@ watch(
 }
 
 .sc-init-btn {
-  background: var(--accent, #3b82f6);
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--bg);
   border: none;
   border-radius: 4px;
   padding: 5px 12px;
@@ -1225,7 +1225,7 @@ watch(
 
 .sc-refresh-outline-btn {
   background: transparent;
-  color: var(--text-normal, #e2e8f0);
+  color: var(--text);
   border: 1px solid var(--border-soft);
   border-radius: 4px;
   padding: 5px 10px;
@@ -1273,13 +1273,13 @@ watch(
 
 .sc-branch-chip.local {
   background: rgba(16, 240, 154, 0.12);
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   border: 1px solid rgba(16, 240, 154, 0.25);
 }
 
 .sc-branch-chip.remote {
   background: rgba(120, 119, 198, 0.12);
-  color: var(--text-dim, #b8b3d0);
+  color: var(--text-dim);
   border: 1px solid var(--border-soft);
   font-size: 11px;
   font-weight: 500;
@@ -1299,7 +1299,7 @@ watch(
 
 .sc-no-upstream {
   font-size: 11px;
-  color: var(--text-faint, #6f6885);
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -1319,7 +1319,7 @@ watch(
 }
 
 .sc-sync-stat.highlight {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -1328,7 +1328,7 @@ watch(
 }
 
 .sc-synced-badge {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   font-size: 10.5px;
   font-weight: 500;
   opacity: 0.9;
@@ -1700,7 +1700,7 @@ watch(
   padding: 0 10px;
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #ffffff;
+  color: var(--bg);
   font-size: 11.5px;
   font-weight: 500;
   border-radius: 4px;
@@ -1842,31 +1842,31 @@ watch(
 
 .sc-ref-pill.ref-head {
   background: rgba(16, 240, 154, 0.18);
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   border: 1px solid rgba(16, 240, 154, 0.4);
 }
 
 .sc-ref-pill.ref-branch {
   background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  color: var(--accent-2);
   border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
 .sc-ref-pill.ref-remote {
   background: rgba(168, 85, 247, 0.15);
-  color: #c084fc;
+  color: var(--accent);
   border: 1px solid rgba(168, 85, 247, 0.3);
 }
 
 .sc-ref-pill.ref-tag {
   background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  color: var(--warn);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .ref-dot {
   font-size: 8px;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
 }
 
 .sc-cp-msg {
@@ -1929,40 +1929,40 @@ watch(
 .sc-restore-head {
   font-size: 14px;
   font-weight: 700;
-  color: var(--err, #dc2626);
+  color: var(--err);
 }
 .sc-restore-close {
   background: transparent;
   border: none;
   font-size: 18px;
   line-height: 1;
-  color: var(--text-faint, #756e8b);
+  color: var(--text-faint);
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
 }
 .sc-restore-close:hover {
   background: var(--bg-hover, rgba(255, 255, 255, 0.08));
-  color: var(--text, #f4f3f8);
+  color: var(--text);
 }
 .sc-restore-desc {
   font-size: 13px;
-  color: var(--text-dim, #a8a2bc);
+  color: var(--text-dim);
   line-height: 1.5;
 }
 .sc-commit-hash {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   font-weight: 600;
 }
 .sc-restore-target-subject {
   margin-top: 6px;
   padding: 8px 12px;
-  background: var(--bg-deep, #12111a);
+  background: var(--bg-deep);
   border-radius: 6px;
-  border: 1px solid var(--border-soft, #2b263b);
+  border: 1px solid var(--border-soft);
   font-style: italic;
   font-size: 12px;
-  color: var(--text, #f4f3f8);
+  color: var(--text);
 }
 .sc-restore-actions {
   display: flex;
@@ -1981,7 +1981,7 @@ watch(
 .sc-btn-primary {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #ffffff;
+  color: var(--bg);
 }
 .sc-btn-secondary {
   background: transparent;
@@ -1993,9 +1993,9 @@ watch(
   border-color: var(--border-subtle);
 }
 .sc-btn-danger {
-  background: var(--err, #dc2626);
-  border: 1px solid var(--err, #dc2626);
-  color: #ffffff;
+  background: var(--err);
+  border: 1px solid var(--err);
+  color: var(--bg);
 }
 </style>
 
@@ -2008,8 +2008,8 @@ watch(
   transform: translate(-50%, -50%);
   width: 90%;
   max-width: 440px;
-  background: var(--bg-elev, #1e1c29);
-  border: 1px solid var(--border, #38324a);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
   padding: 18px 20px;
@@ -2017,26 +2017,9 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: var(--text, #f4f3f8);
+  color: var(--text);
   font-family: inherit;
   box-sizing: border-box;
-}
-
-[data-theme="light"] .sc-restore-modal {
-  background: var(--bg-card, #fbf7f0);
-  border-color: var(--border, #c8bba9);
-  box-shadow: 0 20px 60px rgba(69, 43, 34, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
-  color: var(--text, #180c06);
-}
-
-[data-theme="light"] .sc-restore-desc {
-  color: var(--text-dim, #4a3628);
-}
-
-[data-theme="light"] .sc-restore-target-subject {
-  background: var(--bg-deep, #efe6db);
-  border-color: var(--border-soft, #dcd1c3);
-  color: var(--text, #180c06);
 }
 </style>
 

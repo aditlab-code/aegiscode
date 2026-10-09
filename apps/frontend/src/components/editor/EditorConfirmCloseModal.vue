@@ -90,7 +90,7 @@ function onCancel() {
 
 .confirm-close-msg {
   font-size: 13px;
-  color: var(--text-dim, #bcb8cf);
+  color: var(--text-dim);
   line-height: 1.5;
   margin: 0 0 16px 0;
 }

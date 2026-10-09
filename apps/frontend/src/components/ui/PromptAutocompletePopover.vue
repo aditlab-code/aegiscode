@@ -177,7 +177,7 @@ function dirName(path) {
   left: 0;
   right: 0;
   max-height: 250px;
-  background: var(--panel-bg, #1e1e1e);
+  background: var(--panel);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
@@ -210,7 +210,7 @@ function dirName(path) {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
 }
 
 .popover-title {
@@ -220,7 +220,7 @@ function dirName(path) {
 }
 
 .popover-icon {
-  color: var(--accent-color, #4a9eff);
+  color: var(--accent);
 }
 
 .popover-count {
@@ -246,25 +246,25 @@ function dirName(path) {
   cursor: pointer;
   user-select: none;
   font-size: 12px;
-  color: var(--text-main, #c9d1d9);
+  color: var(--text);
   transition: background-color 0.1s ease;
 }
 
 .popover-item:hover,
 .popover-item.active {
   background: var(--hover-bg, rgba(74, 158, 255, 0.15));
-  color: #fff;
+  color: var(--bg-elev);
 }
 
 .item-file-icon {
   display: flex;
   align-items: center;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
   flex-shrink: 0;
 }
 
 .popover-item.active .item-file-icon {
-  color: var(--accent-color, #4a9eff);
+  color: var(--accent);
 }
 
 .item-file-content {
@@ -277,12 +277,12 @@ function dirName(path) {
 
 .file-name {
   font-weight: 500;
-  color: var(--text-main, #e6edf3);
+  color: var(--text);
 }
 
 .file-dir {
   font-size: 11px;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
   opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -292,7 +292,7 @@ function dirName(path) {
   font-family: monospace;
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent-color, #58a6ff);
+  color: var(--accent);
   background: rgba(56, 139, 253, 0.15);
   padding: 2px 6px;
   border-radius: 3px;
@@ -308,12 +308,12 @@ function dirName(path) {
 
 .template-label {
   font-weight: 500;
-  color: var(--text-main, #e6edf3);
+  color: var(--text);
 }
 
 .template-desc {
   font-size: 11px;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
   text-overflow: ellipsis;
   overflow: hidden;
 }
@@ -322,7 +322,7 @@ function dirName(path) {
   padding: 16px;
   text-align: center;
   font-size: 12px;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
 }
 
 .popover-footer {
@@ -330,7 +330,7 @@ function dirName(path) {
   border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   background: var(--header-bg, rgba(255, 255, 255, 0.02));
   font-size: 10px;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted);
   display: flex;
   justify-content: flex-end;
 }

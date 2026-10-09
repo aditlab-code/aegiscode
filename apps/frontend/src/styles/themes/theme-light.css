@@ -1,89 +1,12 @@
-/* AegisCode UI Kit Light Theme Tokens & Component Overrides ([data-theme="light"]) */
+/* Light theme core tokens are centralized in theme-presets.css.
+   This file only retains structural/component-specific light mode overrides. */
 
+:root[data-theme="light"],
 [data-theme="light"] {
-  /* UI Kit Core Palette Tokens (Light Mode) */
-  --surface:        rgba(247, 244, 252, 0.44); /* #f7f4fc70 */
-  --chrome:         rgba(255, 255, 255, 0.16); /* #ffffff28 */
-  --panel:          #f5f3fa;
-  --sidebar:        rgba(255, 255, 255, 0.08); /* #ffffff15 */
-  --rail:           rgba(255, 255, 255, 0.15); /* #ffffff25 */
-  --editor:         rgba(255, 255, 255, 0.13); /* #ffffff20 */
-  --assistant:      rgba(255, 255, 255, 0.13); /* #ffffff22 */
-  --terminal:       rgba(238, 231, 245, 0.13); /* #eee7f522 */
-  --tabs:           rgba(255, 255, 255, 0.09); /* #ffffff18 */
-  --text:           #333044;
-  --secondary:      #555168;
-  --muted:          #736b82;
-  --edge:           rgba(255, 255, 255, 0.7);  /* #ffffffb3 */
-  --line:           rgba(73, 64, 97, 0.1);     /* #4940611a */
-  --hover:          rgba(101, 85, 120, 0.04);  /* #6555780b */
-  --inset:          rgba(220, 215, 232, 0.3);  /* #dcd7e84d */
-  --input:          rgba(255, 255, 255, 0.25); /* #ffffff40 */
-  --bubble:         rgba(255, 255, 255, 0.21); /* #ffffff35 */
-  --accent:         #8261bb;
-  --accent-dim:     #6d4fa3;
-  --accent-soft:    rgba(130, 97, 187, 0.13);
-  --accent-muted:   #8261bb;
-  --selection:      rgba(130, 97, 187, 0.13);
-  --line-highlight: rgba(130, 97, 187, 0.02);
-  --line-number:    #95899f;
-  --syntax-green:   #628c5a;
-  --syntax-purple:  #9a60ad;
-  --syntax-blue:    #4e7f9b;
-
-  /* AegisCode System Mappings & Dual-Theme Compatibility */
-  --bg:             #eae5f4;
-  --bg-panel:       var(--panel);
-  --bg-surface:     #edeaf5;
-  --bg-header:      #e8e4f1;
-  --bg-elev:        #ffffff;
-  --bg-card:        var(--panel);
-  --bg-hover:       rgba(101, 85, 120, 0.06);
-  --bg-deep:        var(--inset);
-  --bg-secondary:   #e4dfea;
-  --bg-sidebar:     #eeeaf5;
-  --bg-drawer:      #eeeaf5;
-
-  /* Borders */
-  --border:         var(--line);
-  --border-soft:    rgba(73, 64, 97, 0.08);
-  --border-subtle:  rgba(73, 64, 97, 0.05);
-  --border-hover:   rgba(130, 97, 187, 0.35);
-  --btn-outline-muted: rgba(85, 81, 104, 0.28);
-
-  /* Typography */
-  --text-dim:       #555168;
-  --text-faint:     #736b82;
-
-  /* Accent 2 */
-  --accent-2:        #9a60ad;
-  --accent-2-dim:    #7c488e;
-  --accent-2-soft:   rgba(154, 96, 173, 0.14);
-  --accent-2-bright: #b87ad0;
-
-  /* Status Colors */
-  --ok:   #628c5a;
-  --warn: #8f5e15;
-  --err:  #8c4351;
-
-  --act-ts:    #333044;
-  --act-agent: #9a60ad;
-  --act-obs:   #4e7f9b;
-
-  /* Alert tokens */
-  --alert-ok-text:   #628c5a;
-  --alert-ok-bg:     rgba(98, 140, 90, 0.12);
-  --alert-ok-border: rgba(98, 140, 90, 0.40);
-  --alert-err-text:  #8c4351;
-  --alert-err-bg:    rgba(140, 67, 81, 0.10);
-  --alert-err-border:rgba(140, 67, 81, 0.40);
-
-  --dot-ok:   #628c5a;
-  --dot-warn: #8f5e15;
-  --dot-err:  #8c4351;
-
-  --shadow-pop: 0 4px 18px -4px rgba(73, 64, 97, 0.14);
+  --bg-sidebar: var(--sidebar);
+  --bg-drawer:  var(--bg-panel);
 }
+
 
 /* Badges & Slider Tracks */
 [data-theme="light"] .app-badge,
@@ -166,12 +89,12 @@
 [data-theme="light"] .nav-assistant-btn {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--bg-elev);
 }
 
 [data-theme="light"] .nav-assistant-btn:hover {
   filter: brightness(1.1);
-  color: #ffffff;
+  color: var(--bg-elev);
 }
 
 /* Activity Bar */
@@ -255,7 +178,7 @@
 }
 
 [data-theme="light"] .breadcrumb-current {
-  color: var(--accent-dim, #1e4080);
+  color: var(--accent-dim);
 }
 
 [data-theme="light"] .wb-editor-tabs {
@@ -320,7 +243,7 @@
 
 [data-theme="light"] .rd-tab-btn.active {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--bg-elev);
 }
 
 [data-theme="light"] .right-drawer-body,
@@ -590,5 +513,83 @@
 [data-theme="light"] .ed-msg {
   background: rgba(253, 251, 247, 0.9);
   color: var(--text-dim);
+}
+
+/* Welcome View (Light Theme) */
+[data-theme="light"] .welcome-card {
+  background: var(--panel);
+  border: 1px solid var(--edge, rgba(255, 255, 255, 0.7));
+  box-shadow: none;
+}
+
+[data-theme="light"] .action-btn {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
+  color: var(--text);
+}
+
+[data-theme="light"] .action-btn:hover:not(:disabled) {
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent);
+  box-shadow: none;
+  transform: none;
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .empty-recent-card {
+  background: rgba(0, 0, 0, 0.015);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .recent-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
+}
+
+[data-theme="light"] .recent-item:hover {
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent);
+  box-shadow: none;
+  transform: none;
+}
+
+[data-theme="light"] .brand-title,
+[data-theme="light"] .btn-label,
+[data-theme="light"] .card-heading,
+[data-theme="light"] .feature-title,
+[data-theme="light"] .recent-name {
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .sc-label {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] kbd,
+[data-theme="light"] .sc-kbd-group kbd {
+  background: var(--bg-deep) !important;
+  color: var(--text) !important;
+  border-color: var(--border-soft) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Git Backup Panel Restore Modal (Light Theme) */
+[data-theme="light"] .sc-restore-modal {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: 0 20px 60px rgba(69, 43, 34, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+
+[data-theme="light"] .sc-restore-desc {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .sc-restore-target-subject {
+  background: var(--bg-deep);
+  border-color: var(--border-soft);
+  color: var(--text);
 }
 

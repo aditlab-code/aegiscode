@@ -192,16 +192,16 @@ const branchTooltip = computed(() => {
   border-color: var(--border-focus, rgba(255, 255, 255, 0.2));
 }
 .badge-telegram-paired .badge-dot {
-  color: #22c55e;
+  color: var(--ok);
 }
 .badge-telegram-idle .badge-dot {
-  color: #facc15;
+  color: var(--warn);
 }
 .badge-telegram-ready .badge-dot {
-  color: #38bdf8;
+  color: var(--accent);
 }
 .badge-telegram-off .badge-dot {
-  color: var(--text-faint, #6a6880);
+  color: var(--text-faint);
 }
 </style>
 

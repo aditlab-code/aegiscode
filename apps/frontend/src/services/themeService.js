@@ -198,15 +198,21 @@ export function getStoredThemeConfig() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
-        const foundation = parsed.foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
-        const matchedPreset = PRESET_CATALOG.find((p) => p.id === parsed.preset);
+        let foundation = parsed.foundation === BASE_FOUNDATIONS.LIGHT ? BASE_FOUNDATIONS.LIGHT : BASE_FOUNDATIONS.DARK;
+        if (legacy === BASE_FOUNDATIONS.LIGHT || legacy === BASE_FOUNDATIONS.DARK) {
+          foundation = legacy;
+        }
+        let matchedPreset = PRESET_CATALOG.find((p) => p.id === parsed.preset);
+        if (matchedPreset && matchedPreset.foundation !== foundation) {
+          matchedPreset = null;
+        }
         const preset = matchedPreset
           ? matchedPreset.id
           : (foundation === BASE_FOUNDATIONS.LIGHT ? CURATED_PRESETS.DEFAULT_LIGHT : CURATED_PRESETS.DEFAULT_DARK);
 
         return {
           preset,
-          foundation: matchedPreset ? matchedPreset.foundation : foundation,
+          foundation,
         };
       }
     }
@@ -394,6 +400,7 @@ let sharedThemeState = null;
  */
 export function createThemeState(forceNew = false) {
   if (sharedThemeState && !forceNew) {
+    sharedThemeState.isWallpaperEnabled.value = getStoredWallpaper(true);
     return sharedThemeState;
   }
 

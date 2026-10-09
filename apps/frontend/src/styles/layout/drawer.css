@@ -29,7 +29,7 @@
 }
 
 .rd-sparkle-ico {
-  color: var(--accent, #a78bfa);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -46,7 +46,7 @@
   padding: 1px 5px;
   border-radius: 999px;
   background: rgba(167, 139, 250, 0.12);
-  color: var(--accent, #a78bfa);
+  color: var(--accent);
   border: 1px solid rgba(167, 139, 250, 0.25);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -82,8 +82,8 @@
 }
 
 .rd-tab-btn.active {
-  color: #ffffff;
-  background: var(--accent, #7c3aed);
+  color: var(--bg-elev);
+  background: var(--accent);
 }
 
 .rd-header-actions {
@@ -106,7 +106,7 @@
 }
 
 .rd-close-btn:hover {
-  color: var(--text, #ffffff);
+  color: var(--text);
   background: var(--bg-hover, rgba(255, 255, 255, 0.05));
 }
 
@@ -223,7 +223,7 @@
 }
 
 .chat-provider-controls .badge-dot {
-  color: var(--accent, #4ec9b0);
+  color: var(--accent);
   font-size: 9px;
   flex: 0 0 auto;
 }
@@ -255,8 +255,8 @@
 }
 
 .chat-header-select option {
-  background: var(--bg-card, #1e1e1e);
-  color: var(--text, #fff);
+  background: var(--bg-card);
+  color: var(--text);
 }
 
 .chat-header-select:disabled {
@@ -265,7 +265,7 @@
 }
 
 .chat-sep {
-  color: var(--text-faint, #666);
+  color: var(--text-faint);
   font-size: 10px;
   flex: 0 0 auto;
 }
@@ -296,8 +296,8 @@
 }
 
 .consultant-mode-select option {
-  background: var(--bg-card, #1e1e1e);
-  color: var(--text, #fff);
+  background: var(--bg-card);
+  color: var(--text);
 }
 
 .consultant-mode-select:disabled {
@@ -314,18 +314,18 @@
 }
 
 .chat-provider-badge .badge-dot {
-  color: var(--accent, #4ec9b0);
+  color: var(--accent);
   font-size: 9px;
 }
 
 .chat-provider-badge .badge-brand {
   font-weight: 600;
-  color: var(--text, #fff);
+  color: var(--text);
   letter-spacing: 0.2px;
 }
 
 .chat-provider-badge .badge-sep {
-  color: var(--text-faint, #666);
+  color: var(--text-faint);
 }
 
 .chat-provider-badge .badge-model {
@@ -351,7 +351,7 @@
 
 .chat-icon-btn:hover,
 .chat-settings-btn:hover {
-  color: var(--text, #ffffff);
+  color: var(--text);
   background: var(--bg-hover, rgba(255, 255, 255, 0.08));
 }
 
@@ -370,15 +370,15 @@
   font-size: 10.5px;
   font-weight: 500;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-soft, #333);
-  color: var(--text, #fff);
+  border: 1px solid var(--border-soft);
+  color: var(--text);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .consultant-new-mini:hover {
   background: var(--bg-hover, rgba(255, 255, 255, 0.1));
-  border-color: var(--accent, #2d7d4e);
+  border-color: var(--accent);
 }
 
 .chat-card-body {
@@ -400,7 +400,7 @@
 }
 
 .chat-prompt-textarea::placeholder {
-  color: var(--text-faint, #666);
+  color: var(--text-faint);
 }
 
 .chat-prompt-textarea:disabled {
@@ -442,7 +442,7 @@
 }
 
 .chat-attach-btn:hover:not(:disabled) {
-  color: var(--text, #ffffff);
+  color: var(--text);
   background: var(--bg-hover, rgba(255, 255, 255, 0.08));
 }
 
@@ -461,7 +461,7 @@
   font-size: 11px;
   font-weight: 500;
   background: rgba(248, 81, 73, 0.15);
-  color: var(--danger, #f85149);
+  color: var(--err);
   border: 1px solid rgba(248, 81, 73, 0.35);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -486,8 +486,8 @@
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
-  background: var(--accent, #2d7d4e);
-  color: var(--text, #ffffff);
+  background: var(--accent);
+  color: var(--bg-elev);
   border: none;
   cursor: pointer;
   transition: filter 0.15s ease, opacity 0.15s ease;

@@ -126,18 +126,37 @@ The loop runs without heuristic "done" detectors:
 
 AegisCode features a developer-first IDE workbench (**AegisCode Studio**) engineered with a high-performance, reactive front-end architecture:
 - **Backend Gateway:** Django application (`apps/django_app/`) serving WebSocket/SSE and REST APIs for session lifecycle, PTY interactive terminal bridge, token metrics, and real-time streaming.
-- **Frontend Architecture:** Modern Vue 3 + Vite single-page application (`apps/frontend/`) featuring a VS Code-style 3-column layout governed by a **Thin Layout Coordinator Pattern** and domain-driven **Facade Subsystems**:
-  - **Thin Layout Coordinator (`WorkbenchView.vue` < 450 lines):** Acts strictly as the root orchestrator connecting layout splitters, keyboard shortcuts, and lifecycle events, delegating all domain state and business logic to dedicated facades.
-  - **Layout & Editor Facades (`src/composables/workbench/`):**
-    - `useWorkbenchEditorFacade.js`: Manages Monaco editor lifecycle, single & multi-pane split editors (horizontal/vertical), model registry synchronization, external modification conflict resolution (Keep Mine / Accept Agent / Review Diff), diagnostic marker tracking, and workspace context serialization (`localStorage`).
-    - `useWorkbenchAssistantFacade.js`: Coordinates AI Agent Drawer and Consultant Chat subsystems, session lifecycles, task proposal delegation, floating background completion toasts, and dynamic provider/model resolution.
-    - `useWorkbenchDockFacade.js`: Manages bottom dock tabs (Terminal, Output, Problems), consumes rolling SSE event buffers (`useWorkbenchLiveEvents`), and automatically reveals dock upon problem detection.
-    - `useWorkbenchLayout.js`: Handles column sizing, responsive breakpoint constraints, and visibility toggles for sidebar, assistant, and bottom dock.
-  - **Extracted Presentational Components (`src/components/editor/`):**
-    - `EditorTabBar.vue`: Reusable tab strip supporting single and dual split panes, dirty indicators (`●`), conflict popovers, and inline save/split/orientation controls (eliminating template duplication and DOM bloat).
-    - `EditorBreadcrumbs.vue`: Context-aware interactive breadcrumb navigation supporting standard paths, diff tabs, settings, and welcome views.
-    - `EditorConfirmCloseModal.vue`: Modal dialog safeguarding against accidental loss of unsaved changes when closing dirty files or collapsing split panes.
-  - **Async DOM Guard & Monaco Integrity:** Monaco editor `layout()` invocations are shielded with `requestAnimationFrame` guards to prevent layout crashes during rapid split-pane resizing and unmounted DOM transitions.
+
+### 4.1 Frontend Architecture & Layout Facades
+The frontend is a Vue 3 + Vite single-page application (`apps/frontend/`) featuring a VS Code-style 3-column layout governed by a **Thin Layout Coordinator Pattern** and domain-driven **Facade Subsystems**:
+- **Thin Layout Coordinator (`WorkbenchView.vue` < 450 lines):** Acts strictly as the root orchestrator connecting layout splitters, keyboard shortcuts, and lifecycle events, delegating all domain state and business logic to dedicated facades.
+- **Layout & Editor Facades (`src/composables/workbench/`):**
+  - `useWorkbenchEditorFacade.js`: Manages Monaco editor lifecycle, single & multi-pane split editors (horizontal/vertical), model registry synchronization, external modification conflict resolution (Keep Mine / Accept Agent / Review Diff), diagnostic marker tracking, and workspace context serialization (`localStorage`).
+  - `useWorkbenchAssistantFacade.js`: Coordinates AI Agent Drawer and Consultant Chat subsystems, session lifecycles, task proposal delegation, floating background completion toasts, and dynamic provider/model resolution.
+  - `useWorkbenchDockFacade.js`: Manages bottom dock tabs (Terminal, Output, Problems), consumes rolling SSE event buffers (`useWorkbenchLiveEvents`), and automatically reveals dock upon problem detection.
+  - `useWorkbenchLayout.js`: Handles column sizing, responsive breakpoint constraints, and visibility toggles for sidebar, assistant, and bottom dock.
+- **Extracted Presentational Components (`src/components/editor/`):**
+  - `EditorTabBar.vue`: Reusable tab strip supporting single and dual split panes, dirty indicators (`●`), conflict popovers, and inline save/split/orientation controls (eliminating template duplication and DOM bloat).
+  - `EditorBreadcrumbs.vue`: Context-aware interactive breadcrumb navigation supporting standard paths, diff tabs, settings, and welcome views.
+  - `EditorConfirmCloseModal.vue`: Modal dialog safeguarding against accidental loss of unsaved changes when closing dirty files or collapsing split panes.
+- **Async DOM Guard & Monaco Integrity:** Monaco editor `layout()` invocations are shielded with `requestAnimationFrame` guards to prevent layout crashes during rapid split-pane resizing and unmounted DOM transitions.
+
+### 4.2 Unified Token & Theming Architecture
+AegisCode Studio implements a strict, centralized CSS custom property theming pipeline:
+- **Single Source of Truth (`apps/frontend/src/styles/themes/theme-presets.css`):**
+  - All color tokens are defined exclusively in this stylesheet across a catalog of 10 curated presets:
+    - **Dark Presets:** `default-dark` (Midnight Obsidian), `tokyo-night` (Cyberpunk Storm), `nordic-frost` (Sub-zero Aurora), `dracula-neo` (Vampire Neon), `gruvbox-dark` (Warm Retro), `catppuccin-mocha` (Soothing Pastel).
+    - **Light Presets:** `default-light` (Alabaster Paper), `orbit-light` (Electric High-Contrast), `nordic-light` (Ice High-Contrast), `gruvbox-light` (Parchment Retro).
+  - **Pure HEX Specification:** Colors are strictly specified in 6-digit `#RRGGBB` or 8-digit `#RRGGBBAA` formats. Nested CSS color functions (`rgba()`, `color-mix()`, `hsl()`) are completely eliminated from the preset definitions.
+- **Zero-Override & Zero-Hex Policy:**
+  - Outside `theme-presets.css`, zero hardcoded HEX values are permitted in any CSS stylesheet or Vue component.
+  - All Vue component `<style>` blocks are strictly decoupled from color token definitions and theme overrides (0 `[data-theme="light"]` selectors in Vue).
+  - Light mode structural variations are centralized in reusable stylesheet `apps/frontend/src/styles/themes/theme-light.css`.
+  - Inline style bindings for color (`:style="{ color: ... }"`) are prohibited; components rely on semantic data attributes such as `[data-file-type="..."]` in `apps/frontend/src/styles/components/explorer.css`.
+- **Reactive Engine & Monaco/Terminal Synchronization:**
+  - `themeService.js` manages active preset resolution and persists user configuration in `localStorage`.
+  - DOM MutationObservers watch `document.documentElement` for `attributeFilter: ["data-theme", "data-theme-preset"]`, dynamically updating Monaco Editor syntax highlighting rules and xterm.js terminal color palettes without full page reloads.
+
 ---
 
 ## 5. Local Semantic Index & Vector Database (Phase 2.1)

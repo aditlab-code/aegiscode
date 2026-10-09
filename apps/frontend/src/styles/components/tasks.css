@@ -244,15 +244,15 @@
 }
 
 .term-head .tl.r {
-  background: #ff5f57;
+  background: var(--traffic-close);
 }
 
 .term-head .tl.y {
-  background: #febc2e;
+  background: var(--traffic-min);
 }
 
 .term-head .tl.g {
-  background: #28c840;
+  background: var(--traffic-max);
 }
 
 .term-head .tt {
@@ -329,8 +329,8 @@
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-top: 1px solid var(--border-soft, #383447);
-  background: var(--bg-card, #1a1825);
+  border-top: 1px solid var(--border-soft);
+  background: var(--bg-card);
 }
 
 .term-input-row.busy {
@@ -351,7 +351,7 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--text, #e8e6ef);
+  color: var(--text);
   font-family: var(--mono, monospace);
   font-size: 12.5px;
   caret-color: var(--accent-muted);
@@ -359,7 +359,7 @@
 }
 
 .term-input::placeholder {
-  color: var(--text-faint, #555);
+  color: var(--text-faint);
 }
 
 .term-input:disabled {
@@ -375,7 +375,7 @@
   height: 22px;
   background: transparent;
   border: none;
-  color: var(--text-dim, #888);
+  color: var(--text-dim);
   cursor: pointer;
   border-radius: 4px;
   padding: 0;
@@ -393,18 +393,18 @@
 
 /* Abort button — red stop square, shown while running */
 .term-abort-btn {
-  color: var(--danger, #f85149) !important;
+  color: var(--err) !important;
   opacity: 1 !important;
 }
 
 .term-abort-btn:hover {
-  color: var(--err, #ff6b6b) !important;
+  color: var(--err) !important;
   background: rgba(248, 81, 73, 0.1);
 }
 
 /* Brief flash when Ctrl+Shift+C copies successfully */
 .term-send-btn.copied {
-  color: var(--ok, #3fb950) !important;
+  color: var(--ok) !important;
   transition: color 0s;
 }
 
@@ -554,8 +554,8 @@
   display: flex;
   gap: 4px;
   padding: 6px 10px;
-  background: var(--bg-surface, #141318);
-  border-bottom: 1px solid var(--border-soft, #383447);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-soft);
   flex-shrink: 0;
 }
 
@@ -567,7 +567,7 @@
   padding: 4px 6px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -578,14 +578,14 @@
 }
 
 .task-subtab-pill:hover {
-  color: var(--text, #f5f3fa);
-  background: var(--bg-hover, #201d2a);
+  color: var(--text);
+  background: var(--bg-hover);
 }
 
 .task-subtab-pill.active {
-  color: var(--text, #f5f3fa);
-  background: var(--bg-card, #262332);
-  border-color: var(--border-soft, #383447);
+  color: var(--text);
+  background: var(--bg-card);
+  border-color: var(--border-soft);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   font-weight: 600;
 }
@@ -595,15 +595,15 @@
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
-  background: var(--border-soft, #383447);
-  color: var(--text-dim, #b8b2cb);
+  background: var(--border-soft);
+  color: var(--text-dim);
   margin-left: 4px;
   line-height: 1;
 }
 
 .task-subtab-pill.active .subtab-count {
   background: var(--accent-soft, rgba(45, 125, 78, 0.25));
-  color: var(--accent-muted, #5ebd87);
+  color: var(--accent-muted);
 }
 
 .task-subtab-body {
@@ -622,7 +622,7 @@
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
   font-size: 12px;
   text-align: center;
   gap: 4px;
@@ -637,7 +637,7 @@
   padding: 24px 16px;
   text-align: center;
   font-size: 12px;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
 }
 
 .q-error-banner {
@@ -650,7 +650,7 @@
   border-radius: 6px;
   background: var(--diff-del-bg, rgba(239, 68, 68, 0.12));
   border: 1px solid var(--diff-del-border, rgba(239, 68, 68, 0.3));
-  color: var(--diff-del-text, #f87171);
+  color: var(--err);
   font-size: 11px;
 }
 
@@ -694,8 +694,8 @@
 }
 
 .task-subpane .q-item:hover {
-  background: var(--bg-hover, #201d2a);
-  border-color: var(--border, #383447);
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .task-subpane .q-item.running {
@@ -713,7 +713,7 @@
 
 .task-subpane .q-text {
   font-size: 12px;
-  color: var(--text, #f5f3fa);
+  color: var(--text);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -725,7 +725,7 @@
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
 }
 
 .task-subpane .q-state-sm {
@@ -738,7 +738,7 @@
 
 .task-subpane .q-state-sm.running {
   background: rgba(45, 125, 78, 0.25);
-  color: #5ebd87;
+  color: var(--accent);
 }
 
 .task-subpane .q-state-sm.disabled {
@@ -791,8 +791,8 @@
 }
 
 .side-hist-item:hover {
-  background: var(--bg-hover, #201d2a);
-  border-color: var(--border, #383447);
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .side-hist-main {
@@ -813,13 +813,13 @@
 
 .side-hist-time {
   font-size: 10px;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
   font-family: var(--font-mono, monospace);
 }
 
 .side-hist-prompt {
   font-size: 12px;
-  color: var(--text, #f5f3fa);
+  color: var(--text);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -847,7 +847,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
 }
 
 .side-sess-new-btn {
@@ -855,16 +855,16 @@
   font-weight: 500;
   padding: 2px 7px;
   border-radius: 4px;
-  border: 1px solid var(--accent, #2d7d4e);
+  border: 1px solid var(--accent);
   background: var(--accent-soft, rgba(45, 125, 78, 0.15));
-  color: var(--accent-muted, #5ebd87);
+  color: var(--accent-muted);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .side-sess-new-btn:hover {
-  background: var(--accent, #2d7d4e);
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--bg-elev);
 }
 
 .side-sess-list {
@@ -887,8 +887,8 @@
 }
 
 .side-sess-item:hover {
-  background: var(--bg-hover, #201d2a);
-  border-color: var(--border, #383447);
+  background: var(--bg-hover);
+  border-color: var(--border);
 }
 
 .side-sess-item.active {
@@ -904,7 +904,7 @@
 .side-sess-name {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text, #f5f3fa);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -912,7 +912,7 @@
 
 .side-sess-meta {
   font-size: 10px;
-  color: var(--text-faint, #8a849d);
+  color: var(--text-faint);
   margin-top: 2px;
 }
 
@@ -930,7 +930,7 @@
   padding: 1px 4px;
   border-radius: 3px;
   background: var(--accent-soft, rgba(45, 125, 78, 0.25));
-  color: var(--accent, #5ebd87);
+  color: var(--accent);
   letter-spacing: 0.3px;
 }
 
@@ -969,7 +969,7 @@
 }
 
 .side-sess-delete-btn:hover {
-  color: var(--error, #e06c75);
+  color: var(--err);
 }
 
 .side-sess-rename-input {
@@ -1360,7 +1360,7 @@
 
 .act-label.tool {
   background: rgba(78, 201, 176, 0.12);
-  color: var(--act-tool, #4ec9b0);
+  color: var(--accent);
 }
 
 .act-label.result {
@@ -1370,7 +1370,7 @@
 
 .act-label.observation {
   background: rgba(156, 220, 254, 0.08);
-  color: var(--act-obs, #9cdcfe);
+  color: var(--act-obs);
 }
 
 .act-label.status {
@@ -1380,7 +1380,7 @@
 
 .act-label.reasoning {
   background: rgba(197, 134, 192, 0.1);
-  color: var(--act-agent, #c586c0);
+  color: var(--act-agent);
 }
 
 .act-body-col {
@@ -1401,7 +1401,7 @@
 
 /* Reasoning animated dots */
 .reasoning-text {
-  color: var(--act-agent, #c586c0);
+  color: var(--act-agent);
   font-size: 11px;
 }
 

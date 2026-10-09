@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { escapeHtml, inlineMarkdown, renderMarkdown } from "../src/markdown.js";
 
 // --- 1. Basic HTML Escaping ---
-assert.equal(escapeHtml('<script>alert("xss")</script>'), "&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;".replace(/&quot;/g, '"'));
+assert.equal(escapeHtml('<script>alert("xss")</script>'), "&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;");
 assert.equal(escapeHtml("Foo & Bar"), "Foo &amp; Bar");
 
 // --- 2. Inline Markdown: bold, italic, code, links ---
@@ -43,7 +43,7 @@ assert.equal(escapeHtml("Foo & Bar"), "Foo &amp; Bar");
 {
   const codeWithLang = "```python\ndef hello():\n    print('world')\n```";
   const html = renderMarkdown(codeWithLang);
-  assert.ok(html.includes('<pre class="md-code" data-lang="python"><code>def hello():\n    print(\'world\')</code></pre>'));
+  assert.ok(html.includes('<pre class="md-code" data-lang="python"><code>def hello():\n    print(&#39;world&#39;)</code></pre>'));
 
   const codeWithoutLang = "```\nplain text code\n```";
   const htmlPlain = renderMarkdown(codeWithoutLang);

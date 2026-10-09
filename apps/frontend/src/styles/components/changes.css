@@ -273,7 +273,7 @@
 .sc-discard-all-btn:hover {
   background: rgba(247, 118, 142, 0.22);
   border-color: var(--err);
-  color: #fff;
+  color: var(--bg-elev);
 }
 
 .sc-discard-all-confirm {
@@ -295,7 +295,7 @@
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--err);
-  color: #fff;
+  color: var(--bg-elev);
   border: 1px solid var(--err);
   cursor: pointer;
   transition: all 0.12s ease;
@@ -354,7 +354,7 @@
 
 .row-confirm-btn.confirm-yes {
   background: var(--err);
-  color: #fff;
+  color: var(--bg-elev);
 }
 .row-confirm-btn.confirm-yes:hover:not(:disabled) {
   background: var(--danger);

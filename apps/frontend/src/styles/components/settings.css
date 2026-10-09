@@ -358,7 +358,7 @@
 .settings-overlay .btn-primary-a {
   background: var(--accent) !important;
   border: 1px solid var(--accent) !important;
-  color: #ffffff !important;
+  color: var(--bg-elev) !important;
 }
 .settings-content .btn-primary:hover:not(:disabled),
 .settings-content .btn-primary-a:hover:not(:disabled),
@@ -370,15 +370,15 @@
 .settings-content .btn-danger-a,
 .settings-overlay .btn-danger,
 .settings-overlay .btn-danger-a {
-  background: var(--alert-err-bg, rgba(247, 118, 142, 0.14)) !important;
-  border: 1px solid var(--alert-err-border, rgba(247, 118, 142, 0.45)) !important;
-  color: var(--err, #f7768e) !important;
+  background: var(--alert-err-bg) !important;
+  border: 1px solid var(--alert-err-border) !important;
+  color: var(--err) !important;
 }
 .settings-content .btn-danger:hover:not(:disabled),
 .settings-content .btn-danger-a:hover:not(:disabled),
 .settings-overlay .btn-danger:hover:not(:disabled),
 .settings-overlay .btn-danger-a:hover:not(:disabled) {
-  border-color: var(--err, #f7768e) !important;
+  border-color: var(--err) !important;
 }
 
 .settings-content .gs-row {

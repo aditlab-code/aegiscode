@@ -436,16 +436,11 @@ function handleOpenProject(p) {
   height: 100%;
   overflow-y: auto;
   background: transparent !important;
-  color: var(--text, #cccccc);
+  color: var(--text);
   padding: 40px 32px;
   box-sizing: border-box;
   position: relative;
   z-index: 1;
-}
-
-[data-theme="light"] .welcome-view-root {
-  background: transparent !important;
-  color: var(--text, #2c2738);
 }
 
 .welcome-container {
@@ -488,7 +483,7 @@ function handleOpenProject(p) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
 }
 
 .brand-text-block {
@@ -502,12 +497,12 @@ function handleOpenProject(p) {
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
 }
 
 .brand-highlight {
   font-weight: 400;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
 }
 
 .version-tag {
@@ -515,15 +510,15 @@ function handleOpenProject(p) {
   font-family: var(--font-mono, monospace);
   padding: 2px 7px;
   border-radius: 999px;
-  background: var(--bg-surface, #252526);
+  background: var(--bg-surface);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
 }
 
 .brand-tagline {
   margin: 0;
   font-size: 14px;
-  color: var(--text-dim, #999999);
+  color: var(--text-dim);
 }
 
 /* Sections */
@@ -537,7 +532,7 @@ function handleOpenProject(p) {
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.8px;
-  color: var(--text-dim, #777777);
+  color: var(--text-dim);
 }
 
 /* Action Buttons */
@@ -555,8 +550,8 @@ function handleOpenProject(p) {
   padding: 12px 16px;
   border-radius: 6px;
   background: var(--inset, rgba(0, 0, 0, 0.25));
-  border: 1px solid var(--line, #1e1e2c);
-  color: var(--text, #cccccc);
+  border: 1px solid var(--line);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -567,29 +562,16 @@ function handleOpenProject(p) {
   -webkit-backdrop-filter: none;
 }
 
-[data-theme="light"] .action-btn {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
-  box-shadow: none;
-}
-
 .action-btn:hover:not(:disabled) {
   background: var(--hover, rgba(255, 255, 255, 0.05));
-  border-color: var(--accent, #a78bfa);
-  color: var(--text, #ffffff);
+  border-color: var(--accent);
+  color: var(--text);
   transform: none;
   box-shadow: none;
-}
-
-[data-theme="light"] .action-btn:hover:not(:disabled) {
-  background: var(--hover, rgba(101, 85, 120, 0.04));
-  border-color: var(--accent, #8261bb);
-  box-shadow: none;
-  transform: none;
 }
 
 .action-icon {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -602,12 +584,12 @@ function handleOpenProject(p) {
 .btn-label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
 }
 
 .btn-sub {
   font-size: 12px;
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
 }
 
 /* Recent Workspaces */
@@ -625,7 +607,7 @@ function handleOpenProject(p) {
 
 .recent-count {
   font-size: 11px;
-  color: var(--text-dim, #777777);
+  color: var(--text-dim);
 }
 
 .empty-recent-card {
@@ -636,19 +618,14 @@ function handleOpenProject(p) {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px dashed var(--border-soft, rgba(255, 255, 255, 0.08));
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
   font-size: 13px;
   width: 100%;
   box-sizing: border-box;
 }
 
-[data-theme="light"] .empty-recent-card {
-  background: rgba(0, 0, 0, 0.015);
-  border-color: rgba(0, 0, 0, 0.08);
-}
-
 .empty-icon {
-  color: var(--text-dim, #666666);
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 
@@ -667,7 +644,7 @@ function handleOpenProject(p) {
   align-items: center;
   border-radius: 6px;
   background: var(--inset, rgba(0, 0, 0, 0.25));
-  border: 1px solid var(--line, #1e1e2c);
+  border: 1px solid var(--line);
   transition: background 0.15s ease, border-color 0.15s ease;
   width: 100%;
   box-sizing: border-box;
@@ -676,28 +653,15 @@ function handleOpenProject(p) {
   -webkit-backdrop-filter: none;
 }
 
-[data-theme="light"] .recent-item {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
-  box-shadow: none;
-}
-
 .recent-item:hover {
   background: var(--hover, rgba(255, 255, 255, 0.05));
-  border-color: var(--accent, #a78bfa);
-  box-shadow: none;
-  transform: none;
-}
-
-[data-theme="light"] .recent-item:hover {
-  background: var(--hover, rgba(101, 85, 120, 0.04));
-  border-color: var(--accent, #8261bb);
+  border-color: var(--accent);
   box-shadow: none;
   transform: none;
 }
 
 .recent-item.active {
-  border-color: var(--accent, #a78bfa);
+  border-color: var(--accent);
 }
 
 .recent-open-btn {
@@ -715,7 +679,7 @@ function handleOpenProject(p) {
 }
 
 .recent-item-icon {
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 
@@ -729,7 +693,7 @@ function handleOpenProject(p) {
 .recent-name {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -737,7 +701,7 @@ function handleOpenProject(p) {
 
 .recent-path {
   font-size: 11px;
-  color: var(--text-dim, #777777);
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -745,7 +709,7 @@ function handleOpenProject(p) {
 
 .recent-time {
   font-size: 11px;
-  color: var(--text-dim, #666666);
+  color: var(--text-dim);
   flex-shrink: 0;
   margin-left: 8px;
 }
@@ -754,32 +718,26 @@ function handleOpenProject(p) {
   background: transparent;
   border: none;
   padding: 8px 10px;
-  color: var(--text-dim, #666666);
+  color: var(--text-dim);
   cursor: pointer;
   border-radius: 4px;
   margin-right: 4px;
 }
 
 .recent-del-btn:hover {
-  color: var(--danger, #e06c75);
+  color: var(--err);
 }
 
 /* Cards - Unified UI Kit Style (Static, No Glow) */
 .welcome-card {
-  background: var(--panel, #14141e);
-  border: 1px solid var(--edge, #262635);
+  background: var(--panel);
+  border: 1px solid var(--edge);
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 24px;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-}
-
-[data-theme="light"] .welcome-card {
-  background: var(--panel, #f5f3fa);
-  border: 1px solid var(--edge, rgba(255, 255, 255, 0.7));
-  box-shadow: none;
 }
 
 /* Cards - Left aligned */
@@ -874,7 +832,7 @@ function handleOpenProject(p) {
   margin: 0 0 16px 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -901,7 +859,7 @@ function handleOpenProject(p) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -914,14 +872,14 @@ function handleOpenProject(p) {
 .feature-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
 }
 
 .feature-desc {
   margin: 0;
   font-size: 12px;
   line-height: 1.4;
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
 }
 
 /* Shortcuts */
@@ -939,7 +897,7 @@ function handleOpenProject(p) {
 }
 
 .sc-label {
-  color: var(--text-dim, #999999);
+  color: var(--text-dim);
 }
 
 .sc-kbd-group {
@@ -954,40 +912,10 @@ kbd {
   font-size: 11px;
   font-family: var(--font-mono, monospace);
   line-height: 1.2;
-  color: var(--text, #cccccc);
-  background: var(--bg-base, #1e1e1e);
+  color: var(--text);
+  background: var(--bg-surface);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.15));
   border-radius: 4px;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-}
-
-/* Light Theme Card Typography & Contrast Overrides */
-[data-theme="light"] .brand-title,
-[data-theme="light"] .btn-label,
-[data-theme="light"] .card-heading,
-[data-theme="light"] .feature-title,
-[data-theme="light"] .recent-name {
-  color: var(--text, #180c06) !important;
-}
-
-[data-theme="light"] .action-btn {
-  color: var(--text, #180c06);
-}
-
-[data-theme="light"] .action-btn:hover:not(:disabled) {
-  color: var(--text, #180c06) !important;
-}
-
-[data-theme="light"] .sc-label {
-  color: var(--text-dim, #4a3628);
-}
-
-/* Button tombol shortcut key bindings di light theme berwarna hitam, label text putih */
-[data-theme="light"] kbd,
-[data-theme="light"] .sc-kbd-group kbd {
-  background: #181524 !important;
-  color: #ffffff !important;
-  border-color: rgba(24, 21, 36, 0.6) !important;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
 }
 </style>

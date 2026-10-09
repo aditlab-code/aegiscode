@@ -265,11 +265,11 @@ watch(() => props.approval, (newVal) => {
   gap: 8px;
   font-weight: 600;
   font-size: 14.5px;
-  color: var(--text-normal, #f1f0f5);
+  color: var(--text);
 }
 
 .approval-shield-icon {
-  color: var(--warn, #e5a00d);
+  color: var(--warn);
   flex-shrink: 0;
 }
 
@@ -280,7 +280,7 @@ watch(() => props.approval, (newVal) => {
   border-radius: 4px;
   background: rgba(229, 160, 13, 0.15);
   border: 1px solid rgba(229, 160, 13, 0.35);
-  color: var(--warn, #e5a00d);
+  color: var(--warn);
   white-space: nowrap;
 }
 
@@ -290,7 +290,7 @@ watch(() => props.approval, (newVal) => {
   gap: 14px;
   padding: 6px 0;
   font-size: 13px;
-  color: var(--text-dim, #a6a4b8);
+  color: var(--text-dim);
 }
 
 .approval-item {
@@ -304,7 +304,7 @@ watch(() => props.approval, (newVal) => {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--text-faint, #6a6880);
+  color: var(--text-faint);
 }
 
 .approval-code-block {
@@ -315,7 +315,7 @@ watch(() => props.approval, (newVal) => {
   font-family: var(--font-mono, monospace);
   font-size: 12px;
   line-height: 1.45;
-  color: var(--text-normal, #ecebf2);
+  color: var(--text);
   word-break: break-all;
   max-height: 120px;
   overflow-y: auto;
@@ -323,7 +323,7 @@ watch(() => props.approval, (newVal) => {
 
 .approval-item-reason {
   line-height: 1.45;
-  color: var(--text-normal, #e0dfea);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.03);
   padding: 8px 10px;
   border-radius: 6px;
@@ -350,13 +350,13 @@ watch(() => props.approval, (newVal) => {
 
 .metadata-label {
   font-weight: 500;
-  color: var(--text-faint, #78768e);
+  color: var(--text-faint);
   flex-shrink: 0;
 }
 
 .metadata-val {
   font-family: var(--font-mono, monospace);
-  color: var(--text-dim, #bab8ce);
+  color: var(--text-dim);
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -369,7 +369,7 @@ watch(() => props.approval, (newVal) => {
   padding: 8px 10px;
   background: rgba(220, 38, 38, 0.12);
   border: 1px solid rgba(220, 38, 38, 0.3);
-  color: var(--err, #f87171);
+  color: var(--err);
   border-radius: 6px;
   font-size: 12px;
 }

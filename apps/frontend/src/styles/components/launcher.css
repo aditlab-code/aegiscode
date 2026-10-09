@@ -242,7 +242,7 @@
 
 .pl-btn-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--bg-elev);
   box-shadow: none;
 }
 
@@ -272,7 +272,7 @@
 .pl-field-error {
   margin-top: 7px;
   font-size: 12px;
-  color: var(--danger, #f87171);
+  color: var(--err);
 }
 
 .pl-empty {

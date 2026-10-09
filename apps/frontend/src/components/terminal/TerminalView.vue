@@ -33,80 +33,68 @@ function openSafeTerminalLink(rawUrl) {
     console.warn("Format URL terminal tidak valid:", err);
   }
 }
-const TOKYO_NIGHT_STORM_TERMINAL = {
-  background: "#101018",
-  foreground: "#dedee9",
-  cursor: "#b5a1ed",
-  cursorAccent: "#101018",
-  selectionBackground: "rgba(181, 161, 237, 0.25)",
-  black: "#101018",
-  red: "#f7768e",
-  green: "#a2c9a3",
-  yellow: "#e0af68",
-  blue: "#91b8d7",
-  magenta: "#c1a4df",
-  cyan: "#91b8d7",
-  white: "#dedee9",
-  brightBlack: "#393a4b",
-  brightRed: "#f7768e",
-  brightGreen: "#a2c9a3",
-  brightYellow: "#e0af68",
-  brightBlue: "#91b8d7",
-  brightMagenta: "#c1a4df",
-  brightCyan: "#91b8d7",
-  brightWhite: "#ffffff",
-};
-
-const TOKYO_NIGHT_LIGHT_TERMINAL = {
-  background: "#f4f1fa",
-  foreground: "#333044",
-  cursor: "#8261bb",
-  cursorAccent: "#f4f1fa",
-  selectionBackground: "rgba(130, 97, 187, 0.2)",
-  black: "#f4f1fa",
-  red: "#8c4351",
-  green: "#628c5a",
-  yellow: "#8f5e15",
-  blue: "#4e7f9b",
-  magenta: "#9a60ad",
-  cyan: "#4e7f9b",
-  white: "#333044",
-  brightBlack: "#95899f",
-  brightRed: "#8c4351",
-  brightGreen: "#628c5a",
-  brightYellow: "#8f5e15",
-  brightBlue: "#4e7f9b",
-  brightMagenta: "#9a60ad",
-  brightCyan: "#4e7f9b",
-  brightWhite: "#333044",
-};
-
 function getActiveTerminalTheme() {
   if (typeof document !== "undefined" && document.documentElement) {
-    const isLight = document.documentElement.dataset?.theme === "light" ||
-                    document.documentElement.getAttribute("data-theme") === "light";
-    const baseTheme = isLight ? TOKYO_NIGHT_LIGHT_TERMINAL : TOKYO_NIGHT_STORM_TERMINAL;
     try {
       const cs = window.getComputedStyle(document.documentElement);
-      const bg = cs.getPropertyValue("--bg").trim();
-      const text = cs.getPropertyValue("--text").trim();
-      const accent = cs.getPropertyValue("--accent").trim();
-      if (bg && text && accent) {
-        return {
-          ...baseTheme,
-          background: bg,
-          foreground: text,
-          cursor: accent,
-          cursorAccent: bg,
-          selectionBackground: isLight ? "rgba(0, 0, 0, 0.15)" : "rgba(255, 255, 255, 0.18)",
-          black: bg,
-          white: text,
-        };
-      }
+      const getVal = (prop) => cs.getPropertyValue(prop)?.trim() || "";
+      const bg = getVal("--terminal") || getVal("--bg") || "var(--bg)";
+      const fg = getVal("--text") || "var(--text)";
+      const accent = getVal("--accent") || "var(--accent)";
+      const accent2 = getVal("--accent-2") || accent;
+      const ok = getVal("--ok") || "var(--ok)";
+      const warn = getVal("--warn") || "var(--warn)";
+      const err = getVal("--err") || "var(--err)";
+      const faint = getVal("--text-faint") || getVal("--muted") || fg;
+
+      return {
+        background: bg,
+        foreground: fg,
+        cursor: accent,
+        cursorAccent: bg,
+        selectionBackground: getVal("--selection") || "rgba(181, 161, 237, 0.25)",
+        black: bg,
+        red: err,
+        green: ok,
+        yellow: warn,
+        blue: accent,
+        magenta: accent2,
+        cyan: accent,
+        white: fg,
+        brightBlack: faint,
+        brightRed: err,
+        brightGreen: ok,
+        brightYellow: warn,
+        brightBlue: accent,
+        brightMagenta: accent2,
+        brightCyan: accent,
+        brightWhite: fg,
+      };
     } catch (_) {}
-    return baseTheme;
   }
-  return TOKYO_NIGHT_STORM_TERMINAL;
+  return {
+    background: "var(--terminal)",
+    foreground: "var(--text)",
+    cursor: "var(--accent)",
+    cursorAccent: "var(--terminal)",
+    selectionBackground: "var(--selection)",
+    black: "var(--terminal)",
+    red: "var(--err)",
+    green: "var(--ok)",
+    yellow: "var(--warn)",
+    blue: "var(--accent)",
+    magenta: "var(--accent-2)",
+    cyan: "var(--accent)",
+    white: "var(--text)",
+    brightBlack: "var(--text-faint)",
+    brightRed: "var(--err)",
+    brightGreen: "var(--ok)",
+    brightYellow: "var(--warn)",
+    brightBlue: "var(--accent)",
+    brightMagenta: "var(--accent-2)",
+    brightCyan: "var(--accent)",
+    brightWhite: "var(--text)",
+  };
 }
 function cleanupSocket() {
   if (socket) {
@@ -343,7 +331,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: var(--terminal, #101018);
+  background: var(--terminal);
   position: relative;
   overflow: hidden;
   outline: none;

@@ -188,14 +188,14 @@
 .dot.tag-done,
 .dot.status-done,
 .dot.ok {
-  background: var(--ok, #059669);
+  background: var(--ok);
   box-shadow: 0 0 6px rgba(5, 150, 105, 0.65);
 }
 
 /* Agent Running / Active */
 .dot.tag-running,
 .dot.status-running {
-  background: var(--warn, #d97706);
+  background: var(--warn);
   box-shadow: 0 0 7px rgba(217, 119, 6, 0.7);
   animation: dot-pulse 1.8s infinite ease-in-out;
 }
@@ -204,7 +204,7 @@
 .dot.tag-idle,
 .dot.status-off,
 .dot.idle {
-  background: var(--text-faint, #64748b);
+  background: var(--text-faint);
   box-shadow: none;
   opacity: 0.75;
 }
@@ -213,7 +213,7 @@
 .dot.err,
 .dot.tag-err,
 .dot.status-err {
-  background: var(--err, #dc2626);
+  background: var(--err);
   box-shadow: 0 0 6px rgba(220, 38, 38, 0.65);
 }
 
@@ -244,7 +244,7 @@
   max-height: 30px;
   border-top: none;
   border-bottom: 1px solid var(--line);
-  background: var(--bg-sidebar, #13141f);
+  background: var(--bg-sidebar);
   margin: 0;
   width: 100%;
   box-sizing: border-box;
@@ -319,13 +319,13 @@
 .empty-ws-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-bright, #ffffff);
+  color: var(--text);
 }
 
 .empty-ws-desc {
   margin: 0;
   font-size: 11px;
-  color: var(--text-dim, #888888);
+  color: var(--text-dim);
   line-height: 1.4;
   max-width: 200px;
 }
@@ -336,8 +336,8 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: var(--accent, #10f09a);
-  color: #12111a;
+  background: var(--accent);
+  color: var(--bg);
   font-size: 12px;
   font-weight: 600;
   border: none;

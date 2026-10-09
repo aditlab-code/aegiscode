@@ -2,11 +2,50 @@
 
 This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, Antigravity, etc.) when working with code in this repository.
 
-> **Scope:** This file configures agents working on the [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) repository itself. It is not meant to be copied into other projects or into a global agent configuration; the reusable assets are the skills in `skills/`, not this file.
+> **Scope:** This file configures AI coding agents working on the **AegisCode** repository (`apps/frontend/`, `apps/django_app/`, `src/agent_ai/`).
+
+
+
+## Rust Token Killer (`rtk`) Integration Guidelines
+
+AegisCode enforces the use of **RTK (Rust Token Killer)** — a high-performance CLI proxy located at `~/.local/bin/rtk` designed to filter, condense, and summarize command line outputs before they enter the LLM context window.
+
+### 1. Mandatory Command Prefixing
+- **Always Prefix Shell Invocations**: All coding agents MUST prefix shell commands with `rtk`:
+  - `rtk git status`, `rtk git diff`, `rtk git log -n 5`
+  - `rtk npm --prefix apps/frontend run build`, `rtk npm test`
+  - `rtk node --test apps/frontend/tests/*.test.mjs`
+  - `rtk ls -la apps/frontend/src/styles/`
+  - `rtk cargo test`, `rtk pytest`
+- **Safe Passthrough**: If `rtk` does not have a dedicated filter for a given tool, it safely runs the command unmodified without altering behavior or exit code.
+- **Strict Chaining Rule**: In compound shell commands, prefix EVERY segment in the chain:
+  - Correct: `rtk git add . && rtk git commit -m "feat: update"`
+  - Incorrect: `rtk git add . && git commit -m "feat: update"`
+
+### 2. Output Handling & Failure Recovery Protocol
+- **Signal Retention**: RTK condenses verbosity while preserving errors, warnings, and stack traces. Treat its output as authoritative and complete.
+- **Fallback (`rtk proxy`)**: If a filtered command returns an unusable result (e.g. unexpectedly empty output, garbled response, or mismatch with exit code), re-run explicitly with proxy mode:
+  ```bash
+  rtk proxy <command>
+  ```
+- **Temporary Bypass**: To execute a raw command completely bypassing RTK:
+  ```bash
+  RTK_DISABLED=1 <command>
+  ```
+- **Unix Piping**: For commands consuming output through pipes:
+  ```bash
+  <command> | rtk pipe
+  ```
+
+### 3. Token Economics & Monitoring
+- Check cumulative token savings across sessions:
+  - `rtk gain` — summary of total tokens saved.
+  - `rtk gain --history` — detailed breakdown per command.
+  - `rtk discover` — analyze past terminal runs for missed compression opportunities.
 
 ## Repository Overview
 
-A collection of skills for Claude.ai and Claude Code for senior software engineers. Skills are packaged instructions and scripts that extend Claude and your coding agents capabilities.
+AegisCode is an AI-assisted engineering workbench combining AegisCode Studio (Vue 3 + Vite IDE) and Aegis Agent (autonomous runtime engine). Skills in `.agents/skills/` and `skills/` extend agent capabilities.
 
 ## OpenCode Integration
 
@@ -67,6 +106,42 @@ Correct behavior:
 
 This ensures OpenCode behaves similarly to Claude Code with full workflow enforcement.
 
+## Frontend UI Engineering & Styling Guidelines (`apps/frontend`)
+
+When working on any frontend code in `apps/frontend/`, agents MUST adhere strictly to the following architectural constraints and quality gates:
+
+### 1. Component Architecture & Coordinator Pattern
+- **Thin Layout Coordinator**: `WorkbenchView.vue` (< 450 lines) is strictly a coordinator. It connects splitters, shortcuts, and root events, delegating state and logic to composable facades (`useWorkbenchEditorFacade.js`, `useWorkbenchAssistantFacade.js`, `useWorkbenchDockFacade.js`, `useWorkbenchLayout.js`).
+- **Presentational Component Decoupling**: Keep UI components focused and modular (e.g., `EditorTabBar.vue`, `EditorBreadcrumbs.vue`, `EditorConfirmCloseModal.vue`).
+- **Async DOM Guard for Monaco**: Wrap all Monaco `layout()` calls in `requestAnimationFrame` guards to prevent crashes during rapid splitter dragging or tab switches.
+
+### 2. Unified Theming & CSS Token Constraints (Strict Non-Negotiables)
+- **Single Source of Truth (`theme-presets.css`)**:
+  - All color tokens are defined exclusively in `apps/frontend/src/styles/themes/theme-presets.css` across 10 curated presets (6 dark, 4 light).
+  - Colors MUST be specified as pure HEX: `#RRGGBB` or `#RRGGBBAA`.
+  - ZERO nested CSS color functions (`rgba()`, `color-mix()`, `hsl()`) in `theme-presets.css`.
+- **Zero Hardcoded HEX**:
+  - No hex codes (`#hex`) are allowed in any CSS file outside `theme-presets.css`.
+  - No hex codes (`#hex`) are allowed inside `.vue` files.
+- **Zero Token Overrides in Vue**:
+  - Do NOT write `[data-theme="light"]` or `:global([data-theme="light"])` selectors inside `<style>` blocks in `.vue` components.
+  - All light theme structural and contrast rules MUST be placed in `apps/frontend/src/styles/themes/theme-light.css`.
+- **Zero Inline Color Styles**:
+  - Do NOT write inline `:style="{ color: ... }"` or `:style="{ backgroundColor: ... }"` in `.vue` templates.
+  - Use semantic data attributes (e.g., `:data-file-type="fileTypeIcon(tab.name)"`) and define their colors in reusable stylesheets (e.g., `apps/frontend/src/styles/components/explorer.css`).
+- **Dynamic Theme Reactivity**:
+  - Monaco Editor and xterm.js terminal themes synchronize reactively with `document.documentElement` attributes (`data-theme`, `data-theme-preset`) via `themeService.js` and DOM MutationObservers (`attributeFilter: ["data-theme", "data-theme-preset"]`).
+
+### 3. Mandatory Frontend Verification Gates
+Before completing any task touching `apps/frontend/`, the agent MUST run and pass these verification checks:
+1. `rtk grep -rn "data-theme" apps/frontend/src/ | grep "\.vue"` -> Must ONLY match `<script>` attribute watchers (0 in `<style>` blocks).
+2. `rtk grep -rn ':style=".*color' apps/frontend/src/ | grep "\.vue"` -> Must return 0 matches.
+3. `rtk grep -rn "#[0-9a-fA-F]\{3,8\}" apps/frontend/src/styles/ | grep -v "theme-presets.css"` -> Must return 0 matches.
+4. `rtk grep -rn "#[0-9a-fA-F]\{3,8\}" apps/frontend/src/ | grep "\.vue"` -> Must return 0 matches.
+5. `rtk npm --prefix apps/frontend run build` -> Must pass with 0 errors.
+6. `rtk node --test apps/frontend/tests/*.test.mjs` -> Must pass 100% of tests.
+
+
 ## Orchestration: Personas, Skills, and Commands
 
 This repo has three composable layers. They have different jobs and should not be confused:
@@ -74,18 +149,6 @@ This repo has three composable layers. They have different jobs and should not b
 - **Skills** (`skills/<name>/SKILL.md`) — workflows with steps and exit criteria. The *how*. Mandatory hops when an intent matches.
 - **Personas** (`agents/<role>.md`) — roles with a perspective and an output format. The *who*.
 - **Slash commands** (`.claude/commands/*.md`) — user-facing entry points. The *when*. The orchestration layer.
-
-Composition rule: **the user (or a slash command) is the orchestrator. Personas do not invoke other personas.** A persona may invoke skills.
-
-The only multi-persona orchestration pattern this repo endorses is **parallel fan-out with a merge step** — used by `/ship` to run `code-reviewer`, `security-auditor`, and `test-engineer` concurrently and synthesize their reports. Do not build a "router" persona that decides which other persona to call; that's the job of slash commands and intent mapping.
-
-See [docs/agents.md](docs/agents.md) for the decision matrix and [references/orchestration-patterns.md](references/orchestration-patterns.md) for the full pattern catalog.
-
-**Claude Code interop:** the personas in `agents/` work as Claude Code subagents (auto-discovered from this plugin's `agents/` directory) and as Agent Teams teammates (referenced by name when spawning). Two platform constraints align with our rules: subagents cannot spawn other subagents, and teams cannot nest. Plugin agents silently ignore the `hooks`, `mcpServers`, and `permissionMode` frontmatter fields.
-
-## Creating a New Skill
-
-> **Before you start:** run the pre-flight checks in [CONTRIBUTING.md](CONTRIBUTING.md#before-proposing-a-new-skill), search the catalog, check open PRs (`gh pr list --state open`), confirm the idea fits [docs/skill-anatomy.md](docs/skill-anatomy.md), and justify the gap in your PR description. Most new-skill ideas overlap an existing skill or an open PR; prefer extending an existing skill over adding a near-duplicate. CONTRIBUTING.md is the single source of truth for this workflow.
 
 Skills in this repo are markdown-first: each lives at `skills/<kebab-case-name>/SKILL.md` with YAML frontmatter (`name`, `description`) and follows the section anatomy (Overview, When to Use, Process, Common Rationalizations, Red Flags, Verification). Add a `scripts/` directory only when the skill ships runnable helpers; most skills are markdown only, and there are no per-skill zip packages.
 

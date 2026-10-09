@@ -211,12 +211,12 @@ async function handleUnlink() {
 .telegram-popover-card {
   width: 90%;
   max-width: 420px;
-  background: var(--bg-surface, #1e1e2e);
+  background: var(--bg-surface);
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 12px;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
   overflow: hidden;
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text);
   font-family: inherit;
 }
 
@@ -242,20 +242,20 @@ async function handleUnlink() {
 }
 
 .telegram-icon {
-  color: #38bdf8;
+  color: var(--accent);
 }
 
 .close-btn {
   background: none;
   border: none;
-  color: var(--text-muted, #a6adc8);
+  color: var(--muted);
   font-size: 20px;
   cursor: pointer;
   line-height: 1;
 }
 
 .close-btn:hover {
-  color: var(--text-primary, #ffffff);
+  color: var(--text);
 }
 
 .popover-body {
@@ -282,12 +282,12 @@ async function handleUnlink() {
 
 .status-icon-bubble.warning {
   background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
+  color: var(--warn);
 }
 
 .status-icon-bubble.success {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--ok);
 }
 
 .btn-inner {
@@ -309,14 +309,14 @@ async function handleUnlink() {
 
 .qr-instructions {
   font-size: 13px;
-  color: var(--text-muted, #a6adc8);
+  color: var(--muted);
   margin-bottom: 14px;
 }
 
 .qr-display-box {
   width: 200px;
   height: 200px;
-  background: #ffffff;
+  background: var(--bg-elev);
   padding: 12px;
   border-radius: 8px;
   display: flex;
@@ -355,17 +355,17 @@ async function handleUnlink() {
 }
 
 .btn-primary {
-  background: #0284c7;
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--bg-elev);
 }
 
 .btn-primary:hover {
-  background: #0369a1;
+  filter: brightness(1.1);
 }
 
 .btn-secondary {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary, #cdd6f4);
+  color: var(--text);
 }
 
 .btn-secondary:hover {
@@ -374,7 +374,7 @@ async function handleUnlink() {
 
 .btn-danger {
   background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
+  color: var(--err);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
@@ -416,24 +416,24 @@ async function handleUnlink() {
 
 .status-chip-active {
   background: rgba(34, 197, 94, 0.12);
-  color: #4ade80;
+  color: var(--ok);
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
 .status-chip-active .chip-dot {
-  color: #22c55e;
+  color: var(--ok);
   font-size: 8px;
   line-height: 1;
 }
 
 .status-chip-standby {
   background: rgba(250, 204, 21, 0.12);
-  color: #facc15;
+  color: var(--warn);
   border: 1px solid rgba(250, 204, 21, 0.25);
 }
 
 .status-chip-standby .chip-dot {
-  color: #facc15;
+  color: var(--warn);
   font-size: 8px;
   line-height: 1;
 }

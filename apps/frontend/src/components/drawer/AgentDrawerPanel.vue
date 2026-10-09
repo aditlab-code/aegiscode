@@ -822,7 +822,7 @@ defineExpose({
   font-size: 11px;
   font-weight: 500;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--bg-elev);
   border: none;
   cursor: pointer;
   transition: filter 0.15s ease, opacity 0.15s ease;

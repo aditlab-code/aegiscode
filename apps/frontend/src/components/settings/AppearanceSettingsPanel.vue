@@ -68,6 +68,7 @@ function handleReset() {
             v-for="preset in PRESET_CATALOG"
             :key="preset.id"
             class="preset-card"
+            :data-theme-preset="preset.id"
             :class="{
               active: themeConfig.preset === preset.id,
               'is-light': preset.variant === 'light',
@@ -91,43 +92,23 @@ function handleReset() {
               <div class="preset-wheel-wrapper" title="Spiral RGB 5-Color Wheel">
                 <svg class="preset-color-wheel" viewBox="0 0 44 44" width="46" height="46" aria-hidden="true">
                   <!-- 5 arcs around circle (circumference = 100.53, each arc 17.5, gap 2.6) -->
-                  <circle cx="22" cy="22" r="16" fill="none" :stroke="preset.preview.bg" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="0" />
-                  <circle cx="22" cy="22" r="16" fill="none" :stroke="preset.preview.surface" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-20.1" />
-                  <circle cx="22" cy="22" r="16" fill="none" :stroke="preset.preview.primary" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-40.2" />
-                  <circle cx="22" cy="22" r="16" fill="none" :stroke="preset.preview.secondary" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-60.3" />
-                  <circle cx="22" cy="22" r="16" fill="none" :stroke="preset.preview.accent" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-80.4" />
+                  <circle cx="22" cy="22" r="16" fill="none" class="wheel-arc-bg" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="0" />
+                  <circle cx="22" cy="22" r="16" fill="none" class="wheel-arc-surface" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-20.1" />
+                  <circle cx="22" cy="22" r="16" fill="none" class="wheel-arc-primary" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-40.2" />
+                  <circle cx="22" cy="22" r="16" fill="none" class="wheel-arc-secondary" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-60.3" />
+                  <circle cx="22" cy="22" r="16" fill="none" class="wheel-arc-accent" stroke-width="4.5" stroke-dasharray="17.5 83" stroke-dashoffset="-80.4" />
                   <!-- Center spiral hub -->
-                  <circle cx="22" cy="22" r="7.5" :fill="preset.preview.bg" :stroke="preset.preview.surface" stroke-width="1.2" />
-                  <path d="M22 17.5a4.5 4.5 0 0 1 4.5 4.5 3.5 3.5 0 0 1-3.5 3.5 2.5 2.5 0 0 1-2.5-2.5" fill="none" :stroke="preset.preview.primary" stroke-width="1.4" stroke-linecap="round" />
+                  <circle cx="22" cy="22" r="7.5" class="wheel-hub-bg" stroke-width="1.2" />
+                  <path d="M22 17.5a4.5 4.5 0 0 1 4.5 4.5 3.5 3.5 0 0 1-3.5 3.5 2.5 2.5 0 0 1-2.5-2.5" fill="none" class="wheel-hub-accent" stroke-width="1.4" stroke-linecap="round" />
                 </svg>
               </div>
 
               <div class="preset-color-strip">
-                <span
-                  class="color-dot"
-                  :style="{ backgroundColor: preset.preview.bg }"
-                  title="Background"
-                />
-                <span
-                  class="color-dot"
-                  :style="{ backgroundColor: preset.preview.surface }"
-                  title="Surface"
-                />
-                <span
-                  class="color-dot"
-                  :style="{ backgroundColor: preset.preview.primary }"
-                  title="Primary"
-                />
-                <span
-                  class="color-dot"
-                  :style="{ backgroundColor: preset.preview.secondary }"
-                  title="Secondary"
-                />
-                <span
-                  class="color-dot"
-                  :style="{ backgroundColor: preset.preview.accent }"
-                  title="Accent"
-                />
+                <span class="color-dot dot-bg" title="Background" />
+                <span class="color-dot dot-surface" title="Surface" />
+                <span class="color-dot dot-primary" title="Primary" />
+                <span class="color-dot dot-secondary" title="Secondary" />
+                <span class="color-dot dot-accent" title="Accent" />
               </div>
             </div>
 
@@ -152,22 +133,22 @@ function handleReset() {
           </div>
         </div>
 
-        <div class="preview-mockup" :style="{ backgroundColor: activePreset.preview.bg }">
-          <div class="mock-sidebar" :style="{ backgroundColor: activePreset.preview.surface }">
-            <div class="mock-item active" :style="{ color: activePreset.preview.primary }">
+        <div class="preview-mockup">
+          <div class="mock-sidebar">
+            <div class="mock-item active">
               <svg class="ap-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
               </svg>
               <span>Explorer</span>
             </div>
-            <div class="mock-item" :style="{ color: activePreset.preview.secondary }">
+            <div class="mock-item">
               <svg class="ap-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
               <span>Search</span>
             </div>
-            <div class="mock-item" :style="{ color: activePreset.preview.secondary }">
+            <div class="mock-item">
               <svg class="ap-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 1.2-2.9H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 2.6 7a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H7a1.7 1.7 0 0 0 1-1.5V1a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V7a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0 1.5 1z"/>
@@ -176,22 +157,22 @@ function handleReset() {
             </div>
           </div>
 
-          <div class="mock-editor-area" :style="{ backgroundColor: activePreset.preview.bg }">
-            <div class="mock-tabs" :style="{ backgroundColor: activePreset.preview.surface }">
-              <span class="mock-tab active" :style="{ borderBottomColor: activePreset.preview.primary, color: activePreset.preview.primary }">App.vue</span>
-              <span class="mock-tab" :style="{ color: activePreset.preview.secondary }">themeService.js</span>
+          <div class="mock-editor-area">
+            <div class="mock-tabs">
+              <span class="mock-tab active">App.vue</span>
+              <span class="mock-tab">themeService.js</span>
             </div>
             <div class="mock-code-canvas">
-              <span class="code-comment" :style="{ color: activePreset.preview.secondary }">// AEGIS Code Editor - Live Theme Synchronized</span>
+              <span class="code-comment">// AEGIS Code Editor - Live Theme Synchronized</span>
               <div class="code-line">
-                <span class="kw" :style="{ color: activePreset.preview.accent }">const</span>
-                <span class="fn" :style="{ color: activePreset.preview.primary }">themeState</span> =
-                <span class="fn" :style="{ color: activePreset.preview.primary }">createThemeState</span>();
+                <span class="kw">const</span>
+                <span class="fn">themeState</span> =
+                <span class="fn">createThemeState</span>();
               </div>
               <div class="mock-buttons-row">
-                <button type="button" class="mock-btn primary" :style="{ backgroundColor: activePreset.preview.primary }">Primary Action</button>
-                <button type="button" class="mock-btn secondary" :style="{ borderColor: activePreset.preview.secondary, color: activePreset.preview.secondary }">Secondary</button>
-                <span class="mock-badge" :style="{ backgroundColor: activePreset.preview.accent }">Accent Tag</span>
+                <button type="button" class="mock-btn primary">Primary Action</button>
+                <button type="button" class="mock-btn secondary">Secondary</button>
+                <span class="mock-badge">Accent Tag</span>
               </div>
             </div>
           </div>
@@ -219,12 +200,12 @@ function handleReset() {
 .ap-sub-title {
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--text, #dedee9);
+  color: var(--text);
 }
 
 .ap-sub-desc {
   font-size: 12px;
-  color: var(--text-dim, #a29eaf);
+  color: var(--text-dim);
   margin-top: 3px;
   line-height: 1.45;
 }
@@ -267,9 +248,9 @@ function handleReset() {
 }
 
 .preset-card.active {
-  border-color: var(--accent, #b5a1ed);
-  box-shadow: 0 0 0 1px var(--accent, #b5a1ed);
-  background: var(--bg-elev, #24283b);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  background: var(--bg-elev);
 }
 
 .preset-card-top {
@@ -282,7 +263,7 @@ function handleReset() {
 .preset-name {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text, #dedee9);
+  color: var(--text);
 }
 
 .preset-badge {
@@ -296,13 +277,13 @@ function handleReset() {
 
 .preset-badge.dark {
   background: rgba(0, 0, 0, 0.4);
-  color: #9aa5ce;
+  color: var(--text-dim);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .preset-badge.light {
   background: rgba(255, 255, 255, 0.85);
-  color: #343b58;
+  color: var(--text);
 }
 
 .preset-wheel-card-body {
@@ -352,13 +333,27 @@ function handleReset() {
   transform: scale(1.2);
 }
 
+.color-dot.dot-bg { background: var(--bg); }
+.color-dot.dot-surface { background: var(--bg-surface); }
+.color-dot.dot-primary { background: var(--accent); }
+.color-dot.dot-secondary { background: var(--text-dim); }
+.color-dot.dot-accent { background: var(--accent-2); }
+
+.wheel-arc-bg { stroke: var(--bg); }
+.wheel-arc-surface { stroke: var(--bg-surface); }
+.wheel-arc-primary { stroke: var(--accent); }
+.wheel-arc-secondary { stroke: var(--text-dim); }
+.wheel-arc-accent { stroke: var(--accent-2); }
+.wheel-hub-bg { fill: var(--bg); stroke: var(--bg-surface); }
+.wheel-hub-accent { stroke: var(--accent); }
+
 .active-indicator {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--accent, #b5a1ed);
+  color: var(--accent);
 }
 
 .active-check-svg {
@@ -374,11 +369,11 @@ function handleReset() {
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
   border-radius: var(--radius-sm, 6px);
   overflow: hidden;
-  background: var(--bg, #181922);
+  background: var(--bg);
 }
 
 .mock-sidebar {
-  background: var(--bg-sidebar, #171822);
+  background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   padding: 10px 8px;
   display: flex;
@@ -393,12 +388,12 @@ function handleReset() {
   font-size: 11px;
   padding: 5px 8px;
   border-radius: 4px;
-  color: var(--text-dim, #a29eaf);
+  color: var(--text-dim);
 }
 
 .mock-item.active {
   background: var(--accent-soft, rgba(181, 161, 237, 0.15));
-  color: var(--accent, #b5a1ed);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -408,7 +403,7 @@ function handleReset() {
 }
 
 .mock-tabs {
-  background: var(--bg-surface, #1f202c);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
   display: flex;
   padding: 4px 8px 0;
@@ -419,13 +414,13 @@ function handleReset() {
   font-size: 11px;
   padding: 4px 10px;
   border-radius: 4px 4px 0 0;
-  color: var(--text-dim, #a29eaf);
+  color: var(--text-dim);
 }
 
 .mock-tab.active {
-  background: var(--bg, #181922);
-  color: var(--text, #dedee9);
-  border-top: 2px solid var(--accent, #b5a1ed);
+  background: var(--bg);
+  color: var(--text);
+  border-top: 2px solid var(--accent);
 }
 
 .mock-code-canvas {
@@ -439,12 +434,12 @@ function handleReset() {
 }
 
 .code-comment {
-  color: var(--muted, #565f89);
+  color: var(--muted);
   font-style: italic;
 }
 
-.code-line .kw { color: var(--syntax-purple, #c1a4df); font-weight: 600; }
-.code-line .fn { color: var(--accent, #b5a1ed); }
+.code-line .kw { color: var(--syntax-purple); font-weight: 600; }
+.code-line .fn { color: var(--accent); }
 
 .mock-buttons-row {
   margin-top: auto;
@@ -462,15 +457,15 @@ function handleReset() {
 }
 
 .mock-btn.primary {
-  background: var(--accent, #b5a1ed);
-  color: #181922;
+  background: var(--accent);
+  color: var(--bg);
   border: none;
 }
 
 .mock-btn.secondary {
   background: transparent;
-  color: var(--secondary, #bcbcca);
-  border: 1px solid var(--secondary, #bcbcca);
+  color: var(--text-dim);
+  border: 1px solid var(--border-soft);
 }
 
 .mock-badge {
@@ -478,7 +473,7 @@ function handleReset() {
   padding: 2px 6px;
   border-radius: 4px;
   background: var(--accent-2-soft, rgba(181, 161, 237, 0.2));
-  color: var(--accent-2, #b5a1ed);
+  color: var(--accent-2);
   border: 1px solid var(--border-hover, rgba(181, 161, 237, 0.4));
 }
 </style>

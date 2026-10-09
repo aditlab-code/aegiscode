@@ -156,7 +156,7 @@ async function handleUnlink() {
 }
 
 .telegram-icon {
-  color: #38bdf8;
+  color: var(--accent);
 }
 
 .companion-body, .info-body {
@@ -182,7 +182,7 @@ async function handleUnlink() {
 
 .summary-item .label {
   font-size: 12px;
-  color: var(--text-muted, #a6adc8);
+  color: var(--muted);
 }
 
 .summary-item .value {
@@ -191,15 +191,15 @@ async function handleUnlink() {
 }
 
 .status-online {
-  color: #4ade80;
+  color: var(--ok);
 }
 
 .status-offline {
-  color: #f87171;
+  color: var(--err);
 }
 
 .status-warning {
-  color: #facc15;
+  color: var(--warn);
 }
 
 .font-mono {
@@ -208,7 +208,7 @@ async function handleUnlink() {
 
 .user-id {
   font-size: 12px;
-  color: var(--text-muted, #a6adc8);
+  color: var(--muted);
 }
 
 .actions-toolbar {
@@ -223,7 +223,7 @@ async function handleUnlink() {
 .info-section h4 {
   margin: 0 0 6px 0;
   font-size: 13px;
-  color: var(--text-primary, #ffffff);
+  color: var(--text);
 }
 
 .info-title {
@@ -233,14 +233,14 @@ async function handleUnlink() {
 }
 
 .info-icon {
-  color: #38bdf8;
+  color: var(--accent);
   flex-shrink: 0;
 }
 
 .info-section p, .info-section ul {
   margin: 0;
   font-size: 13px;
-  color: var(--text-muted, #a6adc8);
+  color: var(--muted);
   line-height: 1.5;
 }
 

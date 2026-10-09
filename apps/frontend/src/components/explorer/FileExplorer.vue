@@ -144,42 +144,6 @@ const FILE_ICONS = {
   lock: "lock", lockb: "lock",
 };
 
-const FILE_COLORS = {
-  python:     "#22a06b",   // green
-  html:       "#2d7ab8",   // blue
-  javascript: "#c9880e",   // amber
-  typescript: "#2d7ab8",   // blue
-  vue:        "#22a06b",   // green
-  css:        "#5ebd87",   // green-muted (replaces violet #c4b5fd)
-  json:       "#c9880e",   // amber
-  yaml:       "#c96aa0",   // muted pink
-  markdown:   "#9b98b0",   // text-dim
-  text:       "#6a6880",   // text-faint
-  xml:        "#d4703a",   // orange
-  sql:        "#2d7ab8",   // blue (replaces #818cf8)
-  shell:      "#22a06b",   // green
-  batch:      "#2d7ab8",   // blue
-  php:        "#5ebd87",   // green (replaces #c084fc)
-  java:       "#d96b7a",   // rose
-  cpp:        "#5aacd4",   // sky blue
-  csharp:     "#5ebd87",   // green (replaces #c084fc)
-  go:         "#2d7d4e",   // accent green
-  rust:       "#d4703a",   // orange
-  ruby:       "#d96b7a",   // rose
-  toml:       "#d4703a",
-  config:     "#6a6880",
-  env:        "#22a06b",
-  // Gruvbox Material palette extensions
-  image:      "#b16286",   // purple
-  archive:    "#d79921",   // yellow
-  lock:       "#cc241d",   // red
-  docker:     "#458588",   // blue/aqua
-  dockerfile: "#458588",   // blue/aqua
-  package:    "#b16286",   // purple
-  git:        "#af3a03",   // orange
-  gitignore:  "#af3a03",   // orange
-};
-
 function fileTypeIcon(name) {
   // Check special filenames first.
   const lower = name.toLowerCase();
@@ -199,11 +163,6 @@ function fileTypeIcon(name) {
   if (dot < 0) return "generic";
   const ext = name.slice(dot + 1).toLowerCase();
   return FILE_ICONS[ext] || "generic";
-}
-
-function fileTypeColor(name) {
-  const icon = fileTypeIcon(name);
-  return FILE_COLORS[icon] || null;
 }
 
 // Path helpers.
@@ -588,7 +547,7 @@ watch(
                 :class="{ active: tab.path === activeTabPath && activePane === 'pane1', dirty: tab.dirty }"
                 @click="emit('select-tab', tab.path, 'pane1')"
               >
-                <span class="oe-icon" :style="{ color: fileTypeColor(tab.name) }">
+                <span class="oe-icon" :data-file-type="fileTypeIcon(tab.name)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <path d="M14 2v6h6" />
@@ -637,7 +596,7 @@ watch(
                 :class="{ active: tab.path === activeTabPath2 && activePane === 'pane2', dirty: tab.dirty }"
                 @click="emit('select-tab', tab.path, 'pane2')"
               >
-                <span class="oe-icon" :style="{ color: fileTypeColor(tab.name) }">
+                <span class="oe-icon" :data-file-type="fileTypeIcon(tab.name)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <path d="M14 2v6h6" />
@@ -688,7 +647,7 @@ watch(
                 :class="{ active: tab.path === activeTabPath, dirty: tab.dirty }"
                 @click="emit('select-tab', tab.path, 'pane1')"
               >
-                <span class="oe-icon" :style="{ color: fileTypeColor(tab.name) }">
+                <span class="oe-icon" :data-file-type="fileTypeIcon(tab.name)">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <path d="M14 2v6h6" />
@@ -767,7 +726,6 @@ watch(
           :dirs="expanded"
           :selected="selected"
           :icon-fn="fileTypeIcon"
-          :color-fn="fileTypeColor"
           :git-status-map="gitStatusMap"
           @toggle="handleToggle"
           @open="handleOpen"

@@ -49,7 +49,7 @@
 .btn-primary-a {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #ffffff;
+  color: var(--bg-elev);
 }
 
 .btn-primary:hover:not(:disabled),
@@ -59,14 +59,14 @@
 
 .btn-danger,
 .btn-danger-a {
-  background: var(--alert-err-bg, rgba(247, 118, 142, 0.14));
-  border: 1px solid var(--alert-err-border, rgba(247, 118, 142, 0.45));
-  color: var(--err, #f7768e);
+  background: var(--alert-err-bg);
+  border: 1px solid var(--alert-err-border);
+  color: var(--err);
 }
 
 .btn-danger:hover:not(:disabled),
 .btn-danger-a:hover:not(:disabled) {
-  border-color: var(--err, #f7768e);
+  border-color: var(--err);
 }
 
 .btn-spinner {
@@ -107,7 +107,7 @@
   bottom: 0;
   left: 2px;
   width: 1px;
-  background: var(--edge, #262635);
+  background: var(--edge);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -134,7 +134,7 @@
   right: 0;
   top: 2px;
   height: 1px;
-  background: var(--edge, #262635);
+  background: var(--edge);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -150,7 +150,7 @@
 
 .app-splitter:hover::after,
 .splitter-dragging::after {
-  background: var(--accent, #a78bfa) !important;
+  background: var(--accent) !important;
   box-shadow: 0 0 4px rgba(167, 139, 250, 0.4);
 }
 
@@ -257,19 +257,19 @@
 
 .tag-done {
   background: rgba(45, 125, 78, 0.2);
-  color: var(--accent-muted, #5ebd87);
+  color: var(--accent-muted);
   border: 1px solid rgba(45, 125, 78, 0.4);
 }
 
 .tag-running {
   background: rgba(168, 85, 247, 0.2);
-  color: var(--accent-2-bright, #c084fc);
+  color: var(--accent-2-bright);
   border: 1px solid rgba(168, 85, 247, 0.4);
 }
 
 .tag-err {
   background: rgba(248, 113, 113, 0.2);
-  color: var(--err, #f87171);
+  color: var(--err);
   border: 1px solid rgba(248, 113, 113, 0.4);
 }
 
@@ -545,7 +545,7 @@
   padding: 2px 7px;
   border-radius: 4px;
   background: rgba(167, 139, 250, 0.12);
-  color: var(--accent, #a78bfa);
+  color: var(--accent);
   border: 1px solid rgba(167, 139, 250, 0.25);
   flex-shrink: 0;
 }
@@ -593,7 +593,7 @@
 .cmd-palette-item:hover,
 .cmd-palette-item.active {
   background: var(--hover, rgba(255, 255, 255, 0.06));
-  color: var(--text, #ffffff);
+  color: var(--text);
 }
 
 .cmd-item-left,
@@ -608,7 +608,7 @@
 
 .cmd-item-icon {
   font-size: 13px;
-  color: var(--accent, #a78bfa);
+  color: var(--accent);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -687,7 +687,7 @@
 
 .ctx-item:hover {
   background: rgba(255, 255, 255, 0.06);
-  color: #fff;
+  color: var(--text);
 }
 
 .ctx-sep {

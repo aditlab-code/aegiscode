@@ -253,7 +253,7 @@
 .oe-conflict-dot {
   font-size: 11px;
   font-weight: 700;
-  color: var(--danger, #ef4444);
+  color: var(--err);
   margin-right: 4px;
   line-height: 1;
 }
@@ -265,11 +265,11 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   user-select: none;
 }
-.oe-git-badge.git-m { color: #eab308; }
-.oe-git-badge.git-u { color: #10b981; }
-.oe-git-badge.git-d { color: #ef4444; }
-.oe-git-badge.git-a { color: #38bdf8; }
-.oe-git-badge.git-r { color: #a855f7; }
+.oe-git-badge.git-m { color: var(--warn); }
+.oe-git-badge.git-u { color: var(--ok); }
+.oe-git-badge.git-d { color: var(--err); }
+.oe-git-badge.git-a { color: var(--accent); }
+.oe-git-badge.git-r { color: var(--accent-2); }
 
 .oe-close-btn {
   display: none;
@@ -336,7 +336,7 @@
 }
 
 .oe-group.is-active-pane .oe-group-header {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
 }
 
 .oe-group-title {
@@ -361,3 +361,111 @@
   color: var(--text-faint);
   padding: 4px 16px;
 }
+
+/* File Type Semantic Colors (Unified Theme Presets) */
+.oe-icon[data-file-type="python"],
+.ex-name[data-file-type="python"] { color: var(--ok); }
+
+.oe-icon[data-file-type="html"],
+.ex-name[data-file-type="html"] { color: var(--accent); }
+
+.oe-icon[data-file-type="javascript"],
+.ex-name[data-file-type="javascript"] { color: var(--warn); }
+
+.oe-icon[data-file-type="typescript"],
+.ex-name[data-file-type="typescript"] { color: var(--accent); }
+
+.oe-icon[data-file-type="vue"],
+.ex-name[data-file-type="vue"] { color: var(--ok); }
+
+.oe-icon[data-file-type="css"],
+.ex-name[data-file-type="css"] { color: var(--ok); }
+
+.oe-icon[data-file-type="json"],
+.ex-name[data-file-type="json"] { color: var(--warn); }
+
+.oe-icon[data-file-type="yaml"],
+.ex-name[data-file-type="yaml"] { color: var(--accent-2); }
+
+.oe-icon[data-file-type="markdown"],
+.ex-name[data-file-type="markdown"] { color: var(--text-dim); }
+
+.oe-icon[data-file-type="text"],
+.ex-name[data-file-type="text"] { color: var(--text-faint); }
+
+.oe-icon[data-file-type="xml"],
+.ex-name[data-file-type="xml"] { color: var(--warn); }
+
+.oe-icon[data-file-type="sql"],
+.ex-name[data-file-type="sql"] { color: var(--accent); }
+
+.oe-icon[data-file-type="shell"],
+.ex-name[data-file-type="shell"] { color: var(--ok); }
+
+.oe-icon[data-file-type="batch"],
+.ex-name[data-file-type="batch"] { color: var(--accent); }
+
+.oe-icon[data-file-type="php"],
+.ex-name[data-file-type="php"] { color: var(--ok); }
+
+.oe-icon[data-file-type="java"],
+.ex-name[data-file-type="java"] { color: var(--err); }
+
+.oe-icon[data-file-type="cpp"],
+.ex-name[data-file-type="cpp"] { color: var(--accent); }
+
+.oe-icon[data-file-type="csharp"],
+.ex-name[data-file-type="csharp"] { color: var(--ok); }
+
+.oe-icon[data-file-type="go"],
+.ex-name[data-file-type="go"] { color: var(--ok); }
+
+.oe-icon[data-file-type="rust"],
+.ex-name[data-file-type="rust"] { color: var(--warn); }
+
+.oe-icon[data-file-type="ruby"],
+.ex-name[data-file-type="ruby"] { color: var(--err); }
+
+.oe-icon[data-file-type="toml"],
+.ex-name[data-file-type="toml"] { color: var(--warn); }
+
+.oe-icon[data-file-type="config"],
+.ex-name[data-file-type="config"] { color: var(--text-faint); }
+
+.oe-icon[data-file-type="env"],
+.oe-icon[data-file-type="env-example"],
+.ex-name[data-file-type="env"],
+.ex-name[data-file-type="env-example"] { color: var(--ok); }
+
+.oe-icon[data-file-type="license"],
+.ex-name[data-file-type="license"] { color: var(--text-dim); }
+
+.oe-icon[data-file-type="image"],
+.ex-name[data-file-type="image"] { color: var(--accent-2); }
+
+.oe-icon[data-file-type="archive"],
+.ex-name[data-file-type="archive"] { color: var(--warn); }
+
+.oe-icon[data-file-type="lock"],
+.ex-name[data-file-type="lock"] { color: var(--err); }
+
+.oe-icon[data-file-type="docker"],
+.oe-icon[data-file-type="dockerfile"],
+.ex-name[data-file-type="docker"],
+.ex-name[data-file-type="dockerfile"] { color: var(--accent); }
+
+.oe-icon[data-file-type="package"],
+.oe-icon[data-file-type="pyproject"],
+.ex-name[data-file-type="package"],
+.ex-name[data-file-type="pyproject"] { color: var(--accent-2); }
+
+.oe-icon[data-file-type="requirements"],
+.ex-name[data-file-type="requirements"] { color: var(--accent); }
+
+.oe-icon[data-file-type="makefile"],
+.ex-name[data-file-type="makefile"] { color: var(--warn); }
+
+.oe-icon[data-file-type="git"],
+.oe-icon[data-file-type="gitignore"],
+.ex-name[data-file-type="git"],
+.ex-name[data-file-type="gitignore"] { color: var(--warn); }

@@ -487,11 +487,6 @@ onMounted(load);
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   box-sizing: border-box;
 }
-:global([data-theme="light"]) .gs-track,
-:global([data-theme="light"]) .slider-track {
-  background: rgba(0, 0, 0, 0.08);
-  border-color: var(--border);
-}
 .gs-thumb,
 .slider-thumb {
   position: absolute;

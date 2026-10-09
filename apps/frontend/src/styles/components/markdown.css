@@ -46,7 +46,7 @@
 
 .report-btn:hover {
   background: rgba(45, 125, 78, 0.26);
-  color: #ffffff;
+  color: var(--text);
 }
 
 .modal.report-m {
@@ -174,7 +174,7 @@
 .md code {
   font-family: var(--mono);
   font-size: 12px;
-  color: #abffc7;
+  color: var(--ok);
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
   padding: 1px 5px;
@@ -193,7 +193,7 @@
 .md .md-code code {
   background: none;
   padding: 0;
-  color: #f3ff0a;
+  color: var(--warn);
 }
 
 .md .md-code[data-lang]::before {

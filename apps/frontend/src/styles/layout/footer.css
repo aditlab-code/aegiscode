@@ -43,7 +43,7 @@
 }
 
 .license-item svg {
-  color: var(--accent, #10f09a);
+  color: var(--accent);
   flex-shrink: 0;
 }
 
@@ -62,12 +62,12 @@
 }
 
 .status-btn:hover {
-  color: var(--text, #ffffff);
+  color: var(--text);
   background: var(--bg-hover, rgba(255, 255, 255, 0.05));
 }
 
 .status-btn.active {
-  color: var(--text, #ffffff);
+  color: var(--text);
   background: var(--bg-card);
 }
 
@@ -110,39 +110,39 @@
 
 /* System online / offline */
 .badge-online .badge-dot {
-  color: var(--accent, #22a06b);
+  color: var(--ok);
 }
 
 .badge-offline .badge-dot {
-  color: var(--err, #dc2626);
+  color: var(--err);
 }
 
 /* Agent status */
 .badge-agent.status-on .badge-dot,
 .badge-agent.status-active .badge-dot {
-  color: var(--accent, #22a06b);
+  color: var(--ok);
 }
 
 .badge-agent.status-run .badge-dot,
 .badge-agent.status-running .badge-dot {
-  color: var(--warn, #d97706);
+  color: var(--warn);
 }
 
 .badge-agent.status-off .badge-dot,
 .badge-agent.status-idle .badge-dot {
-  color: var(--text-faint, #6a6880);
+  color: var(--text-faint);
 }
 
 .badge-agent.status-err .badge-dot {
-  color: var(--err, #dc2626);
+  color: var(--err);
 }
 
 .problem-count-badge {
   font-size: 9.5px;
   font-weight: 600;
   padding: 0 4px;
-  background: var(--warn, #d97706);
-  color: #ffffff;
+  background: var(--warn);
+  color: var(--bg-elev);
   border-radius: 8px;
   line-height: 1.2;
 }
@@ -159,10 +159,10 @@
 }
 .badge-git-branch:hover {
   background: var(--bg-hover, rgba(255, 255, 255, 0.08));
-  color: var(--text, #ffffff);
+  color: var(--text);
 }
 .badge-git-branch svg {
-  color: var(--accent, #a855f7);
+  color: var(--accent);
   flex-shrink: 0;
 }
 .badge-branch-name {
@@ -179,15 +179,15 @@
   margin-left: 2px;
 }
 .sync-ahead {
-  color: var(--accent, #a855f7);
+  color: var(--accent);
   font-weight: 600;
 }
 .sync-behind {
-  color: var(--warn, #f59e0b);
+  color: var(--warn);
   font-weight: 600;
 }
 .sync-synced {
-  color: var(--ok, #10f09a);
+  color: var(--ok);
   font-size: 9.5px;
 }
 

@@ -31,15 +31,15 @@
 }
 
 .light-close {
-  background-color: #ff6058;
+  background-color: var(--traffic-close);
 }
 
 .light-minimize {
-  background-color: #febc2e;
+  background-color: var(--traffic-min);
 }
 
 .light-maximize {
-  background-color: #29c840;
+  background-color: var(--traffic-max);
 }
 
 .nav-left {

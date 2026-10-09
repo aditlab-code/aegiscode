@@ -261,11 +261,6 @@ async function copyLicense() {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-[data-theme="light"] .about-card {
-  background: rgba(0, 0, 0, 0.02) !important;
-  border-color: var(--line, rgba(73, 64, 97, 0.1)) !important;
-}
-
 .about-card:hover {
   border-color: var(--accent, var(--edge)) !important;
   box-shadow: none !important;
@@ -298,11 +293,6 @@ async function copyLicense() {
   border: 1px solid var(--line);
   border-radius: 8px;
   margin-bottom: 16px;
-}
-
-[data-theme="light"] .license-card {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .license-text {
@@ -340,11 +330,6 @@ async function copyLicense() {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-[data-theme="light"] .credit-item {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--line, rgba(73, 64, 97, 0.1));
 }
 
 .credit-name {

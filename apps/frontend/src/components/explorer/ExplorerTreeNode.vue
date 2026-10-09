@@ -27,7 +27,6 @@ const props = defineProps({
   selected: { type: String, default: "" },
   // Helper tipe/indikasi ikon file (dimiliki FileExplorer, bukan diduplikasi).
   iconFn: { type: Function, required: true },
-  colorFn: { type: Function, required: true },
   // Map path -> status code ('M', 'U', 'D', 'A', etc.)
   gitStatusMap: { type: Object, default: () => ({}) },
 });
@@ -135,7 +134,7 @@ function onContext(e) {
     </span>
     <span
       class="ex-name"
-      :style="{ color: !isDir ? (colorFn(entry.name) || 'inherit') : 'inherit' }"
+      :data-file-type="!isDir ? iconFn(entry.name) : undefined"
       :title="entry.name"
     >{{ entry.name }}</span>
     <span
@@ -157,7 +156,6 @@ function onContext(e) {
       :dirs="dirs"
       :selected="selected"
       :icon-fn="iconFn"
-      :color-fn="colorFn"
       :git-status-map="gitStatusMap"
       @toggle="(...a) => emit('toggle', ...a)"
       @open="(...a) => emit('open', ...a)"
@@ -178,18 +176,18 @@ function onContext(e) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .ex-git-badge.git-m {
-  color: #eab308;
+  color: var(--warn);
 }
 .ex-git-badge.git-u {
-  color: #10b981;
+  color: var(--ok);
 }
 .ex-git-badge.git-d {
-  color: #ef4444;
+  color: var(--err);
 }
 .ex-git-badge.git-a {
-  color: #38bdf8;
+  color: var(--accent);
 }
 .ex-git-badge.git-r {
-  color: #a855f7;
+  color: var(--accent-2);
 }
 </style>

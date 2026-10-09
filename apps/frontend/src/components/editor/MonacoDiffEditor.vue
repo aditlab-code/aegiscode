@@ -481,7 +481,7 @@ defineExpose({ layout });
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: var(--bg-deep, #14121e);
+  background: var(--bg-deep);
   overflow: hidden;
   position: relative;
 }
@@ -493,7 +493,7 @@ defineExpose({ layout });
   height: 32px;
   min-height: 32px;
   padding: 0 10px;
-  background: var(--bg-surface, #1b1828);
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   font-size: 11.5px;
 }
@@ -506,14 +506,14 @@ defineExpose({ layout });
 }
 
 .diff-split-icon {
-  color: var(--accent, #a855f7);
+  color: var(--accent);
   display: flex;
   align-items: center;
 }
 
 .diff-file-name {
   font-weight: 600;
-  color: var(--text, #e2e0ea);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -528,20 +528,20 @@ defineExpose({ layout });
 }
 .diff-tag-pill.tag-modified {
   background: rgba(234, 179, 8, 0.15);
-  color: #eab308;
+  color: var(--warn);
 }
 .diff-tag-pill.tag-untracked {
   background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  color: var(--ok);
 }
 .diff-tag-pill.tag-deleted {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--err);
 }
 
 .diff-ref-indicator {
   font-size: 10.5px;
-  color: var(--text-faint, #756e8b);
+  color: var(--text-faint);
   white-space: nowrap;
 }
 
@@ -553,7 +553,7 @@ defineExpose({ layout });
   font-weight: 700;
   padding: 1px 6px;
   border-radius: 4px;
-  color: var(--text-faint, #9f9baa);
+  color: var(--text-faint);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
   letter-spacing: 0.04em;
@@ -583,7 +583,7 @@ defineExpose({ layout });
   padding: 2px 7px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-faint, #756e8b);
+  color: var(--text-faint);
   background: transparent;
   border: none;
   border-radius: 3px;
@@ -592,12 +592,12 @@ defineExpose({ layout });
 }
 
 .diff-mode-btn:hover {
-  color: var(--text, #e2e0ea);
+  color: var(--text);
 }
 
 .diff-mode-btn.active {
-  color: #fff;
-  background: var(--accent, #a855f7);
+  color: var(--bg);
+  background: var(--accent);
 }
 
 .diff-btn {
@@ -607,7 +607,7 @@ defineExpose({ layout });
   padding: 3px 8px;
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-muted, #9f9baa);
+  color: var(--muted);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   border-radius: 4px;
@@ -615,29 +615,29 @@ defineExpose({ layout });
   transition: all 0.12s ease;
 }
 .diff-btn:hover {
-  color: var(--text, #e2e0ea);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.08);
   border-color: var(--border, rgba(255, 255, 255, 0.15));
 }
 .diff-edit-btn {
-  color: var(--accent, #c084fc);
+  color: var(--accent);
   background: rgba(168, 85, 247, 0.12);
   border-color: rgba(168, 85, 247, 0.3);
 }
 .diff-edit-btn:hover {
-  color: #fff;
-  background: var(--accent, #a855f7);
-  border-color: var(--accent, #a855f7);
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 .diff-discard-btn {
-  color: #f87171;
+  color: var(--err);
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.25);
 }
 .diff-discard-btn:hover {
-  color: #fff;
-  background: #ef4444;
-  border-color: #ef4444;
+  color: var(--bg);
+  background: var(--err);
+  border-color: var(--err);
 }
 
 .diff-discard-inline-confirm {
@@ -653,20 +653,20 @@ defineExpose({ layout });
 .diff-confirm-msg {
   font-size: 11px;
   font-weight: 600;
-  color: #f87171;
+  color: var(--err);
   padding-right: 2px;
 }
 
 .diff-btn-danger {
-  color: #fff;
-  background: #ef4444;
-  border-color: #dc2626;
+  color: var(--bg);
+  background: var(--err);
+  border-color: var(--err);
   font-weight: 600;
   padding: 2px 7px;
 }
 .diff-btn-danger:hover:not(:disabled) {
-  background: #dc2626;
-  border-color: #b91c1c;
+  background: var(--err);
+  border-color: var(--err);
 }
 .diff-btn-danger:disabled {
   opacity: 0.6;
@@ -674,13 +674,13 @@ defineExpose({ layout });
 }
 
 .diff-btn-ghost {
-  color: var(--text-faint, #9f9baa);
+  color: var(--text-faint);
   background: transparent;
   border-color: transparent;
   padding: 2px 6px;
 }
 .diff-btn-ghost:hover:not(:disabled) {
-  color: var(--text, #e2e0ea);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -692,12 +692,12 @@ defineExpose({ layout });
   background: transparent;
   border: none;
   font-size: 14px;
-  color: var(--text-faint, #756e8b);
+  color: var(--text-faint);
   cursor: pointer;
   border-radius: 3px;
 }
 .diff-close-btn:hover {
-  color: var(--text, #e2e0ea);
+  color: var(--text);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -728,33 +728,33 @@ defineExpose({ layout });
   padding: 16px;
   text-align: center;
   font-size: 12px;
-  color: var(--text-faint, #756e8b);
-  background: var(--bg-deep, #14121e);
+  color: var(--text-faint);
+  background: var(--bg-deep);
   z-index: 10;
 }
 
 .diff-msg.diff-err {
-  color: #fca5a5;
+  color: var(--err);
   background: rgba(20, 18, 30, 0.95);
 }
 
 .diff-err-title {
   font-size: 13px;
   font-weight: 600;
-  color: #f87171;
+  color: var(--err);
 }
 
 .diff-err-text {
   max-width: 420px;
   word-break: break-word;
-  color: var(--text-muted, #9f9baa);
+  color: var(--muted);
 }
 
 .diff-spinner {
   width: 22px;
   height: 22px;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--accent, #a855f7);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: diff-spin 0.8s linear infinite;
 }
