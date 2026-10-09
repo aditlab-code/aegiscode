@@ -141,6 +141,20 @@ class ApprovalCoordinator:
         except Exception:  # noqa: BLE001 - event tidak boleh memutus eksekusi
             return
 
+    def emit_audit_event(
+        self,
+        event_type: str,
+        payload: Dict[str, Any],
+        session_id: str = "",
+    ) -> None:
+        """Pancarkan event audit (mis. auto_approval_audit di mode agents) ke sink."""
+        if self._sink is None:
+            return
+        try:
+            self._sink(session_id, event_type, payload)
+        except Exception:  # noqa: BLE001 - event tidak boleh memutus eksekusi
+            return
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -278,6 +292,8 @@ def make_approval_gate(
     task_id: str = "",
     session_id: str = "",
     timeout: Optional[float] = None,
+    mode_getter: Optional[Callable[[], str]] = None,
+    audit_sink: Optional[Callable[[Dict[str, Any]], None]] = None,
 ):
     """Bangun callable gate terikat ke satu task/session.
 
@@ -286,15 +302,51 @@ def make_approval_gate(
     memblokir sampai keputusan user diterima. Mengembalikan True hanya bila
     user ALLOW; selain itu (Deny/timeout/error) -> False.
 
+    Jika ``mode_getter`` mengembalikan 'agents', gate melakukan auto-allow
+    secara non-blocking dan memancarkan audit log.
+
     Args:
         coordinator: ApprovalCoordinator gateway-level.
         task_id: task pemilik action (agar approval tidak tertukar antar task).
         session_id: session AETHER untuk event streaming.
         timeout: override timeout (detik); None = pakai timeout coordinator.
+        mode_getter: callable pengambil mode operasional ('ask' atau 'agents').
+        audit_sink: callback opsional untuk notifikasi audit log saat auto-allow.
     """
 
     def gate(context: Optional[Dict[str, Any]] = None) -> bool:
         ctx = dict(context or {})
+        mode = "ask"
+        if mode_getter is not None:
+            try:
+                mode = mode_getter()
+            except Exception:
+                mode = "ask"
+
+        if str(mode).strip().lower() == "agents":
+            audit_payload = {
+                "tool": str(ctx.get("tool", "") or ""),
+                "target": str(ctx.get("target", "") or ""),
+                "action_class": str(ctx.get("action_class", "") or ""),
+                "matrix_action": str(ctx.get("matrix_action", "") or ""),
+                "scope": str(ctx.get("scope", "") or ""),
+                "reason": str(ctx.get("reason", "") or ""),
+                "tool_call_id": str(ctx.get("tool_call_id", "") or ""),
+                "task_id": task_id,
+                "session_id": session_id,
+                "auto_approved": True,
+            }
+            try:
+                coordinator.emit_audit_event("auto_approval_audit", audit_payload, session_id=session_id)
+            except Exception:
+                pass
+            if audit_sink is not None:
+                try:
+                    audit_sink(audit_payload)
+                except Exception:
+                    pass
+            return True
+
         req = coordinator.request(
             tool=str(ctx.get("tool", "") or ""),
             target=str(ctx.get("target", "") or ""),

@@ -1,0 +1,49 @@
+/**
+ * AETHER Web Workbench - Master Stylesheet Aggregator
+ * Modular Hierarchy:
+ * - base/       : Variables, Tokens, Resets & Base Elements
+ * - layout/     : Workbench Grid, Activity Bar, Sidebar, Drawer, Dock, Navbar, Footer
+ * - components/ : Monaco Editor, Tasks, Explorer, Changes, Consultant, Settings, Launcher, Markdown
+ * - themes/     : Light Mode Overrides and Wallpaper/Glassmorphism Dynamics
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
+
+/* =============================================================================
+   1. Base Tokens & Reset
+   ============================================================================= */
+@import "./styles/base/variables.css";
+@import "./styles/base/reset.css";
+
+/* =============================================================================
+   2. Layout & Shell Structure
+   ============================================================================= */
+@import "./styles/layout/workbench.css";
+@import "./styles/layout/navbar.css";
+@import "./styles/layout/activitybar.css";
+@import "./styles/layout/sidebar.css";
+@import "./styles/layout/drawer.css";
+@import "./styles/layout/dock.css";
+@import "./styles/layout/footer.css";
+@import "./styles/layout/responsive.css";
+
+/* =============================================================================
+   3. Primitives & Interactive Components
+   ============================================================================= */
+@import "./styles/components/primitives.css";
+@import "./styles/components/editor.css";
+@import "./styles/components/tasks.css";
+@import "./styles/components/explorer.css";
+@import "./styles/components/changes.css";
+@import "./styles/components/consultant.css";
+@import "./styles/components/launcher.css";
+@import "./styles/components/settings.css";
+@import "./styles/components/markdown.css";
+
+/* =============================================================================
+   4. Themes (Gruvbox Dark & Light)
+   ============================================================================= */
+@import "./styles/themes/theme-light.css";
+@import "./styles/themes/theme-presets.css";
+@import "./styles/themes/wallpaper.css";
+

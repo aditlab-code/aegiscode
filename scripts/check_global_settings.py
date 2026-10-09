@@ -30,8 +30,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend" / "src"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend" / "src"
 
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:

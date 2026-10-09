@@ -114,4 +114,22 @@ def _isolate_data_and_sessions(tmp_path, monkeypatch, request):
         monkeypatch.setattr(registry_mod.ProjectRegistry, "__init__", _safe_registry_init)
     except Exception:
         pass
+
+    try:
+        from api import auth as auth_mod
+        test_ephemeral_token = "test-ephemeral-token-for-pytest"
+        auth_mod._EPHEMERAL_TOKEN = test_ephemeral_token
+        monkeypatch.setattr(auth_mod, "get_ephemeral_token", lambda: test_ephemeral_token)
+
+        from django.test import Client as DjangoClient
+        orig_client_init = DjangoClient.__init__
+
+        def _auth_client_init(self, *args, **kwargs):
+            if "HTTP_AUTHORIZATION" not in kwargs:
+                kwargs["HTTP_AUTHORIZATION"] = f"Bearer {test_ephemeral_token}"
+            orig_client_init(self, *args, **kwargs)
+
+        monkeypatch.setattr(DjangoClient, "__init__", _auth_client_init)
+    except Exception:
+        pass
     yield

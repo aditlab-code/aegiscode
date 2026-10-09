@@ -34,8 +34,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend"
 SRC_FRONTEND = FRONTEND_DIR / "src"
 
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
@@ -285,7 +285,7 @@ def check_language_detection() -> None:
         "const out = {};\n"
         "for (const k of Object.keys(expected)) out[k] = languageForFile(k);\n"
         "// path Windows + nested harus tetap terdeteksi dari basename\n"
-        "out['nested'] = languageForFile('src\\\\\\\\web/frontend/main.js');\n"
+        "out['nested'] = languageForFile('src\\\\\\\\apps/frontend/main.js');\n"
         "process.stdout.write(JSON.stringify({ expected, out }));\n"
     )
     result = subprocess.run(

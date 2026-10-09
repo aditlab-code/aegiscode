@@ -160,7 +160,7 @@ def test_classify_tool_activity(
         ("ruff check", True),
         ("flake8 .", True),
         ("mypy src/", True),
-        ("eslint web/", True),
+        ("eslint apps/", True),
         ("tsc --noEmit", True),
         ("python check_format.py", True),
         # Operational commands (should not be validation)

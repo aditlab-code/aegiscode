@@ -1,0 +1,4792 @@
+"""Service/facade tipis untuk Aegis Gateway (#50).
+
+Gateway HANYA memanggil komponen Aegis yang sudah ada. TIDAK menduplikasi
+logic Agent/Runtime/Orchestrator/Planning/Tool/Validation/Recovery/Routing/
+Fallback/Project Intelligence/Session.
+
+Yang dipakai dari Aegis:
+    - ProjectRegistry  (src/agent_ai/projects)  -> daftar project
+    - TaskPreparation  (src/agent_ai/task)      -> siapkan task (read-only)
+    - TaskExecutor     (api/execution.py)       -> bridge ke AgentRuntime (#55)
+
+Task execution (#55): setelah task disiapkan, eksekusi nyata dijalankan lewat
+Aegis Runtime di background thread daemon (non-blocking HTTP). TIDAK ada
+background queue / worker framework / database. State task disimpan di memori
+proses. Event eksekusi memakai SessionStore Aegis (event system existing).
+
+Konfigurasi provider (provider-agnostic): provider instance + model dibaca dari
+LLMConfigService (SQLite GLOBAL `data/aegis.db`, tabel yang sama dengan
+ProjectStore) via metadata task (`provider_instance_id`, `model_id`). Sumber
+tunggal pemilihan provider aktif = Provider Instance -> Model (SQLite), BUKAN
+.env. `get_config()` juga mengekspos daftar provider instance + model ke UI
+agar pilihan tidak di-hardcode di frontend.
+"""
+
+from __future__ import annotations
+
+import threading
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from agent_ai.core.cancel import CancellationToken
+from agent_ai.permission.approval import ApprovalCoordinator
+from agent_ai.permission.matrix import MATRIX_ACTIONS, MATRIX_SCOPES
+from agent_ai.projects.permissions import (
+    ACTION_OPTIONS,
+    MATRIX_MODE_VALUES_SET,
+    MODE_OPTIONS,
+)
+from agent_ai.projects.registry import (
+    ProjectNotFoundError,
+    ProjectRegistry,
+    ProjectRootNotFoundError,
+)
+from agent_ai.session.store import InMemorySessionStore, SessionStore
+from agent_ai.task.preparation import TaskPreparation
+from agent_ai.tasks.models import new_task_id
+from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
+
+from api.project_store import ProjectStore
+
+
+# Batas ukuran gambar Consultant (per gambar, estimasi decoded bytes). Bounded
+# agar payload base64 tidak membengkakkan request/response (anti OOM).
+_MAX_CONSULT_IMAGE_BYTES = 8_000_000
+
+
+class GatewayError(Exception):
+    """Base error gateway (dipetakan ke HTTP oleh views)."""
+
+    status_code = 500
+    code = "gateway_error"
+
+    def __init__(self, message: str, *, code: Optional[str] = None) -> None:
+        super().__init__(message)
+        self.message = message
+        if code:
+            self.code = code
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"error": {"code": self.code, "message": self.message}}
+
+
+class ValidationError(GatewayError):
+    """Input request tidak valid."""
+
+    status_code = 400
+    code = "validation_error"
+
+
+class NotFoundError(GatewayError):
+    """Resource tidak ditemukan."""
+
+    status_code = 404
+    code = "not_found"
+
+
+class ConflictError(GatewayError):
+    """Konflik resource (mis. nama provider instance sudah dipakai)."""
+
+    status_code = 409
+    code = "conflict"
+
+
+# Execution mode (Task 01 — hanya parameter task, belum parallel execution).
+# Nilai valid: "queue" | "parallel". Default "queue" agar task lama kompatibel.
+_VALID_EXECUTION_MODES = frozenset({"queue", "parallel"})
+_DEFAULT_EXECUTION_MODE = "queue"
+
+
+def _normalize_execution_mode(value: Optional[str]) -> str:
+    """Normalisasi execution_mode -> 'queue' | 'parallel' (default queue).
+
+    Raises:
+        ValidationError: bila nilai tidak termasuk yang valid.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return _DEFAULT_EXECUTION_MODE
+    v = str(value).strip().lower()
+    if v not in _VALID_EXECUTION_MODES:
+        raise ValidationError(
+            f"execution_mode harus salah satu dari {sorted(_VALID_EXECUTION_MODES)}."
+        )
+    return v
+
+
+@dataclass
+class TaskRecord:
+    """State task di gateway (in-memory, tanpa database).
+
+    Attributes:
+        task_id: id task.
+        task: deskripsi task.
+        project_id: project terkait (opsional).
+        status: status task (lifecycle: prepared/running/completed/failed).
+        prepared: ringkasan PreparedTask (task + plan metadata).
+        metadata: info tambahan bebas.
+        session_id: session Aegis untuk event streaming (#51).
+        result: hasil akhir runtime (bila completed).
+        error: pesan error runtime (bila failed).
+        runtime: ringkasan hasil runtime (iterations, dll).
+    """
+
+    task_id: str
+    task: str
+    project_id: Optional[str] = None
+    status: str = "prepared"
+    prepared: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    session_id: Optional[str] = None
+    result: Optional[str] = None
+    error: Optional[str] = None
+    runtime: Dict[str, Any] = field(default_factory=dict)
+    # Status antrian (TAMPILAN/kontrol UI), TERPISAH dari `status` lifecycle.
+    # Nilai: "pending" | "running" | "disabled" | "done".
+    # SENGAJA bukan bagian dari enum TaskStatus core / TERMINAL_STATUSES, agar
+    # TaskState/TaskLifecycle/.aegis/log/SSE/task history tidak terpengaruh.
+    # Pada tahap ini belum ada scheduler serial: nilai queue_state hanya
+    # merepresentasikan niat user (mis. disable = jangan dieksekusi).
+    queue_state: str = "pending"
+    # Urutan posisi di antrian (FIFO by creation; Move Up/Down mengubah nilai).
+    queue_order: int = 0
+    # Execution mode (Task 01 — hanya parameter/niat execution, belum parallel).
+    # Nilai valid: "queue" | "parallel". Default "queue" agar task lama kompatibel.
+    execution_mode: str = _DEFAULT_EXECUTION_MODE
+    # Agent Execution Policy (fast/balanced/deep) — INFORMASI/strategi kerja,
+    # TERPISAH dari `status`/`execution_mode` di atas. requested_mode = mode
+    # yang diminta user; effective_mode = mode yang benar-benar dipakai Agent
+    # (dapat naik setelah assessment). SENGAJA field gateway (bukan enum
+    # TaskStatus core) agar TaskState/TaskLifecycle/.aegis log/SSE tidak
+    # terpengaruh. None = policy tidak aktif (perilaku lama).
+    requested_mode: Optional[str] = None
+    effective_mode: Optional[str] = None
+    policy_reason: Optional[str] = None
+    policy_escalated: bool = False
+    policy_escalations: List[Dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "task": self.task,
+            "project_id": self.project_id,
+            "status": self.status,
+            "prepared": self.prepared,
+            "metadata": self.metadata,
+            "session_id": self.session_id,
+            "result": self.result,
+            "error": self.error,
+            "runtime": self.runtime,
+            "queue_state": self.queue_state,
+            "queue_order": self.queue_order,
+            "execution_mode": self.execution_mode,
+            "requested_mode": self.requested_mode,
+            "effective_mode": self.effective_mode,
+            "policy_reason": self.policy_reason,
+            "policy_escalated": self.policy_escalated,
+            "policy_escalations": [dict(item) for item in self.policy_escalations],
+        }
+
+
+def _extract_matrix_payload(body: Dict[str, Any]) -> Dict[str, Any]:
+    """Ambil payload matrix dari body POST policy (kanonik atau dibungkus).
+
+    Menerima:
+        - matrix kanonik langsung: {"read_files": {"inside": ...}, ...}
+        - dibungkus: {"matrix": {...}} atau {"rules": {...}}
+    """
+    if not isinstance(body, dict):
+        return {}
+    for key in ("matrix", "rules"):
+        inner = body.get(key)
+        if isinstance(inner, dict):
+            return inner
+    return body
+
+
+def _validate_matrix_payload(payload: Any) -> None:
+    """Validasi payload matrix; raise ValidationError bila tidak valid.
+
+    Menerima payload kosong (matrix default). Untuk setiap aksi/scope yang
+    dikirim, nilai WAJIB allow|ask|deny (tidak menurunkan diam-diam).
+    """
+    if payload is None:
+        return
+    if not isinstance(payload, dict):
+        raise ValidationError("Body policy harus berupa object JSON.")
+    allowed_scopes = set(MATRIX_SCOPES)
+    unknown_actions = set(payload) - set(MATRIX_ACTIONS)
+    if unknown_actions:
+        raise ValidationError(
+            "Aksi policy tidak dikenal: "
+            f"{', '.join(sorted(unknown_actions))}. "
+            f"Gunakan salah satu dari {', '.join(MATRIX_ACTIONS)}."
+        )
+    for action, scopes in payload.items():
+        if not isinstance(scopes, dict):
+            raise ValidationError(
+                f"Nilai '{action}' harus berupa object {{inside, outside}}."
+            )
+        unknown_scopes = set(scopes) - allowed_scopes
+        if unknown_scopes:
+            raise ValidationError(
+                f"Scope tidak dikenal pada '{action}': "
+                f"{', '.join(sorted(unknown_scopes))}. Gunakan inside | outside."
+            )
+        for scope, value in scopes.items():
+            if str(value).strip().lower() not in MATRIX_MODE_VALUES_SET:
+                raise ValidationError(
+                    f"Nilai '{action}.{scope}' harus salah satu dari "
+                    "allow | ask | deny."
+                )
+
+
+class GatewayService:
+    """Facade tipis menuju komponen Aegis yang sudah ada.
+
+    Args:
+        project_registry: ProjectRegistry opsional (default: registry Aegis).
+        task_preparation: TaskPreparation opsional (default: TaskPreparation()).
+    """
+
+    def __init__(
+        self,
+        project_registry: Optional[ProjectRegistry] = None,
+        task_preparation: Optional[TaskPreparation] = None,
+        session_store: Optional[SessionStore] = None,
+        task_executor: Optional[Any] = None,
+        auto_execute: bool = True,
+        project_store: Optional[ProjectStore] = None,
+        llm_config_service: Optional[Any] = None,
+        consultant_service: Optional[Any] = None,
+        unified_session_store: Optional[Any] = None,
+    ) -> None:
+        self.projects = project_registry or ProjectRegistry()
+        self.preparation = task_preparation or TaskPreparation()
+        # Persistence launcher + active project (SQLite, layer gateway).
+        # Bukan Project Registry kedua: registry Aegis tetap sumber kebenaran
+        # struktur project; store ini hanya metadata launcher + active state.
+        self.project_store = project_store or ProjectStore()
+        # SessionStore Aegis (event system existing). Dipakai untuk event
+        # streaming (#51). Tidak ada event model kedua.
+        self.sessions = session_store or InMemorySessionStore()
+        # Execution bridge ke Aegis Runtime (#55). Dibuat lazy agar import
+        # runtime tidak membebani jalur read-only (health/projects).
+        self._task_executor = task_executor
+        self.auto_execute = auto_execute
+        # Konfigurasi LLM tersimpan (SQLite) — provider instance + model.
+        # Lazy agar jalur read-only tetap ringan. Database GLOBAL Aegis.
+        self._llm_config_service = llm_config_service
+        # Consultant (Aegis reasoning layer, read-only terhadap CODE PROJECT).
+        # Lazy agar jalur read-only tetap ringan; verifier dapat menyuntikkan.
+        self._consultant_service = consultant_service
+        # GitHub Backup (fitur OPTIONAL per project). Lazy: hanya dibangun saat
+        # endpoint backup dipakai, sehingga jalur read-only tetap ringan.
+        self._github_backup_service = None
+        # Unified Threaded Session Architecture (SQLite store).
+        self._unified_session_store = unified_session_store
+        self._tasks: Dict[str, TaskRecord] = {}
+        # PreparedTask asli (bukan ringkasan) untuk diteruskan ke runtime.
+        self._prepared: Dict[str, Any] = {}
+        # Attachment gambar per task (image content parts provider-agnostic,
+        # SUDAH dipreprocess). Disimpan TERPISAH dari TaskRecord.to_dict() agar
+        # base64 TIDAK bocor ke API list/history/activity/log. Ini mekanisme
+        # penyimpanan attachment level-task (in-memory, seumur eksekusi task) —
+        # BUKAN storage subsystem baru. Dipakai jalur Agent Task (vision).
+        self._task_attachments: Dict[str, List[Dict[str, Any]]] = {}
+        self._lock = threading.Lock()
+        # Cooperative cancellation: satu token per task yang sedang dieksekusi.
+        # Bukan sistem cancellation kedua — primitif tunggal (agent_ai.core.cancel)
+        # yang dibagikan ke runtime/orchestrator agar loop berhenti di safe
+        # boundary. Token dihapus saat eksekusi selesai.
+        self._cancel_tokens: Dict[str, "CancellationToken"] = {}
+        # Monotonic counter untuk urutan antrian (di belakang self._lock).
+        # Task Lifecycle Managers untuk memelihara idempotensi transisi dan enqueue_guard
+        self._task_lifecycles: Dict[str, Any] = {}
+        self._queue_seq = 0
+        # Scheduler serial GLOBAL (1 execution slot). `_pumping` hanya penjaga
+        # re-entrancy agar pump tidak rekursif; keputusan "slot bebas" SELALU
+        # dibaca ulang dari self._tasks di dalam self._lock (bukan flag ini).
+        # Ini BUKAN worker framework/queue subsystem kedua: satu queue, satu
+        # scheduler, satu slot — sumber data tetap self._tasks.
+        self._pumping = False
+        # Koordinator approval untuk action yang butuh approval (ASK/mode
+        # `require_approval`). Ini BUKAN sistem permission kedua: keputusan
+        # tetap dibuat PermissionManager existing; koordinator HANYA menahan
+        # eksekusi lalu meneruskan keputusan user (Allow/Deny) ke gate. Event
+        # approval memakai event system existing (SessionStore).
+        self._approvals = ApprovalCoordinator(sink=self._on_approval_event)
+
+    @property
+    def task_executor(self) -> Any:
+        """TaskExecutor (execution bridge) lazy — dibuat saat pertama dipakai."""
+        if self._task_executor is None:
+            from api.execution import TaskExecutor
+
+            self._task_executor = TaskExecutor(
+                self.sessions, llm_config_service=self.llm_config_service
+            )
+        return self._task_executor
+
+    @property
+    def llm_config_service(self) -> Any:
+        """LLMConfigService efektif (lazy; database GLOBAL `data/aegis.db`).
+
+        Dibuat lazy agar gateway tetap ringan pada jalur read-only, dan agar
+        verifier dapat menyuntikkan service dengan DB fixture sementara.
+        """
+        if self._llm_config_service is None:
+            from agent_ai.llm_config import LLMConfigService
+
+            self._llm_config_service = LLMConfigService()
+        return self._llm_config_service
+
+    @llm_config_service.setter
+    def llm_config_service(self, value: Any) -> None:
+        self._llm_config_service = value
+
+    @property
+    def consultant_service(self) -> Any:
+        """ConsultantService Aegis (lazy).
+
+        Consultant adalah reasoning layer (bukan Agent eksekutor): memakai loop
+        & tool Aegis yang sudah ada dengan boundary read-only terhadap CODE
+        PROJECT dan read+update terhadap Project Bible. Dibuat lazy agar jalur
+        read-only gateway tetap ringan.
+        """
+        if self._consultant_service is None:
+            from agent_ai.consultant import ConsultantService
+
+            self._consultant_service = ConsultantService()
+        return self._consultant_service
+
+    # ------------------------------------------------------------------ #
+    # Consultant Session Management (pass-through to ConsultantService)
+    # ------------------------------------------------------------------ #
+    def list_consultant_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List consultant sessions, newest first, optionally filtered by project_id."""
+        return self.consultant_service.list_sessions(project_id=project_id)
+
+    def get_consultant_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Get a consultant session by ID, optionally scoped to a project."""
+        return self.consultant_service.get_session(session_id, project_id=project_id)
+
+    def create_consultant_session(
+        self, project_id: Optional[str] = None, title: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Create a new consultant session (scoped to project if given)."""
+        return self.consultant_service.create_session(project_id=project_id, title=title)
+
+    def rename_consultant_session(
+        self, session_id: str, title: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Rename a consultant session."""
+        return self.consultant_service.rename_session(session_id, title, project_id=project_id)
+
+    def delete_consultant_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> bool:
+        """Delete a consultant session."""
+        return self.consultant_service.delete_session(session_id, project_id=project_id)
+    @property
+    def unified_session_store(self) -> Any:
+        """UnifiedSessionStore (SQLite) — Unified Threaded Session Architecture."""
+        if self._unified_session_store is None:
+            from agent_ai.session.unified_store import UnifiedSessionStore
+
+            self._unified_session_store = UnifiedSessionStore()
+        return self._unified_session_store
+
+    # ------------------------------------------------------------------ #
+    # Unified Threaded Session Architecture (#Fase 2)
+    # ------------------------------------------------------------------ #
+    def list_unified_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar sesi terpadu, terbaru lebih dahulu."""
+        return self.unified_session_store.list_sessions(project_id=project_id)
+
+    def get_unified_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Ambil sesi terpadu beserta seluruh turn-nya."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if sess is None:
+            return None
+        return sess.to_dict()
+
+    def create_unified_session(
+        self, project_id: Optional[str] = None, title: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Buat sesi terpadu baru."""
+        sess = self.unified_session_store.create_session(project_id=project_id, title=title)
+        return sess.to_dict()
+
+    def rename_unified_session(
+        self, session_id: str, title: str, project_id: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Ubah judul sesi terpadu."""
+        sess = self.unified_session_store.rename_session(session_id, title, project_id=project_id)
+        return sess.to_dict() if sess else None
+
+    def delete_unified_session(
+        self, session_id: str, project_id: Optional[str] = None
+    ) -> bool:
+        """Hapus sesi terpadu beserta seluruh turn-nya."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if sess and sess.active_task_id:
+            try:
+                self.cancel_task(sess.active_task_id)
+            except Exception:
+                pass
+        return self.unified_session_store.delete_session(session_id, project_id=project_id)
+
+    def cancel_unified_session(self, session_id: str) -> Dict[str, Any]:
+        """Batalkan giliran agen aktif pada sesi terpadu."""
+        sess = self.unified_session_store.get_session(session_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError("Session not found")
+        if sess.active_task_id:
+            try:
+                self.cancel_task(sess.active_task_id)
+            except Exception:
+                pass
+        self.unified_session_store.update_session_state(session_id, "idle", active_task_id=None)
+        return {"session_id": session_id, "cancelled": True}
+
+    def create_unified_turn(
+        self,
+        session_id: str,
+        content: str,
+        *,
+        mode: str = "ask",
+        provider_instance_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
+        project_id: Optional[str] = None,
+        execution_mode: Optional[str] = None,
+        requested_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Jalankan satu giliran pada sesi terpadu (ask atau agent)."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError(f"Session '{session_id}' tidak ditemukan.")
+
+        target_mode = "agent" if str(mode).strip().lower() == "agent" else "ask"
+        from agent_ai.session.unified_models import TurnExecutionData, UnifiedTurn, new_turn_id
+
+        # Simpan giliran user
+        user_turn = UnifiedTurn(
+            turn_id=new_turn_id(),
+            role="user",
+            mode=target_mode,
+            content=content,
+            created_at=time.time(),
+            images=images,
+        )
+        self.unified_session_store.append_turn(session_id, user_turn)
+
+        if target_mode == "ask":
+            # Mode Ask: analisis read-only melalui ConsultantService
+            consult_mode = "investigate" if requested_mode in ("investigate", "deep") else "quick"
+            consult_res = self.consult(
+                message=content,
+                session_id=session_id,
+                provider_instance_id=provider_instance_id,
+                model_id=model_id,
+                project_id=project_id or sess.project_id,
+                mode=consult_mode,
+                images=images,
+                active_file=active_file,
+            )
+            asst_turn = UnifiedTurn(
+                turn_id=new_turn_id(),
+                role="assistant",
+                mode="ask",
+                content=consult_res.get("reply") or "",
+                created_at=time.time(),
+            )
+            self.unified_session_store.append_turn(session_id, asst_turn)
+            return {
+                "session_id": session_id,
+                "user_turn": user_turn.to_dict(),
+                "assistant_turn": asst_turn.to_dict(),
+                "consultant_result": consult_res,
+            }
+        else:
+            # Mode Agent: eksekusi modifikasi berkas melalui TaskPreparation & TaskExecutor
+            metadata = {
+                "session_id": session_id,
+                "provider_instance_id": provider_instance_id,
+                "model_id": model_id,
+                "requested_mode": requested_mode,
+                "skip_turn_sync": True,
+            }
+            task_rec = self.create_task(
+                task=content,
+                project_id=project_id or sess.project_id,
+                metadata=metadata,
+                execution_mode=execution_mode,
+                images=images,
+                active_file=active_file,
+            )
+            task_id = task_rec["task_id"]
+            exec_data = TurnExecutionData(
+                task_id=task_id,
+                status=task_rec.get("status", "running"),
+            )
+            asst_turn = UnifiedTurn(
+                turn_id=new_turn_id(),
+                role="assistant",
+                mode="agent",
+                content="",
+                created_at=time.time(),
+                execution=exec_data,
+            )
+            self.unified_session_store.append_turn(session_id, asst_turn)
+            self.unified_session_store.update_session_state(session_id, "running", active_task_id=task_id)
+            return {
+                "session_id": session_id,
+                "user_turn": user_turn.to_dict(),
+                "assistant_turn": asst_turn.to_dict(),
+                "task": task_rec,
+            }
+
+    def get_or_create_active_unified_session(
+        self, project_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Ambil sesi terpadu aktif terbaru, atau buat sesi baru bila belum ada."""
+        pid = project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception:
+                pid = None
+        sessions = self.list_unified_sessions(project_id=pid)
+        if sessions:
+            return sessions[0]
+        return self.create_unified_session(project_id=pid, title="Unified Session")
+
+    def _get_skill_directive(self, skill_name: str) -> Optional[str]:
+        """Menghasilkan instruksi direktif untuk steering respons LLM berdasarkan skill aktif."""
+        clean_name = (skill_name or "").strip().lower()
+        directives = {
+            "interview-me": (
+                "[ACTIVE SKILL: interview-me]\n"
+                "You are operating under the 'interview-me' skill.\n"
+                "Instructions:\n"
+                "1. Ask exactly ONE clarifying question at a time to drill down into the user's intent.\n"
+                "2. Provide your best guess/recommendation alongside the question.\n"
+                "3. Format your response cleanly:\n"
+                "   Q: <Your clarifying question>\n"
+                "   GUESS: <Your educated hypothesis or recommended approach>\n"
+                "4. Do not start implementing or generating full code yet until intent is clear.\n"
+                "Reply in Indonesian or the language used by the user."
+            ),
+            "spec-driven-development": (
+                "[ACTIVE SKILL: spec-driven-development]\n"
+                "Focus on defining structured specifications, functional requirements, and acceptance criteria before implementation."
+            ),
+            "planning-and-task-breakdown": (
+                "[ACTIVE SKILL: planning-and-task-breakdown]\n"
+                "Break down the request into an ordered, testable, and step-by-step task breakdown."
+            ),
+            "incremental-implementation": (
+                "[ACTIVE SKILL: incremental-implementation]\n"
+                "Focus on small, vertical, verifiable increments. Implement one slice at a time."
+            ),
+            "test-driven-development": (
+                "[ACTIVE SKILL: test-driven-development]\n"
+                "Follow TDD rules: Red-Green-Refactor loop. Ensure tests are defined before writing code."
+            ),
+            "code-review-and-quality": (
+                "[ACTIVE SKILL: code-review-and-quality]\n"
+                "Conduct a 5-axis code review: Correctness, Readability, Architecture, Security, Performance."
+            ),
+            "code-simplification": (
+                "[ACTIVE SKILL: code-simplification]\n"
+                "Focus on simplifying code structure, eliminating dead code, and improving readability without altering behavior."
+            ),
+            "shipping-and-launch": (
+                "[ACTIVE SKILL: shipping-and-launch]\n"
+                "Focus on pre-launch readiness, deployment safety, rollback strategies, and operational checklists."
+            ),
+        }
+        return directives.get(clean_name)
+
+    def dispatch_remote_turn(
+        self,
+        content: str,
+        *,
+        session_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        project_id: Optional[str] = None,
+        skill_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Eksekusi satu giliran dari antarmuka remote (Telegram) dengan konteks aktif."""
+        pid = project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception:
+                pid = None
+
+        sid = session_id
+        if not sid:
+            active_sess = self.get_or_create_active_unified_session(project_id=pid)
+            sid = active_sess.get("session_id") or active_sess.get("id")
+
+        eff_mode = mode or self.get_operational_mode() or "ask"
+        # Normalisasi: create_unified_turn hanya menerima "agent" (bukan "agents")
+        if str(eff_mode).strip().lower() == "agents":
+            eff_mode = "agent"
+        active_provider = self.get_active_provider()
+        active_model = self.get_active_model()
+        active_skill = skill_name or self.get_active_skill()
+
+        effective_content = str(content)
+        if active_skill and not effective_content.startswith("[ACTIVE SKILL:"):
+            directive = self._get_skill_directive(active_skill)
+            if directive:
+                effective_content = f"{directive}\n\n[User Message]:\n{effective_content}"
+
+        return self.create_unified_turn(
+            session_id=str(sid),
+            content=effective_content,
+            mode=str(eff_mode),
+            provider_instance_id=active_provider,
+            model_id=active_model,
+            project_id=pid,
+        )
+
+    def delegate_session_to_agent_task(
+        self,
+        session_id: str,
+        *,
+        project_id: Optional[str] = None,
+        custom_task_prompt: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Delegasikan hasil sesi (misal wawancara interview-me) menjadi Task resmi di IDE mode agents."""
+        sess = self.unified_session_store.get_session(session_id, project_id=project_id)
+        if not sess:
+            from api.services import NotFoundError
+
+            raise NotFoundError(f"Session '{session_id}' tidak ditemukan.")
+
+        pid = project_id or sess.project_id
+        if not pid:
+            try:
+                pid = self.project_store.get_active_project_id()
+            except Exception as exc:
+                logger.warning("Gagal membaca active project ID untuk delegasi: %s", exc)
+                pid = None
+        turns = sess.turns or []
+
+        # Ekstrak intisari instruksi dari giliran sebelumnya
+        task_prompt = custom_task_prompt
+        if not task_prompt:
+            context_pieces = []
+            for t in reversed(turns):
+                if t.content and t.content.strip():
+                    context_pieces.insert(0, f"[{t.role.upper()}]: {t.content.strip()}")
+                if len(context_pieces) >= 4:
+                    break
+
+            if context_pieces:
+                task_prompt = (
+                    "Implementasikan kesepakatan dan hasil analisis berikut ke dalam codebase:\n\n"
+                    + "\n\n".join(context_pieces)
+                )
+            else:
+                task_prompt = "Eksekusi tugas berdasarkan hasil diskusi sesi sebelumnya."
+
+        return self.create_unified_turn(
+            session_id=session_id,
+            content=task_prompt,
+            mode="agent",
+            provider_instance_id=self.get_active_provider(),
+            model_id=self.get_active_model(),
+            project_id=pid,
+        )
+
+    @property
+    def github_backup_service(self) -> Any:
+        """GithubBackupService (lazy) — fitur OPTIONAL per project.
+
+        Memakai ulang Git Awareness Foundation Aegis (read) + `.aegis/github`
+        project-local store + proteksi credential Windows (DPAPI). Dibuat lazy
+        agar jalur read-only gateway tetap ringan. Bukan subsystem kedua:
+        checkpoint/commit history tetap milik Git, bukan DB checkpoint baru.
+        """
+        if self._github_backup_service is None:
+            from api.github_backup import GithubBackupService
+
+            self._github_backup_service = GithubBackupService()
+        return self._github_backup_service
+
+    # ------------------------------------------------------------------ #
+    # Health
+    # ------------------------------------------------------------------ #
+    def health(self) -> Dict[str, Any]:
+        """Status gateway sederhana (tanpa memanggil model/API)."""
+        return {"status": "ok", "service": "aegis-gateway"}
+
+    # ------------------------------------------------------------------ #
+    # Config (dibaca dari Aegis settings; TIDAK hardcode di frontend)
+    # ------------------------------------------------------------------ #
+    def get_config(self) -> Dict[str, Any]:
+        """Konfigurasi provider/model/mode dari Aegis.
+
+        Frontend TIDAK meng-hardcode nama model/provider: semua dibaca dari
+        konfigurasi Aegis yang sudah ada (provider-agnostic).
+
+        Sumber tunggal pemilihan provider aktif = Provider Instance + Model
+        (SQLite). `providers` = daftar nama provider terdaftar (ProviderRegistry,
+        hanya katalog), `provider_instances` = instance + nested model tersimpan,
+        `provider_instance_id`/`model_id` = default terpilih.
+        """
+        from agent_ai.config.settings import settings
+        from agent_ai.providers.registry import registry
+
+        # Provider instance + model dari konfigurasi LLM tersimpan (SQLite).
+        # Sumber tunggal pemilihan provider aktif: Provider Instance -> Model.
+        # Frontend membaca dari sini (bukan hardcode) sehingga task dapat
+        # menunjuk provider_instance_id + model_id yang benar-benar tersimpan.
+        instances: List[Dict[str, Any]] = []
+        try:
+            if hasattr(self.llm_config_service, "ensure_default_providers"):
+                self.llm_config_service.ensure_default_providers()
+            instances = self.llm_config_service.get_full_config()
+        except Exception:  # noqa: BLE001 - config read tidak boleh mematikan UI
+            instances = []
+
+        # Default terpilih DARI Provider Instance DB (aturan yang sama dipakai
+        # Consultant & runtime; lihat `_select_default_llm`).
+        selection = self._select_default_llm(instances)
+
+        from agent_ai.config.settings import agent_default_mode
+        from agent_ai.runtime.policy import available_modes
+
+        return {
+            "providers": registry.list_providers(),
+            "provider_instances": instances,
+            "provider_instance_id": selection["instance_id"],
+            "model_id": selection["model_id"],
+            "mode": agent_default_mode(),
+            "modes": available_modes(),
+        }
+
+    @staticmethod
+    def _select_default_llm(instances: List[Dict[str, Any]]) -> Dict[str, str]:
+        """Pilih Provider Instance + Model default dari instance tersimpan.
+
+        Aturan deterministik (SATU tempat, dipakai /api/config & Consultant):
+            1. instance enabled yang punya model enabled (Default UI New Task)
+               -> pakai model enabled pertama,
+            2. instance enabled yang TIDAK membutuhkan model konkret
+               (mis. "custom"/"9router") -> tanpa model,
+            3. fallback: instance enabled pertama.
+
+        Returns:
+            {"instance_id": str, "model_id": str} (kosong bila tak ada instance
+            enabled). Dipakai juga untuk memastikan Consultant TANPA
+            `provider_instance_id` memakai instance DB yang sama dengan Settings
+            (TIDAK fallback diam-diam ke konfigurasi .env lama).
+        """
+        enabled = [i for i in instances if i.get("enabled") is not False]
+        # 1) instance enabled dengan model enabled.
+        for inst in enabled:
+            models = [
+                m for m in (inst.get("models") or []) if m.get("enabled") is not False
+            ]
+            if models:
+                return {
+                    "instance_id": inst.get("id") or "",
+                    "model_id": models[0].get("id") or "",
+                }
+        # 2) instance yang tidak butuh model konkret (custom/9router).
+        for inst in enabled:
+            if inst.get("requires_model") is False:
+                return {"instance_id": inst.get("id") or "", "model_id": ""}
+        # 3) fallback: instance enabled pertama.
+        if enabled:
+            return {"instance_id": enabled[0].get("id") or "", "model_id": ""}
+        return {"instance_id": "", "model_id": ""}
+
+    # ------------------------------------------------------------------ #
+    # Global Settings (`data/settings.json` — SATU sumber konfigurasi global)
+    #
+    # Gateway HANYA meneruskan baca/tulis ke loader konfigurasi Aegis yang
+    # sudah ada (`agent_ai.config.settings`). TIDAK ada skema/file konfigurasi
+    # kedua: `data/settings.json` tetap sumber tunggal, dan penulisan bersifat
+    # MERGE (key lain tidak hilang).
+    # ------------------------------------------------------------------ #
+    def get_global_settings(self) -> Dict[str, Any]:
+        """Nilai aktual konfigurasi global user-facing (dari `data/settings.json`)."""
+        from agent_ai.config.settings import global_settings
+
+        return {"settings": global_settings()}
+
+    def update_global_settings(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Simpan perubahan konfigurasi global (deep-merge, tanpa menghapus key).
+
+        Raises:
+            ValidationError: payload tidak valid (tipe/rentang/key tak dikenal).
+        """
+        from agent_ai.config.settings import SettingsWriteError, update_global_settings
+
+        try:
+            updated = update_global_settings(updates if isinstance(updates, dict) else {})
+        except SettingsWriteError as exc:
+            raise ValidationError(str(exc)) from exc
+        return {"settings": updated}
+
+    # ------------------------------------------------------------------ #
+    # LLM Config (halaman Settings; LLMConfigService Aegis existing)
+    #
+    # Gateway HANYA memanggil facade CRUD konfigurasi LLM Aegis
+    # (`agent_ai.llm_config`). TIDAK ada model konfigurasi kedua. Nilai
+    # secret (.env) TIDAK pernah dikembalikan: hanya versi masked.
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _llm_error_to_gateway(exc: Exception) -> GatewayError:
+        """Petakan error konfigurasi LLM Aegis -> error gateway (HTTP)."""
+        from agent_ai.llm_config import (
+            LLMConfigConflictError,
+            LLMConfigNotFoundError,
+            LLMConfigValidationError,
+        )
+
+        if isinstance(exc, LLMConfigNotFoundError):
+            return NotFoundError(str(exc))
+        if isinstance(exc, LLMConfigConflictError):
+            return ConflictError(str(exc))
+        if isinstance(exc, LLMConfigValidationError):
+            return ValidationError(str(exc))
+        return GatewayError(str(exc))
+
+    def get_llm_config(self) -> Dict[str, Any]:
+        """Konfigurasi LLM lengkap untuk halaman Settings (TANPA secret).
+
+        Mengembalikan:
+            credentials: daftar credential .env (masked + relasi pemakai),
+            provider_types: katalog provider type (statis), dan
+            providers: provider instance tersimpan + nested model.
+        """
+        from agent_ai.llm_config import list_provider_types
+
+        try:
+            if hasattr(self.llm_config_service, "ensure_default_providers"):
+                self.llm_config_service.ensure_default_providers()
+            credentials = self.llm_config_service.list_credentials()
+            providers = self.llm_config_service.get_full_config()
+        except Exception as exc:  # noqa: BLE001 - error baca -> error gateway
+            raise self._llm_error_to_gateway(exc) from exc
+
+        return {
+            "credentials": [c.to_dict() for c in credentials],
+            "provider_types": [t.to_dict() for t in list_provider_types()],
+            "providers": providers,
+        }
+
+    def list_llm_providers(self) -> List[Dict[str, Any]]:
+        """Daftar provider instance + nested model (TANPA secret).
+
+        Dipakai alur New Task: dropdown Provider Instance + Model diambil dari
+        konfigurasi LLM tersimpan (SQLite) via LLMConfigService Aegis existing,
+        BUKAN dari settings/.env. Nilai secret tidak pernah dikembalikan.
+        """
+        try:
+            if hasattr(self.llm_config_service, "ensure_default_providers"):
+                self.llm_config_service.ensure_default_providers()
+            return self.llm_config_service.get_full_config()
+        except Exception as exc:  # noqa: BLE001 - error baca -> error gateway
+            raise self._llm_error_to_gateway(exc) from exc
+
+    # ---- Credential (.env API key) ----
+    def create_llm_credential(self, name: str, value: str) -> Dict[str, Any]:
+        """Simpan/set API key di .env (dikembalikan hanya versi masked)."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            info = self.llm_config_service.set_api_key(name, value)
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+        return info.to_dict()
+
+    def delete_llm_credential(self, name: str, force: bool = False) -> Dict[str, Any]:
+        """Hapus API key dari .env (hanya baris variabel terkait)."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            deleted = self.llm_config_service.delete_api_key(name, force=bool(force))
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+        if not deleted:
+            raise NotFoundError(f"Credential '{name}' tidak ditemukan.")
+        return {"deleted": True, "name": name}
+
+    # ---- Provider Instance ----
+    def create_llm_provider(
+        self,
+        name: str,
+        provider_type: str,
+        api_key_env: str = "",
+        api_url: str = "",
+        enabled: bool = True,
+    ) -> Dict[str, Any]:
+        """Buat provider instance baru (relasi ke credential .env)."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            instance = self.llm_config_service.create_provider_instance(
+                name=name,
+                provider_type=provider_type,
+                api_key_env=api_key_env,
+                api_url=api_url,
+                enabled=enabled,
+            )
+            return self.llm_config_service.get_provider_config(instance.id)
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+
+    def update_llm_provider(
+        self,
+        provider_id: str,
+        name: Optional[str] = None,
+        provider_type: Optional[str] = None,
+        api_key_env: Optional[str] = None,
+        api_url: Optional[str] = None,
+        enabled: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Update provider instance (field None = tidak diubah)."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            self.llm_config_service.update_provider_instance(
+                provider_id,
+                name=name,
+                provider_type=provider_type,
+                api_key_env=api_key_env,
+                api_url=api_url,
+                enabled=enabled,
+            )
+            return self.llm_config_service.get_provider_config(provider_id)
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+
+    def delete_llm_provider(self, provider_id: str) -> Dict[str, Any]:
+        """Hapus provider instance (beserta model-nya, cascade di store)."""
+        deleted = self.llm_config_service.delete_provider_instance(provider_id)
+        if not deleted:
+            raise NotFoundError(f"Provider instance '{provider_id}' tidak ditemukan.")
+        return {"deleted": True, "id": provider_id}
+
+    # ---- Model ----
+    def create_llm_model(
+        self,
+        provider_id: str,
+        model_name: str,
+        enabled: bool = True,
+        context_window: int = 128000,
+        supports_thinking: bool = False,
+        reasoning_budget: Optional[int] = None,
+        timeout: int = 60,
+    ) -> Dict[str, Any]:
+        """Tambah model pada sebuah provider instance."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            model = self.llm_config_service.add_model(
+                provider_id,
+                model_name,
+                enabled=enabled,
+                context_window=context_window,
+                supports_thinking=supports_thinking,
+                reasoning_budget=reasoning_budget,
+                timeout=timeout,
+            )
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+        return model.to_dict()
+
+    def update_llm_model(
+        self,
+        model_id: str,
+        model_name: Optional[str] = None,
+        enabled: Optional[bool] = None,
+        context_window: Optional[int] = None,
+        supports_thinking: Optional[bool] = None,
+        reasoning_budget: Any = ...,
+        timeout: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Update model (nama/enabled/kapabilitas; None = tidak diubah)."""
+        from agent_ai.llm_config import LLMConfigError
+
+        try:
+            model = self.llm_config_service.update_model(
+                model_id,
+                model_name=model_name,
+                enabled=enabled,
+                context_window=context_window,
+                supports_thinking=supports_thinking,
+                reasoning_budget=reasoning_budget,
+                timeout=timeout,
+            )
+        except LLMConfigError as exc:
+            raise self._llm_error_to_gateway(exc) from exc
+        return model.to_dict()
+
+    def delete_llm_model(self, model_id: str) -> Dict[str, Any]:
+        """Hapus satu model."""
+        deleted = self.llm_config_service.delete_model(model_id)
+        if not deleted:
+            raise NotFoundError(f"Model '{model_id}' tidak ditemukan.")
+        return {"deleted": True, "id": model_id}
+
+    # ---- Test Connection ----
+    def test_llm_provider(self, provider_id: str, model_name: Optional[str] = None) -> Dict[str, Any]:
+        """Test koneksi ke provider instance.
+
+        Melakukan request HTTP ringan ke endpoint provider untuk memverifikasi
+        bahwa API key dan base URL valid. Untuk provider seperti 9Router yang
+        tidak membutuhkan model, test dilakukan tanpa model.
+        """
+        from agent_ai.providers.base import ProviderError
+        from agent_ai.providers.factory import build_provider_from_config
+
+        if not provider_id:
+            raise ValidationError("Parameter 'provider_id' wajib diisi.")
+
+        try:
+            # Nilai api_key diperlukan untuk benar-benar memanggil endpoint;
+            # `include_api_key` default True sehingga jalur ini identik dengan
+            # yang dipakai Consultant & Agent Runtime (SATU resolver).
+            target_model = model_name or self.get_active_model()
+            resolved = self.llm_config_service.resolve_runtime_config(
+                provider_id, model_name=target_model
+            )
+            provider = build_provider_from_config(resolved)
+        except Exception as exc:
+            raise ValidationError(str(exc)) from exc
+
+        # Test: kirim request chat sederhana.
+        try:
+            result = provider.generate(prompt="ping")
+            if result and result.text is not None:
+                return {"status": "ok", "detail": "Connection successful."}
+            return {"status": "ok", "detail": "Connection successful (empty response)."}
+        except ProviderError as exc:
+            return {"status": "error", "detail": str(exc)}
+        except Exception as exc:  # noqa: BLE001 - error koneksi
+            return {"status": "error", "detail": f"{type(exc).__name__}: {exc}"}
+
+    # ------------------------------------------------------------------ #
+    # Projects (memakai ProjectRegistry Aegis)
+    # ------------------------------------------------------------------ #
+    def list_projects(self) -> List[Dict[str, Any]]:
+        """Daftar project terdaftar (dari ProjectRegistry Aegis)."""
+        return [p.to_dict() for p in self.projects.list()]
+
+    def get_project(self, id_or_name: str) -> Dict[str, Any]:
+        """Ambil project berdasarkan id/name.
+
+        Raises:
+            NotFoundError: bila project tidak ditemukan.
+        """
+        try:
+            data = self.projects.get(id_or_name).to_dict()
+        except ProjectNotFoundError as exc:
+            raise NotFoundError(str(exc)) from exc
+        # Alias `path` = `root` agar frontend konsisten.
+        data["path"] = data.get("root")
+        return data
+
+    # ------------------------------------------------------------------ #
+    # Project Launcher + Active Project (SQLite, layer gateway)
+    # ------------------------------------------------------------------ #
+    def list_launcher_projects(self) -> List[Dict[str, Any]]:
+        """Daftar project untuk Project Launcher (dari SQLite store).
+
+        Sumber daftar launcher = record SQLite (persistence launcher state).
+        Ini konsisten dengan delete: menghapus RECORD SQLite langsung
+        menghilangkan project dari launcher, tanpa bergantung pada folder
+        registry. `path` di-alias dari kolom `path` store agar frontend
+        konsisten (launcher menampilkan `path`).
+        """
+        projects = self.project_store.list_projects()
+        for p in projects:
+            # Alias `path` (store) tetap `path`; sediakan `root` agar konsisten
+            # dengan kontrak project Aegis (registry memakai `root`).
+            p["root"] = p.get("path")
+        return projects
+
+    def create_project(self, name: str, path: str) -> Dict[str, Any]:
+        """Buat project baru: validasi path, daftarkan ke Aegis, jadikan aktif.
+
+        Mengintegrasikan ProjectRegistry Aegis (Core) untuk struktur project,
+        lalu menyimpan metadata launcher (last_opened_at) di SQLite. Project
+        baru langsung dijadikan active project.
+
+        Bila path belum ada, directory dibuat secara recursive (termasuk
+        parent yang belum ada). Project yang dibuat adalah PURE EMPTY project:
+        TIDAK ada template aplikasi/source yang dibuat di sini (hanya metadata
+        & infrastructure Aegis yang diwajibkan oleh mekanisme registration).
+        Bila path menunjuk ke FILE, operasi DITOLAK tanpa menghapus/memindahkan/
+        mengubah file tersebut.
+
+        Raises:
+            ValidationError: bila name/path kosong atau path tidak valid.
+        """
+        if not name or not isinstance(name, str) or not name.strip():
+            raise ValidationError("Field 'name' wajib diisi dan tidak boleh kosong.")
+        if not path or not isinstance(path, str) or not path.strip():
+            raise ValidationError("Field 'path' wajib diisi dan tidak boleh kosong.")
+
+        # Validasi + normalisasi path (Windows-aware via pathlib, path API
+        # yang sudah dipakai project).
+        from pathlib import Path as _Path
+
+        root = _Path(path.strip())
+        if root.exists() and not root.is_dir():
+            raise ValidationError(
+                f"Project path menunjuk ke file, bukan directory: {root}"
+            )
+        if not root.exists():
+            # Kanonikkan dulu (hilangkan drive/folder relatif yang ambigu)
+            # agar mkdir recursive berjalan pada path yang benar.
+            root = root.expanduser().resolve()
+            try:
+                root.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise ValidationError(
+                    f"Gagal membuat directory project '{root}': {exc}"
+                ) from exc
+
+        # Daftarkan ke ProjectRegistry Aegis (Core) -> struktur project.
+        try:
+            config = self.projects.register(name=name.strip(), root=str(root))
+        except ProjectRootNotFoundError as exc:
+            raise ValidationError(str(exc)) from exc
+
+        # Simpan metadata launcher di SQLite (id sama dengan registry Aegis).
+        self.project_store.add_project_with_id(config.id, config.name, config.root)
+        # Jadikan active project.
+        self.project_store.set_active_project(config.id)
+        self.project_store.touch_opened(config.id)
+        meta = self.project_store.get_project(config.id)
+        meta["root"] = meta.get("path")
+        return meta
+
+    def pick_folder(self) -> Dict[str, Any]:
+        """Buka dialog folder native OS (Finder / file manager) — Result dict.
+
+        Dipakai UI Project Launcher agar path ABSOLUT bisa dipilih lintas
+        folder tanpa ketik manual. Implementasi ada di `api.folder_dialog`
+        (modul terpisah, Result pattern — tidak pernah melempar).
+
+        Returns:
+            {"ok": True, "path": str} saat user memilih,
+            {"ok": False, "reason": "cancelled"} saat user membatalkan
+            (HTTP 200 — hasil normal, BUKAN error).
+
+        Raises:
+            ValidationError: bila dialog gagal / platform tak didukung
+            (hasil "failed" | "unsupported" | "timeout" diterjemahkan ke
+            error terstruktur lewat jalur `_handle` yang sama).
+        """
+        from api.folder_dialog import pick_folder as _pick
+
+        result = _pick()
+        if result.get("ok") or result.get("reason") == "cancelled":
+            return result
+        message = result.get("message") or "Dialog folder tidak tersedia."
+        raise ValidationError(f"Folder picker gagal ({result.get('reason')}): {message}")
+
+    def delete_project(self, project_id: str) -> Dict[str, Any]:
+        """Hapus RECORD project dari database SQLite Aegis.
+
+        HANYA menghapus record di SQLite (launcher state). TIDAK menghapus,
+        memindahkan, atau mengubah folder/filesystem project (baik folder
+        project target maupun metadata registry Aegis). Bila project yang
+        dihapus sedang aktif, active project ikut dibersihkan (dilakukan di
+        ProjectStore.delete_project).
+
+        Raises:
+            NotFoundError: bila record project tidak ditemukan di SQLite.
+        """
+        deleted = self.project_store.delete_project(project_id)
+        if not deleted:
+            raise NotFoundError(f"Project '{project_id}' tidak ditemukan.")
+        return {"deleted": True, "id": project_id}
+
+    # ------------------------------------------------------------------ #
+    # Project Policy / Permission (PROJECT-LOCAL)
+    #
+    # Gateway HANYA mengorkestrasi: policy disimpan di
+    # `<root project target>/.aegis/permissions.json` (project-local) memakai
+    # `ProjectPermissionStore` Aegis. TIDAK ada sistem permission kedua:
+    # mode/scope dipetakan ke `PermissionConfig`/`PolicyMode` existing dan
+    # di-enforce oleh PermissionManager yang sudah ada.
+    # ------------------------------------------------------------------ #
+    def _project_policy_store(self, project_id: str):
+        """Store policy project-local untuk project_id (root divalidasi)."""
+        from agent_ai.projects.permissions import ProjectPermissionStore
+
+        return ProjectPermissionStore(root=self._project_root_by_id(project_id))
+
+    def get_project_policy(self, project_id: str) -> Dict[str, Any]:
+        """GET Project Permission Matrix aktual dari `<root>/.aegis/permissions.json`.
+
+        Mengembalikan nilai policy AKTUAL project tersebut (bukan default
+        global). Bila file belum ada, default policy (matrix default) dipakai
+        tanpa merusak project.
+
+        Raises:
+            ValidationError: bila project_id kosong.
+            NotFoundError: bila project tidak ditemukan.
+        """
+        store = self._project_policy_store(project_id)
+        policy = store.load()
+        data = policy.to_ui_dict()
+        data["options"] = {
+            "actions": ACTION_OPTIONS,
+            "scopes": list(MATRIX_SCOPES),
+            "modes": MODE_OPTIONS,
+        }
+        data["path"] = str(store.path)
+        data["exists"] = store.exists()
+        data["project_id"] = str(project_id)
+        return data
+
+    def save_project_policy(
+        self, project_id: str, body: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """POST Project Permission Matrix -> simpan ke `<root>/.aegis/permissions.json`.
+
+        Body menerima matrix kanonik (langsung atau dibungkus `{"matrix": {...}}`):
+
+            {"read_files": {"inside": "allow", "outside": "allow"}, ...}
+
+        Policy hanya berlaku untuk project ini (project-local); project lain
+        tidak terpengaruh.
+
+        Raises:
+            ValidationError: bila project_id kosong atau nilai matrix tidak valid.
+            NotFoundError: bila project tidak ditemukan.
+        """
+        from agent_ai.projects.permissions import ProjectPolicy
+
+        body = body or {}
+        # Pemisahan konfigurasi: Global Settings Aegis (`data/settings.json`)
+        # TIDAK boleh masuk lewat endpoint Project Policy. Hanya field project
+        # policy (matrix) yang diterima; key global ditolak eksplisit.
+        from agent_ai.config.settings import _EDITABLE_SETTINGS_KEYS
+
+        leaked = set(body) & _EDITABLE_SETTINGS_KEYS
+        if leaked:
+            raise ValidationError(
+                "Field berikut milik Global Settings Aegis (bukan Project "
+                f"Policy): {', '.join(sorted(leaked))}. "
+                "Kelola dari Sidebar -> Settings."
+            )
+
+        matrix_payload = _extract_matrix_payload(body)
+        _validate_matrix_payload(matrix_payload)
+
+        store = self._project_policy_store(project_id)
+        policy = ProjectPolicy.from_dict(matrix_payload)
+        store.save(policy)
+        data = policy.to_ui_dict()
+        data["options"] = {
+            "actions": ACTION_OPTIONS,
+            "scopes": list(MATRIX_SCOPES),
+            "modes": MODE_OPTIONS,
+        }
+        data["path"] = str(store.path)
+        data["exists"] = True
+        data["project_id"] = str(project_id)
+        return data
+
+    def project_permission_config(self, project_id: Optional[str]):
+        """PermissionConfig project-local untuk sebuah project (bila ada).
+
+        Dipakai jalur eksekusi task agar policy project benar-benar berlaku.
+        Mengembalikan None bila tidak ada project / policy gagal dibaca
+        (backward compatible: executor memakai default).
+        """
+        candidate = project_id
+        if not candidate:
+            candidate = self.project_store.get_active_project_id()
+        if not candidate:
+            return None
+        try:
+            store = self._project_policy_store(candidate)
+        except GatewayError:
+            return None
+        try:
+            return store.load().to_permission_config()
+        except Exception:  # noqa: BLE001 - policy tidak boleh crash eksekusi
+            return None
+
+    def project_permission_matrix(self, project_id: Optional[str]):
+        """Project Permission Matrix project-local (bila ada).
+
+        Dipakai jalur eksekusi task agar matrix (aksi x inside/outside) benar-
+        benar berlaku. Mengembalikan None bila tidak ada project / matrix gagal
+        dibaca (backward compatible: executor memakai policy default).
+        """
+        candidate = project_id
+        if not candidate:
+            candidate = self.project_store.get_active_project_id()
+        if not candidate:
+            return None
+        try:
+            store = self._project_policy_store(candidate)
+        except GatewayError:
+            return None
+        try:
+            return store.load().matrix
+        except Exception:  # noqa: BLE001 - policy tidak boleh crash eksekusi
+            return None
+
+    def set_active_project(self, project_id: str) -> Dict[str, Any]:
+        """Jadikan project sebagai active project (persistent).
+
+        Validasi terhadap record SQLite (konsisten dengan daftar launcher).
+
+        Raises:
+            NotFoundError: bila project tidak ditemukan.
+        """
+        meta = self.project_store.get_project(project_id)
+        if meta is None:
+            raise NotFoundError(f"Project '{project_id}' tidak ditemukan.")
+        self.project_store.set_active_project(project_id)
+        self.project_store.touch_opened(project_id)
+        meta = self.project_store.get_project(project_id)
+        meta["root"] = meta.get("path")
+        return meta
+
+    def get_active_project(self) -> Optional[Dict[str, Any]]:
+        """Ambil active project (None bila tidak ada).
+
+        Dibaca dari record SQLite (konsisten dengan daftar launcher), bukan
+        dari registry, agar active project tetap valid walau folder registry
+        tidak ada.
+        """
+        project_id = self.project_store.get_active_project_id()
+        if not project_id:
+            return None
+        meta = self.project_store.get_project(project_id)
+        if meta is None:
+            # Record sudah tidak ada -> bersihkan active state.
+            self.project_store.clear_active_project()
+            return None
+        meta["root"] = meta.get("path")
+        return meta
+
+    def clear_active_project(self) -> Dict[str, Any]:
+        """Close Project: hapus active project state (project tetap tersimpan)."""
+        self.project_store.clear_active_project()
+        return {"active_project": None}
+
+    # ------------------------------------------------------------------ #
+    # Operational mode & Provider Runtime State (M1 & M2)
+    # ------------------------------------------------------------------ #
+    def get_operational_mode(self) -> str:
+        """Ambil operational mode saat ini ('ask' atau 'agents')."""
+        return self.project_store.get_operational_mode()
+
+    def set_operational_mode(self, mode: str) -> str:
+        """Set operational mode ('ask' atau 'agents')."""
+        updated = self.project_store.set_operational_mode(mode)
+        try:
+            from agent_ai.session.events import EventType
+            event_type = getattr(EventType, "MODE_UPDATED", "mode_updated")
+            self._emit("global", event_type, payload={"mode": updated})
+        except Exception:
+            pass
+        return updated
+
+    def get_active_provider(self) -> Optional[str]:
+        """Ambil ID provider aktif dari store."""
+        return self.project_store.get_active_provider()
+
+    def set_active_provider(self, provider_id: str) -> None:
+        """Set provider aktif di store."""
+        self.project_store.set_active_provider(provider_id)
+
+    def get_active_repository_info(self) -> Dict[str, Any]:
+        """Ambil metadata dan status Git dari repositori aktif di Aegis IDE."""
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        active = self.get_active_project()
+        if not active or not active.get("path"):
+            return {
+                "has_active_project": False,
+                "name": "-",
+                "root": "-",
+                "branch": "-",
+                "last_commit": "-",
+                "uncommitted_changes": 0,
+                "is_dirty": False,
+                "is_repo": False,
+            }
+
+        root = Path(active["path"])
+        name = active.get("name") or root.name
+
+        facade = GitRepositoryFacade(root=root)
+        is_repo = facade.is_repository()
+        branch = "-"
+        last_commit = "-"
+        uncommitted_changes = 0
+        is_dirty = False
+
+        if is_repo:
+            branch = facade.current_branch() or "HEAD"
+            try:
+                commits = facade.log(limit=1)
+                if commits and len(commits) > 0:
+                    last_commit = f"{commits[0].short_hash} {commits[0].subject}"
+            except Exception:
+                pass
+
+            try:
+                status = facade.status()
+                if status:
+                    uncommitted_changes = len(status.files)
+                    is_dirty = not status.clean
+            except Exception:
+                pass
+
+        return {
+            "has_active_project": True,
+            "project_id": active.get("id"),
+            "name": name,
+            "root": str(root),
+            "branch": branch,
+            "last_commit": last_commit,
+            "uncommitted_changes": uncommitted_changes,
+            "is_dirty": is_dirty,
+            "is_repo": is_repo,
+        }
+
+    def get_subagents_fleet(self) -> List[Dict[str, Any]]:
+        """Daftar subagen Olympus (6 personas) dan status lifecycle terkininya."""
+        from agent_ai.runtime.olympus_workflow import load_lifecycle_state
+
+        active = self.get_active_project()
+        root = Path(active["path"]) if active and active.get("path") else Path(__file__).resolve().parents[3]
+
+        try:
+            lifecycle = load_lifecycle_state(root)
+            active_persona = lifecycle.active_persona
+        except Exception:
+            active_persona = "zeus-orchestrator"
+
+        olympus_personas = [
+            {
+                "persona_id": "zeus-orchestrator",
+                "name": "Zeus Orchestrator",
+                "role": "Orchestrator & Ship Master",
+            },
+            {
+                "persona_id": "athena-planner",
+                "name": "Athena Planner",
+                "role": "Architect & Spec Planner",
+            },
+            {
+                "persona_id": "hephaestus-coder",
+                "name": "Hephaestus Coder",
+                "role": "Core Implementer & Builder",
+            },
+            {
+                "persona_id": "heracles-tester",
+                "name": "Heracles Tester",
+                "role": "Verification & QA Tester",
+            },
+            {
+                "persona_id": "hermes-scout",
+                "name": "Hermes Scout",
+                "role": "Explorer & Fast Scout",
+            },
+            {
+                "persona_id": "themis-reviewer",
+                "name": "Themis Reviewer",
+                "role": "Quality & Security Reviewer",
+            },
+        ]
+
+        fleet = []
+        for agent in olympus_personas:
+            p_id = agent["persona_id"]
+            is_active = (p_id == active_persona)
+            status = "Active" if is_active else "Standby"
+            fleet.append({
+                "persona_id": p_id,
+                "name": agent["name"],
+                "role": agent["role"],
+                "status": status,
+                "is_active": is_active,
+            })
+        return fleet
+
+    def get_providers_status(self) -> List[Dict[str, Any]]:
+        """Daftar provider LLM terkonfigurasi dengan status aktif."""
+        providers = []
+        try:
+            raw_providers = self.list_llm_providers()
+        except Exception:
+            raw_providers = []
+
+        active_id = self.get_active_provider()
+        if not active_id and raw_providers:
+            # Standar Antigravity: prioritaskan provider Antigravity
+            antigravity_p = next(
+                (p for p in raw_providers if p.get("provider_type") == "antigravity" or "antigravity" in str(p.get("name", "")).lower()),
+                None
+            )
+            if antigravity_p:
+                active_id = str(antigravity_p.get("instance_id") or antigravity_p.get("id") or "")
+            else:
+                first_p = raw_providers[0]
+                active_id = str(first_p.get("instance_id") or first_p.get("id") or "")
+
+        if not raw_providers:
+            # Fallback katalog default sistem Antigravity
+            return [
+                {
+                    "id": "c34bd3e5098e4cf08a716d0a8a44c714",
+                    "name": "Google Antigravity",
+                    "provider_type": "antigravity",
+                    "model": "gemini-3.1-pro-high",
+                    "is_active": True,
+                },
+                {
+                    "id": "openai-default",
+                    "name": "OpenAI",
+                    "provider_type": "openai",
+                    "model": "gpt-4o",
+                    "is_active": False,
+                },
+                {
+                    "id": "anthropic-default",
+                    "name": "Anthropic",
+                    "provider_type": "anthropic",
+                    "model": "claude-3-5-sonnet",
+                    "is_active": False,
+                },
+                {
+                    "id": "ollama-default",
+                    "name": "Ollama Local",
+                    "provider_type": "ollama",
+                    "model": "llama3.2",
+                    "is_active": False,
+                },
+            ]
+
+        active_model = self.get_active_model()
+        for p in raw_providers:
+            pid = str(p.get("instance_id") or p.get("id") or "")
+            pname = str(p.get("instance_name") or p.get("name") or pid)
+            is_active = bool(active_id and pid == active_id)
+            models = p.get("models", [])
+            primary_model = (active_model if (is_active and active_model) else None) or p.get("model") or (models[0].get("model_name") if models else "default")
+            providers.append({
+                "id": pid,
+                "name": pname,
+                "provider_type": p.get("provider_type", ""),
+                "model": primary_model,
+                "is_active": is_active,
+            })
+        return providers
+
+    def test_active_provider(self) -> Dict[str, Any]:
+        """Test konektivitas ke provider LLM aktif dan ukur latensi (ms)."""
+        active_id = self.get_active_provider()
+        providers = self.get_providers_status()
+        if not providers:
+            return {
+                "status": "error",
+                "message": "Tidak ada LLM provider yang terkonfigurasi.",
+                "latency_ms": 0.0,
+            }
+
+        target = None
+        if active_id:
+            target = next((p for p in providers if p["id"] == active_id), None)
+        if not target and providers:
+            # Prioritaskan Google Antigravity
+            target = next((p for p in providers if p.get("provider_type") == "antigravity" or "antigravity" in p.get("name", "").lower()), providers[0])
+            active_id = target["id"]
+
+        provider_name = target["name"] if target else "Unknown"
+        active_model = self.get_active_model()
+        model_name = (active_model if target and target.get("is_active") else None) or target.get("model") or active_model or "default"
+
+        t0 = time.perf_counter()
+        try:
+            test_res = self.test_llm_provider(active_id, model_name=model_name)
+            t1 = time.perf_counter()
+            latency_ms = round((t1 - t0) * 1000, 1)
+
+            if test_res.get("status") == "ok":
+                return {
+                    "status": "ok",
+                    "provider": provider_name,
+                    "model": model_name,
+                    "latency_ms": latency_ms,
+                    "detail": test_res.get("detail", "OK"),
+                }
+            else:
+                return {
+                    "status": "error",
+                    "provider": provider_name,
+                    "model": model_name,
+                    "latency_ms": latency_ms,
+                    "detail": test_res.get("detail", "Connection test failed"),
+                }
+        except Exception as exc:
+            t1 = time.perf_counter()
+            latency_ms = round((t1 - t0) * 1000, 1)
+            return {
+                "status": "error",
+                "provider": provider_name,
+                "model": model_name,
+                "latency_ms": latency_ms,
+                "detail": str(exc),
+            }
+
+    def get_active_model(self) -> Optional[str]:
+        """Ambil nama/id model aktif."""
+        return self.project_store.get_active_model()
+
+    def set_active_model(self, model_name: str) -> None:
+        """Simpan model aktif."""
+        self.project_store.set_active_model(model_name)
+
+    def get_models_for_provider(self, provider_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar model yang terkonfigurasi untuk provider tertentu."""
+        pid = provider_id or self.get_active_provider()
+        try:
+            raw_providers = self.list_llm_providers()
+        except Exception:
+            raw_providers = []
+
+        target_provider = None
+        if pid:
+            target_provider = next(
+                (p for p in raw_providers if str(p.get("instance_id") or p.get("id")) == str(pid)
+                 or str(p.get("provider_type", "")).lower() == str(pid).lower()
+                 or str(p.get("name", "")).lower() == str(pid).lower()),
+                None
+            )
+        if not target_provider and raw_providers:
+            target_provider = next((p for p in raw_providers if p.get("provider_type") == "antigravity"), raw_providers[0])
+
+        active_model = self.get_active_model()
+        models = []
+        if target_provider:
+            raw_models = target_provider.get("models", [])
+            for idx, rm in enumerate(raw_models):
+                mname = rm.get("model_name", "")
+                is_active = (active_model == mname) if active_model else (idx == 0)
+                models.append({
+                    "id": rm.get("id", mname),
+                    "name": mname,
+                    "is_active": is_active,
+                })
+
+        if not models:
+            defaults = ["claude-sonnet-4-6", "claude-opus-4-6", "gemini-3.8-flash-medium", "gemini-3.1-pro-high"]
+            for idx, dm in enumerate(defaults):
+                models.append({
+                    "id": dm,
+                    "name": dm,
+                    "is_active": (active_model == dm) if active_model else (idx == 0),
+                })
+        return models
+
+    def get_active_skill(self) -> Optional[str]:
+        """Ambil skill aktif."""
+        return self.project_store.get_active_skill()
+
+    def set_active_skill(self, skill_name: str) -> None:
+        """Simpan skill aktif."""
+        self.project_store.set_active_skill(skill_name)
+
+    def get_available_skills(self) -> List[Dict[str, Any]]:
+        """Daftar resmi skills AegisCode."""
+        active_skill = self.get_active_skill()
+        skills = [
+            {"id": "spec-driven-development", "name": "Spec-Driven Dev", "description": "Tulis spesifikasi sebelum coding"},
+            {"id": "planning-and-task-breakdown", "name": "Plan & Breakdown", "description": "Pecah tugas ke unit terukur"},
+            {"id": "incremental-implementation", "name": "Incremental Build", "description": "Eksekusi slice per slice"},
+            {"id": "test-driven-development", "name": "Test-Driven Dev", "description": "Kembangkan logika dengan TDD"},
+            {"id": "code-review-and-quality", "name": "Code Review", "description": "Evaluasi kualitas multi-dimensi"},
+            {"id": "code-simplification", "name": "Code Simplifier", "description": "Sederhanakan kode tanpa ubah perilaku"},
+            {"id": "interview-me", "name": "Interview Me", "description": "Ekstraksi kebutuhan mendalam"},
+            {"id": "shipping-and-launch", "name": "Ship & Launch", "description": "Persiapan rilis dan verifikasi akhir"},
+        ]
+        for s in skills:
+            s["is_active"] = bool(active_skill and active_skill == s["id"])
+        return skills
+
+
+    def open_active_project_in_explorer(self) -> Dict[str, Any]:
+        """Buka Windows Explorer pada path ACTIVE PROJECT (bukan arbitrary path).
+
+        Path TIDAK diterima dari frontend: selalu diambil dari active project
+        yang tersimpan di backend. Ini mencegah frontend membuka path sembarang.
+
+        Raises:
+            NotFoundError: bila tidak ada active project.
+            ValidationError: bila path project tidak valid / bukan directory.
+        """
+        active = self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+
+        from pathlib import Path as _Path
+
+        target = _Path(root)
+        if not target.exists() or not target.is_dir():
+            raise ValidationError(f"Path project tidak ditemukan: {root}")
+
+        import os
+        import subprocess
+        import sys
+
+        try:
+            if sys.platform.startswith("win"):
+                # Buka Explorer pada folder (bukan shell command dari user).
+                os.startfile(str(target))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(target)])
+            else:
+                subprocess.Popen(["xdg-open", str(target)])
+        except Exception as exc:  # noqa: BLE001 - gagal buka explorer -> error jelas
+            raise ValidationError(f"Gagal membuka Explorer: {exc}") from exc
+
+        return {"opened": True, "path": str(target)}
+
+    def reveal_file_in_explorer(self, file_path: str) -> Dict[str, Any]:
+        """Buka Windows Explorer dan highlight file tertentu.
+
+        Path harus berada di dalam active project root.
+        Backend memvalidasi path sebelum membuka Explorer.
+
+        Raises:
+            NotFoundError: bila tidak ada active project.
+            ValidationError: bila path di luar project root atau tidak ditemukan.
+        """
+        active = self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+
+        from pathlib import Path as _Path
+
+        root_resolved = _Path(root).resolve()
+        target = _Path(file_path)
+        if not target.is_absolute():
+            target = root_resolved / target
+        target = target.resolve()
+
+        # Validasi: path harus berada di dalam project root.
+        if target != root_resolved and root_resolved not in target.parents:
+            raise ValidationError(f"Path '{file_path}' berada di luar project root.")
+
+        if not target.exists():
+            raise ValidationError(f"File tidak ditemukan: {file_path}")
+
+        import os
+        import subprocess
+        import sys
+
+        try:
+            if sys.platform.startswith("win"):
+                # Buka Explorer dan highlight file menggunakan /select,
+                # yang didukung oleh Windows Explorer.
+                subprocess.Popen(
+                    ["explorer", "/select,", str(target)],  # type: ignore[attr-defined]
+                )
+            else:
+                # Non-Windows: buka folder induk.
+                parent = target.parent
+                if sys.platform == "darwin":
+                    subprocess.Popen(["open", str(parent)])
+                else:
+                    subprocess.Popen(["xdg-open", str(parent)])
+        except Exception as exc:  # noqa: BLE001
+            raise ValidationError(f"Gagal membuka Explorer: {exc}") from exc
+
+        return {"opened": True, "path": str(target)}
+
+    def delete_project_entry(self, rel_path: str, entry_type: str = "file") -> Dict[str, Any]:
+        """Hapus file atau folder dari project active.
+
+        Path harus berada di dalam active project root.
+        Untuk folder, isi folder juga dihapus secara rekursif.
+
+        Raises:
+            NotFoundError: bila tidak ada active project.
+            ValidationError: bila path di luar project root atau tidak ditemukan.
+        """
+        active = self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+
+        from pathlib import Path as _Path
+
+        root_resolved = _Path(root).resolve()
+        target = root_resolved / rel_path
+        target = target.resolve()
+
+        # Validasi: path harus berada di dalam project root.
+        if target != root_resolved and root_resolved not in target.parents:
+            raise ValidationError(f"Path '{rel_path}' berada di luar project root.")
+
+        if not target.exists():
+            raise ValidationError(f"Path tidak ditemukan: {rel_path}")
+
+        import shutil
+
+        try:
+            if target.is_dir():
+                shutil.rmtree(target)
+            else:
+                target.unlink()
+        except Exception as exc:  # noqa: BLE001
+            raise ValidationError(f"Gagal menghapus '{rel_path}': {exc}") from exc
+
+        return {"deleted": True, "path": str(target)}
+
+    def rename_project_file(
+        self, old_path: str, new_path: str, project_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Ubah nama file atau folder di dalam active project root.
+
+        Memvalidasi path traversal (larangan path di luar project root).
+        """
+        active = self.get_project(project_id) if project_id else self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+
+        from pathlib import Path as _Path
+        import shutil
+
+        root_resolved = _Path(root).resolve()
+        src = (root_resolved / old_path).resolve()
+        dst = (root_resolved / new_path).resolve()
+
+        if src != root_resolved and root_resolved not in src.parents:
+            raise ValidationError(f"Path sumber '{old_path}' berada di luar project root.")
+        if dst != root_resolved and root_resolved not in dst.parents:
+            raise ValidationError(f"Path tujuan '{new_path}' berada di luar project root.")
+        if not src.exists():
+            raise ValidationError(f"Path tidak ditemukan: {old_path}")
+        if dst.exists():
+            raise ValidationError(f"Path tujuan sudah ada: {new_path}")
+
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+        except Exception as exc:  # noqa: BLE001
+            raise ValidationError(f"Gagal mengubah nama '{old_path}' menjadi '{new_path}': {exc}") from exc
+
+        return {"renamed": True, "old_path": str(src), "new_path": str(dst)}
+
+    def list_project_files(self, path: str = ".", recursive: bool = False) -> Dict[str, Any]:
+        """Daftar file project aktif (read-only) via ListFilesTool Aegis.
+
+        Memakai tool filesystem Aegis yang sudah ada (bukan abstraksi baru).
+        Root dibatasi ke path project aktif.
+
+        Raises:
+            NotFoundError: bila tidak ada active project.
+            ValidationError: bila path di luar project root.
+        """
+        active = self.get_active_project()
+        if active is None:
+            return {
+                "path": path or ".",
+                "count": 0,
+                "total": 0,
+                "truncated": False,
+                "entries": [],
+            }
+
+        from pathlib import Path as _Path
+
+        from agent_ai.tools.base import ToolError
+        from agent_ai.tools.filesystem import ListFilesTool
+
+        root = active.get("root") or active.get("path")
+        tool = ListFilesTool(root=_Path(root))
+        try:
+            return tool.execute(path=path or ".", recursive=recursive)
+        except ToolError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    def _active_project_root(self):
+        """Root active project untuk operasi file workspace (Code Editor).
+
+        Satu sumber path (active project). Boundary workspace TIDAK dibuat
+        ulang: ReadFileTool/WriteFileTool Aegis yang memvalidasi path tetap di
+        dalam root ini (tidak ada mekanisme security kedua).
+
+        Raises:
+            NotFoundError: bila tidak ada active project.
+            ValidationError: bila active project tidak punya path.
+        """
+        from pathlib import Path as _Path
+
+        active = self.get_active_project()
+        if active is None:
+            raise NotFoundError("Tidak ada active project.")
+        root = active.get("root") or active.get("path")
+        if not root:
+            raise ValidationError("Active project tidak memiliki path.")
+        target = _Path(root)
+        if not target.exists() or not target.is_dir():
+            raise ValidationError(f"Path project tidak ditemukan: {root}")
+        return target
+
+    def read_project_file(self, path: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Baca isi file project via ReadFileTool Aegis.
+
+        Bila project_id disertakan, root project target ditentukan spesifik.
+        Bila None, jatuh kembali ke active project global.
+
+        Raises:
+            NotFoundError: bila tidak ada active/target project.
+            ValidationError: bila path kosong / di luar root / tidak ditemukan.
+        """
+        from agent_ai.tools.base import ToolError
+        from agent_ai.tools.filesystem import ReadFileTool
+
+        if not path:
+            raise ValidationError("Field 'path' wajib diisi.")
+
+        root = self._project_root_by_id(project_id) if project_id else self._active_project_root()
+        tool = ReadFileTool(root=root)
+        try:
+            return tool.execute(path=path)
+        except ToolError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    def write_project_file(self, path: str, content: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Simpan isi file project via WriteFileTool Aegis.
+
+        Bila project_id disertakan, root project target ditentukan spesifik.
+        Bila None, jatuh kembali ke active project global.
+
+        Raises:
+            NotFoundError: bila tidak ada active/target project.
+            ValidationError: bila path kosong / di luar root / gagal ditulis.
+        """
+        from agent_ai.tools.base import ToolError
+        from agent_ai.tools.workspace import WriteFileTool
+
+        if not path:
+            raise ValidationError("Field 'path' wajib diisi.")
+        if content is None:
+            raise ValidationError("Field 'content' wajib diisi.")
+
+        root = self._project_root_by_id(project_id) if project_id else self._active_project_root()
+        tool = WriteFileTool(root=root)
+        try:
+            return tool.execute(path=path, content=content)
+        except ToolError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    # ------------------------------------------------------------------ #
+    # GitHub Backup (OPTIONAL per project; checkpoint/recovery via Git)
+    #
+    # Gateway HANYA mengorkestrasi: konfigurasi per project disimpan di
+    # `<root>/.aegis/github/` (credential terenkripsi Windows DPAPI), sedangkan
+    # checkpoint/history/recovery memakai Git yang sudah ada (bukan DB kedua).
+    # Token TIDAK pernah dikembalikan ke frontend / dicatat di log.
+    # ------------------------------------------------------------------ #
+    def _project_root_by_id(self, project_id: str):
+        """Root project target berdasarkan id/name (satu sumber: store launcher).
+
+        Raises:
+            ValidationError: bila project_id kosong.
+            NotFoundError: bila project tidak ditemukan.
+            ValidationError: bila path project tidak ada / bukan directory.
+        """
+        from pathlib import Path as _Path
+
+        if not project_id or not str(project_id).strip():
+            raise ValidationError("Field 'project_id' wajib diisi.")
+        project_id = str(project_id).strip()
+
+        root = None
+        meta = self.project_store.get_project(project_id)
+        if meta is not None:
+            root = meta.get("path") or meta.get("root")
+        if not root:
+            try:
+                root = self.projects.get(project_id).root
+            except ProjectNotFoundError as exc:
+                raise NotFoundError(f"Project '{project_id}' tidak ditemukan.") from exc
+        if not root:
+            raise ValidationError("Project tidak memiliki path.")
+
+        target = _Path(root)
+        if not target.exists() or not target.is_dir():
+            raise ValidationError(f"Path project tidak ditemukan: {root}")
+        return target
+
+    @staticmethod
+    def _github_error_to_gateway(exc: Exception) -> GatewayError:
+        """Petakan error GitHub Backup -> error gateway (HTTP)."""
+        from api.github_backup import GithubBackupError
+
+        message = str(exc)
+        if "belum diamankan" in message or "force" in message.lower():
+            err = ConflictError(message)
+            err.code = "conflict"
+            return err
+        if isinstance(exc, GithubBackupError):
+            return ValidationError(message)
+        return GatewayError(message)
+
+    def github_backup_status(self, project_id: str) -> Dict[str, Any]:
+        """Status konfigurasi GitHub Backup + ringkasan changes (TANPA token)."""
+        root = self._project_root_by_id(project_id)
+        try:
+            return self.github_backup_service.get_config(root)
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    def save_github_backup_config(
+        self, project_id: str, payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Simpan konfigurasi GitHub Backup project (token dienkripsi)."""
+        root = self._project_root_by_id(project_id)
+        payload = payload or {}
+        try:
+            return self.github_backup_service.save_config(
+                root,
+                repository=payload.get("repository"),
+                branch=payload.get("branch"),
+                exclude=payload.get("exclude"),
+                token=payload.get("token") or None,
+                clear_token=bool(payload.get("clear_token", False)),
+                enabled=payload.get("enabled"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    def test_github_backup_connection(
+        self, project_id: str, payload: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Uji token/repository/branch. TIDAK commit/push."""
+        root = self._project_root_by_id(project_id)
+        payload = payload or {}
+        try:
+            return self.github_backup_service.test_connection(
+                root,
+                repository=payload.get("repository"),
+                branch=payload.get("branch"),
+                token=payload.get("token") or None,
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    def list_github_checkpoints(self, project_id: str) -> Dict[str, Any]:
+        """Daftar checkpoint dari Git history project (bukan DB kedua)."""
+        root = self._project_root_by_id(project_id)
+        try:
+            return {"checkpoints": self.github_backup_service.list_checkpoints(root)}
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    def create_github_checkpoint(
+        self, project_id: str, description: str
+    ) -> Dict[str, Any]:
+        """Buat checkpoint (add -> commit -> push) memakai Git Aegis existing."""
+        root = self._project_root_by_id(project_id)
+        try:
+            return self.github_backup_service.create_checkpoint(root, description)
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    def restore_github_checkpoint(
+        self, project_id: str, commit: str, force: bool = False
+    ) -> Dict[str, Any]:
+        """Recovery: restore working tree ke sebuah checkpoint."""
+        root = self._project_root_by_id(project_id)
+        try:
+            return self.github_backup_service.restore_checkpoint(
+                root, commit, force=bool(force)
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise self._github_error_to_gateway(exc) from exc
+
+    # ------------------------------------------------------------------ #
+    # Local Git Service (#Fase 1.2)
+    # ------------------------------------------------------------------ #
+    def git_status(self, project_id: str) -> Dict[str, Any]:
+        """Status Git local (branch, clean, file changes M/U/D/A)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        gi_rules = facade.gitignore_patterns()
+        is_repo = facade.is_repository()
+        if not is_repo:
+            return {
+                "is_repository": False,
+                "branch": None,
+                "branch_info": None,
+                "clean": True,
+                "files": [],
+                "gitignore_rules": gi_rules,
+            }
+        st = facade.status()
+        b_info = facade.branch_info()
+        return {
+            "is_repository": True,
+            "branch": st.branch,
+            "branch_info": b_info.to_dict(),
+            "clean": st.clean,
+            "files": [f.to_dict() for f in st.files],
+            "gitignore_rules": gi_rules,
+        }
+
+    def git_branches(self, project_id: str) -> Dict[str, Any]:
+        """Detail branch aktif, upstream remote, dan daftar branches Git."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            return {
+                "is_repository": False,
+                "current": None,
+                "upstream": None,
+                "ahead": 0,
+                "behind": 0,
+                "detached": False,
+                "local_branches": [],
+                "remote_branches": [],
+            }
+        info = facade.branch_info()
+        res = info.to_dict()
+        res["is_repository"] = True
+        return res
+
+    def git_diff(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Diff Git local: per-file detail untuk Monaco Diff atau ringkasan."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            return {"is_repository": False, "files": [], "diff": ""}
+
+        if file_path:
+            detail = facade.diff_detail(file_path)
+            detail["is_repository"] = True
+            return detail
+
+        summaries = facade.diff()
+        unified = facade.file_diff_unified()
+        return {
+            "is_repository": True,
+            "files": [s.to_dict() for s in summaries],
+            "diff": unified,
+        }
+
+    def git_commits(
+        self, project_id: str, limit: int = 10
+    ) -> Dict[str, Any]:
+        """Riwayat commit Git local."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            return {"is_repository": False, "commits": []}
+
+        limit_val = max(1, min(int(limit), 100))
+        commits = facade.log(limit=limit_val)
+        return {
+            "is_repository": True,
+            "commits": [c.to_dict() for c in commits],
+        }
+
+    def git_discard(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Tolak / buang perubahan working tree (revert ke HEAD atau hapus file untracked)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.discard(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
+    def git_stage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Tambahkan perubahan file ke staging index (git add)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.stage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
+    def git_unstage(
+        self, project_id: str, file_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Hapus perubahan file dari staging index (git restore --staged atau git reset)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        if not facade.is_repository():
+            raise GatewayError(
+                f"Project {project_id} bukan git repository yang valid."
+            )
+
+        res = facade.unstage(file_path=file_path)
+        return {
+            "is_repository": True,
+            "ok": res.get("ok", False),
+            "file_path": res.get("file_path"),
+        }
+
+    def git_init(self, project_id: str) -> Dict[str, Any]:
+        """Inisialisasi Git repository baru pada root project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        res = facade.init()
+        is_repo = facade.is_repository()
+        return {
+            "ok": res.get("ok", False) and is_repo,
+            "is_repository": is_repo,
+            "message": res.get("message", "Git repository initialized"),
+            "error": res.get("error"),
+        }
+
+    def git_deinit(self, project_id: str) -> Dict[str, Any]:
+        """De-initialize Git repository pada root project (hapus .git)."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        res = facade.deinit()
+        is_repo = facade.is_repository()
+        return {
+            "ok": res.get("ok", False) and not is_repo,
+            "is_repository": is_repo,
+            "message": res.get("message", "Git repository de-initialized"),
+            "error": res.get("error"),
+        }
+
+    def git_checkout(
+        self,
+        project_id: str,
+        branch: str,
+        create: bool = False,
+        start_point: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Beralih ke branch lain atau buat branch baru jika create=True."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.checkout(branch, create=create, start_point=start_point)
+
+    def git_create_branch(
+        self,
+        project_id: str,
+        branch: str,
+        start_point: Optional[str] = None,
+        checkout: bool = False,
+    ) -> Dict[str, Any]:
+        """Buat branch baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.create_branch(branch, start_point=start_point, checkout=checkout)
+
+    def git_delete_branch(
+        self,
+        project_id: str,
+        branch: str,
+        force: bool = False,
+        is_remote: bool = False,
+        remote: str = "origin",
+    ) -> Dict[str, Any]:
+        """Hapus branch lokal atau remote."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.delete_branch(
+            branch, force=force, is_remote=is_remote, remote=remote
+        )
+
+    def git_merge(
+        self,
+        project_id: str,
+        branch: str,
+        message: Optional[str] = None,
+        no_ff: bool = False,
+    ) -> Dict[str, Any]:
+        """Gabungkan branch target ke branch aktif saat ini."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.merge(branch, message=message, no_ff=no_ff)
+
+    def git_stash(
+        self,
+        project_id: str,
+        message: Optional[str] = None,
+        include_untracked: bool = True,
+    ) -> Dict[str, Any]:
+        """Simpan perubahan sementara ke git stash."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash(message=message, include_untracked=include_untracked)
+
+    def git_stash_list(self, project_id: str) -> Dict[str, Any]:
+        """Daftar stashes dalam repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"stashes": facade.stash_list()}
+
+    def git_stash_pop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash dan hapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_pop(index=index)
+
+    def git_stash_apply(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Terapkan stash tanpa menghapus dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_apply(index=index)
+
+    def git_stash_drop(self, project_id: str, index: int = 0) -> Dict[str, Any]:
+        """Hapus stash dari stash list."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.stash_drop(index=index)
+
+    def git_push(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        force: bool = False,
+    ) -> Dict[str, Any]:
+        """Push commit ke remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.push(
+            remote=remote, branch=branch, set_upstream=set_upstream, force=force
+        )
+
+    def git_pull(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        branch: Optional[str] = None,
+        rebase: bool = False,
+    ) -> Dict[str, Any]:
+        """Pull perubahan terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.pull(remote=remote, branch=branch, rebase=rebase)
+
+    def git_fetch(
+        self,
+        project_id: str,
+        remote: Optional[str] = None,
+        prune: bool = True,
+    ) -> Dict[str, Any]:
+        """Fetch referensi terbaru dari remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.fetch(remote=remote, prune=prune)
+
+    def git_remotes(self, project_id: str) -> Dict[str, Any]:
+        """Daftar remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return {"remotes": facade.remotes()}
+
+    def git_add_remote(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Tambahkan remote repositori baru."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.add_remote(name=name, url=url)
+
+    def git_set_remote_url(
+        self, project_id: str, name: str, url: str
+    ) -> Dict[str, Any]:
+        """Perbarui URL remote repositori."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.set_remote_url(name=name, url=url)
+
+    def git_clone(
+        self, project_id: str, url: str, target_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Clone repositori ke dalam project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.clone(url=url, target_dir=target_dir)
+
+    def git_commit(
+        self, project_id: str, message: str, stage_all: bool = False
+    ) -> Dict[str, Any]:
+        """Buat git commit pada branch aktif project."""
+        root = self._project_root_by_id(project_id)
+        from agent_ai.git.repository import GitRepositoryFacade
+
+        facade = GitRepositoryFacade(root=root)
+        return facade.commit(message=message, stage_all=stage_all)
+
+    # ------------------------------------------------------------------ #
+    # Universal Linter Service
+    # ------------------------------------------------------------------ #
+    def lint_project(
+        self,
+        project_id: str,
+        target_file: Optional[str] = None,
+        scope: str = "file",
+    ) -> Dict[str, Any]:
+        """Jalankan linter untuk project berdasarkan project_id."""
+        from api.linter import run_project_lint
+
+        root = self._project_root_by_id(project_id)
+        return run_project_lint(str(root), target_file=target_file, scope=scope)
+
+    # ------------------------------------------------------------------ #
+    # Tasks
+    # ------------------------------------------------------------------ #
+    def _prepare_task_image_parts(
+        self, images: Optional[Any]
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Normalisasi + proses gambar task -> image content parts (ADDITIVE).
+
+        Memakai normalisasi gambar bersama (`_normalize_images`, batas IDENTIK
+        dengan Consultant) dan helper vision bersama
+        (`agent_ai.vision.parts.build_image_parts`). TIDAK menulis ulang logika
+        image. None/kosong -> None (text-only, perilaku lama tidak berubah).
+
+        Returns:
+            List image content part (provider-agnostic) atau None bila tidak ada.
+
+        Raises:
+            ValidationError: bentuk/ukuran gambar tidak valid, atau gambar tidak
+                dapat diproses modul vision (bukan PNG/JPEG/WebP / rusak).
+        """
+        normalized = self._normalize_images(images)
+        if not normalized:
+            return None
+
+        from agent_ai.vision.parts import build_image_parts
+
+        try:
+            return build_image_parts(normalized)
+        except ValidationError:
+            raise
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - map error vision ke ValidationError
+            from agent_ai.vision.models import VisionError
+
+            if isinstance(exc, VisionError):
+                raise ValidationError(f"Gambar tidak dapat diproses: {exc}") from exc
+            raise
+
+    def create_task(
+        self,
+        task: str,
+        project_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        execution_mode: Optional[str] = None,
+        images: Optional[List[Dict[str, Any]]] = None,
+        active_file: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Buat task: validasi + siapkan via TaskPreparation, lalu eksekusi.
+
+        Menyiapkan (context + plan) memakai komponen Aegis yang sudah ada,
+        menyimpan state task di memori, lalu (bila auto_execute) menjalankan
+        eksekusi nyata lewat Aegis Runtime di background thread.
+
+        Args:
+            task: deskripsi task (wajib, non-kosong).
+            project_id: project terkait (opsional; divalidasi bila diisi).
+            metadata: metadata tambahan (opsional).
+            execution_mode: 'queue' | 'parallel' (opsional, default 'queue').
+            images: daftar gambar opsional (multimodal, ADDITIVE). Setiap item:
+                {"data": "<base64>", "mime_type": "image/png", "filename":
+                opsional}. Dinormalisasi + diproses modul vision existing
+                (batas sama dengan Consultant: maks 8 gambar, JPEG/PNG/WebP)
+                lalu diteruskan sebagai image parts ke jalur Agent Task
+                (AgentOrchestrator menerima `user_parts`).
+
+        Returns:
+            TaskRecord sebagai dict.
+
+        Raises:
+            ValidationError: bila task kosong, execution_mode tidak valid, atau
+                gambar tidak valid / melebihi batas.
+            NotFoundError: bila project_id diisi tapi tidak ditemukan.
+        """
+        if not task or not isinstance(task, str) or not task.strip():
+            raise ValidationError("Field 'task' wajib diisi dan tidak boleh kosong.")
+
+        # Validasi project bila diberikan (terhadap record SQLite launcher).
+        if project_id:
+            if self.project_store.get_project(project_id) is None:
+                raise NotFoundError(f"Project '{project_id}' tidak ditemukan.")
+
+        # Validasi pilihan provider instance/model (bila diberikan) terhadap
+        # konfigurasi LLM tersimpan (SQLite). Ini menjamin relasi
+        # Provider Instance -> Model valid SEBELUM task dieksekusi.
+        self._validate_provider_selection(metadata or {})
+
+        # execution_mode — parameter task (Task 01, belum parallel execution).
+        # Diterima sebagai argumen top-level atau di dalam metadata (backward
+        # compat). Default 'queue' agar task lama kompatibel.
+        raw_mode = execution_mode
+        if raw_mode is None and metadata and isinstance(metadata, dict):
+            raw_mode = metadata.get("execution_mode")
+        execution_mode_norm = _normalize_execution_mode(raw_mode)
+
+        # Attachment gambar (vision, ADDITIVE): normalisasi + proses
+        # (preprocess) di sini agar gambar invalid ditolak LEBIH AWAL (400),
+        # sama seperti jalur Consultant. Hasil = image content parts Aegis
+        # (provider-agnostic). Disimpan per-task, BUKAN di TaskRecord.to_dict().
+        image_parts = self._prepare_task_image_parts(images)
+
+        task_root = self._resolve_workspace_root(project_id)
+        from agent_ai.contextbuilder.mention import resolve_file_mentions
+        from agent_ai.consultant.service import _build_active_file_context
+
+        enriched_task, _ = resolve_file_mentions(task.strip(), task_root)
+        active_block = _build_active_file_context(active_file, task_root)
+        if active_block:
+            enriched_task = enriched_task + "\n" + active_block
+
+        task_id = new_task_id()
+        prepared = self.preparation.prepare(enriched_task, task_id=task_id)
+
+        task_meta = dict(metadata or {})
+        # Penyelarasan ID Sesi: gunakan session_id dari metadata bila ada
+        unified_sid = task_meta.get("session_id")
+
+        # Session Aegis untuk event streaming (#51).
+        # Gunakan session_id unified bila memungkinkan agar sinkron dengan database
+        session_id_to_use = unified_sid
+        session = self.sessions.get_session(session_id_to_use) if session_id_to_use else None
+        if session is None:
+            session = self.sessions.create_session(
+                project_id=project_id,
+                metadata={"task_id": task_id, "unified_session_id": unified_sid},
+                session_id=session_id_to_use,
+            )
+        self.sessions.create_task_reference(session.session_id, task_id)
+
+        record = TaskRecord(
+            task_id=task_id,
+            task=task.strip(),
+            project_id=project_id,
+            status="prepared",
+            prepared={
+                "has_context": prepared.metadata.get("has_context", False),
+                "has_plan": prepared.metadata.get("has_plan", False),
+                "plan_kind": prepared.metadata.get("plan_kind"),
+                "step_count": prepared.metadata.get("step_count", 0),
+            },
+            metadata=task_meta,
+            session_id=session.session_id,
+            execution_mode=execution_mode_norm,
+        )
+        with self._lock:
+            self._queue_seq += 1
+            record.queue_order = self._queue_seq
+            self._tasks[task_id] = record
+            self._prepared[task_id] = prepared
+            # Attachment gambar per-task (dipakai jalur eksekusi Agent).
+            if image_parts:
+                self._task_attachments[task_id] = image_parts
+
+            # Sinkronkan task ke unified_session_store jika belum ada turn untuk task_id ini
+            if unified_sid and not task_meta.get("skip_turn_sync"):
+                try:
+                    u_sess = self.unified_session_store.get_session(unified_sid)
+                    if u_sess:
+                        has_turn = any(
+                            t.execution and t.execution.task_id == task_id
+                            for t in u_sess.turns
+                        )
+                        if not has_turn:
+                            from agent_ai.session.unified_models import (
+                                TurnExecutionData,
+                                UnifiedTurn,
+                                new_turn_id,
+                            )
+
+                            u_turn = UnifiedTurn(
+                                turn_id=new_turn_id(),
+                                role="user",
+                                mode="agent",
+                                content=task.strip(),
+                                created_at=time.time(),
+                                images=images,
+                            )
+                            self.unified_session_store.append_turn(unified_sid, u_turn)
+                            exec_data = TurnExecutionData(
+                                task_id=task_id,
+                                status=record.status,
+                            )
+                            a_turn = UnifiedTurn(
+                                turn_id=new_turn_id(),
+                                role="assistant",
+                                mode="agent",
+                                content="",
+                                created_at=time.time(),
+                                execution=exec_data,
+                            )
+                            self.unified_session_store.append_turn(unified_sid, a_turn)
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "running", active_task_id=task_id
+                            )
+                except Exception:
+                    pass
+
+        # Event TASK_CREATED (memakai event Aegis existing).
+        self._emit(
+            session.session_id,
+            "task_created",
+            task_id=task_id,
+            payload={"task": record.task, "project_id": project_id},
+        )
+        # Inisialisasi lifecycle manager untuk task ini
+        from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
+        manager = TaskLifecycleManager(task_id=task_id, session_id=session.session_id)
+        with self._lock:
+            self._task_lifecycles[task_id] = manager
+
+        # Dispatch berdasarkan execution_mode (Task 02):
+        # - queue: lewat scheduler serial GLOBAL (1 slot, FIFO) — perilaku
+        #   existing tetap dipertahankan.
+        # - parallel: langsung running tanpa menunggu slot queue (tanpa batas).
+        if self.auto_execute:
+            if execution_mode_norm == "parallel":
+                manager.enqueue_guard()
+                self._start_parallel_execution(task_id)
+            else:
+                # Enqueue guard memastikan task tidak terdaftar ganda ke queue
+                if manager.enqueue_guard():
+                    self._scheduler_pump()
+
+        return record.to_dict()
+
+    # ------------------------------------------------------------------ #
+    # Parallel execution (Task 02) — bypass scheduler queue
+    # ------------------------------------------------------------------ #
+    def _start_parallel_execution(self, task_id: str) -> None:
+        """Mulai task parallel seketika tanpa menunggu slot queue.
+
+        Tidak memengaruhi slot serial queue dan tidak dibatasi jumlahnya.
+        Token cancellation dibuat sinkron agar Stop tetap menemukan token.
+        """
+        from api.execution import run_in_background
+
+        with self._lock:
+            rec = self._tasks.get(task_id)
+            if rec is None:
+                return
+            if task_id in self._cancel_tokens:
+                return
+            # Hanya task pending yang dapat dipromosikan; running/done diabaikan.
+            if rec.queue_state != "pending":
+                return
+            if rec.status in ("completed", "failed", "cancelled"):
+                return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
+            rec.queue_state = "running"
+            rec.status = "running"
+            token = CancellationToken()
+            self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
+        run_in_background(lambda: self._execute_task(task_id, token))
+
+    # ------------------------------------------------------------------ #
+    # Serial scheduler GLOBAL (1 execution slot) — HANYA untuk queue mode
+    # ------------------------------------------------------------------ #
+    def _scheduler_pump(self) -> None:
+        """Pilih SATU task `queue` pending eligible berikutnya dan jalankan.
+
+        Hanya task dengan execution_mode == "queue" yang dijadwalkan di sini.
+        Task parallel TIDAK pernah mengisi slot serial dan TIDAK dibatasi.
+        Dipanggil (idempoten):
+            - setelah create_task (queue),
+            - setelah status terminal (completed/failed/cancelled),
+            - setelah disable/enable/cancel.
+
+        Algoritma (seluruh keputusan di dalam self._lock):
+            1. Bila pumping atau sudah ada task QUEUE RUNNING -> slot terpakai -> return.
+            2. Ambil task pending paling awal menurut queue_order (FIFO)
+               yang execution_mode == "queue". Task disabled/done/terminal
+               otomatis dilewati.
+            3. Tandai slot terpakai (queue_state="running", status="running") secara atomic agar
+               task lain tidak bisa mengambil slot yang sama.
+            4. Keluar lock, lalu mulai eksekusi (JANGAN tahan lock saat
+               TaskExecutor bekerja).
+
+        Re-entrancy dijaga oleh self._pumping di dalam lock.
+        """
+        from api.execution import run_in_background
+
+        with self._lock:
+            if self._pumping:
+                return
+            # [1] Slot serial HANYA ditempati task QUEUE. Parallel tidak
+            #     memblokir slot queue dan tidak dibatasi jumlahnya.
+            has_queue_running = any(
+                r.queue_state == "running" and r.execution_mode == "queue"
+                for r in self._tasks.values()
+            )
+            has_queue_token = any(
+                tid in self._tasks and self._tasks[tid].execution_mode == "queue"
+                for tid in self._cancel_tokens
+            )
+            if has_queue_running or has_queue_token:
+                return
+            # [2] Kandidat: pending QUEUE saja, bukan terminal, queue_order paling awal.
+            candidates = []
+            for r in self._tasks.values():
+                if r.queue_state != "pending" or r.execution_mode != "queue":
+                    continue
+                if r.status in ("completed", "failed", "cancelled"):
+                    continue
+                lc = self._task_lifecycles.get(r.task_id)
+                if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                    continue
+                candidates.append(r)
+
+            if not candidates:
+                return  # Sistem idle.
+            candidate = min(candidates, key=lambda r: (r.queue_order, r.task_id))
+            # [3] Ambil slot secara atomic (di dalam lock yang sama).
+            candidate.queue_state = "running"
+            candidate.status = "running"
+            task_id = candidate.task_id
+            # Token cancellation dibuat & didaftarkan SINKRON di sini
+            # (sebelum thread jalan) agar Stop selalu menemukan token.
+            token = CancellationToken()
+            self._cancel_tokens[task_id] = token
+            self._pumping = True
+
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and not lc.is_terminal and lc.current_state != TaskLifecycleState.RUNNING.value:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
+
+        try:
+            # [4] Mulai eksekusi di luar lock.
+            run_in_background(lambda: self._execute_task(task_id, token))
+        except Exception:  # noqa: BLE001 - kegagalan start tidak boleh deadlock
+            with self._lock:
+                self._pumping = False
+                self._cancel_tokens.pop(task_id, None)
+                rec = self._tasks.get(task_id)
+                if rec is not None and rec.queue_state == "running":
+                    rec.queue_state = "pending"
+                    rec.status = "pending"
+            raise
+        else:
+            with self._lock:
+                self._pumping = False
+
+    # ------------------------------------------------------------------ #
+    # Execution bridge (#55)
+    # ------------------------------------------------------------------ #
+    def _start_execution(self, task_id: str) -> None:
+        """Mulai eksekusi task di background thread (slot sudah direservasi).
+
+        Token cancellation DIBUAT & DIDAFTARKAN di sini (thread pemanggil,
+        sinkron) SEBELUM thread daemon dijalankan. Ini menutup race: Stop yang
+        datang tepat setelah task dibuat tetap menemukan token dan dapat
+        menandainya (tidak ada jendela "belum terdaftar").
+
+        Catatan: pemanggil normal adalah `_scheduler_pump` (yang sudah menandai
+        slot running). Method ini dipertahankan agar tetap kompatibel dengan
+        pemanggil existing/verifier yang memanggilnya secara langsung.
+        """
+        from api.execution import run_in_background
+
+        with self._lock:
+            existing = self._tasks.get(task_id)
+            if existing is None:
+                return
+            if task_id in self._cancel_tokens:
+                return
+            if existing.queue_state == "running":
+                return
+            if existing.status in ("completed", "failed", "cancelled"):
+                return
+            lc = self._task_lifecycles.get(task_id)
+            if lc is not None and (lc.is_terminal or lc.current_state == TaskLifecycleState.RUNNING.value):
+                return
+            existing.queue_state = "running"
+            existing.status = "running"
+            token = CancellationToken()
+            self._cancel_tokens[task_id] = token
+            if lc is not None:
+                try:
+                    lc.transition_to(TaskLifecycleState.RUNNING.value)
+                except Exception:
+                    pass
+
+        run_in_background(lambda: self._execute_task(task_id, token))
+
+    def _execute_task(self, task_id: str, token: CancellationToken) -> None:
+        """Jalankan task lewat Aegis Runtime (dipanggil di background thread).
+
+        Error apa pun ditangkap dan dicatat sebagai status FAILED agar thread
+        tidak crash dan task tidak menggantung di status 'running'.
+
+        Slot release: blok `finally` terluar SELALU melepas execution slot
+        (menghapus token + memastikan queue_state tidak "nyangkut" running bila
+        runtime gagal tanpa on_status terminal) lalu memanggil `_scheduler_pump`
+        agar task berikutnya (per queue_order) mulai. Ini TIDAK menjadikan
+        AgentRuntime sebagai scheduler: runtime tetap tak tahu soal queue.
+        """
+        try:
+            with self._lock:
+                rec = self._tasks.get(task_id)
+                lc = self._task_lifecycles.get(task_id)
+                is_terminal = (
+                    (rec is not None and rec.status in ("completed", "failed", "cancelled"))
+                    or (lc is not None and lc.is_terminal)
+                )
+                if token.is_cancelled() or is_terminal:
+                    return
+            self._run_task_inner(task_id, token)
+        finally:
+            # --- Release execution slot (COMPLETED/FAILED/CANCELLED/semua path).
+            term_status_to_update: Optional[str] = None
+            term_error_to_update: Optional[str] = None
+            with self._lock:
+                self._cancel_tokens.pop(task_id, None)
+                # Attachment gambar tidak lagi dibutuhkan setelah eksekusi
+                # (hindari menahan base64 di memori).
+                self._task_attachments.pop(task_id, None)
+                rec = self._tasks.get(task_id)
+                # Bila runtime crash tanpa pernah mengirim status terminal,
+                # pastikan record ditransisikan ke terminal dan queue_state menjadi done.
+                if rec is not None and rec.status not in ("completed", "failed", "cancelled"):
+                    term_status = "cancelled" if token.is_cancelled() else "failed"
+                    rec.status = term_status
+                    rec.error = rec.error or "Task terminated unexpectedly before completing."
+                    rec.queue_state = "done"
+                    term_status_to_update = term_status
+                    term_error_to_update = rec.error
+                elif rec is not None and rec.queue_state == "running":
+                    rec.queue_state = "done"
+
+            if term_status_to_update is not None:
+                try:
+                    self._update_task_status(task_id, term_status_to_update, error=term_error_to_update)
+                except Exception:
+                    pass
+
+            # Slot bebas -> scheduler memilih task berikutnya (FIFO).
+            self._scheduler_pump()
+
+    def _run_task_inner(self, task_id: str, token: CancellationToken) -> None:
+        """Isi eksekusi task (dipisah agar slot release di `_execute_task`)."""
+        with self._lock:
+            record = self._tasks.get(task_id)
+            prepared = self._prepared.get(task_id)
+            # Attachment gambar (image content parts) untuk task ini, bila ada.
+            # Dibaca di dalam lock agar konsisten dengan penyimpanan saat
+            # create_task.
+            user_parts = self._task_attachments.get(task_id)
+        if record is None or prepared is None:
+            return
+
+        def on_status(status: str, result: Optional[str], error: Optional[str]) -> None:
+            # Sekali pembatalan diminta, jangan biarkan runtime menimpa status
+            # CANCELLED dengan completed/failed (menutup race di akhir eksekusi).
+            if token.is_cancelled() and status != "cancelled":
+                status = "cancelled"
+            self._update_task_status(task_id, status, result=result, error=error)
+
+        # Workspace root = active project root (bila ada). Ini mengarahkan
+        # tool filesystem/workspace ke folder project aktif sehingga write/edit
+        # relatif terhadap project, bukan root Aegis.
+        workspace_root = self._resolve_workspace_root(record.project_id)
+
+        # Pilihan provider/model eksplisit dari UI (metadata task). Diteruskan
+        # ke runtime agar task benar-benar memakai provider/model yang dipilih,
+        # bukan selalu default provider. Bila kosong -> perilaku default.
+        meta = record.metadata or {}
+        provider_name = meta.get("provider") or None
+        model_name = meta.get("model") or None
+
+        # Pilihan provider instance/model dari konfigurasi LLM tersimpan
+        # (SQLite). Bila diisi, backend merakit provider + api_url + api_key +
+        # model dari konfigurasi ini (mengalahkan provider_name registry).
+        provider_instance_id = meta.get("provider_instance_id") or None
+        model_id = meta.get("model_id") or None
+
+        run_kwargs: Dict[str, Any] = {
+            "session_id": record.session_id,
+            "task_id": task_id,
+            "on_status": on_status,
+            "workspace_root": workspace_root,
+            "provider_name": provider_name,
+            "model_name": model_name,
+            "provider_instance_id": provider_instance_id,
+            "model_id": model_id,
+            "cancel_token": token,
+        }
+        # Hanya kirim `user_parts` bila ADA attachment gambar. Ini menjaga
+        # kompatibilitas dengan TaskExecutor/verifier lama yang signature-nya
+        # belum mengenal parameter ini (perilaku text-only tidak berubah).
+        if user_parts:
+            run_kwargs["user_parts"] = user_parts
+        # Policy project-local (`<root>/.aegis/permissions.json`) HANYA untuk
+        # project task ini. Hanya dikirim bila policy ADA, agar verifier/
+        # executor lama yang belum mengenal parameter ini tetap bekerja.
+        project_config = self.project_permission_config(record.project_id)
+        if project_config is not None:
+            run_kwargs["project_permission_config"] = project_config
+        # Project Permission Matrix project-local (aksi x inside/outside). Bila
+        # project punya `.aegis/permissions.json`, matrix-nya di-enforce pada
+        # execution path (DENY menahan, ASK menahan + butuh approval). Bila
+        # tidak ada, perilaku existing tidak berubah.
+        project_matrix = self.project_permission_matrix(record.project_id)
+        if project_matrix is not None:
+            run_kwargs["project_permission_matrix"] = project_matrix
+
+        # Gate approval (ASK): action yang butuh approval DITAHAN lalu dimintakan
+        # keputusan user. Gate terikat ke task/session ini sehingga approval TIDAK
+        # tertukar antar task. Hanya memengaruhi action ber-mode ask/require_approval.
+        # Dikirim HANYA bila executor mendukungnya (verifier/executor lama tetap
+        # bekerja tanpa parameter ini — backward compatible).
+        if self._run_accepts("approval_gate"):
+            run_kwargs["approval_gate"] = self.approval_gate_for(
+                task_id, record.session_id
+            )
+
+        # Agent Execution Policy (fast/balanced/deep): mode dari metadata task
+        # diteruskan sampai runtime (requested_mode). Metadata/strategi saja dan
+        # TIDAK mengubah keputusan loop LLM. Dikirim HANYA bila executor
+        # mendukungnya; nilai dibaca lewat helper policy existing agar
+        # normalisasi mode TIDAK diduplikasi di gateway.
+        requested_mode = self._task_requested_mode(meta)
+        if requested_mode and self._run_accepts("requested_mode"):
+            run_kwargs["requested_mode"] = requested_mode
+
+        try:
+            summary = self.task_executor.run(prepared, **run_kwargs)
+        except Exception as exc:  # noqa: BLE001 - jangan biarkan thread crash
+            if token.is_cancelled():
+                # Dibatalkan saat error: pertahankan status CANCELLED.
+                self._update_task_status(
+                    task_id,
+                    "cancelled",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            else:
+                self._update_task_status(
+                    task_id,
+                    "failed",
+                    error=f"{type(exc).__name__}: {exc}",
+                )
+            return
+
+        with self._lock:
+            rec = self._tasks.get(task_id)
+            if rec is not None:
+                rec.runtime = {
+                    "iterations": summary.get("iterations", 0),
+                }
+                # Ringkasan policy (INFO) pada record runtime, bila tersedia.
+                # Additive: ringkasan dari executor lama tanpa kunci ini -> None.
+                policy_summary = summary.get("policy") if isinstance(summary, dict) else None
+                if isinstance(policy_summary, dict):
+                    self._apply_policy_summary(rec, policy_summary)
+
+    @staticmethod
+    def _task_requested_mode(metadata: Dict[str, Any]) -> Optional[str]:
+        """Ambil mode policy (fast/balanced/deep) dari metadata task.
+
+        Menerima kunci `agent_mode`/`policy_mode`/`mode` (prioritas berurutan)
+        dan menormalisasi memakai resolver policy existing (alias mis.
+        "minimal" -> "fast"), sehingga gateway TIDAK menduplikasi aturan mode.
+        Mengembalikan None bila metadata tidak membawa mode (perilaku lama).
+        """
+        from agent_ai.runtime.policy import (
+            DEFAULT_MODE,
+            ExecutionPolicyResolver,
+            MODE_METADATA_KEYS,
+        )
+
+        if not isinstance(metadata, dict):
+            return None
+        raw = None
+        for key in MODE_METADATA_KEYS:
+            value = metadata.get(key)
+            if isinstance(value, str) and value.strip():
+                raw = value
+                break
+        if raw is None:
+            return None
+        state = ExecutionPolicyResolver().resolve(raw)
+        return state.requested_mode or DEFAULT_MODE
+
+    @staticmethod
+    def _apply_policy_summary(record: "TaskRecord", policy_summary: Dict[str, Any]) -> None:
+        """Simpan ringkasan policy efektif pada TaskRecord (metadata tampilan).
+
+        request/effective + alasan/escalation disimpan apa adanya; tidak ada
+        nilai yang diinterpretasi ulang dan tidak ada status task yang diubah.
+        """
+        requested = policy_summary.get("requested_mode")
+        effective = policy_summary.get("effective_mode")
+        record.requested_mode = str(requested) if requested else None
+        record.effective_mode = str(effective) if effective else None
+        reason = policy_summary.get("reason")
+        record.policy_reason = str(reason) if reason else None
+        record.policy_escalated = bool(policy_summary.get("escalated"))
+        escalations = policy_summary.get("escalations")
+        record.policy_escalations = [
+            dict(item) for item in escalations if isinstance(item, dict)
+        ] if isinstance(escalations, list) else []
+
+    def _validate_provider_selection(self, metadata: Dict[str, Any]) -> None:
+        """Validasi provider_instance_id / model_id dari metadata task.
+
+        Hanya memvalidasi bila field diisi (backward compatible). Mengubah
+        error konfigurasi LLM menjadi ValidationError gateway sehingga request
+        invalid ditolak dengan pesan jelas.
+
+        Raises:
+            ValidationError: instance/model tidak ada atau model bukan milik
+                provider instance yang dipilih.
+        """
+        instance_id = metadata.get("provider_instance_id")
+        model_id = metadata.get("model_id")
+        if not instance_id and not model_id:
+            return
+
+        from agent_ai.llm_config import LLMConfigError
+        from agent_ai.llm_config.providers import get_provider_type as _get_ptype
+
+        try:
+            if instance_id:
+                instance = self.llm_config_service.get_provider_instance(instance_id)
+                spec = _get_ptype(instance.provider_type)
+                # Provider yang tidak membutuhkan model (9Router) tidak perlu
+                # divalidasi model-nya.
+                if spec is not None and not spec.requires_model:
+                    return
+            if model_id:
+                # Coba lookup by ID dulu; jika gagal (model_id adalah nama), cari by name
+                model = None
+                try:
+                    model = self.llm_config_service.get_model(model_id)
+                except LLMConfigError:
+                    # model_id mungkin adalah nama model (bukan UUID) — cari by name
+                    for m in self.llm_config_service.list_models():
+                        if getattr(m, "model_name", None) == model_id or getattr(m, "name", None) == model_id:
+                            model = m
+                            break
+                    if model is None:
+                        raise LLMConfigError(f"Model '{model_id}' tidak ditemukan.")
+                if instance_id and getattr(model, "provider_id", None) != instance_id:
+                    raise ValidationError(
+                        f"Model '{model_id}' bukan milik provider instance "
+                        f"'{instance_id}'."
+                    )
+        except LLMConfigError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    def _resolve_workspace_root(self, project_id: Optional[str]) -> Optional[str]:
+        """Tentukan workspace root untuk eksekusi task.
+
+        Prioritas: project task -> active project -> None (root Aegis default).
+        Mengembalikan path root project (string) atau None bila tidak ada.
+        Path diambil dari record SQLite (konsisten dengan launcher).
+        """
+        candidate = project_id
+        if not candidate:
+            candidate = self.project_store.get_active_project_id()
+        if not candidate:
+            return None
+        meta = self.project_store.get_project(candidate)
+        if meta is None:
+            return None
+        return meta.get("path")
+
+    def _update_task_status(
+        self,
+        task_id: str,
+        status: str,
+        *,
+        result: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        """Update status/result/error sebuah TaskRecord (thread-safe)."""
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is None:
+                return
+            record.status = status
+            if result is not None:
+                record.result = result
+            if error is not None:
+                record.error = error
+            # Sinkronisasi queue_state (TAMPILAN antrian) dengan lifecycle status.
+            # Ini HANYA proyeksi UI; tidak mengubah semantics eksekusi Agent.
+            if status == "running":
+                record.queue_state = "running"
+            elif status in ("completed", "failed", "cancelled"):
+                record.queue_state = "done"
+            manager = self._task_lifecycles.get(task_id)
+            if manager is not None:
+                try:
+                    manager.transition_to(
+                        status,
+                        payload={"result": result, "error": error},
+                    )
+                except Exception:
+                    pass
+
+            # Sinkronisasi ke UnifiedSessionStore bila task terkait unified session.
+            unified_sid = (record.metadata or {}).get("session_id")
+            if unified_sid:
+                try:
+                    u_sess = self.unified_session_store.get_session(unified_sid)
+                    if u_sess:
+                        target_turn = None
+                        for t in u_sess.turns:
+                            if t.execution and t.execution.task_id == task_id:
+                                target_turn = t
+                                break
+                        if target_turn:
+                            from agent_ai.session.unified_models import TurnExecutionData
+
+                            exec_data = target_turn.execution or TurnExecutionData(task_id=task_id)
+                            exec_data.status = status
+                            if result is not None:
+                                exec_data.report = result
+                            if error is not None:
+                                exec_data.error = error
+                            self.unified_session_store.update_turn_execution(
+                                unified_sid, target_turn.turn_id, exec_data
+                            )
+                        if status in ("completed", "failed", "cancelled"):
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "idle", active_task_id=None
+                            )
+                        elif status == "running":
+                            self.unified_session_store.update_session_state(
+                                unified_sid, "running", active_task_id=task_id
+                            )
+                except Exception:
+                    pass
+    def _emit(
+        self,
+        session_id: str,
+        event_type: Any,
+        *,
+        task_id: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit event ke SessionStore Aegis (tanpa event bus baru)."""
+        try:
+            self.emit_event(session_id, event_type, task_id=task_id, payload=payload)
+            if task_id:
+                rec = self._tasks.get(task_id)
+                if rec:
+                    unified_sid = (rec.metadata or {}).get("session_id")
+                    if unified_sid and unified_sid != session_id:
+                        if not self.sessions.get_session(unified_sid):
+                            try:
+                                self.sessions.create_session(
+                                    session_id=unified_sid, project_id=rec.project_id
+                                )
+                            except Exception:
+                                pass
+                        self.emit_event(unified_sid, event_type, task_id=task_id, payload=payload)
+        except Exception:  # noqa: BLE001 - event emission tidak boleh crash
+            return
+
+    # ------------------------------------------------------------------ #
+    # Approval (ASK) — koordinasi tahan-lanjut untuk mode require_approval.
+    #
+    # Ini BUKAN sistem permission kedua: keputusan tetap dibuat
+    # PermissionManager existing. Gateway HANYA menjadi jembatan antara
+    # execution thread (yang menahan action) dan HTTP request user (Allow/Deny),
+    # memakai ApprovalCoordinator (primitif sinkron bounded) + event system
+    # existing (SessionStore).
+    # ------------------------------------------------------------------ #
+    def _on_approval_event(
+        self, session_id: str, event_type: str, payload: Dict[str, Any]
+    ) -> None:
+        """Sink approval -> SessionStore (event streaming existing).
+
+        Event ditandai dengan task_id dari payload sehingga UI dapat mengaitkan
+        approval ke task/execution yang benar (tidak tertukar antar task).
+        """
+        try:
+            task_id = (payload or {}).get("task_id") or None
+            self._emit(session_id, event_type, task_id=task_id, payload=payload)
+        except Exception:  # noqa: BLE001 - event tidak boleh crash eksekusi
+            return
+
+    def approval_gate_for(self, task_id: str, session_id: str):
+        """Bangun gate approval terikat ke satu task/session (untuk TaskExecutor).
+
+        Gate dipanggil pada execution thread saat sebuah action butuh approval:
+        pada mode 'agents', eksekusi di-auto-allow non-blocking dan memancarkan audit log;
+        pada mode 'ask', eksekusi menahan dan menunggu keputusan user.
+        """
+        from agent_ai.permission.approval import make_approval_gate
+
+        def _audit_sink(payload: Dict[str, Any]) -> None:
+            try:
+                self._emit(
+                    session_id,
+                    "agent_observation",
+                    task_id=task_id,
+                    payload={"audit_log": payload, "type": "auto_approval_audit"},
+                )
+            except Exception:
+                pass
+
+        return make_approval_gate(
+            self._approvals,
+            task_id=task_id,
+            session_id=session_id,
+            mode_getter=self.get_operational_mode,
+            audit_sink=_audit_sink,
+        )
+
+    def _run_accepts(self, param: str) -> bool:
+        """True bila ``task_executor.run`` menerima keyword ``param``.
+
+        Dipakai untuk kompatibilitas: verifier/executor lama yang belum mengenal
+        parameter baru (mis. ``approval_gate``) tetap dipanggil dengan signature
+        lamanya (tidak error).
+        """
+        import inspect
+
+        run = getattr(self.task_executor, "run", None)
+        if run is None:
+            return False
+        try:
+            params = inspect.signature(run).parameters
+        except (TypeError, ValueError):
+            return False
+        if param in params:
+            return True
+        return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
+
+    def list_approvals(self, task_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar approval yang masih PENDING (opsional difilter task_id)."""
+        return [r.to_dict() for r in self._approvals.pending(task_id)]
+
+    def resolve_approval(self, request_id: str, allow: bool) -> Dict[str, Any]:
+        """Selesaikan approval (Allow/Deny) -> lanjutkan/batalkan action tertahan.
+
+        Raises:
+            ValidationError: bila request_id kosong.
+            NotFoundError: bila approval tidak ditemukan.
+        """
+        if not request_id or not str(request_id).strip():
+            raise ValidationError("Field 'request_id' wajib diisi.")
+        record = self._approvals.resolve(str(request_id).strip(), bool(allow))
+        if record is None:
+            raise NotFoundError(f"Approval '{request_id}' tidak ditemukan.")
+        return record.to_dict()
+
+    def get_task(self, task_id: str) -> Dict[str, Any]:
+        """Ambil task berdasarkan id.
+
+        Raises:
+            NotFoundError: bila task tidak ditemukan.
+        """
+        with self._lock:
+            record = self._tasks.get(task_id)
+        if record is None:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
+        return record.to_dict()
+
+    def list_tasks(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar task yang dibuat (in-memory).
+        
+        Args:
+            project_id: Filter task berdasarkan project (opsional). Bila None,
+                mengembalikan semua task (perilaku lama untuk backward compat).
+        """
+        with self._lock:
+            if project_id is not None:
+                return [r.to_dict() for r in self._tasks.values() if r.project_id == project_id]
+            return [r.to_dict() for r in self._tasks.values()]
+
+    # ------------------------------------------------------------------ #
+    # Task Queue (TAMPILAN/kontrol UI — bukan scheduler eksekusi)
+    # ------------------------------------------------------------------ #
+    # CATATAN: pada tahap ini BELUM ada scheduler serial. queue_state adalah
+    # proyeksi UI dari TaskRecord (pending/running/disabled/done) + niat user
+    # (disable = jangan dieksekusi). TIDAK ada TaskManager/queue subsystem
+    # kedua: sumber data tetap self._tasks (satu queue GLOBAL Aegis).
+    _QUEUE_ACTIVE = ("pending", "running", "disabled")
+
+    def list_queue(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar antrian task (aktif saja: pending/running/disabled).
+
+        Filter opsional berdasarkan project_id (bila diberikan) untuk diterapkan pada
+        task yang eligible (pending/running/disabled). Task yang tidak memiliki
+        project_id (legacy) dipertahankan untuk ditampilkan bila filter tidak
+        diset.
+
+        Args:
+            project_id: Filter antrian per project (opsional).
+
+        Returns:
+            Daftar dict task yang terfilter.
+        """
+        with self._lock:
+            if project_id is not None:
+                records = [
+                    r for r in self._tasks.values()
+                    if r.queue_state in self._QUEUE_ACTIVE and r.project_id == project_id
+                ]
+            else:
+                records = [
+                    r for r in self._tasks.values() if r.queue_state in self._QUEUE_ACTIVE
+                ]
+            # Urutkan menurut queue_order / FIFO.
+            records.sort(key=lambda r: r.queue_order)
+            return [r.to_dict() for r in records]
+
+    def set_queue_state(self, task_id: str, queue_state: str) -> Dict[str, Any]:
+        """Set queue_state (disable/enable). TIDAK menyentuh eksekusi Agent.
+
+        Aturan:
+            - "disabled"/"pending" hanya boleh untuk task yang BELUM running
+              (queue_state running ditolak) — agar disable != cancel dan tidak
+              ada dua mekanisme penghentian.
+            - Task terminal (done) tidak dapat diubah.
+
+        Raises:
+            NotFoundError: bila task tidak ditemukan.
+            ValidationError: bila transisi tidak valid.
+        """
+        from api.services import ValidationError as _ValidationError
+
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is None:
+                raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
+            if record.queue_state == "done":
+                raise _ValidationError(
+                    "Task sudah selesai dan tidak dapat diubah di antrian."
+                )
+            if record.queue_state == "running":
+                raise _ValidationError(
+                    "Task sedang berjalan; gunakan Stop (cancel) untuk menghentikannya."
+                )
+            if queue_state not in ("pending", "disabled"):
+                raise _ValidationError("queue_state harus 'pending' atau 'disabled'.")
+            record.queue_state = queue_state
+            # Parallel task yang di-enable harus langsung running (bypass queue).
+            parallel_to_start = (
+                task_id
+                if record.execution_mode == "parallel" and queue_state == "pending"
+                else None
+            )
+            result = record.to_dict()
+        # Disable/Enable memengaruhi eligibility scheduler -> pump.
+        # Enable queue: bisa langsung mempromosikan task ke RUNNING bila tidak ada
+        # blocker di depannya (FIFO). Enable parallel: langsung running tanpa slot.
+        if self.auto_execute:
+            if parallel_to_start is not None:
+                self._start_parallel_execution(parallel_to_start)
+            else:
+                self._scheduler_pump()
+        return result
+
+    def move_task(self, task_id: str, direction: str) -> List[Dict[str, Any]]:
+        """Geser posisi task non-running di antrian (FIFO default).
+
+        Args:
+            task_id: id task yang digeser.
+            direction: "up" atau "down".
+
+        Raises:
+            NotFoundError: bila task tidak ditemukan.
+            ValidationError: bila task running/terminal atau arah tidak valid.
+        """
+        from api.services import ValidationError as _ValidationError
+
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is None:
+                raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
+            if record.queue_state in ("running", "done"):
+                raise _ValidationError(
+                    "Hanya task yang belum berjalan yang dapat digeser di antrian."
+                )
+            ordered = sorted(
+                [r for r in self._tasks.values() if r.queue_state in self._QUEUE_ACTIVE],
+                key=lambda r: r.queue_order,
+            )
+            idx = next((i for i, r in enumerate(ordered) if r.task_id == task_id), None)
+            if idx is None:
+                raise _ValidationError("Task tidak berada di antrian aktif.")
+            if direction == "up" and idx > 0:
+                swap = ordered[idx - 1]
+                record.queue_order, swap.queue_order = swap.queue_order, record.queue_order
+            elif direction == "down" and idx < len(ordered) - 1:
+                swap = ordered[idx + 1]
+                record.queue_order, swap.queue_order = swap.queue_order, record.queue_order
+            elif direction not in ("up", "down"):
+                raise _ValidationError("direction harus 'up' atau 'down'.")
+        return self.list_queue()
+
+    def remove_task(self, task_id: str) -> Dict[str, Any]:
+        """Hapus task dari daftar/antrian (HANYA non-running).
+
+        Ini BUKAN cancel: cancel memakai CancellationToken existing. Remove
+        hanya membuang task yang belum berjalan dari daftar in-memory.
+
+        Raises:
+            NotFoundError: bila task tidak ditemukan.
+            ValidationError: bila task sedang berjalan.
+        """
+        from api.services import ValidationError as _ValidationError
+
+        with self._lock:
+            record = self._tasks.pop(task_id, None)
+            if record is None:
+                raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
+            if record.queue_state == "running":
+                # Kembalikan: running tidak boleh dihapus.
+                self._tasks[task_id] = record
+                raise _ValidationError(
+                    "Task sedang berjalan; gunakan Stop (cancel), bukan Remove."
+                )
+            self._prepared.pop(task_id, None)
+            self._cancel_tokens.pop(task_id, None)
+        return {"task_id": task_id, "removed": True}
+
+    def clear_queue(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Kosongkan antrian task non-running (pending & disabled).
+
+        Task yang sedang running TIDAK akan dihapus. Bila project_id diberikan,
+        hanya task milik project tersebut yang dibersihkan.
+
+        Args:
+            project_id: project terkait (opsional).
+
+        Returns:
+            Dict dengan status cleared dan jumlah task yang dihapus.
+        """
+        with self._lock:
+            keys_to_remove = [
+                tid
+                for tid, r in self._tasks.items()
+                if r.queue_state in ("pending", "disabled")
+                and (project_id is None or r.project_id == project_id)
+            ]
+            for tid in keys_to_remove:
+                self._tasks.pop(tid, None)
+                self._prepared.pop(tid, None)
+                self._cancel_tokens.pop(tid, None)
+
+        return {"cleared": True, "deleted_count": len(keys_to_remove)}
+
+    # ------------------------------------------------------------------ #
+    # Task History (from .aegis/log/ persistent store)
+    # ------------------------------------------------------------------ #
+    def list_task_history(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Daftar semua task dari .aegis/log/ (persistent source of truth).
+
+        Membaca file log task dan mengembalikan ringkasan terurut
+        terbaru -> terlama berdasarkan `last_timestamp` dari isi log
+        (BUKAN nama file / UUID / urutan filesystem).
+
+        Isolasi: bila `project_id` diberikan, HANYA log di root project itu yang
+        dibaca (task project lain tidak pernah bocor). Bila `project_id` tidak
+        diberikan, pencarian mencakup seluruh candidate root (project_id/active
+        project, Aegis workspace, project terdaftar) lalu di-dedupe per task_id.
+
+        Args:
+            project_id: project terkait (opsional).
+
+        Returns:
+            Daftar task info terurut terbaru ke terlama.
+        """
+        from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
+
+        # Isolasi per project: bila project_id diberikan, HANYA baca root project
+        # ini. JANGAN menambahkan repo root Aegis / project terdaftar lain
+        # (perilaku `_candidate_log_roots`), karena itu membuat task milik
+        # project lain ikut muncul di Sidebar -> Tasks (task "stale" dari
+        # project sebelumnya). Tanpa project_id (perilaku lama / daftar semua)
+        # tetap memakai seluruh candidate root.
+        if project_id is not None:
+            roots: List[str] = []
+            meta = self.project_store.get_project(project_id)
+            if meta is not None:
+                root = meta.get("path") or meta.get("root")
+                if root:
+                    roots.append(str(root))
+        else:
+            roots = self._candidate_log_roots(None)
+
+        by_task: Dict[str, Dict[str, Any]] = {}
+        for root in roots:
+            try:
+                store = AegisProjectStore(root)
+                log_paths = store.list_task_logs()
+            except Exception:  # noqa: BLE001 - satu root rusak tidak mengganggu root lain
+                continue
+            for log_path in log_paths:
+                task_id = log_path.stem  # nama file tanpa .log = identitas task
+                try:
+                    info = TaskLogReader(store, task_id=task_id).get_task_info()
+                except Exception:  # noqa: BLE001 - satu task rusak tidak mengganggu yang lain
+                    continue
+                if info is None:
+                    continue
+                existing = by_task.get(task_id)
+                if existing is None or (info.get("last_timestamp") or "") > (
+                    existing.get("last_timestamp") or ""
+                ):
+                    by_task[task_id] = info
+
+        # Sinkronkan status task aktif in-memory bila sedang running
+        with self._lock:
+            for tid, rec in self._tasks.items():
+                if project_id is not None and rec.project_id != project_id:
+                    continue
+                if rec.status == "running" and tid in by_task:
+                    by_task[tid]["status"] = "running"
+
+        tasks = list(by_task.values())
+        tasks.sort(key=lambda t: t.get("last_timestamp") or "", reverse=True)
+        return tasks
+
+    def get_task_history(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Ambil ringkasan task spesifik dari .aegis/log/.
+
+        Args:
+            task_id: identifier task.
+            project_id: project terkait (opsional).
+
+        Returns:
+            Task info dict (status "incomplete" bila log belum punya event).
+
+        Raises:
+            NotFoundError: bila file log task benar-benar tidak ditemukan.
+        """
+        reader = self._reader_for_task(task_id, project_id)
+        if reader is None:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di log.")
+        info = reader.get_task_info()
+        if info is None:
+            # File log ada tetapi belum berisi event yang bisa diringkas:
+            # task tetap dianggap ada (jangan salah jadi "tidak ditemukan").
+            return {
+                "task_id": task_id,
+                "first_timestamp": None,
+                "last_timestamp": None,
+                "status": "incomplete",
+                "task": "",
+                "result": None,
+                "error": None,
+            }
+        return info
+
+    def rename_task_history(
+        self,
+        task_id: str,
+        new_title: str,
+        project_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Ubah judul/prompt ringkasan satu task history.
+
+        Memperbarui atribut `task` pada record in-memory bila ada, serta
+        menambahkan event `task_renamed` ke file log task di `.aegis/log/`.
+
+        Raises:
+            ValidationError: bila new_title kosong.
+            NotFoundError: bila task tidak ditemukan di in-memory maupun log.
+        """
+        from api.services import ValidationError as _ValidationError
+        from agent_ai.projects.aegis_store import TaskLog
+
+        clean_title = str(new_title or "").strip()
+        if not clean_title:
+            raise _ValidationError("Judul task baru tidak boleh kosong.")
+
+        had_record = False
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is not None:
+                record.task = clean_title
+                had_record = True
+
+        target_root = self._resolve_project_root(project_id) if project_id else None
+        log_path = self._find_log_file(task_id, root=target_root, project_id=project_id)
+        had_log = False
+        if log_path is not None and log_path.is_file():
+            had_log = True
+            # log_path adalah <project_root>/.aegis/log/<task_id>.log
+            project_root = log_path.parent.parent.parent
+            task_log = TaskLog(project_root, task_id=log_path.stem)
+            task_log.append("task_renamed", {"title": clean_title, "prompt": clean_title})
+
+        if not had_record and not had_log:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di history.")
+
+        return {"task_id": task_id, "task": clean_title, "renamed": True}
+
+    def delete_task_history(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Hapus satu task history (file log + response log + state in-memory).
+
+        Raises:
+            ValidationError: bila task sedang berjalan (running).
+            NotFoundError: bila task tidak ditemukan di log maupun in-memory.
+        """
+        from api.services import ValidationError as _ValidationError
+
+        had_record = False
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is not None:
+                if record.queue_state == "running" or record.status == "running":
+                    raise _ValidationError(
+                        "Task sedang berjalan; hentikan task terlebih dahulu sebelum menghapus."
+                    )
+                had_record = True
+                self._tasks.pop(task_id, None)
+                self._prepared.pop(task_id, None)
+                self._cancel_tokens.pop(task_id, None)
+
+        target_root = self._resolve_project_root(project_id) if project_id else None
+        log_path = self._find_log_file(task_id, root=target_root, project_id=project_id)
+        had_log = False
+        if log_path is not None and log_path.is_file():
+            had_log = True
+            try:
+                log_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            try:
+                resp_log = log_path.parent / "response" / f"{log_path.stem}.json"
+                if resp_log.is_file():
+                    resp_log.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        if not had_record and not had_log:
+            return {"task_id": task_id, "deleted": True, "already_absent": True}
+
+        return {"task_id": task_id, "deleted": True}
+
+    def clear_task_history(self, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Hapus seluruh task history yang sudah selesai untuk sebuah project.
+
+        Task yang sedang running TIDAK akan dihapus. Bila project_id tidak
+        diberikan, active project akan digunakan. Bila tidak ada active project,
+        ValidationError akan dimunculkan untuk mencegah accidental global wipe.
+
+        Args:
+            project_id: identifier project (opsional).
+
+        Returns:
+            Dict dengan status cleared dan jumlah task history yang dihapus.
+        """
+        from pathlib import Path as _Path
+        from agent_ai.projects.aegis_store import AegisProjectStore
+        from api.services import ValidationError as _ValidationError
+
+        target_roots: List[str] = []
+        target_project_id = project_id
+
+        if project_id:
+            resolved = self._resolve_project_root(project_id)
+            if resolved:
+                target_roots.append(resolved)
+            elif _Path(project_id).is_dir():
+                target_roots.append(str(project_id))
+            else:
+                raise _ValidationError(f"Project '{project_id}' tidak ditemukan.")
+        else:
+            active_id = self.project_store.get_active_project_id()
+            if active_id:
+                target_project_id = active_id
+                resolved = self._resolve_project_root(active_id)
+                if resolved:
+                    target_roots.append(resolved)
+            if not target_roots:
+                raise _ValidationError("project_id diperlukan atau set active project terlebih dahulu.")
+
+        deleted_count = 0
+        for root in target_roots:
+            try:
+                store = AegisProjectStore(root)
+                log_paths = store.list_task_logs()
+            except Exception:
+                continue
+
+            for log_path in log_paths:
+                task_id = log_path.stem
+                with self._lock:
+                    record = self._tasks.get(task_id)
+                    if record is not None and (record.queue_state == "running" or record.status == "running"):
+                        continue
+                    self._tasks.pop(task_id, None)
+                    self._prepared.pop(task_id, None)
+                    self._cancel_tokens.pop(task_id, None)
+
+                try:
+                    log_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                try:
+                    resp_log = store.response_log_path(task_id)
+                    if resp_log.is_file():
+                        resp_log.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                deleted_count += 1
+
+        # Evict remaining terminal in-memory tasks for matching project
+        with self._lock:
+            terminal_keys = [
+                tid
+                for tid, r in self._tasks.items()
+                if (r.project_id == target_project_id or (target_roots and any(r.project_id == root for root in target_roots)))
+                and (r.queue_state in ("done", "completed", "failed", "cancelled") or r.status in ("completed", "failed", "cancelled"))
+            ]
+            for tid in terminal_keys:
+                self._tasks.pop(tid, None)
+                self._prepared.pop(tid, None)
+                self._cancel_tokens.pop(tid, None)
+            deleted_count += len(terminal_keys)
+
+        return {"cleared": True, "deleted_count": deleted_count}
+
+    # ------------------------------------------------------------------ #
+    # Activity API (chronological events per task)
+    # ------------------------------------------------------------------ #
+    def get_task_activity(
+        self,
+        task_id: str,
+        project_id: Optional[str] = None,
+        event_types: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Ambil seluruh chronological activity satu Task dari .aegis/log/.
+
+        Source: .aegis/log/<task_id>.log
+
+        Args:
+            task_id: identifier task.
+            project_id: project terkait (opsional).
+            event_types: daftar tipe event yang relevan (opsional).
+                Bila None, semua event diambil (termasuk tool activity).
+
+        Returns:
+            Daftar event terurut chronological berdasarkan timestamp.
+
+        Raises:
+            NotFoundError: bila file log task benar-benar tidak ditemukan.
+        """
+        reader = self._reader_for_task(task_id, project_id)
+        if reader is None:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di log.")
+        # Seluruh event dikembalikan (termasuk tool_called / tool_completed /
+        # observation_received), bukan hanya agent_commentary.
+        return reader.get_activity(event_types=event_types)
+
+    # ------------------------------------------------------------------ #
+    # Report API
+    # ------------------------------------------------------------------ #
+    def get_task_report(self, task_id: str, project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Ambil final Agent Report dari .aegis/log/.
+
+        Source utama: task_completed.data.result.
+        Fallback: task_finished.data.result.
+
+        Args:
+            task_id: identifier task.
+            project_id: project terkait (opsional).
+
+        Returns:
+            Dict dengan task_id, status, dan report (teks final).
+            `report` bernilai None bila log ada tetapi tidak punya
+            `task_completed`/`task_finished` dengan result.
+
+        Raises:
+            NotFoundError: bila file log task tidak ditemukan.
+        """
+        reader = self._reader_for_task(task_id, project_id)
+        if reader is None:
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan di log.")
+        info = reader.get_task_info() or {}
+        return {
+            "task_id": task_id,
+            "status": info.get("status", "unknown"),
+            "report": reader.get_report(),
+        }
+
+    def _resolve_project_root(self, project_id: Optional[str]) -> Optional[str]:
+        """Tentukan project root untuk membaca .aegis/log/.
+
+        Prioritas: project_id dari parameter -> active project dari store.
+        """
+        if project_id:
+            meta = self.project_store.get_project(project_id)
+            if meta is not None:
+                return meta.get("path") or meta.get("root")
+            from pathlib import Path as _Path
+            try:
+                p = _Path(project_id)
+                if p.is_dir():
+                    return str(p)
+            except Exception:
+                pass
+        active_id = self.project_store.get_active_project_id()
+        if active_id:
+            meta = self.project_store.get_project(active_id)
+            if meta is not None:
+                return meta.get("path") or meta.get("root")
+        return None
+
+    def _candidate_log_roots(self, project_id: Optional[str] = None) -> List[str]:
+        """Kandidat root tempat `.aegis/log/` dicari (terurut & unik).
+
+        Log task bersifat project-local, tetapi satu task_id bisa berada di
+        root yang berbeda dari active project (mis. Aegis workspace tempat
+        proses ini berjalan). Karena itu reader mencari beberapa kandidat:
+            1. project_id eksplisit (bila diberikan),
+            2. active project (bila ada),
+            3. Aegis workspace/repo root tempat backend berjalan,
+            4. seluruh project yang terdaftar di launcher.
+        """
+        from pathlib import Path as _Path
+
+        roots: List[str] = []
+
+        def _add(value: Optional[str]) -> None:
+            if not value:
+                return
+            normalized = str(value)
+            if normalized not in roots:
+                roots.append(normalized)
+
+        _add(self._resolve_project_root(project_id))
+        try:
+            # api/services.py -> api/ -> django_app/ -> web/ -> repo root
+            _add(str(_Path(__file__).resolve().parents[3]))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            for meta in self.project_store.list_projects():
+                _add(meta.get("path") or meta.get("root"))
+        except Exception:  # noqa: BLE001
+            pass
+        return roots
+
+    def _find_log_file(
+        self,
+        task_id: str,
+        root: Optional[str] = None,
+        project_id: Optional[str] = None,
+    ) -> Optional[Path]:
+        """Cari file log task di `.aegis/log/` berdasarkan task_id.
+
+        Bila `root` diberikan, hanya root tersebut yang dicari (kompatibel
+        dengan pemanggilan lama). Bila `root` None, pencarian dilakukan di
+        seluruh candidate root (`_candidate_log_roots`). Exact match
+        `<task_id>.log` dicoba lebih dulu, lalu prefix match (mengakomodasi
+        task_id yang dinormalisasi oleh `safe_task_id`).
+
+        Nama file `<task_id>.log` adalah identitas persistent Task; pencarian
+        TIDAK mensyaratkan metadata `project_id`/`task_id` ada di dalam event.
+
+        Returns:
+            Path file log jika ditemukan, None bila tidak ada.
+        """
+        from pathlib import Path as _Path
+        from agent_ai.projects.aegis_store import safe_task_id
+
+        safe_id = safe_task_id(task_id)
+        if not safe_id:
+            return None
+        candidates = [root] if root else self._candidate_log_roots(project_id)
+        for candidate in candidates:
+            if not candidate:
+                continue
+            log_dir = _Path(candidate) / ".aegis" / "log"
+            if not log_dir.exists():
+                continue
+            exact = log_dir / f"{safe_id}.log"
+            if exact.is_file():
+                return exact
+            for f in sorted(log_dir.glob("*.log")):
+                if f.stem.startswith(safe_id):
+                    return f
+        return None
+
+    def _reader_for_task(self, task_id: str, project_id: Optional[str] = None) -> Optional[Any]:
+        """Buat TaskLogReader yang terikat ke file log yang benar-benar ada.
+
+        Root diturunkan dari path file (`<root>/.aegis/log/<task_id>.log`)
+        sehingga reader membaca file yang sama persis dengan hasil
+        `_find_log_file()`. Tidak ada validasi kedua terhadap isi event yang
+        bisa membuat task valid dianggap tidak ditemukan.
+
+        Returns:
+            TaskLogReader, atau None bila file log tidak ditemukan.
+        """
+        from agent_ai.projects.aegis_store import AegisProjectStore, TaskLogReader
+
+        log_file = self._find_log_file(task_id, project_id=project_id)
+        if log_file is None:
+            return None
+        # <root>/.aegis/log/<task_id>.log -> root = parents[2] dari file dir.
+        store = AegisProjectStore(log_file.parent.parent.parent)
+        return TaskLogReader(store, task_id=log_file.stem)
+
+    def cancel_task(self, task_id: str) -> Dict[str, Any]:
+        """Minta penghentian task: sinyal cancellation + tandai CANCELLED.
+
+        Mechanism (cooperative, aman):
+            1. set cancellation signal pada token task (bila sedang berjalan),
+            2. tandai status record gateway CANCELLED (agar UI langsung tahu),
+            3. Agent loop (runtime/orchestrator) melihat signal pada safe
+               boundary, berhenti, dan mencatat event `task_cancelled` +
+               `task_finished(status=cancelled)` ke `.aegis/log` (sumber
+               tunggal observability). TIDAK ada thread.kill / force terminate.
+
+        Task yang sudah terminal (completed/failed/cancelled) TIDAK diubah.
+
+        Raises:
+            NotFoundError: bila task tidak ditemukan.
+        """
+        with self._lock:
+            record = self._tasks.get(task_id)
+            token = self._cancel_tokens.get(task_id)
+        if record is None:
+            # Periksa apakah task tercatat di disk log
+            reader = self._reader_for_task(task_id)
+            if reader is not None:
+                info = reader.get_task_info() or {}
+                events = reader.load_events()
+                has_terminal = any(
+                    (e.get("event") or e.get("event_type")) in ("task_completed", "task_failed", "task_cancelled")
+                    for e in events
+                )
+                if not has_terminal:
+                    try:
+                        from agent_ai.projects.aegis_store import TaskLog
+                        TaskLog(reader.store, task_id).append(
+                            "task_cancelled",
+                            {"reason": "user_cancelled_stale_task"}
+                        )
+                    except Exception:
+                        pass
+                return {
+                    "task_id": task_id,
+                    "status": "cancelled",
+                    "queue_state": "done",
+                    "prompt": info.get("task", ""),
+                }
+            raise NotFoundError(f"Task '{task_id}' tidak ditemukan.")
+
+        # Hanya task yang belum terminal yang bisa dibatalkan. Task yang sudah
+        # COMPLETED/FAILED tetap pada statusnya (tidak diubah menjadi CANCELLED).
+        if record.status in ("completed", "failed", "cancelled"):
+            return record.to_dict()
+
+        # 1) Sinyal kooperatif: Agent loop berhenti di safe boundary.
+        if token is not None:
+            token.request("user_cancelled")
+        # 1b) Tolak approval PENDING milik task ini agar action tertahan tidak
+        #     menggantung (gate menerima DENY -> action dibatalkan segera).
+        try:
+            self._approvals.cancel_task(task_id)
+        except Exception:  # noqa: BLE001 - cleanup tidak boleh gagal cancel
+            pass
+        # 2) Status record gateway langsung CANCELLED (UI/HTTP responsif).
+        #    Ini juga menyetel queue_state="done" (via _update_task_status),
+        #    sehingga task keluar dari antrian aktif.
+        with self._lock:
+            manager = self._task_lifecycles.get(task_id)
+        if manager is not None:
+            try:
+                manager.cancel_task(reason="user_cancelled")
+            except Exception:
+                pass
+
+        if token is None:
+            # Task BELUM pernah running (masih antre di queue): pancarkan
+            # event kanonik task_cancelled tepat satu kali dan pump scheduler.
+            try:
+                self._emit(
+                    record.session_id,
+                    "task_cancelled",
+                    task_id=task_id,
+                    payload={"reason": "user_cancelled", "task_id": task_id},
+                )
+            except Exception:
+                pass
+            self._update_task_status(task_id, "cancelled")
+            if self.auto_execute:
+                self._scheduler_pump()
+        else:
+            # Task sedang aktif di background: jangan pancarkan event di sini
+            # agar tidak duplikat dengan event yang dipancarkan saat runtime
+            # mencapai safe boundary. Cukup mutasi status record gateway.
+            self._update_task_status(task_id, "cancelled")
+
+        return self.get_task(task_id)
+
+    def cancel_all_tasks(self) -> int:
+        """Batalkan seluruh task yang sedang aktif/berjalan (untuk shutdown aman)."""
+        with self._lock:
+            active_ids = [
+                task_id
+                for task_id, record in self._tasks.items()
+                if record.status not in ("completed", "failed", "cancelled")
+            ]
+        count = 0
+        for task_id in active_ids:
+            try:
+                self.cancel_task(task_id)
+                count += 1
+            except Exception:
+                pass
+        return count
+
+    # ------------------------------------------------------------------ #
+    # Consultant (Aegis reasoning layer — read-only terhadap CODE PROJECT)
+    # ------------------------------------------------------------------ #
+    def consult(
+        self,
+        message: str,
+        *,
+        session_id: Optional[str] = None,
+        provider_instance_id: Optional[str] = None,
+        model_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        mode: Optional[str] = None,
+        images: Optional[List[Dict[str, Any]]] = None,
+        provider: Optional[Any] = None,
+        root: Optional[str] = None,
+        active_file: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Jalankan satu giliran konsultasi Consultant.
+
+        Consultant memakai loop & tool Aegis yang sudah ada (read-only terhadap
+        CODE PROJECT, read+update terhadap Project Bible). Hasilnya dapat memuat
+        Task Proposal yang siap dikirim ke Agent lewat alur task existing.
+
+        Args:
+            message: pertanyaan/permintaan user (wajib).
+            session_id: id sesi konsultasi (konteks lintas giliran).
+            provider_instance_id/model_id: pilihan provider+model dari konfigurasi
+                LLM tersimpan (SQLite). Bila kosong, dipakai provider instance
+                enabled pertama.
+            project_id: project terkait (opsional; default active project).
+            mode: mode Consultant ("quick" | "investigate"; default "quick").
+                Mengontrol tool yang benar-benar tersedia bagi LLM.
+            images: daftar gambar opsional (multimodal) untuk pesan user.
+                Setiap item: {"data": "<base64>", "mime_type": "image/png",
+                "filename": opsional}. Diteruskan ke ConsultantService yang
+                memprosesnya lewat modul vision existing.
+            provider: override provider (khusus verifier; tidak dari HTTP).
+            root: override root project (khusus verifier; tidak dari HTTP).
+
+        Returns:
+            Dict hasil konsultasi: session_id, reply, status, error, iterations,
+            tool_events, task_proposal.
+
+        Raises:
+            ValidationError: message kosong / provider tidak tersedia / gambar
+                tidak valid.
+        """
+        normalized_images = self._normalize_images(images)
+
+        if not message or not str(message).strip():
+            if normalized_images:
+                message = "Tolong analisis gambar yang dilampirkan."
+            else:
+                raise ValidationError("Field 'message' wajib diisi dan tidak boleh kosong.")
+
+        # Default ke active project (konsisten dengan _resolve_workspace_root)
+        # agar sesi Consultant ter-tag dan TERISOLASI per project.
+        if not project_id:
+            try:
+                project_id = self.project_store.get_active_project_id() or None
+            except Exception:  # noqa: BLE001 - project state tidak boleh menggagalkan consult
+                project_id = None
+
+        if root is None:
+            root = self._resolve_workspace_root(project_id)
+        if not root:
+            # Fallback ke root workspace Aegis (repo tempat backend berjalan)
+            # agar Consultant tetap dapat menganalisis project Aegis sendiri
+            # walau belum ada project aktif.
+            from pathlib import Path as _Path
+
+            root = str(_Path(__file__).resolve().parents[3])
+
+        if provider is None:
+            provider = self._build_consultant_provider(provider_instance_id, model_id)
+
+        try:
+            result = self.consultant_service.consult(
+                str(message).strip(),
+                provider=provider,
+                root=root,
+                session_id=session_id,
+                project_id=project_id,
+                mode=mode,
+                images=normalized_images,
+                active_file=active_file,
+            )
+        except ValidationError:
+            raise
+        except ValueError as exc:
+            # Payload gambar tidak valid / format tidak didukung -> pesan jelas.
+            raise ValidationError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - map error vision ke ValidationError
+            from agent_ai.vision.models import VisionError
+
+            if isinstance(exc, VisionError):
+                raise ValidationError(f"Gambar tidak dapat diproses: {exc}") from exc
+            raise
+        res_dict = result.to_dict()
+        # Penyelarasan ID Sesi & Persistensi State:
+        # Simpan giliran ke UnifiedSessionStore agar sesi percakapan selaras
+        res_sid = result.session_id
+        if res_sid:
+            try:
+                u_sess = self.unified_session_store.get_session(res_sid)
+                if not u_sess:
+                    u_sess = self.unified_session_store.create_session(
+                        project_id=project_id,
+                        title=self.unified_session_store._auto_title(str(message).strip()),
+                        session_id=res_sid,
+                    )
+                has_user = any(
+                    t.role == "user" and t.mode == "ask" and t.content == str(message).strip()
+                    for t in u_sess.turns
+                )
+                if not has_user:
+                    from agent_ai.session.unified_models import UnifiedTurn, new_turn_id
+
+                    u_turn = UnifiedTurn(
+                        turn_id=new_turn_id(),
+                        role="user",
+                        mode="ask",
+                        content=str(message).strip(),
+                        created_at=time.time(),
+                        images=normalized_images,
+                    )
+                    self.unified_session_store.append_turn(res_sid, u_turn)
+
+                has_asst = any(
+                    t.role == "assistant" and t.mode == "ask" and t.content == (result.reply or "")
+                    for t in u_sess.turns
+                )
+                if not has_asst and result.reply:
+                    from agent_ai.session.unified_models import UnifiedTurn, new_turn_id
+
+                    a_turn = UnifiedTurn(
+                        turn_id=new_turn_id(),
+                        role="assistant",
+                        mode="ask",
+                        content=result.reply or "",
+                        created_at=time.time(),
+                    )
+                    self.unified_session_store.append_turn(res_sid, a_turn)
+            except Exception:
+                pass
+        return res_dict
+    def _normalize_images(
+        self, images: Optional[Any]
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Validasi & normalisasi daftar gambar (GENERALIZED: Consultant + Task).
+
+        Bentuk yang diterima: list of {"data": "<base64>", "mime_type": str,
+        "filename": opsional}. Dibatasi jumlah/ukuran agar aman.
+
+        Returns:
+            List gambar tervalidasi, atau None bila tidak ada.
+
+        Raises:
+            ValidationError: bentuk tidak valid / terlalu banyak / terlalu besar.
+        """
+        if images is None:
+            return None
+        if not isinstance(images, list):
+            raise ValidationError("Field 'images' harus berupa array.")
+        if not images:
+            return None
+        max_images = 8
+        if len(images) > max_images:
+            raise ValidationError(f"Jumlah gambar maksimum {max_images}.")
+        max_bytes = _MAX_CONSULT_IMAGE_BYTES
+        normalized: List[Dict[str, Any]] = []
+        for index, item in enumerate(images):
+            if not isinstance(item, dict):
+                raise ValidationError(f"Gambar[{index}] harus berupa object.")
+            data = item.get("data")
+            if not data or not isinstance(data, str):
+                raise ValidationError(f"Gambar[{index}].data (base64) wajib diisi.")
+            # Estimasi ukuran decoded (base64 -> ~3/4 panjang).
+            approx_bytes = (len(data) * 3) // 4
+            if approx_bytes > max_bytes:
+                raise ValidationError(
+                    f"Gambar[{index}] terlalu besar (>{max_bytes} bytes)."
+                )
+            entry: Dict[str, Any] = {
+                "data": data,
+                "mime_type": str(item.get("mime_type") or "").strip(),
+            }
+            if item.get("filename"):
+                entry["filename"] = str(item["filename"])
+            normalized.append(entry)
+        return normalized
+
+    def _build_consultant_provider(
+        self,
+        provider_instance_id: Optional[str],
+        model_id: Optional[str],
+    ) -> Any:
+        """Bangun provider Consultant dari konfigurasi LLM tersimpan (SQLite).
+
+        Bila provider instance tidak dipilih, dipakai instance enabled pertama.
+        Error konfigurasi dipetakan menjadi ValidationError dengan pesan jelas.
+        """
+        from agent_ai.providers.base import ProviderError
+        from agent_ai.providers.factory import build_provider_from_config
+
+        instance_id = provider_instance_id
+        if not instance_id:
+            # Default = Provider Instance DB yang SAMA dengan Settings
+            # (`_select_default_llm`), bukan fallback diam-diam ke .env lama.
+            try:
+                instances = self.list_llm_providers()
+            except Exception as exc:  # noqa: BLE001 - konfigurasi LLM gagal dibaca
+                raise ValidationError(
+                    f"Tidak dapat membaca konfigurasi LLM: {exc}"
+                ) from exc
+            instance_id = self._select_default_llm(instances)["instance_id"]
+        if not instance_id:
+            raise ValidationError(
+                "Tidak ada Provider Instance yang dikonfigurasi untuk Consultant. "
+                "Tambahkan provider di Settings terlebih dahulu."
+            )
+
+        try:
+            # `include_api_key` default True (nilai api_key dipakai runtime).
+            resolved = self.llm_config_service.resolve_runtime_config(
+                instance_id, model_id=model_id
+            )
+        except Exception as exc:  # noqa: BLE001 - konfigurasi provider error
+            raise ValidationError(str(exc)) from exc
+
+        try:
+            return build_provider_from_config(resolved)
+        except ProviderError as exc:
+            raise ValidationError(str(exc)) from exc
+
+    # ------------------------------------------------------------------ #
+    # Events (memakai SessionStore Aegis; tanpa event model kedua)
+    # ------------------------------------------------------------------ #
+    # ------------------------------------------------------------------ #
+    # Extension Management (Task 07) — thin facade over ExtensionManager
+    # ------------------------------------------------------------------ #
+    def _get_extension_manager(self):  # type: ignore[no-untyped-def]
+        """Return singleton ExtensionManager bound to GatewayService shared registries.
+
+        Registries are loaded once via ExtensionLoader (filesystem + lifecycle).
+        All subsequent operations reuse same registry/capability/lifecycle objects,
+        so catalog reflects live state (install/enable/disable/update/uninstall).
+        No duplicated lifecycle logic: all via ExtensionManager.
+        """
+        if hasattr(self, "_ext_manager") and getattr(self, "_ext_manager", None) is not None:
+            return self._ext_manager  # type: ignore[attr-defined]
+        from agent_ai.extensions.capabilities import CapabilityRegistry
+        from agent_ai.extensions.lifecycle import get_lifecycle_store
+        from agent_ai.extensions.loader import ExtensionLoader
+        from agent_ai.extensions.manager import ExtensionManager
+        from agent_ai.extensions.registry import ExtensionRegistry
+
+        cap_reg = getattr(self, "_ext_capability_registry", None)
+        ext_reg = getattr(self, "_ext_registry", None)
+        lifecycle = getattr(self, "_ext_lifecycle_store", None)
+        if cap_reg is None or ext_reg is None:
+            try:
+                from agent_ai.extensions.agent_bridge import get_agent_extension_manager
+
+                mgr = get_agent_extension_manager()
+                self._ext_capability_registry = mgr.capability_registry  # type: ignore[attr-defined]
+                self._ext_registry = mgr.registry  # type: ignore[attr-defined]
+                self._ext_lifecycle_store = mgr.lifecycle_store  # type: ignore[attr-defined]
+                self._ext_tool_registry = mgr.tool_registry  # type: ignore[attr-defined]
+                self._ext_manager = mgr  # type: ignore[attr-defined]
+                return mgr
+            except Exception:
+                pass
+        if cap_reg is None or ext_reg is None:
+            cap_reg = CapabilityRegistry()
+            ext_reg = ExtensionRegistry()
+            lifecycle = get_lifecycle_store()
+            loader = ExtensionLoader(
+                registry=ext_reg,
+                capability_registry=cap_reg,
+                lifecycle_store=lifecycle,
+                enable_entry_points=False,
+            )
+            try:
+                loader.load_all()
+            except Exception:
+                pass
+            self._ext_capability_registry = cap_reg  # type: ignore[attr-defined]
+            self._ext_registry = ext_reg  # type: ignore[attr-defined]
+            self._ext_lifecycle_store = lifecycle  # type: ignore[attr-defined]
+        else:
+            if lifecycle is None:
+                from agent_ai.extensions.lifecycle import get_lifecycle_store as _gls
+
+                lifecycle = _gls()
+                self._ext_lifecycle_store = lifecycle  # type: ignore[attr-defined]
+
+        tool_reg = getattr(self, "_ext_tool_registry", None)
+        if tool_reg is None:
+            try:
+                from agent_ai.tools.registry import get_extension_tool_registry
+
+                tool_reg = get_extension_tool_registry()
+            except Exception:
+                tool_reg = None
+            self._ext_tool_registry = tool_reg  # type: ignore[attr-defined]
+
+        config_store = None
+        try:
+            from agent_ai.extensions.config import get_config_store
+
+            config_store = get_config_store()
+        except Exception:
+            config_store = None
+
+        mgr = ExtensionManager(
+            registry=ext_reg,
+            capability_registry=cap_reg,
+            lifecycle_store=lifecycle,
+            tool_registry=tool_reg,
+            config_store=config_store,
+        )
+        self._ext_manager = mgr  # type: ignore[attr-defined]
+        return mgr
+
+    @staticmethod
+    def _extension_error_to_gateway(exc: Exception):  # type: ignore[no-untyped-def]
+        """Map Extension errors to GatewayError HTTP semantics."""
+        from agent_ai.extensions.errors import (
+            ExtensionCompatibilityError,
+            ExtensionInstallError,
+            ExtensionLifecycleError,
+            ExtensionUninstallError,
+            ExtensionUpdateError,
+            ExtensionValidationError,
+        )
+        from agent_ai.extensions.manifest import DuplicateExtensionError
+
+        msg = str(exc) or exc.__class__.__name__
+        low = msg.lower()
+        # Not found -> 404
+        if isinstance(exc, (ExtensionLifecycleError, ExtensionUninstallError, ExtensionUpdateError)):
+            if "not found" in low:
+                from api.services import NotFoundError as _NF
+
+                return _NF(msg)
+        if isinstance(exc, DuplicateExtensionError):
+            from api.services import ConflictError as _CF
+
+            return _CF(msg)
+        if isinstance(exc, ExtensionInstallError):
+            if "duplicate" in low or "already installed" in low or "already exists" in low or "folder collision" in low:
+                from api.services import ConflictError as _CF
+
+                return _CF(msg)
+            # git clone / validation etc. -> 400
+            from api.services import ValidationError as _VE
+
+            return _VE(msg)
+        if isinstance(exc, (ExtensionValidationError, ExtensionCompatibilityError)):
+            from api.services import ValidationError as _VE
+
+            return _VE(msg)
+        if isinstance(exc, ExtensionUpdateError):
+            if "not found" in low:
+                from api.services import NotFoundError as _NF
+
+                return _NF(msg)
+            from api.services import ValidationError as _VE
+
+            return _VE(msg)
+        if isinstance(exc, ExtensionUninstallError):
+            if "not found" in low:
+                from api.services import NotFoundError as _NF
+
+                return _NF(msg)
+            from api.services import ValidationError as _VE
+
+            return _VE(msg)
+        if isinstance(exc, ExtensionLifecycleError):
+            from api.services import ValidationError as _VE
+
+            return _VE(msg)
+        # Generic duplicate message
+        if "duplicate" in low or "already installed" in low:
+            from api.services import ConflictError as _CF
+
+            return _CF(msg)
+        if "not found" in low:
+            from api.services import NotFoundError as _NF
+
+            return _NF(msg)
+        # Fallback 400 for validation-like, 500 otherwise -> map to GatewayError 500 but we prefer 400 for extension errors
+        from api.services import ValidationError as _VE
+
+        return _VE(msg)
+
+    def list_extensions(self) -> Dict[str, Any]:
+        """List installed extensions (generic catalog, UI-friendly)."""
+        mgr = self._get_extension_manager()
+        items = mgr.list_installed()
+        # Enrich with capability counts
+        for item in items:
+            try:
+                caps = self._ext_capability_registry.list_by_extension(item["id"])  # type: ignore[attr-defined]
+                summary: Dict[str, int] = {}
+                for rec in caps:
+                    summary[rec.type] = summary.get(rec.type, 0) + 1
+                item["capabilities"] = summary
+                item["capability_count"] = len(caps)
+            except Exception:
+                item.setdefault("capabilities", {})
+                item.setdefault("capability_count", 0)
+        # Include failed extensions not in registry but known via failures / lifecycle
+        try:
+            fails = self._ext_registry.failures()  # type: ignore[attr-defined]
+            existing_ids = {i["id"] for i in items}
+            for f in fails:
+                fid = f.get("id")
+                err = f.get("error", "")
+                src = f.get("source", "")
+                if fid and fid not in existing_ids:
+                    items.append(
+                        {
+                            "id": fid,
+                            "name": fid,
+                            "version": "",
+                            "description": "",
+                            "api_version": "",
+                            "status": "failed",
+                            "enabled": False,
+                            "error": err,
+                            "installed_version": "",
+                            "source": src,
+                            "capabilities": {},
+                            "capability_count": 0,
+                        }
+                    )
+                    existing_ids.add(fid)
+                elif not fid:
+                    key = src or "unknown"
+                    if key not in existing_ids:
+                        items.append(
+                            {
+                                "id": key,
+                                "name": key,
+                                "version": "",
+                                "description": "",
+                                "api_version": "",
+                                "status": "failed",
+                                "enabled": False,
+                                "error": err,
+                                "installed_version": "",
+                                "source": src,
+                                "capabilities": {},
+                                "capability_count": 0,
+                            }
+                        )
+        except Exception:
+            pass
+        try:
+            rows = self._ext_lifecycle_store.all_rows()  # type: ignore[attr-defined]
+            ids = {i["id"] for i in items}
+            for r in rows:
+                eid = r.get("extension_id")
+                if r.get("status") == "failed" and eid not in ids:
+                    items.append(
+                        {
+                            "id": eid,
+                            "name": eid,
+                            "version": r.get("installed_version") or "",
+                            "description": "",
+                            "api_version": "",
+                            "status": "failed",
+                            "enabled": False,
+                            "error": r.get("error") or "",
+                            "installed_version": r.get("installed_version") or "",
+                            "source": "",
+                            "capabilities": {},
+                            "capability_count": 0,
+                        }
+                    )
+        except Exception:
+            pass
+        items_sorted = sorted(items, key=lambda x: str(x.get("id", "")).lower())
+        return {"count": len(items_sorted), "extensions": items_sorted}
+
+    def get_extension(self, extension_id: str) -> Dict[str, Any]:
+        """Detail for one extension (generic, secret-safe)."""
+        if not extension_id or not str(extension_id).strip():
+            raise ValidationError("Field 'extension_id' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            data = mgr.get_status(str(extension_id).strip())
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        # Capability summary
+        try:
+            caps = self._ext_capability_registry.list_by_extension(data["id"])  # type: ignore[attr-defined]
+            summary: Dict[str, int] = {}
+            for rec in caps:
+                summary[rec.type] = summary.get(rec.type, 0) + 1
+            data["capabilities"] = summary
+            data["capability_count"] = len(caps)
+        except Exception:
+            data.setdefault("capabilities", {})
+            data.setdefault("capability_count", 0)
+        # UI contributions (generic)
+        try:
+            from agent_ai.extensions.ui import UICatalog
+
+            cat = UICatalog(self._ext_capability_registry, self._ext_registry)  # type: ignore[attr-defined]
+            contribs = cat.list_contributions(extension_id=data["id"], enabled_only=False)
+            data["ui_contributions"] = [c.to_dict() for c in contribs]
+            data["ui_count"] = len(contribs)
+        except Exception:
+            data.setdefault("ui_contributions", [])
+            data.setdefault("ui_count", 0)
+        return data
+
+    def install_extension(self, repository_url: str, ref: Optional[str] = None) -> Dict[str, Any]:
+        if not repository_url or not str(repository_url).strip():
+            raise ValidationError("Field 'repository_url' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            result = mgr.install(str(repository_url).strip(), ref=str(ref).strip() if ref and str(ref).strip() else None)
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        result["restart_required"] = False
+        return result
+
+    def enable_extension(self, extension_id: str) -> Dict[str, Any]:
+        if not extension_id or not str(extension_id).strip():
+            raise ValidationError("Field 'extension_id' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            result = mgr.enable(str(extension_id).strip())
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        return result
+
+    def disable_extension(self, extension_id: str) -> Dict[str, Any]:
+        if not extension_id or not str(extension_id).strip():
+            raise ValidationError("Field 'extension_id' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            result = mgr.disable(str(extension_id).strip())
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        return result
+
+    def update_extension(self, extension_id: str, repository_url: Optional[str] = None, ref: Optional[str] = None) -> Dict[str, Any]:
+        if not extension_id or not str(extension_id).strip():
+            raise ValidationError("Field 'extension_id' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            result = mgr.update(str(extension_id).strip(), repository_url=str(repository_url).strip() if repository_url and str(repository_url).strip() else None, ref=str(ref).strip() if ref and str(ref).strip() else None)
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        # Task 06 explicitly requires restart for Python code activation — never hot reload
+        result["restart_required"] = True
+        return result
+
+    def uninstall_extension(self, extension_id: str) -> Dict[str, Any]:
+        if not extension_id or not str(extension_id).strip():
+            raise ValidationError("Field 'extension_id' wajib diisi.")
+        mgr = self._get_extension_manager()
+        try:
+            result = mgr.uninstall(str(extension_id).strip())
+        except Exception as exc:
+            raise self._extension_error_to_gateway(exc) from exc
+        return result
+
+    def emit_event(
+        self,
+        session_id: str,
+        event_type: Any,
+        *,
+        task_id: Optional[str] = None,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Append event ke SessionStore Aegis (append-only).
+
+        Hanya meneruskan ke store existing; tidak membuat model event baru.
+        """
+        from agent_ai.session.events import EventType, make_event
+
+        if not isinstance(event_type, EventType):
+            event_type = EventType(event_type)
+
+        data_payload = dict(payload or {})
+        # Penanda tipe konteks (Isolasi Aliran Event SSE)
+        if "context_type" not in data_payload:
+            if task_id:
+                data_payload["context_type"] = "agent"
+                data_payload.setdefault("mode", "agent")
+            else:
+                data_payload["context_type"] = "consultation"
+                data_payload.setdefault("mode", "ask")
+
+        event = make_event(
+            session_id=session_id,
+            event_type=event_type,
+            task_id=task_id,
+            payload=data_payload,
+        )
+        stored = self.sessions.append_event(event)
+        return stored.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Instance default (dipakai views). Dibuat lazy agar mudah di-override test.
+# ---------------------------------------------------------------------------
+_default_service: Optional[GatewayService] = None
+
+
+def get_service() -> GatewayService:
+    """Ambil instance GatewayService default (lazy singleton)."""
+    global _default_service
+    if _default_service is None:
+        _default_service = GatewayService()
+    return _default_service

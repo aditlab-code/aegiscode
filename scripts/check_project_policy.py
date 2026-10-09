@@ -32,7 +32,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:
@@ -329,7 +329,7 @@ def _run() -> int:
     print("[11] tiap project punya permissions.json sendiri (isolasi) OK")
 
     # --- [12] Boundary frontend: Sidebar -> Projects -> Project Settings ---
-    frontend_dir = PROJECT_ROOT / "web" / "frontend" / "src"
+    frontend_dir = PROJECT_ROOT / "apps" / "frontend" / "src"
     api_js = (frontend_dir / "api.js").read_text(encoding="utf-8")
     for fn in ("getProjectPolicy", "saveProjectPolicy"):
         assert fn in api_js, f"api.js harus mengekspor {fn}"

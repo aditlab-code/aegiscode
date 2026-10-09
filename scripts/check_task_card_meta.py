@@ -16,7 +16,7 @@ Menguji (sesuai acceptance criteria):
   8. Task lama tanpa timestamp tetap aman (fallback -> bagian durasi tidak tampil).
   9. Lifecycle stepper yang sekarang tetap dipertahankan.
  10. Kontrak scroll Explorer tidak berubah.
- 11. Tidak ada perubahan backend/Python (git status -- src web/django_app).
+ 11. Tidak ada perubahan backend/Python (git status -- src apps/django_app).
 
 Jalankan:
     python scripts/check_task_card_meta.py
@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend"
 SRC_FRONTEND = FRONTEND_DIR / "src"
 DIST_ASSETS = FRONTEND_DIR / "dist" / "assets"
 
@@ -237,14 +237,14 @@ def main() -> int:
 
     # --- 11) Tidak ada perubahan backend/Python ---
     proc = subprocess.run(
-        ["git", "status", "--porcelain", "--", "src", "web/django_app"],
+        ["git", "status", "--porcelain", "--", "src", "apps/django_app"],
         cwd=str(PROJECT_ROOT),
         capture_output=True,
         text=True,
     )
     dirty = proc.stdout.strip()
     assert dirty == "", f"backend/Python berubah (harusnya kosong):\n{dirty}"
-    print("[11] Backend/Python TIDAK berubah (git status -- src web/django_app kosong) OK")
+    print("[11] Backend/Python TIDAK berubah (git status -- src apps/django_app kosong) OK")
 
     print()
     print("[OK] Task Card lebih informatif: Provider + Model + Duration (live -> final),")

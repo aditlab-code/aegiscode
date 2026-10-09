@@ -30,7 +30,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -325,11 +325,11 @@ def _run(root: Path) -> int:
     print("[7] Gateway/HTTP OK -> POST /api/consultant/consult + validasi 400 + mode")
 
     # 7c) Frontend mengirim 'mode' (default quick) ke endpoint Consultant.
-    api_js = (PROJECT_ROOT / "web" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
+    api_js = (PROJECT_ROOT / "apps" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
     assert "body.mode = mode" in api_js, "api.js harus mengirim field 'mode'"
     assert 'mode = "quick"' in api_js, "api.js default mode harus 'quick'"
     chat_vue = (
-        PROJECT_ROOT / "web" / "frontend" / "src" / "components" / "ConsultantChat.vue"
+        PROJECT_ROOT / "apps" / "frontend" / "src" / "components" / "ConsultantChat.vue"
     ).read_text(encoding="utf-8")
     assert 'const mode = ref("quick")' in chat_vue, "ConsultantChat default mode = quick"
     assert "mode: mode.value" in chat_vue, "ConsultantChat harus mengirim mode tiap request"

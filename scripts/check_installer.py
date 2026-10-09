@@ -17,7 +17,7 @@ tidak mengubah working tree. Ia membuktikan bahwa:
        --rebuild-frontend, --host, --port (semuanya lewat jalur simulasi).
     5. run.bat memuat gate simulasi (AETHER_SIMULATE / --simulate), melewati
        `git clone` pada jalur simulasi, dan tidak 'pause' di mode simulasi.
-    6. Boundary: tidak ada perubahan pada src/ atau web/django_app/ (backend/core
+    6. Boundary: tidak ada perubahan pada src/ atau apps/django_app/ (backend/core
        Agent tidak tersentuh).
 
 Jalankan (offline):
@@ -265,16 +265,16 @@ def _run() -> int:
     git = shutil.which("git")
     if git:
         result = subprocess.run(
-            [git, "diff", "--name-only", "--", "src", "web/django_app"],
+            [git, "diff", "--name-only", "--", "src", "apps/django_app"],
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,
         )
         changed = [line for line in (result.stdout or "").splitlines() if line.strip()]
-        assert not changed, f"tidak boleh ada perubahan di src/ atau web/django_app/: {changed}"
+        assert not changed, f"tidak boleh ada perubahan di src/ atau apps/django_app/: {changed}"
     else:  # pragma: no cover - git praktis selalu ada di repo ini
         print("[7] git tidak tersedia; boundary check dilewati")
-    print("[7] boundary OK -> tidak ada perubahan pada src/ atau web/django_app/")
+    print("[7] boundary OK -> tidak ada perubahan pada src/ atau apps/django_app/")
 
     print()
     print("[OK] Installer simulation OK")

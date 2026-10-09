@@ -11,7 +11,7 @@ baru dibuat sebagai task yang dipantau (`task.id = record.task_id`,
 mengembalikan `queue_state="pending"` (B belum dieksekusi). Konsep "task yang
 dipantau (viewed/running)" tercampur dengan "task yang baru di-submit".
 
-Perbaikan: pisahkan kedua konsep (helper murni `web/frontend/src/taskView.js`):
+Perbaikan: pisahkan kedua konsep (helper murni `apps/frontend/src/taskView.js`):
     - submit B saat memantau task A yang benar-benar RUNNING -> JANGAN adopsi B;
       B hanya masuk antrian (pending), stream A tidak di-rebind,
     - saat A selesai dan scheduler BENAR-BENAR menjalankan B (event
@@ -43,9 +43,10 @@ from typing import Any, Dict, List, Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend"
 SRC_FRONTEND = FRONTEND_DIR / "src"
+TESTS_FRONTEND = FRONTEND_DIR / "tests"
 
 for _p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if _p not in sys.path:
@@ -65,8 +66,8 @@ def _read(path: Path) -> str:
 def scenario_task_view_logic() -> None:
     node = shutil.which("node")
     assert node, "node tidak tersedia"
-    test_file = SRC_FRONTEND / "taskView.test.mjs"
-    assert test_file.exists(), "web/frontend/src/taskView.test.mjs tidak ada"
+    test_file = TESTS_FRONTEND / "taskView.test.mjs"
+    assert test_file.exists(), "apps/frontend/tests/taskView.test.mjs tidak ada"
     proc = subprocess.run(
         [node, str(test_file)],
         cwd=str(FRONTEND_DIR),

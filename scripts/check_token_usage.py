@@ -28,7 +28,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-FRONTEND = PROJECT_ROOT / "web" / "frontend"
+FRONTEND = PROJECT_ROOT / "apps" / "frontend"
 FRONTEND_SRC = FRONTEND / "src"
 
 if str(SRC_DIR) not in sys.path:
@@ -141,7 +141,7 @@ def _run() -> int:
         assert "Tokens" in bundle_js, "bundle JS harus memuat label Tokens"
         print("[6] bundle build memuat label Tokens OK")
     else:
-        print("[6] SKIP -> dist belum di-build (jalankan 'npm run build' di web/frontend)")
+        print("[6] SKIP -> dist belum di-build (jalankan 'npm run build' di apps/frontend)")
 
     print()
     print("[OK] Token Usage tampil di Task Card (usage provider aktual, format compact, tooltip penuh).")

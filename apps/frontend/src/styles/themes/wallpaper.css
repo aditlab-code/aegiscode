@@ -1,0 +1,397 @@
+/* AETHER Wallpaper & Glassmorphism Aesthetics
+   Active when html:not([data-wallpaper="disabled"]) */
+
+html:not([data-wallpaper="disabled"]) body {
+  background-image: var(--bg-wallpaper);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+}
+
+html:not([data-wallpaper="disabled"]) .launcher-wrap {
+  background: var(--wallpaper-overlay);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+html:not([data-wallpaper="disabled"]) .pl-root {
+  background: transparent;
+}
+
+html:not([data-wallpaper="disabled"]) .pl-topbar {
+  background: var(--glass-header-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border);
+}
+
+html:not([data-wallpaper="disabled"]) .pl-panel {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-color: var(--glass-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.35);
+}
+
+html:not([data-wallpaper="disabled"]) .ide-root {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .ide-main-row {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .app-navbar {
+  background: var(--bg-secondary) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .app-activity-bar {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-right: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .app-footer {
+  background: var(--bg-secondary) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-top: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .workbench-view {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-left-column {
+  background: var(--bg-secondary) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-right: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-rim);
+}
+
+html:not([data-wallpaper="disabled"]) .app-left-sidebar {
+  background: transparent !important;
+  border-right: none !important;
+}
+
+html:not([data-wallpaper="disabled"]) .sidebar-header,
+html:not([data-wallpaper="disabled"]) .right-drawer-header {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .sidebar-footer,
+html:not([data-wallpaper="disabled"]) .sidebar-content,
+html:not([data-wallpaper="disabled"]) .drawer-sec-head,
+html:not([data-wallpaper="disabled"]) .sc-header-bar,
+html:not([data-wallpaper="disabled"]) .sc-commit-block,
+html:not([data-wallpaper="disabled"]) .task-subtabs-bar,
+html:not([data-wallpaper="disabled"]) .backup-subpanel,
+html:not([data-wallpaper="disabled"]) .git-panel,
+html:not([data-wallpaper="disabled"]) .queue-panel,
+html:not([data-wallpaper="disabled"]) .explorer-panel {
+  background: transparent !important;
+  border-color: var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .app-splitter {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .app-splitter:hover,
+html:not([data-wallpaper="disabled"]) .splitter-dragging {
+  background: var(--accent) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-right-column {
+  background: var(--glass-panel-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-left: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-rim);
+}
+
+html:not([data-wallpaper="disabled"]) .app-right-drawer {
+  background: transparent !important;
+  border-left: none !important;
+}
+
+html:not([data-wallpaper="disabled"]) .right-drawer-body,
+html:not([data-wallpaper="disabled"]) .rd-activity-view,
+html:not([data-wallpaper="disabled"]) .rd-scroll-area,
+html:not([data-wallpaper="disabled"]) .rd-consultant-view,
+html:not([data-wallpaper="disabled"]) .consultant-wrapper.consultant-embedded,
+html:not([data-wallpaper="disabled"]) .consultant-content-pane.consultant-embedded-pane,
+html:not([data-wallpaper="disabled"]) .consultant-body.embedded-view,
+html:not([data-wallpaper="disabled"]) .consultant-embedded-pane .consultant-chat,
+html:not([data-wallpaper="disabled"]) .consultant-embedded-pane .consultant-messages,
+html:not([data-wallpaper="disabled"]) .task-hstrip,
+html:not([data-wallpaper="disabled"]) .rd-card-integrated,
+html:not([data-wallpaper="disabled"]) .rd-composer,
+html:not([data-wallpaper="disabled"]) .consultant-foot {
+  background: transparent !important;
+  border-color: var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-center-column {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-editor-tabs-bar {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-editor-tabs {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-breadcrumbs-bar {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .wb-editor-canvas {
+  background: transparent !important;
+}
+
+/* Monaco Code Editor Frosted Glass Surface */
+html:not([data-wallpaper="disabled"]) .ed-root-embedded {
+  background: var(--glass-editor-bg) !important;
+  backdrop-filter: blur(var(--glass-editor-blur, 32px)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-editor-blur, 32px)) saturate(var(--glass-saturate, 180%)) !important;
+  box-shadow: var(--glass-rim);
+}
+
+html:not([data-wallpaper="disabled"]) .ed-status {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-top: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .ed-monaco .monaco-editor,
+html:not([data-wallpaper="disabled"]) .ed-monaco .monaco-editor .overflow-guard,
+html:not([data-wallpaper="disabled"]) .ed-monaco .monaco-editor-background,
+html:not([data-wallpaper="disabled"]) .diff-monaco .monaco-editor,
+html:not([data-wallpaper="disabled"]) .diff-monaco .monaco-editor .overflow-guard,
+html:not([data-wallpaper="disabled"]) .diff-monaco .monaco-editor-background {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .ed-monaco .monaco-editor .margin,
+html:not([data-wallpaper="disabled"]) .diff-monaco .monaco-editor .margin {
+  background: transparent !important;
+}
+
+/* Settings tab canvas */
+html:not([data-wallpaper="disabled"]) .wb-settings-tab {
+  background: var(--glass-editor-bg) !important;
+  backdrop-filter: blur(var(--glass-editor-blur, 32px)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-editor-blur, 32px)) saturate(var(--glass-saturate, 180%)) !important;
+  box-shadow: var(--glass-rim);
+}
+
+/* Welcome Canvas */
+html:not([data-wallpaper="disabled"]) .wb-welcome {
+  background: transparent !important;
+}
+
+/* Getting Started & Welcome View (Uses Background Wallpaper) */
+html:not([data-wallpaper="disabled"]) .wb-getting-started-wrapper,
+html:not([data-wallpaper="disabled"]) .welcome-view-root {
+  background: transparent !important;
+}
+
+html:not([data-wallpaper="disabled"]) .welcome-card {
+  border-radius: var(--radius, 12px);
+  background: rgba(14, 13, 20, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+}
+
+html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card {
+  background: rgba(253, 249, 243, 0.55) !important;
+  border: 1px solid rgba(69, 43, 34, 0.14) !important;
+  box-shadow: 0 16px 40px rgba(69, 43, 34, 0.10) !important;
+}
+
+/* Inner Action Buttons & Recent Items inside Welcome Cards */
+html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
+html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
+  border-radius: var(--radius-sm, 6px);
+  background: var(--inset, rgba(0, 0, 0, 0.25)) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
+html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
+  background: var(--hover, rgba(255, 255, 255, 0.05)) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .action-btn,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-item,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid var(--line) !important;
+  box-shadow: none !important;
+}
+
+html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .action-btn:hover:not(:disabled),
+html:not([data-wallpaper="disabled"])[data-theme="light"] .welcome-card .recent-item:hover,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .action-btn:hover:not(:disabled),
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .welcome-card .recent-item:hover {
+  background: var(--hover, rgba(101, 85, 120, 0.04)) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html:not([data-wallpaper="disabled"]) .welcome-shortcuts {
+  background: var(--glass-panel-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-color: var(--glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+}
+
+html:not([data-wallpaper="disabled"]) .app-bottom-dock {
+  background: var(--glass-panel-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-top: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .dock-header {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .settings-overlay-dialog:not(.dialog-embedded) {
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 16px 48px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Settings Page Frosted Glass Architecture */
+html:not([data-wallpaper="disabled"]) .settings-nav {
+  background: var(--glass-panel-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-right: 1px solid var(--glass-border) !important;
+  box-shadow: var(--glass-rim);
+}
+
+html:not([data-wallpaper="disabled"]) .settings-embedded-search-bar {
+  background: var(--glass-header-bg) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate, 180%)) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+  padding: 8px 16px !important;
+}
+
+html:not([data-wallpaper="disabled"]) .settings-search-box {
+  background: rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .settings-search-box,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .settings-search-box {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border-color: var(--glass-border) !important;
+}
+
+/* Settings Content & Panels: Unified Solid Profile */
+html:not([data-wallpaper="disabled"]) .settings-panel,
+html:not([data-wallpaper="disabled"]) .settings-content .panel,
+html:not([data-wallpaper="disabled"]) .settings-content .card {
+  background: var(--panel, var(--bg-card)) !important;
+  border: 1px solid var(--edge, var(--border)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+html:not([data-wallpaper="disabled"]) .aegis-table thead th,
+html:not([data-wallpaper="disabled"]) .aether-table thead th {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aegis-table thead th,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aether-table thead th,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aegis-table thead th,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aether-table thead th {
+  background: rgba(255, 255, 255, 0.40) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .aegis-table tbody td,
+html:not([data-wallpaper="disabled"]) .aether-table tbody td {
+  border-bottom: 1px solid var(--glass-border) !important;
+}
+
+html:not([data-wallpaper="disabled"]) .aegis-table tbody tr:hover,
+html:not([data-wallpaper="disabled"]) .aether-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aegis-table tbody tr:hover,
+[data-theme="light"] html:not([data-wallpaper="disabled"]) .aether-table tbody tr:hover,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aegis-table tbody tr:hover,
+html:not([data-wallpaper="disabled"])[data-theme="light"] .aether-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+
+
+/* Wallpaper Toggle in Settings & Topbars */
+.settings-wallpaper-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+  color: var(--text-dim);
+  transition: all 0.18s ease;
+}
+
+.settings-wallpaper-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-hover);
+}
+
+.settings-wallpaper-toggle.active {
+  color: var(--accent-muted);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

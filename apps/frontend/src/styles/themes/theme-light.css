@@ -1,0 +1,595 @@
+/* Light theme core tokens are centralized in theme-presets.css.
+   This file only retains structural/component-specific light mode overrides. */
+
+:root[data-theme="light"],
+[data-theme="light"] {
+  --bg-sidebar: var(--sidebar);
+  --bg-drawer:  var(--bg-panel);
+}
+
+
+/* Badges & Slider Tracks */
+[data-theme="light"] .app-badge,
+[data-theme="light"] .aegis-badge,
+[data-theme="light"] .aether-badge,
+[data-theme="light"] .seg-badge,
+[data-theme="light"] .badge-n,
+[data-theme="light"] .q-badge {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-faint);
+}
+
+[data-theme="light"] .slider-track,
+[data-theme="light"] .gs-track {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: var(--border);
+}
+
+/* IDE Root */
+[data-theme="light"] .ide-root {
+  background: var(--bg);
+}
+
+/* Project Launcher */
+[data-theme="light"] .pl-topbar {
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .pl-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="light"] .pl-btn-browse {
+  background: var(--bg-deep);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .pl-icon-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+/* Top Navbar */
+[data-theme="light"] .app-navbar {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .nav-path-btn,
+[data-theme="light"] .nav-cmd-btn {
+  background: var(--bg-deep);
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .nav-path-btn:hover,
+[data-theme="light"] .nav-cmd-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .cmd-shortcut {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .nav-toggle-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .nav-toggle-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+[data-theme="light"] .nav-assistant-btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-elev);
+}
+
+[data-theme="light"] .nav-assistant-btn:hover {
+  filter: brightness(1.1);
+  color: var(--bg-elev);
+}
+
+/* Activity Bar */
+[data-theme="light"] .app-activity-bar {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .act-btn {
+  color: var(--text-faint);
+}
+
+[data-theme="light"] .act-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .act-btn.active {
+  color: var(--text);
+}
+
+/* Left Sidebar */
+[data-theme="light"] .app-left-sidebar {
+  background: var(--bg-secondary);
+  border-right: none;
+}
+
+[data-theme="light"] .sidebar-header {
+  background: var(--glass-header-bg);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .sidebar-footer {
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .project-select {
+  background: var(--bg-deep);
+  border-color: var(--border-soft);
+  color: var(--text);
+}
+
+[data-theme="light"] .close-project-btn {
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .close-project-btn:hover {
+  background: var(--bg-hover);
+}
+
+/* Workbench View & Tabs */
+[data-theme="light"] .workbench-view {
+  background: var(--bg);
+}
+
+[data-theme="light"] .wb-left-column {
+  background: var(--bg-secondary);
+  border-right-color: var(--edge);
+  box-shadow: 4px 0 14px rgba(69, 43, 34, 0.08);
+}
+
+[data-theme="light"] .wb-right-column {
+  background: var(--bg-panel);
+  border-left-color: var(--edge);
+  box-shadow: -4px 0 14px rgba(69, 43, 34, 0.08);
+}
+
+[data-theme="light"] .wb-center-column {
+  background: var(--bg);
+}
+
+[data-theme="light"] .wb-breadcrumbs-bar {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .breadcrumb-crumb:hover,
+[data-theme="light"] .crumb-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .breadcrumb-current {
+  color: var(--accent-dim);
+}
+
+[data-theme="light"] .wb-editor-tabs {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .wb-tab-item {
+  color: var(--text-dim);
+  border-right-color: var(--border-soft);
+}
+
+[data-theme="light"] .wb-tab-item:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .wb-tab-item.active {
+  background: var(--bg);
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+[data-theme="light"] .wb-empty-canvas {
+  background: var(--bg);
+}
+
+[data-theme="light"] .app-splitter {
+  background: transparent;
+}
+
+[data-theme="light"] .app-splitter::after {
+  background: var(--edge);
+}
+
+[data-theme="light"] .app-splitter:hover::after,
+[data-theme="light"] .app-splitter.is-dragging::after,
+[data-theme="light"] .splitter-dragging::after {
+  background: var(--accent) !important;
+  box-shadow: 0 0 4px rgba(130, 97, 187, 0.35);
+}
+
+/* Right Drawer */
+[data-theme="light"] .app-right-drawer {
+  background: var(--bg-drawer);
+  border-left: none;
+}
+
+[data-theme="light"] .right-drawer-header {
+  background: var(--glass-header-bg);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .rd-tab-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .rd-tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .rd-tab-btn.active {
+  background: var(--accent);
+  color: var(--bg-elev);
+}
+
+[data-theme="light"] .right-drawer-body,
+[data-theme="light"] .rd-activity-view,
+[data-theme="light"] .rd-scroll-area,
+[data-theme="light"] .rd-consultant-view,
+[data-theme="light"] .consultant-wrapper.consultant-embedded,
+[data-theme="light"] .consultant-content-pane.consultant-embedded-pane,
+[data-theme="light"] .consultant-body.embedded-view,
+[data-theme="light"] .consultant-embedded-pane .consultant-chat,
+[data-theme="light"] .consultant-embedded-pane .consultant-messages {
+  background: var(--bg-drawer);
+}
+
+[data-theme="light"] .task-hstrip {
+  background: transparent;
+  border-bottom-color: var(--border-soft);
+}
+
+[data-theme="light"] .rd-close-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .rd-close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Bottom Dock */
+[data-theme="light"] .app-bottom-dock {
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .dock-header {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .dock-tab-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .dock-tab-btn:hover {
+  color: var(--text);
+}
+
+[data-theme="light"] .dock-tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+[data-theme="light"] .dock-act-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .dock-act-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .dock-log-line {
+  color: var(--text-dim);
+}
+
+/* Footer / Statusbar */
+[data-theme="light"] .app-footer {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .status-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .status-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .status-btn.active {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .dock-shortcut,
+[data-theme="light"] .status-pill,
+[data-theme="light"] .status-badge {
+  background: var(--bg-hover);
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+/* Settings Overlay */
+[data-theme="light"] .settings-overlay,
+[data-theme="light"] .settings-overlay-dialog {
+  background: var(--bg);
+}
+
+[data-theme="light"] .settings-overlay-header {
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .settings-title {
+  color: var(--text);
+}
+
+[data-theme="light"] .settings-subtitle {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .settings-close-btn {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+  color: var(--text);
+}
+
+[data-theme="light"] .settings-close-btn:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="light"] .shortcut-badge {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .settings-nav {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-soft);
+}
+
+[data-theme="light"] .settings-tab-btn {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .settings-tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .settings-tab-btn.active {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Panels & Chat Overrides */
+[data-theme="light"] .ex-row:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+[data-theme="light"] .file-row:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="light"] .consultant-head {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .ctext {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+  color: var(--text);
+}
+
+[data-theme="light"] .cmsg.user .ctext {
+  background: rgba(45, 125, 78, 0.12);
+  border-color: rgba(45, 125, 78, 0.35);
+  color: var(--text);
+}
+
+[data-theme="light"] .close-x:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+/* Modals & Command Palette */
+[data-theme="light"] .modal-backdrop,
+[data-theme="light"] .cmd-palette-backdrop {
+  background: rgba(14, 13, 20, 0.45);
+}
+
+[data-theme="light"] .modal {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="light"] .modal-actions {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="light"] .cmd-palette-modal {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .cmd-palette-input {
+  color: var(--text);
+}
+
+[data-theme="light"] .cmd-palette-footer {
+  border-top-color: var(--border-soft);
+  color: var(--text-faint);
+}
+
+/* Task Subtabs & Panels (Light Theme) */
+[data-theme="light"] .task-subtabs-bar {
+  background: var(--bg-panel);
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .task-subtab-pill.active {
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .side-hist-item,
+[data-theme="light"] .side-sess-item {
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+}
+
+[data-theme="light"] .side-hist-item:hover,
+[data-theme="light"] .side-sess-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+[data-theme="light"] .side-sess-item.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Sidebar Footer Status HUD (Light Theme) */
+[data-theme="light"] .sidebar-footer {
+  background: var(--bg-panel);
+  border-top-color: var(--border-soft);
+}
+
+[data-theme="light"] .sys-row {
+  color: var(--text-faint);
+}
+
+[data-theme="light"] .sys-row .k {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .sys-row .v {
+  color: var(--text);
+}
+
+/* Code Editor (Light Theme) */
+[data-theme="light"] .ed-status {
+  background: var(--bg-surface);
+  border-top-color: var(--border-soft);
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .ed-msg {
+  background: rgba(253, 251, 247, 0.9);
+  color: var(--text-dim);
+}
+
+/* Welcome View (Light Theme) */
+[data-theme="light"] .welcome-card {
+  background: var(--panel);
+  border: 1px solid var(--edge, rgba(255, 255, 255, 0.7));
+  box-shadow: none;
+}
+
+[data-theme="light"] .action-btn {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
+  color: var(--text);
+}
+
+[data-theme="light"] .action-btn:hover:not(:disabled) {
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent);
+  box-shadow: none;
+  transform: none;
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .empty-recent-card {
+  background: rgba(0, 0, 0, 0.015);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .recent-item {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--line, rgba(73, 64, 97, 0.1));
+  box-shadow: none;
+}
+
+[data-theme="light"] .recent-item:hover {
+  background: var(--hover, rgba(101, 85, 120, 0.04));
+  border-color: var(--accent);
+  box-shadow: none;
+  transform: none;
+}
+
+[data-theme="light"] .brand-title,
+[data-theme="light"] .btn-label,
+[data-theme="light"] .card-heading,
+[data-theme="light"] .feature-title,
+[data-theme="light"] .recent-name {
+  color: var(--text) !important;
+}
+
+[data-theme="light"] .sc-label {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] kbd,
+[data-theme="light"] .sc-kbd-group kbd {
+  background: var(--bg-deep) !important;
+  color: var(--text) !important;
+  border-color: var(--border-soft) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Git Backup Panel Restore Modal (Light Theme) */
+[data-theme="light"] .sc-restore-modal {
+  background: var(--bg-card);
+  border-color: var(--border);
+  box-shadow: 0 20px 60px rgba(69, 43, 34, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+
+[data-theme="light"] .sc-restore-desc {
+  color: var(--text-dim);
+}
+
+[data-theme="light"] .sc-restore-target-subject {
+  background: var(--bg-deep);
+  border-color: var(--border-soft);
+  color: var(--text);
+}
+

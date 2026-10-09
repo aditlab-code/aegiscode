@@ -4,7 +4,7 @@ import time
 import pytest
 from agent_ai.session.unified_models import UnifiedTurn, new_turn_id
 from agent_ai.session.unified_store import UnifiedSessionStore
-from web.django_app.api.services import GatewayService
+from apps.django_app.api.services import GatewayService
 
 
 def test_dual_entity_turn_sync(tmp_path) -> None:

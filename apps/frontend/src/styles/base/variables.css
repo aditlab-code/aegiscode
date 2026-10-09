@@ -1,0 +1,50 @@
+/* AegisCode Design System — Core Non-Color Variables & Semantic Aliases
+   All concrete color definitions are centralized in theme-presets.css. */
+
+:root {
+  /* Layout Dimensions & Radius */
+  --sidebar-w:   240px;
+  --right-col-w: 320px;
+  --radius:      10px;
+  --radius-sm:   6px;
+
+  /* Typography Font Families */
+  --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Line & Syntax Semantic Aliases (pointing to theme presets) */
+  --line-number:    var(--muted);
+  --line-highlight: var(--hover);
+  --syntax-green:   var(--ok);
+  --syntax-purple:  var(--accent-2);
+  --syntax-blue:    var(--accent);
+
+  /* Activity timeline tokens */
+  --act-ts:    var(--text);
+  --act-agent: var(--accent-2);
+  --act-obs:   var(--accent);
+
+  /* Alert tokens */
+  --alert-ok-text:   var(--ok);
+  --alert-ok-bg:     var(--hover);
+  --alert-ok-border: var(--border-soft);
+  --alert-err-text:  var(--err);
+  --alert-err-bg:    var(--hover);
+  --alert-err-border:var(--border-soft);
+
+  /* Status dot flat colors */
+  --dot-ok:   var(--ok);
+  --dot-warn: var(--warn);
+  --dot-err:  var(--err);
+
+  /* Button & Accent aliases */
+  --btn-outline-muted: var(--border-soft);
+  --accent-2-soft:     var(--accent-soft);
+  --accent-2-bright:   var(--accent-2);
+
+  /* Container background semantic aliases */
+  --bg-sidebar: var(--sidebar);
+  --bg-drawer:  var(--bg-panel);
+
+  --shadow-pop: 0 28px 90px -20px var(--border-subtle);
+}

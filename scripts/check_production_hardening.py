@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 SETTINGS_PATH = DJANGO_APP_DIR / "config" / "settings.py"
 
 

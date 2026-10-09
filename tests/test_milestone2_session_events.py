@@ -42,7 +42,7 @@ def test_ai05_consultant_service_has_single_load_sessions_method_and_persists_ca
 
 def test_ai04_gateway_consult_accepts_image_only_with_default_prompt():
     """Memverifikasi GatewayService.consult mengisi prompt default bila teks kosong tetapi gambar dilampirkan."""
-    from web.django_app.api.services import GatewayService
+    from apps.django_app.api.services import GatewayService
 
     gateway = GatewayService.__new__(GatewayService)
     gateway._normalize_images = lambda imgs: imgs or []
@@ -86,7 +86,7 @@ def test_ai04_gateway_consult_accepts_image_only_with_default_prompt():
 
 def test_ai04_gateway_consult_rejects_empty_message_when_no_images():
     """Memverifikasi GatewayService.consult tetap menolak pesan kosong jika TIDAK ada gambar."""
-    from web.django_app.api.services import GatewayService, ValidationError
+    from apps.django_app.api.services import GatewayService, ValidationError
 
     gateway = GatewayService.__new__(GatewayService)
     gateway._normalize_images = lambda imgs: imgs or []

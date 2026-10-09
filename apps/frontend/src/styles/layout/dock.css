@@ -1,0 +1,369 @@
+/* AegisCode Bottom Collapsible Dock Styles — UI Kit Alignment */
+
+.app-bottom-dock {
+  flex: 0 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--terminal);
+  border-top: 1px solid var(--line);
+  box-sizing: border-box;
+  overflow: hidden;
+  height: 32px;
+  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.app-bottom-dock:not(.open) {
+  height: 32px !important;
+}
+
+.app-bottom-dock:not(.open) .dock-header {
+  border-bottom: none;
+}
+
+.dock-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: var(--chrome);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+}
+
+.dock-tabs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+}
+
+.dock-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.dock-tab-btn:hover {
+  color: var(--text);
+}
+
+.dock-tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.dock-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-act-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.12s ease;
+}
+
+.dock-act-btn:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.dock-panel {
+  height: 100%;
+}
+
+.dock-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* Output Diagnostic Toolbar */
+.dock-output-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 11px;
+  user-select: none;
+}
+
+.dock-toolbar-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dock-tb-title {
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.dock-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dock-filter-pill:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text);
+}
+
+.dock-filter-pill.active {
+  border-color: var(--accent);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text);
+  font-weight: 500;
+}
+
+.pill-syntax .dot-syntax { color: var(--err); }
+.pill-lint .dot-lint { color: var(--warn); }
+.pill-type .dot-type { color: var(--accent-2); }
+.pill-error .dot-error { color: var(--err); }
+
+.dock-tb-clean {
+  color: var(--ok);
+  font-weight: 500;
+}
+
+/* Output Log Lines & Error Tags */
+.dock-output-lines {
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dock-log-line {
+  display: flex;
+  align-items: baseline;
+  color: var(--text-dim);
+  line-height: 1.5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.dock-log-line.clickable {
+  cursor: pointer;
+}
+
+.dock-log-line.clickable:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.dock-log-line.line-syntax,
+.dock-log-line.line-error {
+  background: rgba(248, 81, 73, 0.05);
+}
+
+.dock-log-line.line-lint {
+  background: rgba(227, 179, 65, 0.05);
+}
+
+.dock-log-line.line-type {
+  background: rgba(188, 140, 255, 0.05);
+}
+
+.dock-log-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 8px;
+  border-radius: 3px;
+  padding: 1px 4px;
+  letter-spacing: 0.02em;
+}
+
+.tag-syntax {
+  color: var(--err);
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.tag-lint {
+  color: var(--warn);
+  background: rgba(227, 179, 65, 0.15);
+}
+
+.tag-type {
+  color: var(--accent-2);
+  background: rgba(188, 140, 255, 0.15);
+}
+
+.tag-error {
+  color: var(--err);
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.dock-log-text {
+  flex: 1 1 auto;
+  word-break: break-all;
+}
+
+.dock-log-loc {
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 10.5px;
+  color: var(--accent);
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+.dock-log-loc:hover {
+  opacity: 1;
+}
+
+.dock-badge-warn {
+  background: var(--warn) !important;
+  color: var(--bg) !important;
+}
+
+.dock-problems-list {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dock-problem-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.dock-problem-row.clickable {
+  cursor: pointer;
+}
+
+.dock-problem-row.clickable:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+}
+
+.dock-problem-row.prob-syntax,
+.dock-problem-row.prob-error {
+  color: var(--err);
+  background: rgba(248, 81, 73, 0.05);
+}
+
+.dock-problem-row.prob-lint {
+  color: var(--warn);
+  background: rgba(227, 179, 65, 0.05);
+}
+
+.dock-problem-row.prob-type {
+  color: var(--accent-2);
+  background: rgba(188, 140, 255, 0.05);
+}
+
+.dock-prob-dot {
+  font-size: 8px;
+  line-height: 1;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.dock-prob-dot.dot-syntax,
+.dock-prob-dot.dot-error {
+  color: var(--err);
+}
+
+.dock-prob-dot.dot-lint {
+  color: var(--warn);
+}
+
+.dock-prob-dot.dot-type {
+  color: var(--accent-2);
+}
+
+.dock-prob-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 4px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.badge-syntax,
+.badge-error {
+  color: var(--err);
+  background: rgba(248, 81, 73, 0.15);
+}
+
+.badge-lint {
+  color: var(--warn);
+  background: rgba(227, 179, 65, 0.15);
+}
+
+.badge-type {
+  color: var(--accent-2);
+  background: rgba(188, 140, 255, 0.15);
+}
+
+.dock-prob-text {
+  flex: 1 1 auto;
+  word-break: break-all;
+}
+
+.dock-prob-loc {
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: 10.5px;
+  color: var(--accent);
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+.dock-prob-loc:hover {
+  opacity: 1;
+}

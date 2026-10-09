@@ -190,9 +190,9 @@ REM argumen berkutip. %%~fI TIDAK membuang trailing backslash, jadi di-strip man
 :detect_aegis
 set "AEGIS_DIR="
 set "CANDIDATE="
-if exist "%~1\pyproject.toml" if exist "%~1\web\django_app\manage.py" set "CANDIDATE=%~1"
-if exist "%~1\web\django_app\manage.py" if exist "%~1\scripts\install_aegis.py" set "CANDIDATE=%~1"
-if exist "%~1\web\django_app\manage.py" if exist "%~1\scripts\install_aether.py" set "CANDIDATE=%~1"
+if exist "%~1\pyproject.toml" if exist "%~1\apps\django_app\manage.py" set "CANDIDATE=%~1"
+if exist "%~1\apps\django_app\manage.py" if exist "%~1\scripts\install_aegis.py" set "CANDIDATE=%~1"
+if exist "%~1\apps\django_app\manage.py" if exist "%~1\scripts\install_aether.py" set "CANDIDATE=%~1"
 if not defined CANDIDATE exit /b 0
 set "AEGIS_DIR=%CANDIDATE%"
 if "%AEGIS_DIR:~-1%"=="\" set "AEGIS_DIR=%AEGIS_DIR:~0,-1%"

@@ -31,6 +31,15 @@ from agent_ai.runtime.lifecycle import (
     TaskLifecycleTransitionError,
     TERMINAL_LIFECYCLE_STATES,
 )
+from agent_ai.runtime.olympus_workflow import (
+    OlympusPhase,
+    OLYMPUS_ASSIGNMENTS,
+    LifecycleState,
+    load_lifecycle_state,
+    save_lifecycle_state,
+    advance_lifecycle_phase,
+    map_olympus_to_ui_activity,
+)
 
 __all__ = [
     "AgentRuntime",
@@ -46,4 +55,11 @@ __all__ = [
     "TaskLifecycleState",
     "TaskLifecycleTransitionError",
     "TERMINAL_LIFECYCLE_STATES",
+    "OlympusPhase",
+    "OLYMPUS_ASSIGNMENTS",
+    "LifecycleState",
+    "load_lifecycle_state",
+    "save_lifecycle_state",
+    "advance_lifecycle_phase",
+    "map_olympus_to_ui_activity",
 ]

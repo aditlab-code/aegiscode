@@ -24,7 +24,7 @@ import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 
 for _p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if _p not in sys.path:
@@ -130,7 +130,7 @@ def test_queue_submission_while_running() -> None:
 
     # 2.2 Frontend adoption guard via Node
     node_script = """
-    const { isViewedTaskRunning, shouldAdoptSubmittedTask } = await import('./web/frontend/src/taskView.js');
+    const { isViewedTaskRunning, shouldAdoptSubmittedTask } = await import('./apps/frontend/src/taskView.js');
     const viewedTaskId = 'task-a';
     const runningTaskId = 'task-a';
     const isViewing = isViewedTaskRunning(viewedTaskId, runningTaskId);
@@ -181,7 +181,7 @@ def test_history_while_reasoning() -> None:
 
     # Verifikasi guard isolasi event stream frontend via Node
     node_reducer = """
-    const { isEventForMonitoredTask } = await import('./web/frontend/src/services/taskStateReducer.js');
+    const { isEventForMonitoredTask } = await import('./apps/frontend/src/services/taskStateReducer.js');
     const state = { monitoredTaskId: 'task-current' };
     const sameEvt = { task_id: 'task-current', type: 'agent_reasoning_delta' };
     const otherEvt = { task_id: 'task-other', type: 'agent_reasoning_delta' };

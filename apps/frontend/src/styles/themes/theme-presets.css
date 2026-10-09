@@ -1,0 +1,497 @@
+/**
+ * AegisCode Theme Presets (Curated Themes)
+ * Single Source of Truth for Color Palettes (HEX / 8-digit HEX)
+ *
+ * Supports:
+ * - Aegis Orbit (Dark & Light)
+ * - Tokyo Night (Dark & Light)
+ * - Nordic / Nord (Dark & Light)
+ * - Atom One (Dark & Light)
+ * - High Contrast (Dark & Light)
+ */
+
+/* =============================================================================
+   Core Shell & Workbench Token Mappings for All Presets
+   ============================================================================= */
+:root,
+[data-theme-preset] {
+  --traffic-close: #ff6058;
+  --traffic-min: #febc2e;
+  --traffic-max: #29c840;
+
+  --chrome: var(--bg-secondary);
+  --rail: var(--bg-sidebar);
+  --sidebar: var(--bg-sidebar);
+  --editor: var(--bg);
+  --tabs: var(--bg-surface);
+  --assistant: var(--bg-drawer);
+  --terminal: var(--bg);
+  --edge: var(--border);
+  --line: var(--border-soft);
+  --inset: var(--bg-deep);
+  --glass-editor-bg: var(--bg);
+  --glass-header-bg: var(--bg-header);
+  --glass-panel-bg: var(--panel);
+  --glass-border: var(--border);
+
+  --status-ok: var(--ok);
+  --status-warn: var(--warn);
+  --status-err: var(--err);
+  --status-info: var(--accent);
+
+  --syntax-keyword: var(--accent-2);
+  --syntax-string: var(--ok);
+  --syntax-fn: var(--accent);
+  --syntax-var: var(--text);
+  --syntax-num: var(--warn);
+  --syntax-type: var(--accent);
+  --syntax-comment: var(--muted);
+
+  --diff-add-bg: #28a74526;
+  --diff-delete-bg: #d73a4926;
+  --diff-add-border: #28a745;
+  --diff-delete-border: #d73a49;
+  --diff-add-text: var(--ok);
+  --diff-delete-text: var(--err);
+}
+
+/* =============================================================================
+   0a. Aegis Orbit (Default Dark)
+   ============================================================================= */
+:root,
+[data-theme-preset="default-dark"] {
+  --bg: #181922;
+  --panel: #1f202c;
+  --surface: #292a36;
+  --bg-panel: #1f202c;
+  --bg-surface: #292a36;
+  --bg-header: #21222e;
+  --bg-elev: #292a36;
+  --bg-card: #1f202c;
+  --bg-sidebar: #171822;
+  --bg-drawer: #171822;
+  --sidebar: #171822d9;
+  --bg-deep: #15161f;
+  --bg-secondary: #1d1e28;
+
+  --text: #dedee9;
+  --text-dim: #bcbcca;
+  --text-faint: #a29eaf;
+  --secondary: #bcbcca;
+  --muted: #a29eaf;
+
+  --accent: #b5a1ed;
+  --accent-dim: #9d7cd8;
+  --accent-soft: #b5a1ed29;
+  --accent-muted: #b5a1ed;
+  --accent-2: #c1a4df;
+  --accent-2-dim: #9d7cd8;
+  --selection: #b5a1ed29;
+
+  --border: #ffffff14;
+  --border-soft: #ffffff0f;
+  --border-subtle: #ffffff08;
+  --border-hover: #b5a1ed73;
+  --line: #ffffff12;
+  --hover: #ffffff0f;
+
+  --ok: #a2c9a3;
+  --warn: #e0af68;
+  --err: #f7768e;
+}
+
+/* =============================================================================
+   0b. Aegis Orbit Light (Default Light)
+   ============================================================================= */
+[data-theme-preset="default-light"] {
+  --bg: #eae5f4;
+  --panel: #f5f3fa;
+  --surface: #f5f3fa;
+  --bg-panel: #f5f3fa;
+  --bg-surface: #f5f3fa;
+  --bg-header: #e8e4f1;
+  --bg-elev: #ffffff;
+  --bg-card: #f5f3fa;
+  --bg-sidebar: #eeeaf5;
+  --bg-drawer: #eeeaf5;
+  --sidebar: #eeeaf5e0;
+  --bg-deep: #dcd7e8;
+  --bg-secondary: #e4dfea;
+
+  --text: #333044;
+  --text-dim: #555168;
+  --text-faint: #736b82;
+  --secondary: #555168;
+  --muted: #736b82;
+
+  --accent: #8261bb;
+  --accent-dim: #6d4fa3;
+  --accent-soft: #8261bb21;
+  --accent-muted: #8261bb;
+  --accent-2: #9a60ad;
+  --accent-2-dim: #7c488e;
+  --selection: #8261bb21;
+
+  --border: #4940611f;
+  --border-soft: #49406114;
+  --border-subtle: #4940610d;
+  --border-hover: #8261bb73;
+  --line: #4940611a;
+  --hover: #6555780f;
+
+  --ok: #628c5a;
+  --warn: #9a7638;
+  --err: #a63f4f;
+}
+
+/* =============================================================================
+   1. Tokyo Night (Dark)
+   ============================================================================= */
+[data-theme-preset="tokyo-night-dark"] {
+  --bg: #1a1b26;
+  --panel: #1f2335;
+  --surface: #24283b;
+  --bg-panel: #1f2335;
+  --bg-surface: #24283b;
+  --bg-header: #1f2335;
+  --bg-elev: #24283b;
+  --bg-card: #1f2335;
+  --bg-sidebar: #16161e;
+  --bg-drawer: #16161e;
+  --sidebar: #16161ed9;
+  --bg-deep: #13141c;
+  --bg-secondary: #1f2335;
+
+  --text: #c0caf5;
+  --text-dim: #9aa5ce;
+  --text-faint: #565f89;
+  --secondary: #9aa5ce;
+  --muted: #565f89;
+
+  --accent: #7aa2f7;
+  --accent-dim: #565f89;
+  --accent-soft: #7aa2f72e;
+  --accent-muted: #7aa2f7;
+  --accent-2: #bb9af7;
+  --accent-2-dim: #9d7cd8;
+  --selection: #7aa2f740;
+
+  --border: #7aa2f729;
+  --border-soft: #ffffff14;
+  --border-subtle: #ffffff0a;
+  --border-hover: #7aa2f773;
+  --line: #ffffff17;
+  --hover: #ffffff14;
+
+  --ok: #9ece6a;
+  --warn: #e0af68;
+  --err: #f7768e;
+}
+
+/* =============================================================================
+   2. Tokyo Night (Light)
+   ============================================================================= */
+[data-theme-preset="tokyo-night-light"] {
+  --bg: #d5d6db;
+  --panel: #e1e2e7;
+  --surface: #e9e9ed;
+  --bg-panel: #e1e2e7;
+  --bg-surface: #e9e9ed;
+  --bg-header: #cbccd1;
+  --bg-elev: #ffffff;
+  --bg-card: #e1e2e7;
+  --bg-sidebar: #cbccd1;
+  --bg-drawer: #cbccd1;
+  --sidebar: #cbccd1d9;
+  --bg-deep: #c0c1c7;
+  --bg-secondary: #dcddde;
+
+  --text: #343b58;
+  --text-dim: #565a6e;
+  --text-faint: #8990b3;
+  --secondary: #565a6e;
+  --muted: #8990b3;
+
+  --accent: #34548a;
+  --accent-dim: #29426f;
+  --accent-soft: #34548a26;
+  --accent-muted: #34548a;
+  --accent-2: #5a4a78;
+  --accent-2-dim: #45375c;
+  --selection: #34548a2e;
+
+  --border: #34548a2e;
+  --border-soft: #34548a1a;
+  --border-subtle: #34548a0d;
+  --border-hover: #34548a73;
+  --line: #34548a1f;
+  --hover: #34548a0f;
+
+  --ok: #485e30;
+  --warn: #8c6c3e;
+  --err: #8c4351;
+}
+
+/* =============================================================================
+   3. Nordic / Nord (Dark)
+   ============================================================================= */
+[data-theme-preset="nord-dark"] {
+  --bg: #2e3440;
+  --panel: #3b4252;
+  --surface: #434c5e;
+  --bg-panel: #3b4252;
+  --bg-surface: #434c5e;
+  --bg-header: #2e3440;
+  --bg-elev: #434c5e;
+  --bg-card: #3b4252;
+  --bg-sidebar: #242933;
+  --bg-drawer: #242933;
+  --sidebar: #242933e0;
+  --bg-deep: #1e222a;
+  --bg-secondary: #353b49;
+
+  --text: #eceff4;
+  --text-dim: #d8dee9;
+  --text-faint: #4c566a;
+  --secondary: #e5e9f0;
+  --muted: #4c566a;
+
+  --accent: #88c0d0;
+  --accent-dim: #81a1c1;
+  --accent-soft: #88c0d02e;
+  --accent-muted: #88c0d0;
+  --accent-2: #b48ead;
+  --accent-2-dim: #9a7293;
+  --selection: #88c0d038;
+
+  --border: #88c0d02e;
+  --border-soft: #ffffff14;
+  --border-subtle: #ffffff0a;
+  --border-hover: #88c0d073;
+  --line: #ffffff14;
+  --hover: #ffffff12;
+
+  --ok: #a3be8c;
+  --warn: #ebcb8b;
+  --err: #bf616a;
+}
+
+/* =============================================================================
+   4. Nordic / Nord (Light)
+   ============================================================================= */
+[data-theme-preset="nord-light"] {
+  --bg: #eceff4;
+  --panel: #e5e9f0;
+  --surface: #e5e9f0;
+  --bg-panel: #e5e9f0;
+  --bg-surface: #e5e9f0;
+  --bg-header: #e5e9f0;
+  --bg-elev: #ffffff;
+  --bg-card: #e5e9f0;
+  --bg-sidebar: #e5e9f0;
+  --bg-drawer: #e5e9f0;
+  --sidebar: #e5e9f0e6;
+  --bg-deep: #d8dee9;
+  --bg-secondary: #e5e9f0;
+
+  --text: #2e3440;
+  --text-dim: #4c566a;
+  --text-faint: #7b88a1;
+  --secondary: #81a1c1;
+  --muted: #7b88a1;
+
+  --accent: #5e81ac;
+  --accent-dim: #4c688d;
+  --accent-soft: #5e81ac26;
+  --accent-muted: #5e81ac;
+  --accent-2: #88c0d0;
+  --accent-2-dim: #81a1c1;
+  --selection: #5e81ac2e;
+
+  --border: #5e81ac38;
+  --border-soft: #2e34401a;
+  --border-subtle: #2e34400d;
+  --border-hover: #5e81ac73;
+  --line: #2e34401a;
+  --hover: #5e81ac0f;
+
+  --ok: #678650;
+  --warn: #987834;
+  --err: #993b45;
+}
+
+/* =============================================================================
+   5. Atom One (Dark)
+   ============================================================================= */
+[data-theme-preset="atom-dark"] {
+  --bg: #282c34;
+  --panel: #21252b;
+  --surface: #2c313a;
+  --bg-panel: #21252b;
+  --bg-surface: #2c313a;
+  --bg-header: #21252b;
+  --bg-elev: #2c313a;
+  --bg-card: #21252b;
+  --bg-sidebar: #1e2227;
+  --bg-drawer: #1e2227;
+  --sidebar: #1e2227e0;
+  --bg-deep: #1b1d23;
+  --bg-secondary: #242830;
+
+  --text: #abb2bf;
+  --text-dim: #828997;
+  --text-faint: #5c6370;
+  --secondary: #9da5b4;
+  --muted: #5c6370;
+
+  --accent: #61afef;
+  --accent-dim: #4d8cd1;
+  --accent-soft: #61afef2e;
+  --accent-muted: #61afef;
+  --accent-2: #c678dd;
+  --accent-2-dim: #ab5cc2;
+  --selection: #61afef38;
+
+  --border: #61afef29;
+  --border-soft: #ffffff14;
+  --border-subtle: #ffffff0a;
+  --border-hover: #61afef73;
+  --line: #ffffff14;
+  --hover: #ffffff12;
+
+  --ok: #98c379;
+  --warn: #e5c07b;
+  --err: #e06c75;
+}
+
+/* =============================================================================
+   6. Atom One (Light)
+   ============================================================================= */
+[data-theme-preset="atom-light"] {
+  --bg: #fafafa;
+  --panel: #f0f0f0;
+  --surface: #e5e5e6;
+  --bg-panel: #f0f0f0;
+  --bg-surface: #e5e5e6;
+  --bg-header: #f0f0f0;
+  --bg-elev: #ffffff;
+  --bg-card: #f0f0f0;
+  --bg-sidebar: #f5f5f5;
+  --bg-drawer: #f5f5f5;
+  --sidebar: #f5f5f5e6;
+  --bg-deep: #dbdbdc;
+  --bg-secondary: #e9e9ea;
+
+  --text: #383a42;
+  --text-dim: #696c77;
+  --text-faint: #a0a1a7;
+  --secondary: #696c77;
+  --muted: #a0a1a7;
+
+  --accent: #4078f2;
+  --accent-dim: #2f5ec4;
+  --accent-soft: #4078f226;
+  --accent-muted: #4078f2;
+  --accent-2: #a626a4;
+  --accent-2-dim: #821c80;
+  --selection: #4078f22e;
+
+  --border: #4078f22e;
+  --border-soft: #383a421a;
+  --border-subtle: #383a420d;
+  --border-hover: #4078f273;
+  --line: #383a421a;
+  --hover: #4078f20f;
+
+  --ok: #50a14f;
+  --warn: #c18401;
+  --err: #e45649;
+}
+
+/* =============================================================================
+   7. High Contrast (Dark)
+   ============================================================================= */
+[data-theme-preset="high-contrast-dark"] {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --surface: #141414;
+  --bg-panel: #0a0a0a;
+  --bg-surface: #141414;
+  --bg-header: #050505;
+  --bg-elev: #1a1a1a;
+  --bg-card: #0a0a0a;
+  --bg-sidebar: #000000;
+  --bg-drawer: #000000;
+  --sidebar: #000000;
+  --bg-deep: #000000;
+  --bg-secondary: #101010;
+
+  --text: #ffffff;
+  --text-dim: #f0f0f0;
+  --text-faint: #d0d0d0;
+  --secondary: #ffffff;
+  --muted: #cccccc;
+
+  --accent: #00ffff;
+  --accent-dim: #00cccc;
+  --accent-soft: #00ffff40;
+  --accent-muted: #00ffff;
+  --accent-2: #ffff00;
+  --accent-2-dim: #cccc00;
+  --selection: #00ffff59;
+
+  --border: #ffffff;
+  --border-soft: #ffffffb3;
+  --border-subtle: #ffffff66;
+  --border-hover: #00ffff;
+  --line: #ffffffb3;
+  --hover: #ffffff2e;
+
+  --ok: #00ff00;
+  --warn: #ffff00;
+  --err: #ff3333;
+}
+
+/* =============================================================================
+   8. High Contrast (Light)
+   ============================================================================= */
+[data-theme-preset="high-contrast-light"] {
+  --bg: #ffffff;
+  --panel: #f2f2f2;
+  --surface: #f2f2f2;
+  --bg-panel: #f2f2f2;
+  --bg-surface: #f2f2f2;
+  --bg-header: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-card: #f2f2f2;
+  --bg-sidebar: #ffffff;
+  --bg-drawer: #ffffff;
+  --sidebar: #ffffff;
+  --bg-deep: #e0e0e0;
+  --bg-secondary: #f2f2f2;
+
+  --text: #000000;
+  --text-dim: #1a1a1a;
+  --text-faint: #333333;
+  --secondary: #990000;
+  --muted: #333333;
+
+  --accent: #0000ee;
+  --accent-dim: #0000aa;
+  --accent-soft: #0000ee2e;
+  --accent-muted: #0000ee;
+  --accent-2: #008800;
+  --accent-2-dim: #006600;
+  --selection: #0000ee40;
+
+  --border: #000000;
+  --border-soft: #000000b3;
+  --border-subtle: #00000066;
+  --border-hover: #0000ee;
+  --line: #000000b3;
+  --hover: #0000001f;
+
+  --ok: #008800;
+  --warn: #885500;
+  --err: #990000;
+}

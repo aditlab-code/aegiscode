@@ -2,8 +2,8 @@
 """Skrip Verifikasi Otomatis Double Run Fase 4: Reliability Gate & Strict QA.
 
 Mengeksekusi dua putaran penuh berturut-turut:
-- Putaran 1: pytest -q && node --test web/frontend/src/*.test.mjs
-- Putaran 2: pytest -q && node --test web/frontend/src/*.test.mjs
+- Putaran 1: pytest -q && node --test apps/frontend/tests/*.test.mjs
+- Putaran 2: pytest -q && node --test apps/frontend/tests/*.test.mjs
 - Memeriksa ketiadaan proses zombie (defunct/zombie processes)
 - Memverifikasi exit code 0 di setiap langkah.
 """
@@ -57,28 +57,11 @@ def main() -> int:
     print("=" * 70)
 
     pytest_cmd = [sys.executable, "-m", "pytest", "-q"]
-    node_cmd = ["node", "--test", "web/frontend/src/activityCopy.test.mjs",
-                "web/frontend/src/asyncAuditRemediation.test.mjs",
-                "web/frontend/src/authService.test.mjs",
-                "web/frontend/src/diagnosticService.test.mjs",
-                "web/frontend/src/editorModelLifecycle.test.mjs",
-                "web/frontend/src/gitVisualizerService.test.mjs",
-                "web/frontend/src/gitWorkbenchIntegration.test.mjs",
-                "web/frontend/src/gitWorkbenchService.test.mjs",
-                "web/frontend/src/lifecycle.test.mjs",
-                "web/frontend/src/lifecycleEventsContract.test.mjs",
-                "web/frontend/src/markdown.test.mjs",
-                "web/frontend/src/remediationVerification.test.mjs",
-                "web/frontend/src/serverService.test.mjs",
-                "web/frontend/src/servicesIntegration.test.mjs",
-                "web/frontend/src/sseGapAndTelemetry.test.mjs",
-                "web/frontend/src/taskStateReducer.test.mjs",
-                "web/frontend/src/taskView.test.mjs",
-                "web/frontend/src/tokenFormat.test.mjs",
-                "web/frontend/src/unifiedSessions.test.mjs",
-                "web/frontend/src/version.test.mjs",
-                "web/frontend/src/workspaceContextService.test.mjs",
-                "web/frontend/src/workspaceIsolation.test.mjs"]
+    frontend_tests = sorted(
+        str(p.relative_to(ROOT_DIR))
+        for p in (ROOT_DIR / "apps" / "frontend" / "tests").glob("*.test.mjs")
+    )
+    node_cmd = ["node", "--test", *frontend_tests]
 
     # --- PUTARAN 1 ---
     print("\n[Fase 4] ==================== PUTARAN 1 ====================")

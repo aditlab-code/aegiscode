@@ -22,7 +22,7 @@ $ErrorActionPreference = "Stop"
 
 # Root project = parent dari folder scripts/.
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$DjangoApp = Join-Path $ProjectRoot "web\django_app"
+$DjangoApp = Join-Path $ProjectRoot "apps\django_app"
 
 # Port dasar dari `data/settings.json` (satu sumber konfigurasi global);
 # `-Port` eksplisit (non-0) menimpa nilai konfigurasi.
@@ -46,7 +46,7 @@ if ($Port -le 0) {
 }
 
 if (-not (Test-Path $DjangoApp)) {
-    Write-Error "Tidak menemukan web\django_app di $DjangoApp"
+    Write-Error "Tidak menemukan apps\django_app di $DjangoApp"
     exit 1
 }
 

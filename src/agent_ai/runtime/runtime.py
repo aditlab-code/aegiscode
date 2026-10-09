@@ -1235,7 +1235,17 @@ class AgentRuntime:
         if phase == self._activity_phase:
             return
         self._activity_phase = phase
-        self._emit_event("phase_changed", {"phase": phase})
+        payload: dict[str, Any] = {"phase": phase}
+        try:
+            if hasattr(self, "project_root") and self.project_root:
+                from agent_ai.runtime.olympus_workflow import load_lifecycle_state
+                st = load_lifecycle_state(self.project_root)
+                payload["olympus_phase"] = st.current_phase
+                payload["persona"] = st.active_persona
+                payload["skills"] = list(st.active_skills)
+        except Exception:
+            pass
+        self._emit_event("phase_changed", payload)
 
     # ------------------------------------------------------------------ #
     # Agent Execution Policy (fast/balanced/deep) — informasi/strategi

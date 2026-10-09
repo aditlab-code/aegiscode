@@ -11,7 +11,7 @@ Tanggung jawab:
     2. Siapkan virtual environment portable di <root>/venv.
     3. Pastikan dependency runtime terpasang (pip install -r requirements.txt).
     4. Pastikan file konfigurasi .env ada (disalin dari template; TANPA credential).
-    5. Pastikan frontend production build ada (web/frontend/dist), build bila perlu.
+    5. Pastikan frontend production build ada (apps/frontend/dist), build bila perlu.
     6. Jalankan AETHER (Django Gateway) pada port yang dibaca dari
        `<root>/data/settings.json` -> `port` (fallback ke port lain yang bebas
        bila port tersebut sedang dipakai; default 8000 bila tidak dikonfigurasi).
@@ -30,8 +30,8 @@ Kapitalisasi flag ditoleransi (mis. `--SIMULATE`), karena gate simulasi di
 run.bat mencocokkan argumen secara case-insensitive.
 
 Batasan arsitektur yang dipertahankan:
-    - Entry backend tetap web/django_app/manage.py.
-    - Frontend tetap dibangun dari web/frontend memakai Vite; build memakai
+    - Entry backend tetap apps/django_app/manage.py.
+    - Frontend tetap dibangun dari apps/frontend memakai Vite; build memakai
       `node node_modules/vite/bin/vite.js build` (tidak bergantung pada npm
       script) sesuai konvensi proyek.
     - Tidak ada credential yang ditulis ke file mana pun.
@@ -117,7 +117,7 @@ def requirements_file(root: Path) -> Path:
 
 
 def frontend_dir(root: Path) -> Path:
-    return root / "web" / "frontend"
+    return root / "apps" / "frontend"
 
 
 def frontend_dist_index(root: Path) -> Path:
@@ -125,7 +125,7 @@ def frontend_dist_index(root: Path) -> Path:
 
 
 def django_app_dir(root: Path) -> Path:
-    return root / "web" / "django_app"
+    return root / "apps" / "django_app"
 
 
 def settings_file(root: Path) -> Path:
@@ -333,7 +333,7 @@ def ensure_frontend(root: Path, force: bool = False) -> bool:
     if not node_modules.exists():
         npm = shutil.which("npm")
         if not npm:
-            error("'npm' tidak ditemukan di PATH; dibutuhkan untuk 'npm install' di web/frontend.")
+            error("'npm' tidak ditemukan di PATH; dibutuhkan untuk 'npm install' di apps/frontend.")
             error("Instal Node.js LTS (yang menyertakan npm) lalu jalankan ulang run.bat.")
             return False
         info("Memasang dependency frontend (npm install)...")
@@ -344,7 +344,7 @@ def ensure_frontend(root: Path, force: bool = False) -> bool:
 
     vite = node_modules / "vite" / "bin" / "vite.js"
     if not vite.exists():
-        error("vite tidak ditemukan di node_modules. Hapus web/frontend/node_modules lalu jalankan ulang run.bat.")
+        error("vite tidak ditemukan di node_modules. Hapus apps/frontend/node_modules lalu jalankan ulang run.bat.")
         return False
 
     info("Membangun frontend production build (vite build)...")
@@ -352,7 +352,7 @@ def ensure_frontend(root: Path, force: bool = False) -> bool:
     if result.returncode != 0 or not dist_index.exists():
         error("build frontend gagal. Periksa pesan di atas lalu jalankan ulang run.bat.")
         return False
-    info("Frontend production build siap (web/frontend/dist).")
+    info("Frontend production build siap (apps/frontend/dist).")
     return True
 
 
@@ -561,9 +561,17 @@ def launch(root: Path, python: Path, host: str, port: int | None = None, open_br
     info(f"URL: {url}")
     info("Tekan Ctrl+C di jendela ini untuk menghentikan AegisCode.")
 
-    if open_browser:
-        _open_browser_later(url)
+    token_file = root / ".aegis" / "run" / "gateway.token"
+    token = ""
+    if token_file.is_file():
+        try:
+            token = token_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
 
+    browser_url = f"{url}?token={token}" if token else url
+    if open_browser:
+        _open_browser_later(browser_url)
     argv = [str(python), "manage.py", "runserver", f"{host}:{actual_port}"]
 
     popen_kwargs: dict[str, Any] = {
@@ -624,9 +632,9 @@ def _aegis_markers(root: Path) -> list[str]:
     if (root / "pyproject.toml").exists():
         found.append("pyproject.toml")
     if (django_app_dir(root) / "manage.py").exists():
-        found.append("web/django_app/manage.py")
+        found.append("apps/django_app/manage.py")
     if (frontend_dir(root) / "package.json").exists():
-        found.append("web/frontend/package.json")
+        found.append("apps/frontend/package.json")
     return found
 
 
@@ -636,7 +644,7 @@ _aether_markers = _aegis_markers
 def looks_like_aegis(root: Path) -> bool:
     """True bila root memuat marker instalasi AegisCode (tanpa efek samping)."""
     markers = _aegis_markers(root)
-    return "pyproject.toml" in markers or "web/django_app/manage.py" in markers
+    return "pyproject.toml" in markers or "apps/django_app/manage.py" in markers
 
 
 looks_like_aether = looks_like_aegis

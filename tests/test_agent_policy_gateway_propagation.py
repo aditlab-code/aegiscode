@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-for _p in (str(PROJECT_ROOT / "src"), str(PROJECT_ROOT / "web" / "django_app")):
+for _p in (str(PROJECT_ROOT / "src"), str(PROJECT_ROOT / "apps" / "django_app")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

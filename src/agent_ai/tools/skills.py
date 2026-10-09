@@ -56,7 +56,7 @@ class _SkillToolBase(BaseTool):
     def _store(self):
         from agent_ai.projects.skills import SkillStore
 
-        return SkillStore(self._require_root())
+        return SkillStore(self._require_root(), include_central=True)
 
 
 class SkillCatalogTool(_SkillToolBase):

@@ -1,0 +1,244 @@
+/* AETHER Bottom Statusbar Footer HUD */
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+  padding: 0 12px;
+  background: var(--bg-secondary, var(--chrome));
+  border-top: 1px solid var(--edge);
+  box-sizing: border-box;
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--dim, var(--text-dim));
+  user-select: none;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.footer-left,
+.footer-center,
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.license-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.1px;
+  font-weight: 500;
+  user-select: none;
+}
+
+.license-item svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.status-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.status-btn:hover {
+  color: var(--text);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+}
+
+.status-btn.active {
+  color: var(--text);
+  background: var(--bg-card);
+}
+
+.dock-shortcut {
+  font-size: 9.5px;
+  padding: 0 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 10.5px;
+}
+
+/* Compact status badges in footer center */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-soft);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+  user-select: none;
+}
+
+.badge-dot {
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* System online / offline */
+.badge-online .badge-dot {
+  color: var(--ok);
+}
+
+.badge-offline .badge-dot {
+  color: var(--err);
+}
+
+/* Agent status */
+.badge-agent.status-on .badge-dot,
+.badge-agent.status-active .badge-dot {
+  color: var(--ok);
+}
+
+.badge-agent.status-run .badge-dot,
+.badge-agent.status-running .badge-dot {
+  color: var(--warn);
+}
+
+.badge-agent.status-off .badge-dot,
+.badge-agent.status-idle .badge-dot {
+  color: var(--text-faint);
+}
+
+.badge-agent.status-err .badge-dot {
+  color: var(--err);
+}
+
+.problem-count-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 0 4px;
+  background: var(--warn);
+  color: var(--bg-elev);
+  border-radius: 8px;
+  line-height: 1.2;
+}
+
+/* Git Branch Status Badge */
+.badge-git-branch {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 1px 6px;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+  color: var(--text-dim);
+}
+.badge-git-branch:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text);
+}
+.badge-git-branch svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.badge-branch-name {
+  font-family: var(--mono, monospace);
+  font-weight: 600;
+  color: var(--text);
+}
+.badge-sync-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-family: var(--mono, monospace);
+  margin-left: 2px;
+}
+.sync-ahead {
+  color: var(--accent);
+  font-weight: 600;
+}
+.sync-behind {
+  color: var(--warn);
+  font-weight: 600;
+}
+.sync-synced {
+  color: var(--ok);
+  font-size: 9.5px;
+}
+
+/* Dev Server Port Chip Badge */
+.status-ports-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-dev-port {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-hover);
+  cursor: pointer;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.12s ease;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-dev-port:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.badge-dev-port .port-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.badge-port-label {
+  font-weight: 600;
+}
+
+.port-dismiss-btn {
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+  margin-left: 2px;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.port-dismiss-btn:hover {
+  color: var(--err);
+  background: var(--bg-hover);
+}

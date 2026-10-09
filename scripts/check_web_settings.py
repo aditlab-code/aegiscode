@@ -38,8 +38,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
-FRONTEND_DIR = PROJECT_ROOT / "web" / "frontend" / "src"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
+FRONTEND_DIR = PROJECT_ROOT / "apps" / "frontend" / "src"
 
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:
@@ -335,7 +335,7 @@ def _run(env_path: Path, cleanup: list[str]) -> int:
     # 17) serving: "/" benar-benar menyajikan bundle build terbaru + header cache.
     #     Ini menutup akar masalah "UI Settings lama": static.serve tanpa
     #     Cache-Control membuat browser menyajikan index.html/bundle lama.
-    dist_dir = PROJECT_ROOT / "web" / "frontend" / "dist"
+    dist_dir = PROJECT_ROOT / "apps" / "frontend" / "dist"
     if dist_dir.is_dir():
         import re as _re
 
@@ -374,7 +374,7 @@ def _run(env_path: Path, cleanup: list[str]) -> int:
             "index.html no-cache, asset immutable"
         )
     else:
-        print("[17] serving SKIP -> dist belum di-build (jalankan 'npm run build' di web/frontend)")
+        print("[17] serving SKIP -> dist belum di-build (jalankan 'npm run build' di apps/frontend)")
 
     print()
     print("[OK] Web Settings bekerja (CRUD konfigurasi LLM via facade AETHER, tanpa secret bocor).")

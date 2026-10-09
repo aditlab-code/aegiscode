@@ -46,7 +46,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = PROJECT_ROOT / "src"
-DJANGO_APP_DIR = PROJECT_ROOT / "web" / "django_app"
+DJANGO_APP_DIR = PROJECT_ROOT / "apps" / "django_app"
 for p in (str(SRC_DIR), str(DJANGO_APP_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
@@ -251,13 +251,11 @@ def main() -> int:
     print("[7b] jalur Agent tanpa gambar tetap text-only OK")
 
     # 8) Frontend: api.js + TaskComposer.vue memuat jalur attach image.
-    api_js = (PROJECT_ROOT / "web" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
+    api_js = (PROJECT_ROOT / "apps" / "frontend" / "src" / "api.js").read_text(encoding="utf-8")
     assert "function createTask(" in api_js, "createTask harus ada di api.js"
     assert "body.images = images" in api_js, "api.js harus mengirim field 'images'"
     composer = (
-        PROJECT_ROOT
-        / "web"
-        / "frontend"
+        PROJECT_ROOT / "apps" / "frontend"
         / "src"
         / "components"
         / "TaskComposer.vue"

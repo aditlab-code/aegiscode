@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 SRC_DIR = Path(__file__).resolve().parent.parent / "src"
-DJANGO_DIR = Path(__file__).resolve().parent.parent / "web" / "django_app"
+DJANGO_DIR = Path(__file__).resolve().parent.parent / "apps" / "django_app"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 if str(DJANGO_DIR) not in sys.path:

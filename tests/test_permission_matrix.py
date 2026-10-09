@@ -318,7 +318,7 @@ def _ensure_django() -> None:
     import sys
 
     project_root = Path(__file__).resolve().parents[1]
-    for rel in ("src", "web/django_app"):
+    for rel in ("src", "apps/django_app"):
         path = str(project_root / rel)
         if path not in sys.path:
             sys.path.insert(0, path)

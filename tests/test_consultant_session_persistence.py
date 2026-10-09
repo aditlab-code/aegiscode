@@ -149,7 +149,7 @@ def test_views_list_create_get(tmp_store):
     import api.views as views
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "web" / "django_app"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "django_app"))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
     os.environ["DJANGO_ALLOWED_HOSTS"] = "testserver,127.0.0.1,localhost"
     if "testserver" not in settings.ALLOWED_HOSTS:
