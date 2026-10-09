@@ -255,37 +255,8 @@ def _build_active_file_context(
 def _build_auto_semantic_context(
     message: str, root: Optional[str | Path], k: int = 3
 ) -> str:
-    if not root:
-        return ""
-    try:
-        from agent_ai.repointel.semantic.availability import is_available
-
-        if not is_available()[0]:
-            return ""
-        from agent_ai.repointel.semantic.service import SemanticIndexService
-
-        svc = SemanticIndexService.get_instance(root)
-        results = svc.search(message, k=k)
-        if not results:
-            return ""
-        lines = [
-            "",
-            "---",
-            "# Konteks Semantik Relevan dari Basis Kode (Local Vector DB):",
-        ]
-        for res in results:
-            sym_or_kind = res.get("symbol") or res.get("kind") or "code"
-            lines.append(
-                f"## {res.get('path')} ({sym_or_kind}, baris {res.get('start_line', 1)}-{res.get('end_line', 1)}):"
-            )
-            lang = _detect_fence_lang(res.get("path") or "")
-            lines.append(f"```{lang}")
-            lines.append(res.get("snippet", ""))
-            lines.append("```")
-        lines.append("---")
-        return "\n".join(lines)
-    except Exception:
-        return ""
+    """Legacy vector context is decommissioned in favor of deterministic CodeGraph."""
+    return ""
 
 
 class ConsultantService:

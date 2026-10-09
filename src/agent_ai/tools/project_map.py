@@ -394,10 +394,6 @@ def build_project_map_tools(
     ]
     if include_refresh:
         tools.append(RefreshProjectMapTool(root=root, service=service))
-    if include_hybrid:
-        from agent_ai.tools.semantic import HybridSearchTool
-
-        tools.append(HybridSearchTool(root=root))
     return tools
 
 

@@ -261,35 +261,8 @@ def _extract_query_keywords(query: str) -> List[str]:
 
 
 def _resolve_semantic_search_candidates(cwd_path: Path, query: str, limit: int) -> List[Dict[str, Any]]:
-    """Gunakan SemanticIndexService lokal jika database vektor tersedia."""
-    if not query.strip():
-        return []
-    try:
-        from agent_ai.repointel.semantic.availability import is_available
-        avail, _ = is_available()
-        if not avail:
-            return []
-        from agent_ai.repointel.semantic.paths import resolve_vectors_db
-        db_path = resolve_vectors_db(cwd_path)
-        if not db_path.is_file():
-            return []
-        from agent_ai.repointel.semantic.service import SemanticIndexService
-        with SemanticIndexService(root=cwd_path, read_only=True) as service:
-            results = service.search(query=query, k=limit)
-            candidates = []
-            for r in results:
-                rel_path = r.get("path")
-                if rel_path:
-                    candidates.append({
-                        "path": str(rel_path).replace("\\", "/"),
-                        "symbol": r.get("symbol"),
-                        "kind": r.get("kind"),
-                        "start_line": r.get("start_line"),
-                        "end_line": r.get("end_line"),
-                    })
-            return candidates
-    except Exception:
-        return []
+    """Legacy vector search candidates decommissioned in favor of deterministic CodeGraph AST."""
+    return []
 
 
 def _extract_file_symbols(file_path: Path, max_lines: int = 60) -> List[str]:
