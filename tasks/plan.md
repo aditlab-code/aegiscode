@@ -1,58 +1,72 @@
-# Implementation Plan: Refinement Telegram Companion & AppStatusBar Toggle UX
+# Implementation Plan: Git Source Control Commit & Staging Lifecycle Refinement
 
 ## Context & Objectives
-Mengubah interaksi Telegram Companion pada `apps/frontend` menjadi arsitektur **toggle sakelar 1-klik** yang efisien dan deterministik:
-- Tombol Companion di `AppStatusBar.vue` dapat langsung menyalakan/mematikan bot poller dengan notifikasi toast tanpa membuka modal saat akun sudah terhubung atau aktif.
-- Single-poller lock pada `telegramService.js` untuk mencegah benturan race-condition atau pembuatan instansi poller berlebih.
-- Modal `TelegramPairingPopover.vue` diperkaya sebagai pusat informasi: panduan langkah `@BotFather`, warning konfigurasi `.env`, QR Code, dan tautan langsung ke Telegram Web.
-- Menjamin alur kerja komunikasi 2 arah LLM yang sudah berjalan tetap terlindungi tanpa fallback/callback yang menyimpang.
+Memperbaiki bug siklus commit Git pada `apps/frontend`:
+- Saat berkas di-stage dan di-commit, berkas sempat kembali muncul di list "Changes" (unstaged) karena fallback `ChangesPanel.vue` ke memory task changes (`props.changes`) saat status Git bersih (`localGitChanges` kosong).
+- Pengguna sebelumnya terpaksa me-refresh peramban secara manual untuk melihat status repositori yang bersih.
+- Menetapkan `localGitChanges` sebagai **Single Source of Truth** ketika `isRepository: true`.
+- Menyambungkan event pipeline `checkpoint-created` ke `App.vue` untuk membersihkan task memory changes dan menyinkronkan badge counter di Top Navbar serta Activity Bar secara reaktif.
 
 ---
 
 ## Dependency Graph & Architecture
 
 ```
-telegramService.js (Single-Poller Lock, Reactive Status, Toast Hook)
+useTaskLifecycle.js (clearTaskChanges helper)
       ▲
       │
-      ├── AppStatusBar.vue (1-Click Toggle Coordinator, Status Badge, Toast Notification)
-      │
-      └── TelegramPairingPopover.vue (BotFather Guide, .env Warning Banner, QR Code, Web Link)
+      ├── App.vue (handleCheckpointCreated, synchronize badge & explorerRefresh)
+      │     ▲
+      │     │
+      │     └── WorkbenchView.vue (forward @checkpoint-created)
+      │           ▲
+      │           │
+      │           ├── useWorkbenchEditorFacade.js (handleCheckpointCreated, close diff tabs)
+      │           │
+      │           └── GitSidebarPanel.vue (forward @checkpoint-created, loadGitChanges)
+      │                 ▲
+      │                 │
+      │                 ├── GithubBackupPanel.vue (emit checkpoint-created on commit)
+      │                 │
+      │                 └── ChangesPanel.vue (Single Source of Truth in activeFiles)
 ```
 
 ---
 
 ## Detailed Task Breakdown
 
-### Task 1: Single-Poller Lock & Notification State in `telegramService.js`
-- Tambahkan proteksi penguncian aksi *in-flight* (`isToggling` / request lock) pada `startTelegramPoller` dan `stopTelegramPoller` agar tidak ada pemanggilan ganda jika tombol diklik berulang kali.
-- Sediakan state reactive `statusNotification` (message, type) untuk menampung feedback feedback operasional.
-- Pastikan method `startTelegramPoller` dan `stopTelegramPoller` memperbarui status secara sinkron.
-- Files: `apps/frontend/src/services/telegramService.js`
+### Task 1: Expose `clearTaskChanges` in `useTaskLifecycle.js`
+- Sediakan fungsi pembantu `clearTaskChanges()` pada composable `useTaskLifecycle.js`.
+- Ekspor `clearTaskChanges` agar dapat dikonsumsi oleh `App.vue`.
+- Files: `apps/frontend/src/composables/useTaskLifecycle.js`
 
-### Task 2: 1-Click Toggle & Toast Banner in `AppStatusBar.vue`
-- Refactor handler `@click` pada badge Telegram Companion:
-  - Jika `!telegramStatus.configured`: tampilkan modal instruksi (`showTelegramPopover = true`).
-  - Jika `telegramStatus.is_running`: hentikan poller (`stopTelegramPoller()`), tampilkan notifikasi toast di status bar bahwa bot standby, jangan buka modal.
-  - Jika `!telegramStatus.is_running`:
-    - Jika `telegramStatus.is_paired`: aktifkan poller (`startTelegramPoller()`), tampilkan notifikasi toast bahwa bot aktif mendengarkan, jangan buka modal.
-    - Jika `!telegramStatus.is_paired`: aktifkan poller (`startTelegramPoller()`), set status menjadi pairing (*idle on pairing*), dan buka modal (`showTelegramPopover = true`) untuk scan QR / link web.
-- Tambahkan elemen floating toast feedback non-intrusif di atas status bar untuk memberi konfirmasi visual saat status poller berubah.
-- Perbarui tooltip badge agar informatif dan jelas.
-- Files: `apps/frontend/src/components/layout/AppStatusBar.vue`
+### Task 2: Strict Single Source of Truth in `ChangesPanel.vue`
+- Perbarui computed property `activeFiles` di `ChangesPanel.vue`:
+  - Jika `isRepository.value === true`, gunakan secara eksklusif `localGitChanges.value`. Jangan pernah fallback ke `props.changes` saat status Git bersih.
+  - Jika `isRepository.value === false`, pertahankan fallback ke `props.changes` untuk kompatibilitas workspace non-git.
+- Pastikan method `loadGitChanges` diekspos dengan benar dan memperbarui `localGitChanges` secara deterministik.
+- Files: `apps/frontend/src/components/git/ChangesPanel.vue`
 
-### Task 3: Informational Modal & BotFather Guide in `TelegramPairingPopover.vue`
-- Perbarui tampilan modal saat status `!status.configured`:
-  - Tampilkan banner peringatan (*warning*) jelas bahwa bot belum dapat diaktifkan sebelum `TELEGRAM_BOT_TOKEN` dan ID terdaftar (`TELEGRAM_ALLOWED_USER_IDS`) disetel di `.env`.
-  - Berikan panduan bertahap pembuatan bot via `@BotFather` (`/newbot`, nama bot, token API).
-- Perbarui tampilan QR & link:
-  - Pastikan tidak perlu klik pemicu aplikasi desktop; berikan opsi "Buka di Telegram Web" langsung ke peramban.
-  - Tampilkan status poller reactively.
-- Patuhi standar token CSS: tidak ada hardcoded HEX di `<style>` atau template `.vue`.
-- Files: `apps/frontend/src/components/layout/TelegramPairingPopover.vue`
+### Task 3: Event Pipeline & Badge Synchronization in `App.vue` & Layout
+- Tangani event `@checkpoint-created` pada `<WorkbenchView>` di `App.vue`:
+  - Panggil `clearTaskChanges()` untuk membersihkan list in-memory task changes.
+  - Inkrementasikan `explorerRefresh.value++` agar tree explorer dan panel git status tersinkronisasi otomatis.
+- Pastikan badge `changes-count` pada `AppNavbar` dan `AppActivityBar` langsung mencerminkan kondisi bersih (0 atau sisa uncommitted changes).
+- Files:
+  - `apps/frontend/src/App.vue`
+  - `apps/frontend/src/components/sidebar/GitSidebarPanel.vue`
+  - `apps/frontend/src/composables/workbench/useWorkbenchEditorFacade.js`
 
-### Task 4: Unit Test & Verification Gates
-- Tulis unit test untuk `telegramService.js` dan alur single-poller di `apps/frontend/tests/telegramCompanion.test.mjs`.
-- Jalankan static analysis pemeriksaan HEX code, data-theme, dan inline color.
-- Jalankan build `npm run build` dan test suite `node --test`.
-- Files: `apps/frontend/tests/telegramCompanion.test.mjs`
+### Task 4: Unit Testing & Verification Gates
+- Buat test suite baru `apps/frontend/tests/gitCommitLifecycle.test.mjs` untuk menguji:
+  1. Logika evaluasi `activeFiles` ketika `isRepository: true` (clean git status tidak fallback ke stale changes).
+  2. Logika evaluasi `activeFiles` ketika `isRepository: false` (fallback aman ke `props.changes`).
+  3. Pembersihan state `changes` dan propagasi event commit.
+- Jalankan 6 mandatory frontend verification gates:
+  1. Theme check (0 data-theme in Vue `<style>`).
+  2. Inline color check (0 `:style=".*color"`).
+  3. HEX token check (0 hardcoded hex in CSS outside presets).
+  4. Vue HEX token check (0 hardcoded hex in `.vue`).
+  5. Build check (`rtk npm --prefix apps/frontend run build` lolos).
+  6. Unit test check (`rtk node --test apps/frontend/tests/*.test.mjs` 100% pass).
+- Files: `apps/frontend/tests/gitCommitLifecycle.test.mjs`

@@ -110,6 +110,7 @@ const emit = defineEmits([
   "unstage-change",
   "checkpoint-created",
   "branch-info-updated",
+  "changes-updated",
 ]);
 
 const projectOptions = computed(() => {
@@ -241,6 +242,7 @@ function onProjectChange(event) {
         @unstage-change="emit('unstage-change', $event)"
         @checkpoint-created="emit('checkpoint-created', $event)"
         @branch-info-updated="emit('branch-info-updated', $event)"
+        @changes-updated="emit('changes-updated', $event)"
       />
 
       <!-- 3. Threads / History Section -->

@@ -30,12 +30,15 @@ const emit = defineEmits([
   "unstage-change",
   "checkpoint-created",
   "branch-info-updated",
+  "changes-updated",
 ]);
 
 const changesPanelRef = ref(null);
 
-function onCheckpointCreated(result) {
-  changesPanelRef.value?.loadGitChanges();
+async function onCheckpointCreated(result) {
+  if (changesPanelRef.value?.loadGitChanges) {
+    await changesPanelRef.value.loadGitChanges();
+  }
   emit("checkpoint-created", result);
 }
 
@@ -68,6 +71,7 @@ function handleOpenDiff(file) {
           @discard-change="emit('discard-change', $event)"
           @stage-change="emit('stage-change', $event)"
           @unstage-change="emit('unstage-change', $event)"
+          @changes-updated="emit('changes-updated', $event)"
         />
       </GithubBackupPanel>
     </div>

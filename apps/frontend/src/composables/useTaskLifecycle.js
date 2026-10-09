@@ -581,6 +581,10 @@ async function handleOpenReport(taskId) {
   catch (err) { currentReport.value = `Failed to load report: ${err.message || err}`; }
 }
 
+  function clearTaskChanges() {
+    changes.value = [];
+  }
+
   return {
     task,
     isRunning,
@@ -593,6 +597,7 @@ async function handleOpenReport(taskId) {
     activityPhase,
     lifecycleMilestones,
     changes,
+    clearTaskChanges,
     validation,
     liveFsChange,
     tokenCount,

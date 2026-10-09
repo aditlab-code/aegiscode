@@ -21,6 +21,7 @@ const emit = defineEmits([
   "discard-change",
   "stage-change",
   "unstage-change",
+  "changes-updated",
 ]);
 
 const localGitChanges = ref([]);
@@ -261,6 +262,8 @@ async function loadGitChanges() {
   } catch (e) {
     localGitChanges.value = [];
     gitignoreRules.value = [];
+  } finally {
+    emit("changes-updated", activeFiles.value);
   }
 }
 
@@ -273,17 +276,20 @@ watch(
 );
 
 const activeFiles = computed(() => {
-  const raw =
-    isRepository.value && localGitChanges.value.length > 0
-      ? localGitChanges.value
-      : props.changes && props.changes.length > 0
-      ? props.changes
-      : localGitChanges.value;
+  // Bila repositori aktif, status Git riil adalah Single Source of Truth mutlak.
+  // Jangan pernah fallback ke props.changes saat status Git bersih (localGitChanges kosong).
+  const raw = isRepository.value
+    ? localGitChanges.value
+    : (props.changes && props.changes.length > 0 ? props.changes : []);
   return (raw || []).filter(
     (c) =>
       !isInternalOrIgnored(c?.path || c?.detail) &&
       !matchesGitignore(c?.path || c?.detail, gitignoreRules.value)
   );
+});
+
+watch(activeFiles, (files) => {
+  emit("changes-updated", files);
 });
 
 const stagedChanges = computed(() => activeFiles.value.filter((f) => Boolean(f.staged)));

@@ -49,7 +49,7 @@ const emit = defineEmits([
   "update:provider-instance-id", "update:model-id", "update:mode",
   "refresh-config", "refresh-history", "open-history-task",
   "open-consultant-session", "open-session", "open-folder", "delete-project",
-  "open-path", "open-explorer", "branch-info-updated", "checkpoint-created",
+  "open-path", "open-explorer", "branch-info-updated", "checkpoint-created", "changes-updated",
 ]);
 
 // Layout, Editor, Assistant, & Dock Coordinators
@@ -154,7 +154,7 @@ defineExpose({
           @discard-change="editorFacade.handleDirectDiscard" @stage-change="editorFacade.handleStageChange"
           @checkpoint-created="editorFacade.handleCheckpointCreated" @view-task="emit('view-task', $event)"
           @open-composer="assistantFacade.handleOpenAgentComposer" @open-settings="editorFacade.openSettings('providers')"
-          @open-session="assistantFacade.handleOpenConsultantSession" @branch-info-updated="emit('branch-info-updated', $event)"
+          @open-session="assistantFacade.handleOpenConsultantSession" @branch-info-updated="emit('branch-info-updated', $event)" @changes-updated="emit('changes-updated', $event)"
         />
       </aside>
 
