@@ -1,8 +1,7 @@
 <script setup>
-import { computed, ref, onMounted, onUnmounted, watch } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { usePortDiscovery } from "../../services/portDiscoveryService.js";
 import { useTelegramCompanion } from "../../services/telegramService.js";
-import { getOperationalMode, setOperationalMode } from "../../api.js";
 import TelegramPairingPopover from "./TelegramPairingPopover.vue";
 
 const { discoveredPorts, openPortSafely, removeDiscoveredPort } = usePortDiscovery();
@@ -26,18 +25,6 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  modelLabel: {
-    type: String,
-    default: "",
-  },
-  providerLabel: {
-    type: String,
-    default: "",
-  },
-  taskStatus: {
-    type: String,
-    default: "idle",
-  },
   connected: {
     type: Boolean,
     default: false,
@@ -46,101 +33,20 @@ const props = defineProps({
     type: String,
     default: "",
   },
-  agentStatus: {
-    type: Object,
-    default: () => ({ label: "idle", cls: "status-off" }),
-  },
   aegisVersion: {
     type: String,
     default: "0.2.05",
-  },
-  bottomDockOpen: {
-    type: Boolean,
-    default: false,
-  },
-  activeDockTab: {
-    type: String,
-    default: "terminal",
-  },
-  problemsCount: {
-    type: Number,
-    default: 0,
-  },
-  tier: {
-    type: String,
-    default: "desktop",
-    validator: (v) => ["desktop", "compact", "mobile"].includes(v),
   },
   gitBranchInfo: {
     type: Object,
     default: null,
   },
-  operationalMode: {
-    type: String,
-    default: "",
-  },
 });
 
-const emit = defineEmits(["toggle-dock", "open-git", "mode-changed"]);
-
-const operationalMode = ref(props.operationalMode || "ask");
-const isTogglingMode = ref(false);
-
-watch(() => props.operationalMode, (newVal) => {
-  if (newVal) {
-    operationalMode.value = newVal;
-  }
-});
-
-async function fetchMode() {
-  try {
-    const res = await getOperationalMode();
-    if (res?.mode) {
-      operationalMode.value = res.mode;
-    }
-  } catch (_) {
-    // Graceful fallback to default
-  }
-}
-
-async function toggleMode() {
-  if (isTogglingMode.value) return;
-  const nextMode = operationalMode.value === "agents" ? "ask" : "agents";
-  isTogglingMode.value = true;
-  try {
-    const res = await setOperationalMode(nextMode);
-    if (res?.mode) {
-      operationalMode.value = res.mode;
-    } else {
-      operationalMode.value = nextMode;
-    }
-    emit("mode-changed", operationalMode.value);
-  } catch (err) {
-    console.error("Failed to toggle operational mode:", err);
-  } finally {
-    isTogglingMode.value = false;
-  }
-}
-
-function onModeUpdatedEvent(e) {
-  const modeVal = e.detail?.mode || e.detail?.data?.mode || e.detail?.payload?.mode || e.detail;
-  if (typeof modeVal === "string" && ["ask", "agents"].includes(modeVal.toLowerCase())) {
-    operationalMode.value = modeVal.toLowerCase();
-  }
-}
+const emit = defineEmits(["open-git"]);
 
 onMounted(() => {
   checkTelegramStatus();
-  fetchMode();
-  if (typeof window !== "undefined") {
-    window.addEventListener("aegis:mode_updated", onModeUpdatedEvent);
-  }
-});
-
-onUnmounted(() => {
-  if (typeof window !== "undefined") {
-    window.removeEventListener("aegis:mode_updated", onModeUpdatedEvent);
-  }
 });
 
 const branchTooltip = computed(() => {
@@ -190,31 +96,6 @@ const branchTooltip = computed(() => {
         <span class="badge-text">{{ connected ? "Online" : "Offline" }}</span>
       </span>
 
-      <!-- Agent Status Badge -->
-      <span
-        class="status-badge badge-agent"
-        :class="agentStatus?.cls || 'status-off'"
-        title="Agent Status"
-      >
-        <span class="badge-dot">●</span>
-        <span class="badge-text">Agent: {{ agentStatus?.label || "idle" }}</span>
-      </span>
-
-      <!-- Operational Mode Badge (Ask ⏸️ vs Agents ⚡) -->
-      <button
-        type="button"
-        class="status-badge badge-operational-mode"
-        :class="operationalMode === 'agents' ? 'badge-mode-agents' : 'badge-mode-ask'"
-        :title="`Operational Mode: ${operationalMode === 'agents' ? 'Agents (Autonomous ⚡)' : 'Ask (HITL Confirmation ⏸️)'}. Klik untuk beralih mode.`"
-        :disabled="isTogglingMode"
-        @click="toggleMode"
-      >
-        <span class="badge-dot">●</span>
-        <span class="badge-text">
-          Mode: {{ operationalMode === 'agents' ? 'Agents ⚡' : 'Ask ⏸️' }}
-        </span>
-      </button>
-
       <!-- Telegram Remote Companion Badge -->
       <button
         type="button"
@@ -225,7 +106,7 @@ const branchTooltip = computed(() => {
       >
         <span class="badge-dot">●</span>
         <span class="badge-text">
-          Companion: {{ !telegramStatus?.configured ? 'Off' : (!telegramStatus?.is_paired ? 'Pairing' : (telegramStatus?.is_running ? 'Active ⚡' : 'Standby ⏸️')) }}
+          Companion: {{ !telegramStatus?.configured ? 'Off' : (!telegramStatus?.is_paired ? 'Pairing' : (telegramStatus?.is_running ? 'Active' : 'Standby')) }}
         </span>
       </button>
 
@@ -270,7 +151,7 @@ const branchTooltip = computed(() => {
       </span>
     </div>
 
-    <!-- Right Section: Model, Provider, Version -->
+    <!-- Right Section: Cursor, Spaces, Encoding, Language, Version -->
     <div class="footer-right">
       <!-- Editor Position & Language Metadata -->
       <span v-if="cursor" class="status-item cursor-item" title="Line and Column">
@@ -284,19 +165,6 @@ const branchTooltip = computed(() => {
       </span>
       <span v-if="language" class="status-item lang-item" title="File Language">
         {{ language }}
-      </span>
-      <!-- Model Label -->
-      <span v-if="modelLabel" class="status-item model-item" title="Active AI Model">
-        {{ modelLabel }}
-      </span>
-
-      <!-- Provider Label (Desktop & Compact only) -->
-      <span
-        v-if="tier !== 'mobile' && providerLabel"
-        class="status-item provider-item"
-        title="Active AI Provider"
-      >
-        {{ providerLabel }}
       </span>
 
       <!-- AegisCode Version -->
@@ -313,23 +181,6 @@ const branchTooltip = computed(() => {
 </template>
 
 <style scoped>
-.badge-operational-mode {
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
-  transition: all 0.15s ease;
-}
-.badge-operational-mode:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--border-focus, rgba(255, 255, 255, 0.2));
-}
-.badge-mode-agents .badge-dot {
-  color: #38bdf8;
-}
-.badge-mode-ask .badge-dot {
-  color: var(--warn, #e5a00d);
-}
-
 .badge-telegram {
   cursor: pointer;
   background: rgba(255, 255, 255, 0.05);

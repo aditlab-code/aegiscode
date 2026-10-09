@@ -123,18 +123,14 @@ test("M3-APPROVAL: ApprovalModal.vue renders dialog header, tool badge, target, 
   assert.ok(modalCode.includes("aegis:approval_resolved"), "ApprovalModal harus mendukung event approval_resolved");
 });
 
-test("M3-STATUSBAR: AppStatusBar.vue renders operational mode badge with click toggle", () => {
+test("M3-STATUSBAR: AppStatusBar.vue is streamlined without operational mode and agent badges", () => {
   const statusBarCode = readSrc("components/layout/AppStatusBar.vue");
 
-  assert.ok(statusBarCode.includes("badge-operational-mode"), "AppStatusBar harus memiliki badge badge-operational-mode");
-  assert.ok(statusBarCode.includes("getOperationalMode"), "AppStatusBar harus mengimpor getOperationalMode");
-  assert.ok(statusBarCode.includes("setOperationalMode"), "AppStatusBar harus mengimpor setOperationalMode");
-  assert.ok(statusBarCode.includes("toggleMode"), "AppStatusBar harus mendukung fungsi toggleMode");
-  assert.ok(statusBarCode.includes("operationalMode"), "AppStatusBar harus memiliki state/prop operationalMode");
-  assert.ok(statusBarCode.includes("mode-changed"), "AppStatusBar harus memancarkan emit mode-changed");
-  assert.ok(statusBarCode.includes("Agents ⚡"), "AppStatusBar harus menampilkan label Agents ⚡");
-  assert.ok(statusBarCode.includes("Ask ⏸️"), "AppStatusBar harus menampilkan label Ask ⏸️");
-  assert.ok(statusBarCode.includes("aegis:mode_updated"), "AppStatusBar harus mendengarkan event mode_updated");
+  assert.ok(!statusBarCode.includes("badge-operational-mode"), "AppStatusBar tidak boleh memiliki badge-operational-mode");
+  assert.ok(!statusBarCode.includes("badge-agent"), "AppStatusBar tidak boleh memiliki badge-agent");
+  assert.ok(!statusBarCode.includes("model-item"), "AppStatusBar tidak boleh memiliki model-item");
+  assert.ok(!statusBarCode.includes("provider-item"), "AppStatusBar tidak boleh memiliki provider-item");
+  assert.ok(statusBarCode.includes("badge-telegram"), "AppStatusBar harus memiliki badge badge-telegram");
 });
 
 test("M3-APP: App.vue mounts ApprovalModal and coordinates operational mode & SSE approval events", () => {
@@ -149,6 +145,4 @@ test("M3-APP: App.vue mounts ApprovalModal and coordinates operational mode & SS
   assert.ok(appCode.includes("approval_requested"), "App.vue harus merespons SSE approval_requested");
   assert.ok(appCode.includes("approval_resolved"), "App.vue harus merespons SSE approval_resolved");
   assert.ok(appCode.includes("mode_updated"), "App.vue harus merespons SSE mode_updated");
-  assert.ok(appCode.includes(":operational-mode=\"operationalMode\""), "App.vue harus meneruskan operationalMode ke AppStatusBar");
-  assert.ok(appCode.includes("@mode-changed="), "App.vue harus menyelaraskan perubahan mode dari AppStatusBar");
 });

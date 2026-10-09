@@ -104,7 +104,13 @@ async function handleUnlink() {
 
       <div class="info-body">
         <div class="info-section">
-          <h4>🔒 Keamanan Zero-Trust & Outbound Polling</h4>
+          <h4 class="info-title">
+            <svg class="info-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span>Keamanan Zero-Trust & Outbound Polling</span>
+          </h4>
           <p>
             Gateway menggunakan metode <i>long-polling outbound</i> langsung ke server Telegram. Komputer Anda tidak memerlukan port publik atau IP statis.
             Hanya User ID yang berhasil melakukan scan QR yang diizinkan memberi instruksi; akun tak dikenal langsung ditolak.
@@ -112,7 +118,13 @@ async function handleUnlink() {
         </div>
 
         <div class="info-section">
-          <h4>📱 Fitur Remote Steering</h4>
+          <h4 class="info-title">
+            <svg class="info-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+              <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+            <span>Fitur Remote Steering</span>
+          </h4>
           <ul>
             <li><b>Notifikasi Getar & Suara:</b> Ponsel bergetar otomatis saat agen membutuhkan konfirmasi (HITL).</li>
             <li><b>Tombol Persetujuan Cepat:</b> Tekan <code>[Approve]</code> atau <code>[Reject]</code> langsung pada chat Telegram.</li>
@@ -212,6 +224,17 @@ async function handleUnlink() {
   margin: 0 0 6px 0;
   font-size: 13px;
   color: var(--text-primary, #ffffff);
+}
+
+.info-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-icon {
+  color: #38bdf8;
+  flex-shrink: 0;
 }
 
 .info-section p, .info-section ul {

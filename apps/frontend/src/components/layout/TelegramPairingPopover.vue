@@ -11,17 +11,7 @@ const {
   checkTelegramStatus,
   fetchTelegramPairingQr,
   unlinkTelegramUser,
-  startTelegramPoller,
-  stopTelegramPoller,
 } = useTelegramCompanion();
-
-async function handleTogglePoller() {
-  if (status.value.is_running) {
-    await stopTelegramPoller();
-  } else {
-    await startTelegramPoller();
-  }
-}
 
 let pollInterval = null;
 
@@ -48,6 +38,15 @@ onUnmounted(() => {
     clearInterval(pollInterval);
   }
 });
+
+const showQrWhenPaired = ref(false);
+
+async function toggleShowQr() {
+  showQrWhenPaired.value = !showQrWhenPaired.value;
+  if (showQrWhenPaired.value && !qrData.value?.qr_svg) {
+    await fetchTelegramPairingQr();
+  }
+}
 
 async function handleRefreshQr() {
   await fetchTelegramPairingQr();
@@ -85,7 +84,13 @@ async function handleUnlink() {
 
         <!-- 1. Kondisi: Token Belum Dikonfigurasi di .env -->
         <div v-if="!status.configured" class="state-container state-unconfigured">
-          <div class="status-icon-bubble warning">⚠️</div>
+          <div class="status-icon-bubble warning">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
           <h4>Bot Token Belum Diatur</h4>
           <p>
             Untuk mengaktifkan pendamping jarak jauh, buat bot di <b>@BotFather</b> lalu tambahkan ke <code>.env</code>:
@@ -95,45 +100,70 @@ async function handleUnlink() {
 
         <!-- 2. Kondisi: Akun Sudah Terhubung (Paired) -->
         <div v-else-if="status.is_paired" class="state-container state-paired">
-          <div class="status-icon-bubble success">✅</div>
+          <div class="status-icon-bubble success">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
           <h4>Perangkat Terhubung</h4>
           <p class="connected-info">
             Akun Telegram: <b>@{{ status.paired_user?.username || status.paired_user?.first_name || status.paired_user?.user_id }}</b>
           </p>
-          <!-- Poller Control Card -->
-          <div class="poller-control-card">
-            <div class="poller-status-header">
-              <span class="poller-label">Status Bot Poller:</span>
-              <span class="poller-badge" :class="status.is_running ? 'poller-running' : 'poller-stopped'">
-                <span class="dot">●</span>
-                {{ status.is_running ? "Aktif (Mendengarkan Chat)" : "Nonaktif (Standby)" }}
-              </span>
-            </div>
-            <p class="poller-hint">
-              {{ status.is_running
-                ? "Bot sedang berjalan dan siap merespons perintah / chat Anda secara langsung."
-                : "Bot sedang berhenti. Klik tombol di bawah untuk mulai mendengarkan pesan Telegram."
-              }}
-            </p>
-            <button
-              type="button"
-              class="btn"
-              :class="status.is_running ? 'btn-stop-poller' : 'btn-start-poller'"
-              :disabled="loading"
-              @click="handleTogglePoller"
-            >
-              <span v-if="loading">Memproses...</span>
-              <span v-else-if="status.is_running">⏹️ Hentikan Poller Bot</span>
-              <span v-else>▶️ Aktifkan Poller Bot</span>
-            </button>
+
+          <div class="poller-status-chip" :class="status.is_running ? 'status-chip-active' : 'status-chip-standby'">
+            <span class="chip-dot">●</span>
+            <span>{{ status.is_running ? "Poller Aktif (Mendengarkan)" : "Poller Standby" }}</span>
           </div>
 
           <p class="description">
             Ponsel Anda akan bergetar dan menerima pesan saat agen membutuhkan keputusan persetujuan (*Human-in-the-Loop*).
           </p>
-          <button type="button" class="btn btn-danger btn-unlink" :disabled="loading" @click="handleUnlink">
-            Putuskan Hubungan
-          </button>
+
+          <div class="paired-actions-row">
+            <button
+              type="button"
+              class="btn btn-secondary btn-inner"
+              :disabled="loading"
+              @click="toggleShowQr"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              <span>{{ showQrWhenPaired ? "Sembunyikan QR Pairing" : "Tampilkan QR Code Pairing" }}</span>
+            </button>
+            <button type="button" class="btn btn-danger btn-unlink" :disabled="loading" @click="handleUnlink">
+              Putuskan Hubungan
+            </button>
+          </div>
+
+          <!-- Drawer QR Code saat akun terhubung -->
+          <div v-if="showQrWhenPaired" class="paired-qr-drawer">
+            <p class="qr-instructions">
+              Pindai QR code ini untuk menghubungkan akun Telegram lain atau memperbarui sesi:
+            </p>
+            <div class="qr-display-box">
+              <div v-if="loading" class="qr-loading">Memuat QR Code...</div>
+              <div v-else-if="qrData.qr_svg" class="qr-svg-holder" v-html="qrData.qr_svg"></div>
+            </div>
+
+            <div v-if="qrData.deep_link" class="actions-group">
+              <a :href="qrData.deep_link" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-inner">
+                <span>Buka di Telegram</span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+              </a>
+              <button type="button" class="btn btn-secondary" :disabled="loading" @click="handleRefreshQr">
+                Perbarui QR
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 3. Kondisi: Siap Pairing (Menampilkan QR Code) -->
@@ -148,33 +178,16 @@ async function handleUnlink() {
           </div>
 
           <div v-if="qrData.deep_link" class="actions-group">
-            <a :href="qrData.deep_link" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
-              Buka di Telegram ↗
+            <a :href="qrData.deep_link" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-inner">
+              <span>Buka di Telegram</span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/>
+                <line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
             </a>
             <button type="button" class="btn btn-secondary" :disabled="loading" @click="handleRefreshQr">
               Perbarui QR
-            </button>
-          </div>
-
-          <!-- Poller Control Card (saat pairing) -->
-          <div class="poller-control-card">
-            <div class="poller-status-header">
-              <span class="poller-label">Status Bot Poller:</span>
-              <span class="poller-badge" :class="status.is_running ? 'poller-running' : 'poller-stopped'">
-                <span class="dot">●</span>
-                {{ status.is_running ? "Aktif (Mendengarkan)" : "Nonaktif (Standby)" }}
-              </span>
-            </div>
-            <button
-              type="button"
-              class="btn"
-              :class="status.is_running ? 'btn-stop-poller' : 'btn-start-poller'"
-              :disabled="loading"
-              @click="handleTogglePoller"
-            >
-              <span v-if="loading">Memproses...</span>
-              <span v-else-if="status.is_running">⏹️ Hentikan Poller Bot</span>
-              <span v-else>▶️ Aktifkan Poller Bot</span>
             </button>
           </div>
         </div>
@@ -269,10 +282,19 @@ async function handleUnlink() {
 
 .status-icon-bubble.warning {
   background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
 }
 
 .status-icon-bubble.success {
   background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.btn-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .env-snippet {
@@ -360,87 +382,59 @@ async function handleUnlink() {
   background: rgba(239, 68, 68, 0.3);
 }
 
-.poller-control-card {
+.btn-unlink {
+  margin-top: 0;
+}
+
+.paired-actions-row {
+  display: flex;
+  gap: 10px;
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.1));
-  border-radius: 8px;
-  padding: 12px;
-  margin: 12px 0;
+  margin-top: 8px;
+}
+
+.paired-qr-drawer {
+  width: 100%;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  text-align: left;
-}
-
-.poller-status-header {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
 }
 
-.poller-label {
-  color: var(--text-muted, #a6adc8);
-  font-weight: 500;
-}
-
-.poller-badge {
+.poller-status-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 10px;
   border-radius: 12px;
+  margin-bottom: 12px;
 }
 
-.poller-badge.poller-running {
-  background: rgba(34, 197, 94, 0.15);
+.status-chip-active {
+  background: rgba(34, 197, 94, 0.12);
   color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.25);
 }
 
-.poller-badge.poller-stopped {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-muted, #94a3b8);
-}
-
-.poller-badge .dot {
+.status-chip-active .chip-dot {
+  color: #22c55e;
   font-size: 8px;
   line-height: 1;
 }
 
-.poller-hint {
-  font-size: 11.5px;
-  color: var(--text-muted, #a6adc8);
-  margin: 0;
-  line-height: 1.4;
-}
-
-.btn-start-poller {
-  background: #16a34a;
-  color: #ffffff;
-  font-weight: 600;
-  padding: 8px 12px;
-}
-
-.btn-start-poller:hover {
-  background: #15803d;
-}
-
-.btn-stop-poller {
-  background: rgba(234, 179, 8, 0.15);
+.status-chip-standby {
+  background: rgba(250, 204, 21, 0.12);
   color: #facc15;
-  border: 1px solid rgba(234, 179, 8, 0.3);
-  font-weight: 600;
-  padding: 8px 12px;
+  border: 1px solid rgba(250, 204, 21, 0.25);
 }
 
-.btn-stop-poller:hover {
-  background: rgba(234, 179, 8, 0.25);
-}
-
-.btn-unlink {
-  margin-top: 6px;
+.status-chip-standby .chip-dot {
+  color: #facc15;
+  font-size: 8px;
+  line-height: 1;
 }
 </style>

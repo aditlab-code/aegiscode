@@ -398,7 +398,6 @@ onBeforeUnmount(() => {
         :assistant-visible="responsive.rightDrawerOpen.value && Boolean(activeProject)"
         :sidebar-visible="responsive.sidebarOpen.value && Boolean(activeProject)"
         :bottom-dock-visible="workbenchRef?.bottomDockOpen || false"
-        :is-dark="themeState.isDark.value"
         :user="currentUser"
         @logout="handleLogout"
         @open-explorer="activeNav = 'explorer'"
@@ -406,7 +405,6 @@ onBeforeUnmount(() => {
         @toggle-assistant="toggleAssistantAction()"
         @toggle-sidebar="toggleSidebarAction()"
         @toggle-terminal="workbenchRef?.toggleBottomDock()"
-        @toggle-theme="themeState.toggleTheme()"
       />
 
       <div class="ide-main-row">
@@ -447,12 +445,9 @@ onBeforeUnmount(() => {
       </div>
 
       <AppStatusBar
-        :cursor="cursorPos" :language="activeLanguage" :model-label="activeModelLabel" :provider-label="activeProviderLabel"
-        :task-status="task.status" :connected="connected" :gateway-address="gatewayAddress" :agent-status="agentStatus" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
-        :operational-mode="operationalMode"
-        :bottom-dock-open="workbenchRef?.bottomDockOpen || false" :active-dock-tab="workbenchRef?.dockActiveTab || 'terminal'" :tier="responsive.tier.value" :problems-count="workbenchRef?.problems?.length || 0"
-        @toggle-dock="(tab) => workbenchRef?.toggleBottomDock(tab)" @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
-        @mode-changed="(m) => { operationalMode = m; }"
+        :cursor="cursorPos" :language="activeLanguage"
+        :connected="connected" :gateway-address="gatewayAddress" :aegis-version="AEGIS_VERSION" :git-branch-info="gitBranchInfo"
+        @open-git="() => { activeNav = 'git'; toggleSidebarAction(true); }"
       />
     </div>
 

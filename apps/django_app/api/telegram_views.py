@@ -94,6 +94,11 @@ def telegram_pairing_qr(request):
             status=400,
         )
 
+    # Pastikan companion bot aktif mendengarkan saat QR code digenerate
+    comp = get_companion()
+    if comp and not (comp.bot_client and comp.bot_client.is_polling()):
+        comp.start()
+
     bot_username = get_bot_username(token)
     if not bot_username:
         bot_username = "AegisCode_bot"
@@ -118,6 +123,12 @@ def telegram_unlink(request):
 
     sec = get_security_manager()
     success = sec.unlink()
+    global _companion
+    if _companion:
+        try:
+            _companion.stop()
+        except Exception:
+            pass
     return JsonResponse({"success": success})
 
 
