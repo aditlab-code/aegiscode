@@ -536,37 +536,8 @@ const EVENT_DESCRIBERS = {
     icon: "check",
     title: "Recovery completed",
   }),
-  policy_applied: (d, base, index) => {
-    const req = d.requested_mode ? (d.requested_mode.charAt(0).toUpperCase() + d.requested_mode.slice(1)) : "Balanced";
-    const eff = d.effective_mode ? (d.effective_mode.charAt(0).toUpperCase() + d.effective_mode.slice(1)) : "Balanced";
-    const act = d.activity || "";
-    const isEscalated = Boolean(d.escalated);
-    return {
-      ...base,
-      key: `policy-${index}`,
-      kind: "notice",
-      icon: isEscalated ? "zap" : "target",
-      title: isEscalated ? `Policy: ${req} → ${eff}` : `Policy: ${eff}`,
-      scope: isEscalated ? `Escalated to ${eff}` : `Mode: ${eff}`,
-      detailText: act || (isEscalated
-        ? `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`
-        : `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}`),
-    };
-  },
-  policy_escalated: (d, base, index) => {
-    const from = d.from_mode ? (d.from_mode.charAt(0).toUpperCase() + d.from_mode.slice(1)) : "Fast";
-    const to = d.to_mode ? (d.to_mode.charAt(0).toUpperCase() + d.to_mode.slice(1)) : "Deep";
-    const act = d.activity || "";
-    return {
-      ...base,
-      key: `policy-esc-${index}`,
-      kind: "notice",
-      icon: "zap",
-      title: `Policy escalated: ${from} → ${to}`,
-      scope: `Escalated: ${from} → ${to}`,
-      detailText: act || `[POLICY]\nEscalated:\n${from} → ${to}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`,
-    };
-  },
+  policy_applied: () => null,
+  policy_escalated: () => null,
   question_asked: (d, base, index) => ({
     ...base,
     key: `question-${d.question_id || index}`,

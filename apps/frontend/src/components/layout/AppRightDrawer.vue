@@ -122,7 +122,7 @@ const props = defineProps({
   },
   mode: {
     type: String,
-    default: "balanced",
+    default: "agents",
   },
   activeTabPath: {
     type: String,

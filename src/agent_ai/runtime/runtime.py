@@ -1336,11 +1336,13 @@ class AgentRuntime:
         return state
 
     def _emit_policy_applied(self, state: ExecutionPolicyState) -> None:
-        """Emit event `policy_applied` (event system existing; best-effort).
+        """Emit event `policy_applied` (best-effort; dilewati pada mode otonom dinamis).
 
         Payload memuat ringkasan policy + `activity` (blok teks siap baca pada
         activity/log, termasuk blok escalation bila ada).
         """
+        if getattr(state, "effective_mode", None) in (None, "agents", "balanced") and getattr(state, "requested_mode", None) in (None, "", "agents"):
+            return
         try:
             payload = state.to_dict()
             payload["activity"] = policy_activity_text(state)

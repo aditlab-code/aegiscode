@@ -19,11 +19,16 @@ flowchart LR
 
 ## 🗺️ Tahapan Milestone Komunitas
 
-### 1. Milestone v0.2.05 (Rilis Saat Ini) — *Baseline Studio & Remote Companion*
+### 1. Milestone v0.2.05 / v0.2.06 (Rilis Saat Ini) — *Baseline Studio, Remote Companion & Autonomous Olympus Architecture*
 - [x] **Sovereign Local Authentication**: Autentikasi sandi lokal PBKDF2-HMAC-SHA256 tanpa ketergantungan server luar.
-- [x] **Telegram Remote Companion**: Outbound long-polling zero-trust, pairing QR code instan, dan remote approval HITL.
+- [x] **Telegram Remote Companion**: Outbound long-polling zero-trust, pairing QR code instan, dan permanen Agents Mode ⚡ dengan audit streaming real-time.
 - [x] **Monaco Workbench IDE**: Editor multi-tab, layout responsif dengan splitter adaptif, dan pelacakan status berkas.
-- [x] **Olympus Multi-Agent Framework**: Pembagian peran otonom (Zeus, Athena, Hermes, Hephaestus, Heracles, Themis).
+- [x] **Olympus Multi-Agent Framework**: 6 tahapan siklus hidup dinamis (DEFINE, PLAN, BUILD, VERIFY, REVIEW, SHIP) dan delegasi peran terkoordinasi (Zeus, Athena, Hermes, Hephaestus, Heracles, Themis).
+- [x] **Unified Single-Mode "Agents"**: Konsolidasi asisten ke 100% otonom penuh, eliminasi mode "Ask" dan penghapusan total throttling (Quick / Balanced / Deep) di workbench dan settings.
+- [x] **Interactive Agent Question Dialogues**: Dialog tanya-balik interaktif langsung di kartu timeline agen (`AgentActivity.vue`) tanpa perlu berpindah mode.
+- [x] **Active Project Root Specifications**: Penyimpanan artefak `SPEC.md` dan `TODO.md` langsung di `<active_project_root>/specs/` dengan aksi 1-klik buka di Monaco Editor.
+- [x] **Unthrottled Runner & Resilient Retry**: Penghapusan circuit-breaker runner (`proc.kill()`), izin refactoring skala besar, dan auto-retry eksponensial untuk koneksi drop.
+- [x] **Rust Token Killer (`rtk`) CLI Proxy**: Kompresi output shell cerdas dan penghematan token konteks LLM secara real-time.
 - [x] **Unified Dual-Theming**: 10 preset tema (6 gelap, 4 terang) berbasis token warna murni tanpa hardcoded hex.
 - [x] **Smart Web Terminal**: Integrasi xterm.js dengan manajemen proses lokal.
 

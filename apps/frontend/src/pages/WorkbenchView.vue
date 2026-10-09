@@ -37,7 +37,7 @@ const props = defineProps({
   activeOverlay: { type: String, default: null }, sidebarVisible: { type: Boolean, default: true }, assistantVisible: { type: Boolean, default: true },
   initialTabs: { type: Array, default: () => [] }, initialActiveTab: { type: String, default: "" }, initialSplitActive: { type: Boolean, default: false },
   initialSplitDirection: { type: String, default: "vertical" }, initialSplitTab: { type: String, default: "" }, providers: { type: Array, default: () => [] },
-  providerInstanceId: { type: String, default: "" }, modelId: { type: String, default: "" }, mode: { type: String, default: "balanced" },
+  providerInstanceId: { type: String, default: "" }, modelId: { type: String, default: "" }, mode: { type: String, default: "agents" },
 });
 
 const emit = defineEmits([
@@ -393,7 +393,7 @@ defineExpose({
           :is-running="isRunning" :is-submitting="isSubmitting" :stop-in-progress="stopInProgress" :error="error"
           :consultant-props="assistantFacade.effectiveConsultantProps.value" :providers="assistantFacade.effectiveProviderList.value"
           :provider-instance-id="assistantFacade.effectiveProviderInstanceId.value" :model-id="assistantFacade.effectiveModelId.value"
-          :mode="props.mode || props.config?.mode || 'balanced'" :active-tab-path="editorFacade.activeTabPath.value"
+          :mode="props.mode || props.config?.mode || 'agents'" :active-tab-path="editorFacade.activeTabPath.value"
           :active-file="editorFacade.activeFile.value" @close="toggleAssistant(false)" @open-composer="assistantFacade.handleOpenAgentComposer"
           @request-stop="emit('request-stop')" @submit-task="emit('submit-task', $event)" @open-settings="emit('open-settings', $event)"
           @open-report="emit('open-report', $event)" @copy-activity="emit('copy-activity')"

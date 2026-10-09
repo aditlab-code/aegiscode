@@ -40,7 +40,7 @@ export function useTaskLifecycle(options = {}) {
   const refreshTaskHistory = options.refreshTaskHistory || (() => {});
   const selectedProviderInstanceId = options.selectedProviderInstanceId || ref("");
   const selectedModelId = options.selectedModelId || ref("");
-  const selectedMode = options.selectedMode || ref("balanced");
+  const selectedMode = options.selectedMode || ref("agents");
   const selectedExecutionMode = options.selectedExecutionMode || ref("queue");
   const activeSessionId = options.activeSessionId || ref("");
   const lastReceivedEventId = options.lastReceivedEventId || ref("");

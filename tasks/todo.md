@@ -29,3 +29,9 @@
   - Acceptance: 100% test pass on frontend and backend; 0 build errors; 0 orphaned imports; 0 CSS hex token violations.
   - Verify: `rtk node --test apps/frontend/tests/*.test.mjs && rtk npm --prefix apps/frontend run build && PYTHONPATH=src rtk pytest`
   - Files: All touched files
+
+- [ ] Task 7: Eradicate legacy 'Policy: Balanced' labels and selectors across Assistant Agent, Runtime, and TaskComposer
+  - Acceptance: Remove policy label rendering and policy_applied/policy_escalated events from AgentActivity.vue & activityCopy.js; stop emitting policy_applied in runtime.py; remove Fast/Balanced/Deep selector in TaskComposer.vue; set default mode to 'agents' across frontend composables.
+  - Verify: `rtk node --test apps/frontend/tests/*.test.mjs && rtk npm --prefix apps/frontend run build && PYTHONPATH=src rtk pytest`
+  - Files: `src/agent_ai/runtime/runtime.py`, `apps/frontend/src/components/drawer/AgentActivity.vue`, `apps/frontend/src/activityCopy.js`, `apps/frontend/src/components/workspace/TaskComposer.vue`, `apps/frontend/src/composables/useTaskLifecycle.js`, `apps/frontend/src/App.vue`, `apps/frontend/src/pages/WorkbenchView.vue`
+

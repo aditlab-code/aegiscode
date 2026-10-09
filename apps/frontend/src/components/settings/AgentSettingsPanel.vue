@@ -66,7 +66,7 @@ async function load() {
   }
 }
 
-// Simpan PARSIAL: `agent.system_prompt` dan `agent.default_mode` yang dikirim.
+// Simpan PARSIAL: `agent.system_prompt` yang dikirim.
 // Backend melakukan deep-merge ke `data/settings.json` sehingga key lain dipertahankan.
 async function save() {
   busy.value = true;
@@ -76,7 +76,6 @@ async function save() {
     const data = await updateGlobalSettings({
       agent: {
         system_prompt: draft.value,
-        default_mode: draftMode.value,
       },
     });
     applyActual(data.settings || {});
@@ -91,7 +90,6 @@ async function save() {
 // Batalkan perubahan yang belum disimpan (kembali ke nilai AKTUAL backend).
 function reset() {
   draft.value = actual.value.system_prompt;
-  draftMode.value = actual.value.default_mode;
   notice.value = "";
   error.value = "";
 }
@@ -99,7 +97,6 @@ function reset() {
 // Isi draft dengan System Prompt bawaan AETHER (belum tersimpan sampai Save).
 function restoreDefault() {
   draft.value = actual.value.default_system_prompt || "";
-  draftMode.value = "balanced";
   notice.value = "";
   error.value = "";
 }
@@ -121,8 +118,7 @@ onMounted(load);
         <span class="as-scope-badge">Global AEGIS Settings</span>
         <span class="as-scope-note">
           Disimpan di <span class="mono">data/settings.json</span> ->
-          <span class="mono">agent.system_prompt</span> /
-          <span class="mono">agent.default_mode</span>.
+          <span class="mono">agent.system_prompt</span>.
         </span>
       </div>
 
@@ -191,10 +187,6 @@ onMounted(load);
                 {{ actual.system_prompt.length }} karakter ·
                 {{ isCustom ? "custom" : "default (bawaan)" }}
               </span>
-            </div>
-            <div class="kv">
-              <span class="k mono">agent.default_mode</span>
-              <span class="v mono">{{ actual.default_mode }}</span>
             </div>
           </div>
         </div>

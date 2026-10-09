@@ -331,7 +331,7 @@ def _normalize_agent_mode(value: Any) -> str:
         text = str(value).strip().lower() if value is not None else ""
         if text == "minimal":
             text = "fast"
-        return text if text in modes else "balanced"
+        return text if text in modes else "agents"
 
 
 #: Mode default AETHER bila user tidak mengaturnya (backward compatible).
