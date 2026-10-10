@@ -2,7 +2,7 @@
 
 Konsep ini SENGAJA dipisahkan dari `TaskPhase` internal runtime
 (preparation/planning/execution/tool_execution/validation/finalization, lihat
-`agent_ai.tasks.models.TaskPhase`). `TaskPhase` menggambarkan tahap eksekusi
+`agent_ai.task.models.TaskPhase`). `TaskPhase` menggambarkan tahap eksekusi
 runtime; `ActivityPhase` menggambarkan AKTIVITAS Agent yang ingin ditampilkan
 ke frontend lewat event `phase_changed`.
 

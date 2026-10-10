@@ -45,7 +45,7 @@ from agent_ai.projects.registry import (
 )
 from agent_ai.session.store import InMemorySessionStore, SessionStore
 from agent_ai.task.preparation import TaskPreparation
-from agent_ai.tasks.models import new_task_id
+from agent_ai.task.models import new_task_id
 from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
 
 from api.project_store import ProjectStore

@@ -1,24 +1,29 @@
-"""Task Preparation Layer AETHER.
+"""Task Subsystem AegisCode.
 
-Menggabungkan task + ContextBuilder + Code Index/Repository Intelligence +
-Project Brain + TaskPlanner menjadi PreparedTask sebelum Agent Runtime
-berjalan:
-
-    User Task -> TaskPreparation -> PreparedTask -> (Agent Runtime)
-
-Layer ini read-only, tidak menjalankan tools, tidak memanggil ToolRegistry,
-tidak menjalankan AgentLoop, dan tidak melakukan LLM call sendiri.
-
-    from agent_ai.task import TaskPreparation
-
-    prep = TaskPreparation(context_builder=builder, planner=planner)
-    prepared = prep.prepare("Perbaiki login yang gagal")
+Menyediakan:
+1. Persiapan task (TaskPreparation, PreparedTask).
+2. Manajemen lifecycle task (TaskLifecycle, TaskStatus, TaskPhase, TaskState, new_task_id).
 """
 
-from agent_ai.task.models import PreparedTask
+from agent_ai.task.lifecycle import InvalidTransitionError, TaskLifecycle
+from agent_ai.task.models import (
+    TERMINAL_STATUSES,
+    PreparedTask,
+    TaskPhase,
+    TaskState,
+    TaskStatus,
+    new_task_id,
+)
 from agent_ai.task.preparation import TaskPreparation
 
 __all__ = [
+    "InvalidTransitionError",
     "PreparedTask",
+    "TERMINAL_STATUSES",
+    "TaskLifecycle",
+    "TaskPhase",
     "TaskPreparation",
+    "TaskState",
+    "TaskStatus",
+    "new_task_id",
 ]

@@ -22,8 +22,8 @@ from agent_ai.core.orchestration.event_reporting import (
     format_provider_response_payload,
 )
 from agent_ai.core.provider_contract import sanitize_provider_response
-from agent_ai.reliability.models import DecisionAction, ReliabilityDecision
 from agent_ai.core.response import LLMResponse
+
 from agent_ai.projects.models import _now_iso
 from agent_ai.providers.base import (
     GenerateOptions,
@@ -453,62 +453,8 @@ class ProviderRunner:
     def handle_provider_error(
         self, loop: AgentLoop, error: BaseException
     ) -> Optional[Message]:
-        """Tangani error provider via reliability layer."""
-        reliability = (
-            getattr(self.orchestrator, "reliability", None)
-            if self.orchestrator is not None
-            else self.reliability
-        )
-        if reliability is None:
-            loop.fail(f"{type(error).__name__}: {error}")
-            return None
-
-        event = reliability.observe_error(error)
-        decision = reliability.decide(outcome=event.type.value)
-
-        if decision.action == DecisionAction.RETRY:
-            reliability.retry.record_attempt()
-            if decision.delay > 0:
-                _get_time_module(self.orchestrator).sleep(decision.delay)
-            return Message(
-                role="user",
-                content=(
-                    f"[reliability] Provider error ({event.type.value}); "
-                    f"retry attempt {reliability.retry.attempts}. {decision.reason}"
-                ),
-            )
-
-        if (
-            reliability.retry.policy.is_retryable(event.type.value)
-            and not reliability.should_retry(event.type.value)
-        ):
-            loop.fail(
-                f"Gagal oleh reliability: retry habis untuk '{event.type.value}' "
-                f"(max_retries={reliability.retry.policy.max_retries})."
-            )
-            return None
-
-        if decision.action == DecisionAction.RECOVER:
-            if self.orchestrator is not None and hasattr(
-                self.orchestrator, "_recovery_message"
-            ):
-                return self.orchestrator._recovery_message(decision)
-            events = ", ".join(e.type.value for e in decision.events) or "unknown"
-            return Message(
-                role="user",
-                content=(
-                    f"[reliability] Terdeteksi pola bermasalah: {events}. {decision.reason} "
-                    "Ubah pendekatan: jangan ulangi action yang sama tanpa informasi baru. "
-                    "Jika task sudah selesai, berikan jawaban final."
-                ),
-            )
-
-        if decision.action == DecisionAction.STOP:
-            loop.fail(f"Dihentikan oleh reliability: {decision.reason}")
-            return None
-
-        # FAIL
-        loop.fail(f"Gagal oleh reliability: {decision.reason}")
+        """Tangani error provider."""
+        loop.fail(f"{type(error).__name__}: {error}")
         return None
 
     def generate_with_retry(

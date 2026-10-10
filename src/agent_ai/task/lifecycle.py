@@ -23,7 +23,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
 
-from agent_ai.tasks.models import (
+from agent_ai.task.models import (
     TERMINAL_STATUSES,
     TaskPhase,
     TaskState,
@@ -195,7 +195,7 @@ class TaskLifecycle:
         Raises:
             InvalidTransitionError: bila transition tidak valid.
         """
-        state = self.transition(TaskStatus.COMPLETED, metadata=metadata)
+        self.transition(TaskStatus.COMPLETED, metadata=metadata)
         self._state.result = result
         return self.snapshot()
 

@@ -12,28 +12,29 @@ set -euo pipefail
 # Baca stdin
 INPUT_JSON=$(cat)
 
-# Dapatkan direktori root repositori
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ ! -d "${REPO_ROOT}/.aegis" ]; then
+    REPO_ROOT="/Users/aditwicaksono/Documents/Project-AI/AegisCode"
+fi
 
-PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+echo "${INPUT_JSON}" | PYTHONPATH="${REPO_ROOT}/src" python3 -c "
 import json
 import sys
 from pathlib import Path
 
-raw_input = '''${INPUT_JSON}'''
 try:
-    payload = json.loads(raw_input)
+    payload = json.load(sys.stdin)
 except Exception:
     payload = {}
 
 repo_root = Path('${REPO_ROOT}')
 state_file = repo_root / '.aegis' / 'lifecycle_state.json'
 
-current_phase = 'DEFINE'
+current_phase = 'SHIP'
 if state_file.is_file():
     try:
         data = json.loads(state_file.read_text(encoding='utf-8'))
-        current_phase = data.get('current_phase', 'DEFINE')
+        current_phase = data.get('current_phase', 'SHIP')
     except Exception:
         pass
 

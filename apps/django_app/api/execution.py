@@ -41,9 +41,8 @@ from agent_ai.runtime.models import RuntimeStatus
 from agent_ai.runtime.runtime import AgentRuntime
 from agent_ai.session.events import EventType, make_event
 from agent_ai.session.store import SessionStore
-from agent_ai.task.models import PreparedTask
-from agent_ai.tasks.lifecycle import TaskLifecycle
-from agent_ai.tasks.models import TaskStatus
+from agent_ai.task.models import PreparedTask, TaskStatus
+from agent_ai.task.lifecycle import TaskLifecycle
 
 
 def _normalize_change_path(path: Any) -> str:

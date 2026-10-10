@@ -18,7 +18,7 @@ from agent_ai.core.observability import emit as emit_event
 from agent_ai.core.orchestration.contracts import OrchestratorResult
 from agent_ai.core.response import ActionType, LLMResponse, extract_reasoning_and_content
 from agent_ai.providers.base import Message
-from agent_ai.reliability.models import DecisionAction, ProgressSnapshot, ReliabilityDecision
+
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -255,8 +255,8 @@ class LegacyRunner:
         )
 
     @staticmethod
-    def recovery_message(decision: ReliabilityDecision) -> Message:
-        events = ", ".join(e.type.value for e in decision.events) or "unknown"
+    def recovery_message(decision: Any) -> Message:
+        events = ", ".join(getattr(e, "value", str(e)) for e in getattr(decision, "events", [])) or "unknown"
         return Message(
             role="user",
             content=(
@@ -288,34 +288,8 @@ class LegacyRunner:
         loop: AgentLoop,
         action: Any,
         observation: AgentObservation,
-    ) -> Optional[ReliabilityDecision]:
-        reliability = getattr(self.orchestrator, "reliability", None)
-        if reliability is None:
-            return None
-
-        signature = self.action_signature(action)
-        obs_sig = self.observation_signature(observation)
-        outcome = self.observation_outcome(observation)
-
-        prev = reliability.history[-1] if reliability.history else None
-        changed_observation = prev is None or prev.observation_signature != obs_sig
-        made_progress = changed_observation or outcome == "success"
-
-        snapshot = ProgressSnapshot(
-            iteration=loop.iteration,
-            action_signature=signature,
-            outcome=outcome,
-            observation_signature=obs_sig,
-            made_progress=made_progress,
-        )
-        detected = reliability.record_progress(snapshot)
-        if not detected:
-            return None
-
-        decision = reliability.decide(outcome=outcome)
-        if decision.action == DecisionAction.RETRY:
-            return None
-        return decision
+    ) -> Optional[Any]:
+        return None
 
     def run(
         self,
