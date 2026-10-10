@@ -182,25 +182,18 @@ def test_command_dispatcher_aegis_mode():
         set_mode=_set_mode,
     )
 
-    # 1. Bare /aegis_mode shows interactive menu
+    # 1. /aegis_mode permanently confirms Agents mode
     handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/aegis_mode"}})
     text1 = bot.send_message.call_args[1]["text"]
-    markup1 = bot.send_message.call_args[1]["reply_markup"]
-    assert "Kontrol Mode Operasional" in text1
-    assert markup1["inline_keyboard"][0][0]["callback_data"] == "mode:set:ask"
+    assert "Agents ⚡" in text1
+    assert current_mode[0] == "agents"
 
-    # 2. Argument /aegis_mode agents updates mode directly
+    # 2. Argument /aegis_mode agents confirms Agents mode
     bot.reset_mock()
     handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/aegis_mode agents"}})
     assert current_mode[0] == "agents"
     text2 = bot.send_message.call_args[1]["text"]
     assert "Agents ⚡" in text2
-
-    # 3. Invalid argument
-    bot.reset_mock()
-    handler.handle_update({"message": {"chat": {"id": 123}, "from": {"id": 123}, "text": "/aegis_mode invalid"}})
-    text3 = bot.send_message.call_args[1]["text"]
-    assert "Mode Tidak Valid" in text3
 
 
 def test_command_dispatcher_config_llm():

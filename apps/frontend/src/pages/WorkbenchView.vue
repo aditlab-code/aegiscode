@@ -37,7 +37,7 @@ const props = defineProps({
   activeOverlay: { type: String, default: null }, sidebarVisible: { type: Boolean, default: true }, assistantVisible: { type: Boolean, default: true },
   initialTabs: { type: Array, default: () => [] }, initialActiveTab: { type: String, default: "" }, initialSplitActive: { type: Boolean, default: false },
   initialSplitDirection: { type: String, default: "vertical" }, initialSplitTab: { type: String, default: "" }, providers: { type: Array, default: () => [] },
-  providerInstanceId: { type: String, default: "" }, modelId: { type: String, default: "" }, mode: { type: String, default: "balanced" },
+  providerInstanceId: { type: String, default: "" }, modelId: { type: String, default: "" }, mode: { type: String, default: "agents" },
 });
 
 const emit = defineEmits([
@@ -49,7 +49,7 @@ const emit = defineEmits([
   "update:provider-instance-id", "update:model-id", "update:mode",
   "refresh-config", "refresh-history", "open-history-task",
   "open-consultant-session", "open-session", "open-folder", "delete-project",
-  "open-path", "open-explorer", "branch-info-updated", "checkpoint-created",
+  "open-path", "open-explorer", "branch-info-updated", "checkpoint-created", "changes-updated",
 ]);
 
 // Layout, Editor, Assistant, & Dock Coordinators
@@ -154,7 +154,7 @@ defineExpose({
           @discard-change="editorFacade.handleDirectDiscard" @stage-change="editorFacade.handleStageChange"
           @checkpoint-created="editorFacade.handleCheckpointCreated" @view-task="emit('view-task', $event)"
           @open-composer="assistantFacade.handleOpenAgentComposer" @open-settings="editorFacade.openSettings('providers')"
-          @open-session="assistantFacade.handleOpenConsultantSession" @branch-info-updated="emit('branch-info-updated', $event)"
+          @open-session="assistantFacade.handleOpenConsultantSession" @branch-info-updated="emit('branch-info-updated', $event)" @changes-updated="emit('changes-updated', $event)"
         />
       </aside>
 
@@ -393,10 +393,11 @@ defineExpose({
           :is-running="isRunning" :is-submitting="isSubmitting" :stop-in-progress="stopInProgress" :error="error"
           :consultant-props="assistantFacade.effectiveConsultantProps.value" :providers="assistantFacade.effectiveProviderList.value"
           :provider-instance-id="assistantFacade.effectiveProviderInstanceId.value" :model-id="assistantFacade.effectiveModelId.value"
-          :mode="props.mode || props.config?.mode || 'balanced'" :active-tab-path="editorFacade.activeTabPath.value"
+          :mode="props.mode || props.config?.mode || 'agents'" :active-tab-path="editorFacade.activeTabPath.value"
           :active-file="editorFacade.activeFile.value" @close="toggleAssistant(false)" @open-composer="assistantFacade.handleOpenAgentComposer"
           @request-stop="emit('request-stop')" @submit-task="emit('submit-task', $event)" @open-settings="emit('open-settings', $event)"
           @open-report="emit('open-report', $event)" @copy-activity="emit('copy-activity')"
+          @open-file="(f) => editorFacade.handleOpenFile(f, 'pane1')"
           @run-consultant-task="assistantFacade.handleRunConsultantTask" @consultant-event="assistantFacade.handleConsultantEvent"
           @apply-to-editor="editorFacade.handleApplyToEditor" @update:provider-instance-id="emit('update:provider-instance-id', $event)"
           @update:model-id="emit('update:model-id', $event)" @update:mode="emit('update:mode', $event)"

@@ -80,7 +80,7 @@ const { workspaceFiles, fetchWorkspaceFiles, invalidateFileCache, setWorkspacePr
 const savedExecutionMode = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_execution_mode")) || "";
 const savedProviderInstanceId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_provider_instance_id")) || "";
 const savedModelId = (typeof localStorage !== "undefined" && localStorage.getItem("aegis_model_id")) || "";
-const llmProviders = ref([]), selectedProviderInstanceId = ref(savedProviderInstanceId), selectedModelId = ref(savedModelId), selectedMode = ref(savedExecutionMode || "balanced"), selectedExecutionMode = ref("queue");
+const llmProviders = ref([]), selectedProviderInstanceId = ref(savedProviderInstanceId), selectedModelId = ref(savedModelId), selectedMode = ref(savedExecutionMode || "agents"), selectedExecutionMode = ref("queue");
 
 watch(selectedMode, (val) => {
   if (typeof localStorage !== "undefined" && val) {
@@ -163,6 +163,7 @@ const {
   activityPhase,
   lifecycleMilestones,
   changes,
+  clearTaskChanges,
   validation,
   liveFsChange,
   tokenCount,
@@ -329,6 +330,17 @@ async function refreshAllConfig() { await loadConfig(); await refreshLLMProvider
 function toggleSidebarAction(f) { responsive.toggleSidebar(f); }
 function toggleAssistantAction(f) { responsive.toggleRightDrawer(f); }
 
+function handleCheckpointCreated() {
+  clearTaskChanges();
+  explorerRefresh.value++;
+}
+
+function handleChangesUpdated(files) {
+  if (Array.isArray(files)) {
+    changes.value = files;
+  }
+}
+
 function onKeyDown(e) {
   if (matchesShortcut(e, "Cmd+P") || matchesShortcut(e, "Ctrl+P")) {
     e.preventDefault(); commandPaletteMode.value = "files"; commandPaletteOpen.value = true;
@@ -438,6 +450,8 @@ onBeforeUnmount(() => {
           @refresh-config="refreshAllConfig" @refresh-history="refreshTaskHistory" @delete-history="handleDeleteHistory" @clear-history="handleClearHistory" @open-history-task="handleViewTask" @open-project-policy="(p) => { policyProject = p; }" @delete-project="handleDeleteProject" @open-project="handleOpenProject"
           @open-folder="handleOpenFolder" @open-path="() => { activeNav = 'explorer'; }" @open-explorer="activeNav = 'explorer'"
           @branch-info-updated="(info) => { gitBranchInfo = info; }"
+          @checkpoint-created="handleCheckpointCreated"
+          @changes-updated="handleChangesUpdated"
           @open-session="(id) => { activeSessionId = id || ''; }"
           @open-consultant-session="(id) => { activeSessionId = id || ''; }"
         />

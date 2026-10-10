@@ -1,45 +1,74 @@
-// Aegis Workbench — logika lifecycle (Frontend-only, TANPA Vue/DOM).
+// Aegis Workbench — Logika Lifecycle Olympus Autonomous Workflow.
 //
-// Lifecycle UI 6 step (Planning, Inspecting, Editing, Running, Validating,
-// Completed) diturunkan dari AKTIVITAS AGENT NYATA yang dikirim backend lewat
-// event `phase_changed` (Task 1), BUKAN dari nilai internal runtime lama
-// (`replan`/`provider_fallback`) dan BUKAN dari timer/round count/jumlah tool.
+// Alur kerja otonom Olympus framework terdiri dari 6 tahapan dinamis:
+//   0. DEFINE : Spesifikasi, PRD, requirements, dan wawancara
+//   1. PLAN   : Perencanaan arsitektur dan pemecahan task
+//   2. BUILD  : Implementasi inkremental & simplifikasi kode
+//   3. VERIFY : Pengujian, debugging, error recovery
+//   4. REVIEW : Code review multi-axis & verifikasi kualitas
+//   5. SHIP   : Peluncuran, staged rollout, deployment readiness
 //
-// Dua konsep dipisah dengan sengaja:
-//   - current activity phase : step yang SEDANG aktif (`●`).
-//   - milestones             : step yang SUDAH pernah dicapai (tetap `✓`).
-//
-// Karena Agent dapat KEMBALI ke aktivitas sebelumnya (Editing -> Inspecting),
-// milestone yang sudah dicapai TIDAK dihitung ulang dari index current phase:
-// current phase boleh bergerak mundur, milestone tetap `done`.
-//
-// Label step (teks "Planning".."Completed") TETAP didefinisikan di App.vue
-// (satu sumber untuk markup stepper); modul murni ini hanya menghitung STATE
-// tiap step (index-based) sehingga bisa diuji tanpa menambah framework test
-// frontend (lihat lifecycle.test.mjs).
+// Dua konsep dipisah:
+//   - current activity phase : step yang SEDANG aktif (active).
+//   - milestones             : step yang SUDAH pernah dicapai (tetap done).
 
-//: Jumlah step lifecycle (Planning..Completed). Harus selaras dengan
-//: LIFECYCLE_STEPS di App.vue (dipakai sebagai default bila tak diberikan).
-export const LIFECYCLE_STEP_COUNT = 6;
+export const OLYMPUS_PHASES = [
+  "DEFINE",
+  "PLAN",
+  "BUILD",
+  "VERIFY",
+  "REVIEW",
+  "SHIP",
+];
 
-//: Activity phase (Task 1) -> index step lifecycle. Hanya nilai ini yang
-//: menggerakkan lifecycle; nilai runtime internal lain diabaikan.
+export const LIFECYCLE_STEP_COUNT = OLYMPUS_PHASES.length;
+
+// Mapping nama phase (Olympus primer + kompatibilitas alias aktivitas) ke index 0..5
 const ACTIVITY_PHASE_INDEX = {
-  planning: 0,
-  inspecting: 1,
+  // 0: DEFINE
+  define: 0,
+  defining: 0,
+  spec: 0,
+  interview: 0,
+
+  // 1: PLAN
+  plan: 1,
+  planning: 1,
+
+  // 2: BUILD
+  build: 2,
+  building: 2,
+  inspecting: 2,
   editing: 2,
+
+  // 3: VERIFY
+  verify: 3,
+  verifying: 3,
   running: 3,
-  validating: 4,
+  validating: 3,
+  validation: 3,
+  test: 3,
+  testing: 3,
+
+  // 4: REVIEW
+  review: 4,
+  reviewing: 4,
+  code_review: 4,
+
+  // 5: SHIP
+  ship: 5,
+  shipping: 5,
+  completed: 5,
 };
 
-//: Index step "Validating" (dipakai saat mekanisme validation existing aktif).
-export const VALIDATING_STEP = ACTIVITY_PHASE_INDEX.validating;
+export const VERIFYING_STEP = 3;
+export const VALIDATING_STEP = 3;
 
 /**
  * Index step lifecycle untuk sebuah activity phase.
  *
- * @returns {number} 0..4 untuk phase yang dikenal, -1 untuk phase tak dikenal
- *   (mis. nilai internal `replan`/`provider_fallback`, atau kosong).
+ * @param {string} phase
+ * @returns {number} 0..5 untuk phase yang dikenal, -1 untuk phase tak dikenal
  */
 export function activityPhaseIndex(phase) {
   if (phase == null) return -1;
@@ -59,6 +88,7 @@ export function isActivityPhase(phase) {
  *
  * @param {number[]} milestones daftar index yang sudah dicapai.
  * @param {number} index index step (0..count-1).
+ * @param {number} [count=LIFECYCLE_STEP_COUNT]
  * @returns {number[]} array baru (unik, terurut); array lama bila tidak berubah.
  */
 export function addMilestone(milestones, index, count = LIFECYCLE_STEP_COUNT) {
@@ -85,20 +115,7 @@ function maxMilestone(milestones) {
 }
 
 /**
- * Hitung STATE tiap step lifecycle dari state frontend yang sudah ada.
- *
- * state = `task.status` (status task backend) + `currentPhase` (activity phase
- * terakhir dari `phase_changed`) + `milestones` (step yang pernah dicapai).
- * TIDAK ada state machine kedua: hanya proyeksi dari event yang sudah diterima.
- *
- * Aturan:
- *   - `completed`  -> semua milestone utama done, `Completed` aktif (TERMINAL).
- *   - `failed`/`cancelled` -> TETAP di aktivitas terakhir yang benar-benar
- *     terjadi (BUKAN Completed, BUKAN dipaksa ke Running).
- *   - selain itu   -> current step = activity phase terakhir; sebelum ada event
- *     phase (mis. task baru mulai) -> `Planning`.
- *   - Step yang sudah dicapai & bukan current -> `done` (tetap `✓`, walau
- *     current phase kini berada di step sebelumnya).
+ * Hitung STATE tiap step lifecycle dari state frontend.
  *
  * @returns {string[]} array state (""|"done"|"active") sepanjang `count`.
  */
@@ -119,14 +136,14 @@ export function buildLifecycleStates({
 
   let activeIdx;
   if (s === "completed") {
-    // Terminal sukses: seluruh step sampai Validating tercapai, Completed titik akhir.
+    // Terminal sukses: seluruh step sampai REVIEW tercapai, SHIP titik akhir.
     for (let i = 0; i < lastIndex; i += 1) done.add(i);
     activeIdx = lastIndex;
   } else if (s === "failed" || s === "cancelled") {
-    // Gagal/dibatalkan BUKAN Completed: pertahankan aktivitas terakhir nyata.
+    // Gagal/dibatalkan BUKAN SHIP: pertahankan aktivitas terakhir nyata.
     activeIdx = phaseIdx >= 0 ? phaseIdx : maxMilestone(milestones);
   } else {
-    // Berjalan: ikuti activity phase terakhir; sebelum ada -> Planning.
+    // Berjalan: ikuti activity phase terakhir; sebelum ada -> DEFINE (index 0).
     activeIdx = phaseIdx >= 0 ? phaseIdx : maxMilestone(milestones);
   }
   if (activeIdx < 0) activeIdx = 0;
@@ -141,9 +158,7 @@ export function buildLifecycleStates({
 }
 
 /**
- * Rekonstruksi lifecycle (milestones + current activity phase) dari daftar event
- * (history/persistent log). Dipakai saat membuka task lama dari Activity API,
- * sehingga lifecycle task lama menampilkan aktivitas nyata yang pernah terjadi.
+ * Rekonstruksi lifecycle dari daftar event.
  */
 export function lifecycleFromEvents(events) {
   let milestones = [];
@@ -153,7 +168,7 @@ export function lifecycleFromEvents(events) {
     const payload = (raw && (raw.payload || raw.data)) || {};
     if (type === "task_started") {
       milestones = addMilestone(milestones, 0);
-      if (!currentPhase) currentPhase = "planning";
+      if (!currentPhase) currentPhase = "define";
     } else if (type === "phase_changed") {
       const idx = activityPhaseIndex(payload.phase);
       if (idx >= 0) {
@@ -162,7 +177,7 @@ export function lifecycleFromEvents(events) {
       }
     } else if (type === "validation_started") {
       milestones = addMilestone(milestones, VALIDATING_STEP);
-      if (!currentPhase) currentPhase = "validating";
+      currentPhase = "verify";
     }
   }
   return { milestones, currentPhase };

@@ -33,12 +33,14 @@ def get_aegis_central_dir() -> Path:
     custom_dir = os.environ.get("AEGIS_CENTRAL_DIR")
     if custom_dir:
         p = Path(custom_dir).resolve()
-        if (p / "agents").is_dir():
+        if (p / ".agents" / "agents").is_dir() or (p / "agents").is_dir():
             return p
 
     # Cari dari path file ini ke atas
     current = Path(__file__).resolve()
     for parent in [current] + list(current.parents):
+        if (parent / ".agents" / "agents").is_dir() and (parent / ".agents" / "skills").is_dir():
+            return parent
         if (parent / "agents").is_dir() and (parent / "skills").is_dir():
             return parent
 
@@ -97,7 +99,9 @@ def directive_prompt_for_mode(mode: Any) -> str:
 def load_persona_prompt(persona_name: str = DEFAULT_PERSONA) -> str:
     """Muat teks prompt sistem langsung dari berkas markdown persona di agents/."""
     central_dir = get_aegis_central_dir()
-    agents_dir = central_dir / "agents"
+    agents_dir = central_dir / ".agents" / "agents"
+    if not agents_dir.is_dir():
+        agents_dir = central_dir / "agents"
 
     # Cek kandidat path: agents/<persona>.md atau agents/<persona>/agent.md
     candidates = [

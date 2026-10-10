@@ -70,11 +70,9 @@ from agent_ai.runtime.working_state import (
 
 if TYPE_CHECKING:  # pragma: no cover - hanya untuk type hint, hindari import cycle
     from agent_ai.changes.tracker import ChangeTracker
-    from agent_ai.fallback.manager import FallbackManager
     from agent_ai.planning.replanner import Replanner
-    from agent_ai.recovery.manager import RecoveryManager
     from agent_ai.session.store import SessionStore
-    from agent_ai.tasks.lifecycle import TaskLifecycle
+    from agent_ai.task.lifecycle import TaskLifecycle
     from agent_ai.validation.runner import ValidationRunner
 
 
@@ -118,8 +116,8 @@ class AgentRuntime:
         change_tracker: Optional["ChangeTracker"] = None,
         max_validation_cycles: Optional[int] = None,
         stop_on_validation_failure: Optional[bool] = None,
-        recovery_manager: Optional["RecoveryManager"] = None,
-        fallback_manager: Optional["FallbackManager"] = None,
+        recovery_manager: Optional[Any] = None,
+        fallback_manager: Optional[Any] = None,
         provider_factory: Optional[Any] = None,
         project_root: Optional[str] = None,
         project_brain: bool = True,
@@ -590,47 +588,29 @@ class AgentRuntime:
         Sinyal berasal dari subsystem yang sudah ada (bukan string exception):
         outcome step, flag command/tool, event reliability, perubahan workspace.
         """
-        from agent_ai.recovery.models import FailureSignal
-
-        # Step yang gagal (untuk menentukan command/tool & outcome).
-        failed_step = None
-        for step in plan.steps:
-            if step.status == StepStatus.FAILED:
-                failed_step = step
-                break
-
-        outcome = "execution_error"
-        is_command = False
-        is_tool = False
-        if failed_step is not None:
-            meta = failed_step.metadata or {}
-            outcome = meta.get("outcome") or outcome
-            is_command = bool(meta.get("is_command"))
-            is_tool = bool(meta.get("is_tool"))
-
-        # Event reliability (bila reliability tersedia di recovery manager).
-        reliability_events: List[str] = []
-        rm = self.recovery_manager
-        if rm is not None and rm.reliability is not None:
-            try:
-                events = rm.reliability.latest_events() or rm.reliability.events
-                reliability_events = [e.type.value for e in events]
-            except Exception:  # noqa: BLE001
-                reliability_events = []
-
-        return FailureSignal(
-            source="runtime",
-            outcome=outcome,
-            recoverable=True,
-            is_command=is_command,
-            is_tool=is_tool,
-            reliability_events=reliability_events,
-            attempts=rm.attempts if rm is not None else 0,
-            metadata={
-                "task_id": getattr(prepared, "task_id", None),
-                "step_id": failed_step.id if failed_step is not None else None,
-            },
-        )
+        try:
+            from agent_ai.recovery.models import FailureSignal
+            return FailureSignal(
+                source="runtime",
+                outcome=outcome,
+                recoverable=True,
+                is_command=is_command,
+                is_tool=is_tool,
+                reliability_events=reliability_events,
+                attempts=rm.attempts if rm is not None else 0,
+                metadata={
+                    "task_id": getattr(prepared, "task_id", None),
+                    "step_id": failed_step.id if failed_step is not None else None,
+                },
+            )
+        except ImportError:
+            return {
+                "source": "runtime",
+                "outcome": outcome,
+                "recoverable": True,
+                "is_command": is_command,
+                "is_tool": is_tool,
+            }
 
     def _recovery_observation(self, plan: TaskPlan, result: RuntimeResult) -> Any:
         """Bangun Observation replanner dari step yang gagal (untuk replan)."""
@@ -894,7 +874,7 @@ class AgentRuntime:
     @staticmethod
     def _lifecycle_to_running(lifecycle: "TaskLifecycle") -> None:
         """Bawa lifecycle ke RUNNING bila memungkinkan (tanpa memaksa)."""
-        from agent_ai.tasks.models import TaskStatus
+        from agent_ai.task.models import TaskStatus
 
         # PREPARING/PLANNING -> RUNNING, atau CREATED -> RUNNING bila belum.
         if lifecycle.status == TaskStatus.CREATED:
@@ -908,7 +888,7 @@ class AgentRuntime:
         """Bawa lifecycle ke VALIDATING bila memungkinkan (tanpa memaksa)."""
         if lifecycle is None or lifecycle.is_terminal:
             return
-        from agent_ai.tasks.models import TaskStatus
+        from agent_ai.task.models import TaskStatus
 
         if lifecycle.can_transition(TaskStatus.VALIDATING):
             lifecycle.transition(TaskStatus.VALIDATING)
@@ -1336,11 +1316,13 @@ class AgentRuntime:
         return state
 
     def _emit_policy_applied(self, state: ExecutionPolicyState) -> None:
-        """Emit event `policy_applied` (event system existing; best-effort).
+        """Emit event `policy_applied` (best-effort; dilewati pada mode otonom dinamis).
 
         Payload memuat ringkasan policy + `activity` (blok teks siap baca pada
         activity/log, termasuk blok escalation bila ada).
         """
+        if getattr(state, "effective_mode", None) in (None, "agents", "balanced") and getattr(state, "requested_mode", None) in (None, "", "agents"):
+            return
         try:
             payload = state.to_dict()
             payload["activity"] = policy_activity_text(state)
@@ -1498,7 +1480,7 @@ class AgentRuntime:
                 self._terminal_emitted_tasks.add(task_id)
         if lifecycle is None or lifecycle.is_terminal:
             return
-        from agent_ai.tasks.models import TaskStatus
+        from agent_ai.task.models import TaskStatus
 
         if result.status == RuntimeStatus.COMPLETED:
             if lifecycle.can_transition(TaskStatus.COMPLETED):
@@ -1562,7 +1544,10 @@ class AgentRuntime:
             Provider alternatif (BaseProvider) bila fallback diputuskan dan
             dapat dibangun; None bila tidak (runtime tetap pakai provider lama).
         """
-        from agent_ai.fallback.models import FallbackAction, FallbackRequest
+        try:
+            from agent_ai.fallback.models import FallbackAction, FallbackRequest
+        except ImportError:
+            return None
 
         fm = self.fallback_manager
         reason = fm.classify_error_from_message(result.error or "")

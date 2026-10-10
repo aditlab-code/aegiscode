@@ -116,28 +116,10 @@ def test_resolve_dynamic_code_context_mode_limits(tmp_path: Path):
     assert "9. " not in ctx_deep
 
 
-def test_resolve_semantic_search_candidates_mocked(tmp_path: Path):
-    """Pastikan kandidat semantik diekstrak dengan baik ketika service aktif."""
-    mock_service_inst = MagicMock()
-    mock_service_inst.__enter__.return_value = mock_service_inst
-    mock_service_inst.search.return_value = [
-        {"path": "src/app/page.tsx", "symbol": "Page", "kind": "function", "start_line": 1, "end_line": 20},
-        {"path": "src/components/Toolbar.tsx", "symbol": "Toolbar", "kind": "class", "start_line": 10, "end_line": 50},
-    ]
-
-    with patch("agent_ai.repointel.semantic.availability.is_available", return_value=(True, "")):
-        with patch("agent_ai.repointel.semantic.paths.resolve_vectors_db") as mock_res_db:
-            fake_db = tmp_path / "vectors.db"
-            fake_db.touch()
-            mock_res_db.return_value = fake_db
-            with patch("agent_ai.repointel.semantic.service.SemanticIndexService", return_value=mock_service_inst):
-                candidates = _resolve_semantic_search_candidates(tmp_path, query="toolbar page", limit=3)
-
-    assert len(candidates) == 2
-    assert candidates[0]["path"] == "src/app/page.tsx"
-    assert candidates[0]["symbol"] == "Page"
-    assert candidates[1]["path"] == "src/components/Toolbar.tsx"
-    assert candidates[1]["symbol"] == "Toolbar"
+def test_resolve_semantic_search_candidates_decommissioned(tmp_path: Path):
+    """Pastikan pencarian kandidat vektor semantik mengembalikan [] secara aman (decommissioned)."""
+    candidates = _resolve_semantic_search_candidates(tmp_path, query="toolbar page", limit=3)
+    assert candidates == []
 
 
 def test_antigravity_generate_injects_workspace_intel(tmp_path: Path):

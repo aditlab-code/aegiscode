@@ -175,7 +175,7 @@ class ProjectStore:
     # ------------------------------------------------------------------ #
     # Operational mode state (ask vs agents)
     # ------------------------------------------------------------------ #
-    def get_operational_mode(self, default: str = "ask") -> str:
+    def get_operational_mode(self, default: str = "agents") -> str:
         """Ambil operational mode saat ini ('ask' atau 'agents')."""
         with self._lock, self._connect() as conn:
             row = conn.execute(

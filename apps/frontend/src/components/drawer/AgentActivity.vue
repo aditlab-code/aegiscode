@@ -43,6 +43,17 @@ const props = defineProps({
   activityPhase: { type: String, default: "" },
 });
 
+const emit = defineEmits(["submit-reply"]);
+
+const questionReplies = ref({});
+
+function handleAnswerQuestion(item, replyText) {
+  if (!replyText || !replyText.trim()) return;
+  item.answered = true;
+  item.answerText = replyText.trim();
+  emit("submit-reply", replyText.trim());
+}
+
 const scroller = ref(null);
 
 async function scrollToLatest() {
@@ -525,37 +536,47 @@ const EVENT_DESCRIBERS = {
     icon: "check",
     title: "Recovery completed",
   }),
-  policy_applied: (d, base, index) => {
-    const req = d.requested_mode ? (d.requested_mode.charAt(0).toUpperCase() + d.requested_mode.slice(1)) : "Balanced";
-    const eff = d.effective_mode ? (d.effective_mode.charAt(0).toUpperCase() + d.effective_mode.slice(1)) : "Balanced";
-    const act = d.activity || "";
-    const isEscalated = Boolean(d.escalated);
-    return {
-      ...base,
-      key: `policy-${index}`,
-      kind: "notice",
-      icon: isEscalated ? "zap" : "target",
-      title: isEscalated ? `Policy: ${req} → ${eff}` : `Policy: ${eff}`,
-      scope: isEscalated ? `Escalated to ${eff}` : `Mode: ${eff}`,
-      detailText: act || (isEscalated
-        ? `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`
-        : `[POLICY]\nRequested Mode: ${req}\nEffective Mode: ${eff}`),
-    };
-  },
-  policy_escalated: (d, base, index) => {
-    const from = d.from_mode ? (d.from_mode.charAt(0).toUpperCase() + d.from_mode.slice(1)) : "Fast";
-    const to = d.to_mode ? (d.to_mode.charAt(0).toUpperCase() + d.to_mode.slice(1)) : "Deep";
-    const act = d.activity || "";
-    return {
-      ...base,
-      key: `policy-esc-${index}`,
-      kind: "notice",
-      icon: "zap",
-      title: `Policy escalated: ${from} → ${to}`,
-      scope: `Escalated: ${from} → ${to}`,
-      detailText: act || `[POLICY]\nEscalated:\n${from} → ${to}${d.reason ? `\n\nReason:\n${d.reason}` : ""}`,
-    };
-  },
+  policy_applied: () => null,
+  policy_escalated: () => null,
+  question_asked: (d, base, index) => ({
+    ...base,
+    key: `question-${d.question_id || index}`,
+    kind: "question",
+    icon: "brain",
+    title: "Question for user",
+    questionText: d.question || d.text || d.message || "",
+    options: Array.isArray(d.options) ? d.options : [],
+    placeholder: d.placeholder || "",
+    answered: Boolean(d.answered),
+    answerText: d.answer || "",
+    questionId: d.question_id || `q-${index}`,
+  }),
+  agent_question: (d, base, index) => ({
+    ...base,
+    key: `question-${d.question_id || index}`,
+    kind: "question",
+    icon: "brain",
+    title: "Agent Question",
+    questionText: d.question || d.text || d.prompt || d.message || "",
+    options: Array.isArray(d.options) ? d.options : [],
+    placeholder: d.placeholder || "",
+    answered: Boolean(d.answered),
+    answerText: d.answer || "",
+    questionId: d.question_id || `q-${index}`,
+  }),
+  clarification_requested: (d, base, index) => ({
+    ...base,
+    key: `clarification-${d.id || index}`,
+    kind: "question",
+    icon: "brain",
+    title: "Clarification Needed",
+    questionText: d.prompt || d.question || d.message || "",
+    options: Array.isArray(d.options) ? d.options : [],
+    placeholder: d.placeholder || "",
+    answered: Boolean(d.answered),
+    answerText: d.answer || "",
+    questionId: d.id || `c-${index}`,
+  }),
 };
 
 // Aktivitas non-tool -> baris status/notice ringkas via dispatcher
@@ -809,6 +830,27 @@ watch(
 
 <template>
   <div ref="scroller" class="act-body">
+    <!-- Olympus Stepper Header -->
+    <div v-if="lifecycleSteps && lifecycleSteps.length" class="olympus-stepper" role="navigation" aria-label="Olympus Workflow Stepper">
+      <div
+        v-for="(step, idx) in lifecycleSteps"
+        :key="step.label"
+        class="olympus-step"
+        :class="[step.state, { active: step.state === 'active', done: step.state === 'done' }]"
+        :title="`${step.label} (${step.state || 'pending'})`"
+      >
+        <div class="olympus-step-indicator">
+          <svg v-if="step.state === 'done'" class="act-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span v-else-if="step.state === 'active'" class="olympus-step-pulse"></span>
+          <span v-else class="olympus-step-num">{{ idx + 1 }}</span>
+        </div>
+        <span class="olympus-step-label">{{ step.label }}</span>
+        <div v-if="idx < lifecycleSteps.length - 1" class="olympus-step-line" :class="{ filled: step.state === 'done' }"></div>
+      </div>
+    </div>
+
     <!-- Empty state -->
     <div v-if="empty" class="vtl-empty">
       <template v-if="status === 'running'">AEGIS is working…</template>
@@ -842,6 +884,70 @@ watch(
               >
                 <div class="act-detail-text" style="padding: 8px;">{{ item.detailText }}</div>
               </AppThinkingBlock>
+            </div>
+          </div>
+        </template>
+
+        <!-- ── Interactive Questioning Dialog (Agent asks the user back) ── -->
+        <template v-else-if="item.kind === 'question'">
+          <div class="vtl-row question active">
+            <div class="vtl-node-col">
+              <div class="vtl-dot question-dot"></div>
+            </div>
+            <div class="vtl-content question-card-content">
+              <div class="act-question-box">
+                <div class="act-question-header">
+                  <span class="act-question-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span>Agent Question</span>
+                  </span>
+                  <span class="act-time">{{ stamp(item.ts) }}</span>
+                </div>
+                <div class="act-question-text">{{ item.questionText }}</div>
+
+                <div v-if="item.options && item.options.length" class="act-question-options">
+                  <button
+                    v-for="(opt, oi) in item.options"
+                    :key="oi"
+                    type="button"
+                    class="act-opt-btn"
+                    :disabled="item.answered"
+                    @click="handleAnswerQuestion(item, opt)"
+                  >
+                    {{ opt }}
+                  </button>
+                </div>
+
+                <div v-if="!item.answered" class="act-question-reply-box">
+                  <input
+                    v-model="questionReplies[item.key]"
+                    type="text"
+                    class="act-question-input"
+                    :placeholder="item.placeholder || 'Type your reply to the agent…'"
+                    @keydown.enter="handleAnswerQuestion(item, questionReplies[item.key])"
+                  />
+                  <button
+                    type="button"
+                    class="act-reply-btn"
+                    :disabled="!questionReplies[item.key] || !questionReplies[item.key].trim()"
+                    @click="handleAnswerQuestion(item, questionReplies[item.key])"
+                  >
+                    <span>Reply</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+                <div v-else class="act-question-answered">
+                  <span class="answered-tag">✓ Replied:</span>
+                  <span class="answered-text">{{ item.answerText }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </template>

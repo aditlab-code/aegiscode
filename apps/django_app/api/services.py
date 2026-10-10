@@ -45,7 +45,7 @@ from agent_ai.projects.registry import (
 )
 from agent_ai.session.store import InMemorySessionStore, SessionStore
 from agent_ai.task.preparation import TaskPreparation
-from agent_ai.tasks.models import new_task_id
+from agent_ai.task.models import new_task_id
 from agent_ai.runtime.lifecycle import TaskLifecycleManager, TaskLifecycleState
 
 from api.project_store import ProjectStore
@@ -642,7 +642,7 @@ class GatewayService:
             active_sess = self.get_or_create_active_unified_session(project_id=pid)
             sid = active_sess.get("session_id") or active_sess.get("id")
 
-        eff_mode = mode or self.get_operational_mode() or "ask"
+        eff_mode = mode or self.get_operational_mode() or "agents"
         # Normalisasi: create_unified_turn hanya menerima "agent" (bukan "agents")
         if str(eff_mode).strip().lower() == "agents":
             eff_mode = "agent"

@@ -319,9 +319,9 @@ def make_approval_gate(
         mode = "ask"
         if mode_getter is not None:
             try:
-                mode = mode_getter()
+                mode = mode_getter() or "agents"
             except Exception:
-                mode = "ask"
+                mode = "agents"
 
         if str(mode).strip().lower() == "agents":
             audit_payload = {

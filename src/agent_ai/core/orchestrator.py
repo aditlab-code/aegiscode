@@ -94,12 +94,7 @@ from agent_ai.providers.base import (
     ToolChoice,
     ToolDefinition,
 )
-from agent_ai.reliability.manager import ReliabilityManager
-from agent_ai.reliability.models import (
-    DecisionAction,
-    ProgressSnapshot,
-    ReliabilityDecision,
-)
+
 
 if TYPE_CHECKING:  # pragma: no cover - hanya untuk type hint, hindari import cycle
     from agent_ai.projects.brain import ProjectBrain
@@ -168,7 +163,7 @@ class AgentOrchestrator:
         brain_learning: bool = True,
         use_tools: bool = True,
         tool_choice: Optional[ToolChoice] = None,
-        reliability: Optional[ReliabilityManager] = None,
+        reliability: Optional[Any] = None,
         event_sink: Optional[EventSink] = None,
         use_continuous_loop: bool = True,
         environment_context: Optional[str] = None,

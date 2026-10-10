@@ -190,18 +190,6 @@ const activeModelName = computed(() => {
   return m ? m.model_name : (props.config?.model || "");
 });
 
-const availableModes = computed(() => {
-  const modes = props.config?.modes || ["autonomous", "architect", "pair-programming"];
-  if (props.config?.mode && !modes.includes(props.config.mode)) {
-    return [props.config.mode, ...modes];
-  }
-  return modes;
-});
-
-const activeMode = computed(() => {
-  return props.mode || props.config?.mode || "autonomous";
-});
-
 const activeCred = computed(() => {
   const env = activeInstance.value?.api_key_env;
   return env ? credentialByName.value[env] : null;
@@ -249,17 +237,6 @@ function onSelectProvider(e) {
 
 function onSelectModel(e) {
   emit("update:model-id", e.target.value);
-}
-
-async function onSelectMode(e) {
-  const newMode = e.target.value;
-  emit("update:mode", newMode);
-  try {
-    await updateGlobalSettings({ agent: { default_mode: newMode } });
-    notice.value = `Default mode set to '${newMode}'.`;
-  } catch (err) {
-    error.value = `Failed to persist default mode: ${err.message || err}`;
-  }
 }
 
 // Quick Key Modal State
@@ -618,27 +595,7 @@ watch(activeTab, (tab) => {
           </div>
         </div>
 
-        <!-- Row 3: Mode Selector -->
-        <div class="sv-config-row">
-          <label class="sv-config-label" for="active-mode-select">
-            <span class="sv-config-title">Mode</span>
-            <span class="sv-config-subtitle">Default runtime autonomy policy</span>
-          </label>
-          <div class="sv-config-control">
-            <select
-              id="active-mode-select"
-              class="sv-select"
-              :value="activeMode"
-              @change="onSelectMode"
-            >
-              <option v-for="m in availableModes" :key="m" :value="m">
-                {{ m }}
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Row 4: Credential & API Key Status -->
+        <!-- Row 3: Credential & API Key Status -->
         <div class="sv-config-row">
           <div class="sv-config-label">
             <span class="sv-config-title">Credential &amp; Key</span>

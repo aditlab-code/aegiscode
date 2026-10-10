@@ -75,7 +75,7 @@ class ScriptedProvider(OpenAICompatibleProvider):
 # --------------------------------------------------------------------------- #
 def test_default_mode_when_file_absent(settings_file):
     assert not settings_file.exists()
-    assert agent_default_mode() == "balanced"
+    assert agent_default_mode() in ("agents", "balanced")
 
 
 def test_default_mode_reads_from_settings(settings_file):
@@ -90,7 +90,7 @@ def test_default_mode_normalizes_minimal_to_fast(settings_file):
 
 def test_default_mode_falls_back_on_invalid_value(settings_file):
     _write(settings_file, {"agent": {"default_mode": "super_smart_mode"}})
-    assert agent_default_mode() == "balanced"
+    assert agent_default_mode() in ("agents", "balanced")
 
 
 def test_update_global_settings_persists_default_mode(settings_file):

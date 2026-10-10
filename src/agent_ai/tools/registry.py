@@ -275,17 +275,6 @@ def build_registry(
     # Project Map (Agent): termasuk refresh_project_map (Agent-only).
     for tool in build_project_map_tools(root=resolved, include_refresh=True):
         reg.register(tool)
-    # Semantic Search & Vector DB (Agent): termasuk refresh_semantic_index (Phase 2.1).
-    from agent_ai.repointel.semantic.availability import is_available
-    import os as _os
-
-    if is_available()[0] or _os.environ.get("AEGIS_ENABLE_SEMANTIC_TOOLS") == "1":
-        from agent_ai.tools.semantic import build_semantic_tools
-
-        for tool in build_semantic_tools(
-            root=resolved, include_refresh=True, read_only=False, include_hybrid=True
-        ):
-            reg.register(tool)
 
     # CodeGraph Relational Intelligence (Fase 2.5):
     from agent_ai.tools.codegraph import build_codegraph_tools
@@ -303,7 +292,8 @@ def build_registry(
 
     for tool in build_skill_tools(root=resolved, include_lifecycle=True):
         reg.register(tool)
-    # Execution Policy Escalation Tool (Agent):
+
+    # Decommissioned Execution Policy Escalation Tool (backward-compatible stub):
     from agent_ai.tools.policy import RequestPolicyEscalationTool
 
     reg.register(RequestPolicyEscalationTool(escalator=policy_escalator))

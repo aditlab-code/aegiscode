@@ -27,7 +27,7 @@ import { statusTagClass, computeTaskTelemetry } from "../services/taskService.js
 import { buildLifecycleStates, activityPhaseIndex, addMilestone, VALIDATING_STEP } from "../lifecycle.js";
 import { saveWorkspaceContext } from "../services/workspaceContextService.js";
 
-export const LIFECYCLE_STEP_LABELS = ["Planning", "Inspecting", "Editing", "Running", "Validating", "Completed"];
+export const LIFECYCLE_STEP_LABELS = ["DEFINE", "PLAN", "BUILD", "VERIFY", "REVIEW", "SHIP"];
 
 export function useTaskLifecycle(options = {}) {
   const activeProject = options.activeProject || ref(null);
@@ -40,7 +40,7 @@ export function useTaskLifecycle(options = {}) {
   const refreshTaskHistory = options.refreshTaskHistory || (() => {});
   const selectedProviderInstanceId = options.selectedProviderInstanceId || ref("");
   const selectedModelId = options.selectedModelId || ref("");
-  const selectedMode = options.selectedMode || ref("balanced");
+  const selectedMode = options.selectedMode || ref("agents");
   const selectedExecutionMode = options.selectedExecutionMode || ref("queue");
   const activeSessionId = options.activeSessionId || ref("");
   const lastReceivedEventId = options.lastReceivedEventId || ref("");
@@ -151,7 +151,7 @@ function activateTaskView(info) {
   taskReducerState.hasSequenceGap = false;
   taskReducerState.missingSequenceGaps = [];
   runningTaskId.value = info.runningTaskId || (info.status === "running" ? info.id : "");
-  activityPhase.value = info.status === "running" ? "planning" : "";
+  activityPhase.value = info.status === "running" ? "define" : "";
   lifecycleMilestones.value = info.status === "running" ? [0] : [];
   activityEvents.value = info.events ? info.events.slice(-500) : [];
   changes.value = [];
@@ -240,7 +240,7 @@ function processEventCore(evt) {
       if (!isForMonitored) break;
       validation.state = "running";
       task.status = "validating";
-      activityPhase.value = "validating";
+      activityPhase.value = "verify";
       lifecycleMilestones.value = addMilestone(lifecycleMilestones.value, VALIDATING_STEP);
       break;
     case "validation_completed":
@@ -581,6 +581,10 @@ async function handleOpenReport(taskId) {
   catch (err) { currentReport.value = `Failed to load report: ${err.message || err}`; }
 }
 
+  function clearTaskChanges() {
+    changes.value = [];
+  }
+
   return {
     task,
     isRunning,
@@ -593,6 +597,7 @@ async function handleOpenReport(taskId) {
     activityPhase,
     lifecycleMilestones,
     changes,
+    clearTaskChanges,
     validation,
     liveFsChange,
     tokenCount,

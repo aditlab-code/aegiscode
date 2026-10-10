@@ -63,7 +63,7 @@ from agent_ai.runtime.policy import (  # noqa: E402
 from agent_ai.runtime.runtime import AgentRuntime  # noqa: E402
 from agent_ai.session.store import InMemorySessionStore  # noqa: E402
 from agent_ai.task.models import PreparedTask  # noqa: E402
-from agent_ai.tasks.models import TaskPhase, TaskStatus  # noqa: E402
+from agent_ai.task.models import TaskPhase, TaskStatus  # noqa: E402
 from agent_ai.tools.registry import build_registry  # noqa: E402
 
 

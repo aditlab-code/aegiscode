@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, Optional, Set
 
 from agent_ai.session.events import EventType, ExecutionEvent, make_event
-from agent_ai.tasks.models import TERMINAL_STATUSES, TaskStatus
+from agent_ai.task.models import TERMINAL_STATUSES, TaskStatus
 
 logger = logging.getLogger(__name__)
 

@@ -116,45 +116,16 @@ def _tool_call_signature(tool_name: str, params: Dict[str, Any]) -> str:
     return f"{tool_name}:{norm_params}"
 
 
-def _format_antigravity_policy_directive(mode: str) -> str:
-    """Format prompt direktif guardrail ketat untuk Antigravity CLI."""
-    mode_clean = (mode or "balanced").lower().strip()
-
+def _format_antigravity_policy_directive(mode: str = "agents") -> str:
+    """Format prompt direktif workspace safety dan eksplorasi alami untuk Antigravity CLI."""
     rules = [
-        "CRITICAL WORKSPACE SAFETY & CONTEXT EFFICIENCY DIRECTIVES:",
+        "CRITICAL WORKSPACE SAFETY & AUTONOMOUS EXPLORATION DIRECTIVES:",
         "1. STRICT LOG FILE PROHIBITION: You must NEVER read, search, grep, or inspect files inside '.aegis/log/' or any '.log' or '.json' files inside log directories. These are internal diagnostic logs and reading them causes immediate context overflow and process termination.",
         "2. WORKSPACE FOCUS: Focus directly on the relevant source code and project documentation (such as README.md, package.json, src/). Do NOT explore or search for non-existent internal metadata directories (.aegis/, .brain/).",
         "3. WORKSPACE BOUNDARY INTEGRITY: You must NEVER execute shell commands or tools that navigate outside the project root (no '..', no inspecting parent directories). Stay strictly inside the active project directory.",
-        "4. NO REDUNDANT READS: Do NOT re-read the same source file repeatedly. Once you have read a file, utilize its content immediately and proceed with your implementation.",
-        "5. NO REPETITIVE SEARCH QUERIES: Do NOT repeat identical search queries or list directory calls. If a search yields 0 results, do not repeat with minor variations; adjust your strategy or proceed with implementation.",
-        "6. NO BLIND SHELL DISCOVERY: Do NOT run raw shell commands like 'find', 'dir', or indiscriminate 'ls' to scan the directory tree. Prioritize the provided Workspace Intel target files or targeted search tools.",
-        "7. VERIFY MANIFEST BEFORE TESTING: Do NOT blindly run 'npm test', 'pytest', or build commands without first reading and verifying the project manifest (e.g. package.json, pyproject.toml) to confirm that the script or test framework actually exists.",
-        "8. NO UNREQUESTED GIT DUMPS: Do NOT run 'git show', 'git log', or commit diff dumps unless the user explicitly requested git history analysis.",
+        "4. NATURAL EXPLORATION & CODEGRAPH NAVIGATION: Feel free to explore related codebases, inspect symbols, follow definitions, and leverage CodeGraph navigation tools to understand architecture and relational dependencies deeply.",
+        "5. CONFIDENT REFACTORING: Thorough reading, iterative edits, and multi-file refactoring are fully supported to complete the requested engineering task safely and accurately.",
     ]
-
-    if mode_clean == "fast":
-        rules.extend([
-            "5. EXECUTION MODE: FAST (STRICT EFFICIENCY LIMITS):",
-            "   - SURGICAL RESOLUTION: Prioritize targeted symbol search and CodeGraph navigation before reading files.",
-            "   - NO REDUNDANT READS: Do NOT read the same file more than once.",
-            "   - IMMEDIATE ACTION: Once you locate the relevant file, immediately use replace_file_content or edit_file to apply the change. Do not explore unrelated components.",
-        ])
-    elif mode_clean == "balanced":
-        rules.extend([
-            "5. EXECUTION MODE: BALANCED:",
-            "   - Read files directly related to the user's task with moderate exploration.",
-            "   - Avoid redundant reads of the same file. Once read, proceed with implementation immediately.",
-            "   - Apply edits as soon as sufficient context is gathered.",
-        ])
-    else:  # deep
-        rules.extend([
-            "5. EXECUTION MODE: DEEP:",
-            "   - Thorough analysis and verification are permitted across the workspace.",
-            "   - Do not re-read the same file repeatedly without edits.",
-            "   - Log files (.aegis/log/) remain strictly prohibited.",
-            "   - Stay strictly within workspace boundaries.",
-        ])
-
     return "\n".join(rules)
 
 
@@ -261,35 +232,8 @@ def _extract_query_keywords(query: str) -> List[str]:
 
 
 def _resolve_semantic_search_candidates(cwd_path: Path, query: str, limit: int) -> List[Dict[str, Any]]:
-    """Gunakan SemanticIndexService lokal jika database vektor tersedia."""
-    if not query.strip():
-        return []
-    try:
-        from agent_ai.repointel.semantic.availability import is_available
-        avail, _ = is_available()
-        if not avail:
-            return []
-        from agent_ai.repointel.semantic.paths import resolve_vectors_db
-        db_path = resolve_vectors_db(cwd_path)
-        if not db_path.is_file():
-            return []
-        from agent_ai.repointel.semantic.service import SemanticIndexService
-        with SemanticIndexService(root=cwd_path, read_only=True) as service:
-            results = service.search(query=query, k=limit)
-            candidates = []
-            for r in results:
-                rel_path = r.get("path")
-                if rel_path:
-                    candidates.append({
-                        "path": str(rel_path).replace("\\", "/"),
-                        "symbol": r.get("symbol"),
-                        "kind": r.get("kind"),
-                        "start_line": r.get("start_line"),
-                        "end_line": r.get("end_line"),
-                    })
-            return candidates
-    except Exception:
-        return []
+    """Legacy vector search candidates decommissioned in favor of deterministic CodeGraph AST."""
+    return []
 
 
 def _extract_file_symbols(file_path: Path, max_lines: int = 60) -> List[str]:
@@ -951,59 +895,15 @@ class AntigravityProvider(BaseProvider):
                                                 read_count = file_read_counts.get(norm_target, 0) + 1
                                                 file_read_counts[norm_target] = read_count
                                                 if read_count > 2:
-                                                    warning_msg = (
-                                                        f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
-                                                        "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
-                                                    )
-                                                    logger.warning(
-                                                        "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
-                                                        target,
-                                                        read_count,
-                                                    )
-                                                    if event_sink:
-                                                        event_sink("warning", {
-                                                            "message": warning_msg,
-                                                            "target": target,
-                                                            "read_count": read_count,
-                                                        })
-                                                        event_sink("agent_reasoning_delta", {
-                                                            "delta": f"\n{warning_msg}\n",
-                                                            "reasoning": f"\n{warning_msg}\n",
-                                                        })
+                                                    logger.debug("Repeated file read: %s (%dx)", target, read_count)
 
-                                        # Multi-Tool Signature Redundancy Tracking & Circuit Breaker (non-read_file)
+                                        # Multi-Tool Signature Redundancy Tracking (non-read_file)
                                         if aegis_tool != "read_file":
                                             tool_sig = _tool_call_signature(aegis_tool, params)
                                             tool_count = tool_call_counts.get(tool_sig, 0) + 1
                                             tool_call_counts[tool_sig] = tool_count
-
                                             if tool_count > 2:
-                                                loop_warning = (
-                                                    f"[PERINGATAN REDUNDANSI] Tool '{aegis_tool}' dipanggil berulang ({tool_count}x) dengan parameter identik. "
-                                                    "Harap segera beralih ke analisis berkas atau perencanaan implementasi."
-                                                )
-                                                logger.warning("Redundant tool call detected: %s (%dx)", tool_sig, tool_count)
-                                                if event_sink:
-                                                    event_sink("warning", {
-                                                        "message": loop_warning,
-                                                        "tool": aegis_tool,
-                                                        "signature": tool_sig,
-                                                        "call_count": tool_count,
-                                                    })
-                                                    event_sink("agent_reasoning_delta", {
-                                                        "delta": f"\n{loop_warning}\n",
-                                                        "reasoning": f"\n{loop_warning}\n",
-                                                    })
-
-                                            if tool_count >= 4 or (policy_mode == "fast" and tool_count >= 3):
-                                                proc.kill()
-                                                raise ProviderAPIError(
-                                                    f"Circuit Breaker Loop Terpicu: Tool '{aegis_tool}' dipanggil {tool_count}x dengan parameter identik. "
-                                                    "Eksekusi dihentikan untuk mencegah pemborosan token dan perulangan tak berujung.",
-                                                    status_code=429,
-                                                    endpoint="agy CLI",
-                                                    response_body=f"Circuit breaker: duplicate tool call loop ({tool_sig})",
-                                                )
+                                                logger.debug("Repeated tool call: %s (%dx)", tool_sig, tool_count)
 
                                         if event_sink:
                                             event_sink("tool_called", {
@@ -1014,28 +914,6 @@ class AntigravityProvider(BaseProvider):
                                             })
                                     elif state == "DONE" and event_sink:
                                         output = tool_info.get("output", "")
-                                        norm_t = target.replace("\\", "/").lower()
-                                        if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
-                                            re_read_warning = (
-                                                f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
-                                                "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
-                                            )
-                                            if isinstance(output, str):
-                                                output = output + re_read_warning
-
-                                        out_text = str(output or "").strip().lower()
-                                        is_empty_search = out_text in ("", "[]", "{}", "0 results", "not found", "no match", "no files found", "none")
-                                        if is_empty_search and aegis_tool in ("search_code", "list_files"):
-                                            zero_result_streak += 1
-                                            if zero_result_streak >= 3:
-                                                zero_warning = (
-                                                    "\n\n[SISTEM GUARDRAIL] Peringatan: Tiga pencarian berturut-turut menghasilkan 0 hasil. "
-                                                    "Hentikan variasi pencarian acak dan periksa struktur berkas root proyek aktif."
-                                                )
-                                                if isinstance(output, str):
-                                                    output = output + zero_warning
-                                        else:
-                                            zero_result_streak = 0
                                         event_sink("tool_completed", {
                                             "tool": aegis_tool,
                                             "success": True,
@@ -1221,24 +1099,7 @@ class AntigravityProvider(BaseProvider):
                                         read_count = file_read_counts.get(norm_target, 0) + 1
                                         file_read_counts[norm_target] = read_count
                                         if read_count > 2:
-                                            warning_msg = (
-                                                f"[PERINGATAN REDUNDANSI] Berkas '{target}' telah dibaca {read_count} kali tanpa modifikasi. "
-                                                "Harap segera lanjutkan ke tahap eksekusi kode (edit_file / write_file) alih-alih mengulang pembacaan berkas."
-                                            )
-                                            logger.warning(
-                                                "Redundant file read detected for '%s' (read count: %d without mutation). Injecting warning directive.",
-                                                target,
-                                                read_count,
-                                            )
-                                            event_sink("warning", {
-                                                "message": warning_msg,
-                                                "target": target,
-                                                "read_count": read_count,
-                                            })
-                                            event_sink("agent_reasoning_delta", {
-                                                "delta": f"\n{warning_msg}\n",
-                                                "reasoning": f"\n{warning_msg}\n",
-                                            })
+                                            logger.debug("Repeated file read: %s (%dx)", target, read_count)
 
                                     # Multi-Tool Signature Redundancy Tracking (non-read_file)
                                     if aegis_tool != "read_file":
@@ -1246,22 +1107,7 @@ class AntigravityProvider(BaseProvider):
                                         tool_count = tool_call_counts.get(tool_sig, 0) + 1
                                         tool_call_counts[tool_sig] = tool_count
                                         if tool_count > 2:
-                                            loop_warning = (
-                                                f"[PERINGATAN REDUNDANSI] Tool '{aegis_tool}' dipanggil berulang ({tool_count}x) dengan parameter identik. "
-                                                "Harap segera beralih ke analisis berkas atau perencanaan implementasi."
-                                            )
-                                            logger.warning("Redundant tool call detected: %s (%dx)", tool_sig, tool_count)
-                                            if event_sink:
-                                                event_sink("warning", {
-                                                    "message": loop_warning,
-                                                    "tool": aegis_tool,
-                                                    "signature": tool_sig,
-                                                    "call_count": tool_count,
-                                                })
-                                                event_sink("agent_reasoning_delta", {
-                                                    "delta": f"\n{loop_warning}\n",
-                                                    "reasoning": f"\n{loop_warning}\n",
-                                                })
+                                            logger.debug("Repeated tool call: %s (%dx)", tool_sig, tool_count)
 
                                     event_sink("tool_called", {
                                         "tool": aegis_tool,
@@ -1271,28 +1117,6 @@ class AntigravityProvider(BaseProvider):
                                     })
                                 elif state == "DONE":
                                     output = tool_info.get("output", "")
-                                    norm_t = target.replace("\\", "/").lower()
-                                    if aegis_tool == "read_file" and file_read_counts.get(norm_t, 0) > 2:
-                                        re_read_warning = (
-                                            f"\n\n[SISTEM GUARDRAIL] Peringatan: Berkas '{target}' telah dibaca berulang kali ({file_read_counts[norm_t]}x). "
-                                            "Gunakan konten berkas yang telah diperoleh dan segera lakukan implementasi/penyuntingan kode."
-                                        )
-                                        if isinstance(output, str):
-                                            output = output + re_read_warning
-
-                                    out_text = str(output or "").strip().lower()
-                                    is_empty_search = out_text in ("", "[]", "{}", "0 results", "not found", "no match", "no files found", "none")
-                                    if is_empty_search and aegis_tool in ("search_code", "list_files"):
-                                        zero_result_streak += 1
-                                        if zero_result_streak >= 3:
-                                            zero_warning = (
-                                                "\n\n[SISTEM GUARDRAIL] Peringatan: Tiga pencarian berturut-turut menghasilkan 0 hasil. "
-                                                "Hentikan variasi pencarian acak dan periksa struktur berkas root proyek aktif."
-                                            )
-                                            if isinstance(output, str):
-                                                output = output + zero_warning
-                                    else:
-                                        zero_result_streak = 0
                                     event_sink("tool_completed", {
                                         "tool": aegis_tool,
                                         "success": True,
@@ -1413,17 +1237,38 @@ class AntigravityProvider(BaseProvider):
                 payload["max_tokens"] = options.max_tokens
 
             endpoint = f"{self.config.base_url.rstrip('/')}/chat/completions"
-            try:
-                resp = requests.post(
-                    endpoint,
-                    json=payload,
-                    headers=headers,
-                    timeout=self.config.timeout or 120,
-                )
-            except requests.RequestException as exc:
+            max_retries = 3
+            resp = None
+            last_exc = None
+            for attempt in range(max_retries):
+                try:
+                    resp = requests.post(
+                        endpoint,
+                        json=payload,
+                        headers=headers,
+                        timeout=self.config.timeout or 120,
+                    )
+                    if resp.status_code in (502, 503, 504) and attempt < max_retries - 1:
+                        time.sleep(0.5 * (2 ** attempt))
+                        continue
+                    break
+                except (requests.ConnectionError, requests.Timeout) as exc:
+                    last_exc = exc
+                    if attempt < max_retries - 1:
+                        time.sleep(0.5 * (2 ** attempt))
+                        continue
+                    raise ProviderUnavailableError(
+                        f"Gagal menghubungi Antigravity HTTP endpoint '{endpoint}': {exc}"
+                    ) from exc
+                except requests.RequestException as exc:
+                    raise ProviderUnavailableError(
+                        f"Gagal menghubungi Antigravity HTTP endpoint '{endpoint}': {exc}"
+                    ) from exc
+
+            if resp is None and last_exc is not None:
                 raise ProviderUnavailableError(
-                    f"Gagal menghubungi Antigravity HTTP endpoint '{endpoint}': {exc}"
-                ) from exc
+                    f"Gagal menghubungi Antigravity HTTP endpoint '{endpoint}' setelah {max_retries} percobaan: {last_exc}"
+                ) from last_exc
 
             if not resp.ok:
                 raise ProviderAPIError(

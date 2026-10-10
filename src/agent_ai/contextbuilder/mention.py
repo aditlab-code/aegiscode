@@ -129,28 +129,7 @@ def _semantic_fallback_search(
     query: str,
     root: Path,
 ) -> Optional[Dict[str, Any]]:
-    """Perform local semantic search fallback if mention did not match a file."""
-    try:
-        from agent_ai.repointel.semantic.availability import is_available
-
-        if not is_available()[0]:
-            return None
-        from agent_ai.repointel.semantic.service import SemanticIndexService
-
-        svc = SemanticIndexService.get_instance(root)
-        hits = svc.search(query, k=1)
-        if hits and hits[0].get("snippet"):
-            top = hits[0]
-            return {
-                "path": top.get("path"),
-                "symbol": top.get("symbol"),
-                "snippet": top.get("snippet"),
-                "start_line": top.get("start_line"),
-                "end_line": top.get("end_line"),
-                "score": top.get("score"),
-            }
-    except Exception:
-        return None
+    """Legacy vector search fallback decommissioned in favor of deterministic CodeGraph AST."""
     return None
 
 

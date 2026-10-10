@@ -25,6 +25,7 @@ from agent_ai.config import settings as settings_mod
 from agent_ai.config.settings import (
     DEFAULT_PORT,
     SettingsWriteError,
+    agent_default_mode,
     api_retry_config,
     compression_enabled,
     global_settings,
@@ -76,7 +77,7 @@ def test_global_settings_reads_actual_values(settings_file):
         "agent": {
             "system_prompt": build_agent_system_prompt(),
             "default_system_prompt": build_agent_system_prompt(),
-            "default_mode": "balanced",
+            "default_mode": agent_default_mode(),
         },
     }
 

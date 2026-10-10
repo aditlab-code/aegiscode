@@ -327,11 +327,11 @@ def _normalize_agent_mode(value: Any) -> str:
         return normalize_mode(value, DEFAULT_MODE)
     except Exception:  # noqa: BLE001 - konfigurasi tidak boleh gagal karena import
         # Fallback minimal bila modul policy tidak tersedia (mis. impor parsial).
-        modes = {"fast", "balanced", "deep"}
+        modes = {"fast", "balanced", "deep", "agents"}
         text = str(value).strip().lower() if value is not None else ""
         if text == "minimal":
             text = "fast"
-        return text if text in modes else "balanced"
+        return text if text in modes else "agents"
 
 
 #: Mode default AETHER bila user tidak mengaturnya (backward compatible).

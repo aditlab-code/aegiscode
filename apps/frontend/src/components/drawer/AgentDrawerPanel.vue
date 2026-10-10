@@ -121,7 +121,7 @@ const props = defineProps({
   },
   mode: {
     type: String,
-    default: "balanced",
+    default: "agents",
   },
   activeTabPath: {
     type: String,
@@ -139,10 +139,20 @@ const emit = defineEmits([
   "request-stop",
   "submit-task",
   "open-settings",
+  "open-file",
   "update:provider-instance-id",
   "update:model-id",
   "update:mode",
 ]);
+
+function handleOpenSpecFile(path) {
+  emit("open-file", path);
+}
+
+function handleActivityReply(reply) {
+  promptText.value = reply;
+  handleSubmit();
+}
 
 const canStop = computed(() => {
   if (props.isRunning) return true;
@@ -425,6 +435,7 @@ defineExpose({
           :is-reasoning="showReasoning"
           :lifecycle-steps="lifecycleSteps"
           :activity-phase="activityPhase"
+          @submit-reply="handleActivityReply"
         />
       </div>
     </template>
@@ -516,18 +527,34 @@ defineExpose({
       </div>
       <div class="chat-card-actions">
         <div class="chat-card-actions-left">
-          <select
-            :value="mode"
-            class="agent-mode-select consultant-mode-select"
-            title="Execution Policy Mode: Fast, Balanced, or Deep"
-            aria-label="Execution Policy Mode"
-            :disabled="isRunning"
-            @change="emit('update:mode', $event.target.value)"
+          <button
+            type="button"
+            class="spec-quick-btn"
+            title="Open SPEC.md in editor"
+            aria-label="Open SPEC.md"
+            @click="handleOpenSpecFile('specs/SPEC.md')"
           >
-            <option value="fast">Fast</option>
-            <option value="balanced">Balanced</option>
-            <option value="deep">Deep</option>
-          </select>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span>SPEC.md</span>
+          </button>
+          <button
+            type="button"
+            class="spec-quick-btn"
+            title="Open TODO.md in editor"
+            aria-label="Open TODO.md"
+            @click="handleOpenSpecFile('docs/specs/TODO.md')"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            <span>TODO.md</span>
+          </button>
         </div>
         <div class="chat-card-actions-right">
           <button
@@ -879,5 +906,25 @@ defineExpose({
   font-size: 12px;
   line-height: 1.5;
   color: var(--text);
+}
+.spec-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: var(--bg-hover);
+  color: var(--text-dim);
+  border: 1px solid var(--border-soft);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.spec-quick-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--bg-card);
 }
 </style>

@@ -6,6 +6,10 @@ import {
   checkTelegramStatus,
   fetchTelegramPairingQr,
   unlinkTelegramUser,
+  startTelegramPoller,
+  stopTelegramPoller,
+  setTelegramNotification,
+  dismissTelegramNotification,
 } from "../src/services/telegramService.js";
 
 describe("telegramService", () => {
@@ -108,5 +112,93 @@ describe("telegramService", () => {
     const success = await unlinkTelegramUser();
     assert.equal(success, true);
     assert.equal(status.value.is_paired, false);
+  });
+
+  it("5. startTelegramPoller starts poller, updates is_running, and triggers notification", async () => {
+    globalThis.fetch = async (url, options) => {
+      if (url.endsWith("/telegram/start-poller") && options?.method === "POST") {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ success: true, is_running: true }),
+        };
+      }
+      if (url.endsWith("/telegram/status")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            configured: true,
+            is_paired: true,
+            bot_username: "Aegis_bot",
+            is_running: true,
+          }),
+        };
+      }
+      return { ok: false, status: 404, text: async () => "{}" };
+    };
+
+    const { activeNotification } = useTelegramCompanion();
+    const ok = await startTelegramPoller();
+    assert.equal(ok, true);
+    assert.equal(status.value.is_running, true);
+    assert.equal(activeNotification.value?.type, "success");
+    assert.match(activeNotification.value?.message, /aktif mendengarkan/);
+  });
+
+  it("6. stopTelegramPoller stops poller and updates is_running to false", async () => {
+    globalThis.fetch = async (url, options) => {
+      if (url.endsWith("/telegram/stop-poller") && options?.method === "POST") {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ success: true, is_running: false }),
+        };
+      }
+      if (url.endsWith("/telegram/status")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({
+            configured: true,
+            is_paired: true,
+            bot_username: "Aegis_bot",
+            is_running: false,
+          }),
+        };
+      }
+      return { ok: false, status: 404, text: async () => "{}" };
+    };
+
+    const { activeNotification } = useTelegramCompanion();
+    const ok = await stopTelegramPoller();
+    assert.equal(ok, true);
+    assert.equal(status.value.is_running, false);
+    assert.equal(activeNotification.value?.type, "info");
+    assert.match(activeNotification.value?.message, /dinonaktifkan/);
+  });
+
+  it("7. in-flight lock prevents duplicate concurrent poller calls", async () => {
+    const { isToggling } = useTelegramCompanion();
+    isToggling.value = true;
+
+    // Both start and stop should reject/return false immediately while isToggling is active
+    const startResult = await startTelegramPoller();
+    assert.equal(startResult, false);
+
+    const stopResult = await stopTelegramPoller();
+    assert.equal(stopResult, false);
+
+    isToggling.value = false;
+  });
+
+  it("8. setTelegramNotification and dismissTelegramNotification control activeNotification ref", () => {
+    const { activeNotification } = useTelegramCompanion();
+    setTelegramNotification("Custom alert", "warning");
+    assert.equal(activeNotification.value?.message, "Custom alert");
+    assert.equal(activeNotification.value?.type, "warning");
+
+    dismissTelegramNotification();
+    assert.equal(activeNotification.value, null);
   });
 });

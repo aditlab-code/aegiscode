@@ -232,10 +232,19 @@ def advance_lifecycle_phase(
         # Jika ingin masuk ke BUILD dari DEFINE/PLAN: pastikan define_passed atau ada spec
         if target_enum in (OlympusPhase.BUILD, OlympusPhase.VERIFY, OlympusPhase.REVIEW, OlympusPhase.SHIP):
             if current_enum == OlympusPhase.DEFINE and not state.gates.get("define_passed"):
-                # Cek apakah ada file spesifikasi di workspace
-                spec_cand = [Path(root) / "SPEC.md", Path(root) / "PRD.md", Path(root) / "spec.md"]
-                if not any(p.is_file() for p in spec_cand):
-                    return False, "STOP-GATE: Tahap DEFINE belum selesai (berkas SPEC.md / PRD.md belum ditemukan).", state
+                # Cek apakah ada file spesifikasi di workspace (termasuk specs/ folder di root)
+                specs_dir = Path(root) / "specs"
+                spec_cand = [
+                    Path(root) / "SPEC.md",
+                    Path(root) / "PRD.md",
+                    Path(root) / "spec.md",
+                    specs_dir / "SPEC.md",
+                ]
+                has_spec = any(p.is_file() for p in spec_cand)
+                if not has_spec and specs_dir.is_dir():
+                    has_spec = any(p.is_file() and p.name.startswith("SPEC") and p.suffix.lower() == ".md" for p in specs_dir.glob("*.md"))
+                if not has_spec:
+                    return False, "STOP-GATE: Tahap DEFINE belum selesai (berkas SPEC.md / PRD.md di root atau specs/ belum ditemukan).", state
                 state.gates["define_passed"] = True
 
         # Jika ingin masuk ke REVIEW atau SHIP: pastikan VERIFY sudah lewat

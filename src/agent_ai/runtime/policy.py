@@ -60,9 +60,9 @@ DEFAULT_MODE = MODE_BALANCED
 #: Urutan escalation yang disarankan: fast -> balanced -> deep.
 ESCALATION_ORDER: Tuple[str, ...] = (MODE_FAST, MODE_BALANCED, MODE_DEEP)
 
-#: Batas maksimal berkas unik yang boleh dibaca penuh per mode eksekusi
-FAST_MODE_MAX_FULL_READS = 3
-BALANCED_MODE_MAX_FULL_READS = 8
+#: Batas maksimal berkas unik yang boleh dibaca penuh per mode eksekusi (unthrottled)
+FAST_MODE_MAX_FULL_READS = 999999
+BALANCED_MODE_MAX_FULL_READS = 999999
 
 
 #: Alias nilai mode LAMA/asing -> mode policy kanonik.

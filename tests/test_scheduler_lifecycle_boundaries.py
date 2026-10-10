@@ -49,7 +49,7 @@ from tests.conftest import wait_for_condition
 from agent_ai.runtime.runtime import AgentRuntime, RuntimeProgress, RuntimeResult, RuntimeStatus
 from agent_ai.session.events import EventType, ExecutionEvent
 from agent_ai.session.store import InMemorySessionStore
-from agent_ai.tasks.models import TaskStatus
+from agent_ai.task.models import TaskStatus
 from api.services import GatewayService, TaskRecord
 
 
