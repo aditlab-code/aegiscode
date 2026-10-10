@@ -49,12 +49,12 @@ AegisCode is an AI-assisted engineering workbench combining AegisCode Studio (Vu
 
 ## OpenCode Integration
 
-OpenCode uses a **skill-driven execution model** powered by the `skill` tool and this repository's `/skills` directory.
+OpenCode uses a **skill-driven execution model** powered by the `skill` tool and this repository's `.agents/skills` directory.
 
 ### Core Rules
 
 - If a task matches a skill, you MUST invoke it
-- Skills are located in `skills/<skill-name>/SKILL.md`
+- Skills are located in `.agents/skills/<skill-name>/SKILL.md` (or `skills/<skill-name>/SKILL.md`)
 - Never implement directly if a skill applies
 - Always follow the skill instructions exactly (do not partially apply them)
 
@@ -146,10 +146,10 @@ Before completing any task touching `apps/frontend/`, the agent MUST run and pas
 
 This repo has three composable layers. They have different jobs and should not be confused:
 
-- **Skills** (`skills/<name>/SKILL.md`) — workflows with steps and exit criteria. The *how*. Mandatory hops when an intent matches.
-- **Personas** (`agents/<role>.md`) — roles with a perspective and an output format. The *who*.
-- **Slash commands** (`.claude/commands/*.md`) — user-facing entry points. The *when*. The orchestration layer.
+- **Skills** (`.agents/skills/<name>/SKILL.md`) — workflows with steps and exit criteria. The *how*. Mandatory hops when an intent matches.
+- **Personas** (`.agents/agents/<role>.md`) — roles with a perspective and an output format. The *who*.
+- **Slash commands** (`.agents/commands/*.toml` / `.claude/commands/*.md`) — user-facing entry points. The *when*. The orchestration layer.
 
-Skills in this repo are markdown-first: each lives at `skills/<kebab-case-name>/SKILL.md` with YAML frontmatter (`name`, `description`) and follows the section anatomy (Overview, When to Use, Process, Common Rationalizations, Red Flags, Verification). Add a `scripts/` directory only when the skill ships runnable helpers; most skills are markdown only, and there are no per-skill zip packages.
+Skills in this repo are markdown-first: each lives at `.agents/skills/<kebab-case-name>/SKILL.md` with YAML frontmatter (`name`, `description`) and follows the section anatomy (Overview, When to Use, Process, Common Rationalizations, Red Flags, Verification). Add a `scripts/` directory only when the skill ships runnable helpers; most skills are markdown only, and there are no per-skill zip packages.
 
 For the full format, naming conventions, frontmatter rules, supporting-file thresholds, and writing principles, see [docs/skill-anatomy.md](docs/skill-anatomy.md), the single source of truth for skill structure. Do not restate that guidance here, link to it.

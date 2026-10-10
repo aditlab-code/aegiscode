@@ -7,17 +7,24 @@
 # Output: JSON pada stdout ({"injectSteps": [{"ephemeralMessage": "..."}]})
 # ==============================================================================
 
-set -euo pipefail
+# Zero-Interference Guard: Jika hook eksternal aktif di lingkungan pengembang luar
+if [ "${AEGIS_EXTERNAL_HOOKS_ACTIVE:-0}" = "1" ]; then
+    echo '{"injectSteps": []}'
+    exit 0
+fi
 
 # Baca stdin
 INPUT_JSON=$(cat)
 
-# Dapatkan direktori root repositori secara dinamis
+# Dapatkan direktori root repositori secara dinamis (.agents/hooks -> root)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ ! -d "${REPO_ROOT}/.aegis" ] && [ -d "${SCRIPT_DIR}/.." ]; then
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
 
-# Eksekusi helper python untuk membangun payload injectSteps
-REPO_ROOT="${REPO_ROOT}" PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+# Eksekusi helper python untuk membangun payload injectSteps (mandiri tanpa modul produk)
+REPO_ROOT="${REPO_ROOT}" python3 -c "
 import json
 import os
 import sys
@@ -39,8 +46,10 @@ if state_file.is_file():
     except Exception:
         pass
 
-# Baca petikan ringkas persona
-persona_file = repo_root / 'agents' / f'{active_persona}.md'
+# Baca petikan ringkas persona dari .agents/agents/
+persona_file = repo_root / '.agents' / 'agents' / f'{active_persona}.md'
+if not persona_file.is_file():
+    persona_file = repo_root / 'agents' / f'{active_persona}.md'
 persona_role = 'Olympus Agent'
 if persona_file.is_file():
     try:

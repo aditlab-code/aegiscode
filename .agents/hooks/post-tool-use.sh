@@ -7,14 +7,22 @@
 # Output: JSON kosong pada stdout ({})
 # ==============================================================================
 
-set -euo pipefail
+# Zero-Interference Guard: Jika hook eksternal aktif di lingkungan pengembang luar
+if [ "${AEGIS_EXTERNAL_HOOKS_ACTIVE:-0}" = "1" ]; then
+    echo "{}"
+    exit 0
+fi
 
 INPUT_JSON=$(cat)
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ ! -d "${REPO_ROOT}/.aegis" ] && [ -d "${SCRIPT_DIR}/.." ]; then
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
 
 # Refresh CodeGraph cache jika script ada
-if [ -x "${REPO_ROOT}/hooks/sdd-codegraph-cache.sh" ]; then
-    "${REPO_ROOT}/hooks/sdd-codegraph-cache.sh" >/dev/null 2>&1 || true
+if [ -x "${SCRIPT_DIR}/sdd-codegraph-cache.sh" ]; then
+    "${SCRIPT_DIR}/sdd-codegraph-cache.sh" >/dev/null 2>&1 || true
 fi
 
 # Output JSON kosong sesuai kontrak

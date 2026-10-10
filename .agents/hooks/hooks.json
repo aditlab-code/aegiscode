@@ -3,13 +3,13 @@
     "enabled": true,
     "SessionStart": [
       {
-        "command": "hooks/session-start.sh",
+        "command": ".agents/hooks/session-start.sh",
         "timeout": 15
       }
     ],
     "PreInvocation": [
       {
-        "command": "hooks/pre-invocation.sh",
+        "command": ".agents/hooks/pre-invocation.sh",
         "timeout": 15
       }
     ],
@@ -18,7 +18,7 @@
         "matcher": "*",
         "hooks": [
           {
-            "command": "hooks/pre-tool-use.sh",
+            "command": ".agents/hooks/pre-tool-use.sh",
             "timeout": 15
           }
         ]
@@ -29,7 +29,7 @@
         "matcher": "*",
         "hooks": [
           {
-            "command": "hooks/post-tool-use.sh",
+            "command": ".agents/hooks/post-tool-use.sh",
             "timeout": 15
           }
         ]
@@ -37,7 +37,7 @@
     ],
     "Stop": [
       {
-        "command": "hooks/stop-guard.sh",
+        "command": ".agents/hooks/stop-guard.sh",
         "timeout": 15
       }
     ]

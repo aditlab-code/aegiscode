@@ -7,15 +7,22 @@
 # Output: JSON pada stdout ({"decision": "allow"|"deny", "reason": "..."})
 # ==============================================================================
 
-set -euo pipefail
+# Zero-Interference Guard: Jika hook eksternal aktif di lingkungan pengembang luar
+if [ "${AEGIS_EXTERNAL_HOOKS_ACTIVE:-0}" = "1" ]; then
+    echo '{"decision": "allow"}'
+    exit 0
+fi
 
 # Baca stdin
 INPUT_JSON=$(cat)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ ! -d "${REPO_ROOT}/.aegis" ] && [ -d "${SCRIPT_DIR}/.." ]; then
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
 
-echo "${INPUT_JSON}" | REPO_ROOT="${REPO_ROOT}" PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+echo "${INPUT_JSON}" | REPO_ROOT="${REPO_ROOT}" python3 -c "
 import json
 import os
 import sys

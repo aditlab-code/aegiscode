@@ -530,7 +530,7 @@ defineExpose({
           <button
             type="button"
             class="spec-quick-btn"
-            title="Open specs/SPEC.md in editor"
+            title="Open SPEC.md in editor"
             aria-label="Open SPEC.md"
             @click="handleOpenSpecFile('specs/SPEC.md')"
           >
@@ -545,9 +545,9 @@ defineExpose({
           <button
             type="button"
             class="spec-quick-btn"
-            title="Open specs/TODO.md in editor"
+            title="Open TODO.md in editor"
             aria-label="Open TODO.md"
-            @click="handleOpenSpecFile('specs/TODO.md')"
+            @click="handleOpenSpecFile('docs/specs/TODO.md')"
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M9 11l3 3L22 4"></path>

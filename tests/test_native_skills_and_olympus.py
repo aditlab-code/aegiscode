@@ -19,12 +19,13 @@ from agent_ai.tools.skills import LoadSkillTool, SkillCatalogTool
 
 def test_aegis_central_directory_contains_agents_and_skills() -> None:
     central_dir = get_aegis_central_dir()
-    assert (central_dir / "agents").is_dir(), "Direktori agents/ wajib ada di central root"
-    assert (central_dir / "skills").is_dir(), "Direktori skills/ wajib ada di central root"
-    assert (central_dir / ".agents").is_dir(), "Direktori .agents/ wajib ada di central root"
+    dot_agents = central_dir / ".agents"
+    assert dot_agents.is_dir(), "Direktori .agents/ wajib ada di central root"
+    assert (dot_agents / "agents").is_dir(), "Direktori .agents/agents/ wajib ada di central root"
+    assert (dot_agents / "skills").is_dir(), "Direktori .agents/skills/ wajib ada di central root"
 
 
-def test_symlink_dot_agents_resolution() -> None:
+def test_dot_agents_resolution() -> None:
     central_dir = get_aegis_central_dir()
     dot_agents = central_dir / ".agents"
     assert (dot_agents / "skills").is_dir()
@@ -64,7 +65,9 @@ scope: project
 
 def test_find_skill_file_prefers_skill_md_capital() -> None:
     central_dir = get_aegis_central_dir()
-    interview_dir = central_dir / "skills" / "interview-me"
+    interview_dir = central_dir / ".agents" / "skills" / "interview-me"
+    if not interview_dir.is_dir():
+        interview_dir = central_dir / "skills" / "interview-me"
     found = _find_skill_file(interview_dir)
     assert found is not None
     assert found.name in ("SKILL.md", "skill.md")

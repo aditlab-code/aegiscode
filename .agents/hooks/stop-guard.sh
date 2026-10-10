@@ -7,17 +7,26 @@
 # Output: JSON pada stdout ({"decision": "allow"|"continue", "reason": "..."})
 # ==============================================================================
 
-set -euo pipefail
+# Zero-Interference Guard: Jika hook eksternal aktif di lingkungan pengembang luar
+if [ "${AEGIS_EXTERNAL_HOOKS_ACTIVE:-0}" = "1" ]; then
+    echo '{"decision": "allow"}'
+    exit 0
+fi
 
 INPUT_JSON=$(cat)
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+if [ ! -d "${REPO_ROOT}/.aegis" ] && [ -d "${SCRIPT_DIR}/.." ]; then
+    REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
 
-PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+REPO_ROOT="${REPO_ROOT}" python3 -c "
 import json
+import os
 import sys
 from pathlib import Path
 
-repo_root = Path('${REPO_ROOT}')
+repo_root = Path(os.environ.get('REPO_ROOT', '.'))
 state_file = repo_root / '.aegis' / 'lifecycle_state.json'
 
 current_phase = 'DEFINE'

@@ -113,7 +113,9 @@ def test_advance_lifecycle_phase_stop_gates(tmp_path: Path) -> None:
 
 def test_pre_invocation_hook_script() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    script_path = repo_root / "hooks" / "pre-invocation.sh"
+    script_path = repo_root / ".agents" / "hooks" / "pre-invocation.sh"
+    if not script_path.is_file():
+        script_path = repo_root / "hooks" / "pre-invocation.sh"
     assert script_path.is_file()
 
     proc = subprocess.run(
@@ -135,7 +137,9 @@ def test_pre_invocation_hook_script() -> None:
 
 def test_pre_tool_use_hook_script() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    script_path = repo_root / "hooks" / "pre-tool-use.sh"
+    script_path = repo_root / ".agents" / "hooks" / "pre-tool-use.sh"
+    if not script_path.is_file():
+        script_path = repo_root / "hooks" / "pre-tool-use.sh"
     assert script_path.is_file()
 
     # 1. read_file harus diizinkan
@@ -165,7 +169,9 @@ def test_pre_tool_use_hook_script() -> None:
 
 def test_stop_guard_hook_script() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    script_path = repo_root / "hooks" / "stop-guard.sh"
+    script_path = repo_root / ".agents" / "hooks" / "stop-guard.sh"
+    if not script_path.is_file():
+        script_path = repo_root / "hooks" / "stop-guard.sh"
     assert script_path.is_file()
 
     proc = subprocess.run(
