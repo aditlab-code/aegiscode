@@ -12,16 +12,18 @@ set -euo pipefail
 # Baca stdin
 INPUT_JSON=$(cat)
 
-# Dapatkan direktori root repositori
-REPO_ROOT="/Users/aditwicaksono/Documents/Project-AI/AegisCode"
+# Dapatkan direktori root repositori secara dinamis
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Eksekusi helper python untuk membangun payload injectSteps
-PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+REPO_ROOT="${REPO_ROOT}" PYTHONPATH="${REPO_ROOT}/src" python3 -c "
 import json
+import os
 import sys
 from pathlib import Path
 
-repo_root = Path('/Users/aditwicaksono/Documents/Project-AI/AegisCode')
+repo_root = Path(os.environ.get('REPO_ROOT', '.'))
 state_file = repo_root / '.aegis' / 'lifecycle_state.json'
 
 current_phase = 'DEFINE'

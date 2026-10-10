@@ -12,13 +12,12 @@ set -euo pipefail
 # Baca stdin
 INPUT_JSON=$(cat)
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [ ! -d "${REPO_ROOT}/.aegis" ]; then
-    REPO_ROOT="/Users/aditwicaksono/Documents/Project-AI/AegisCode"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "${INPUT_JSON}" | PYTHONPATH="${REPO_ROOT}/src" python3 -c "
+echo "${INPUT_JSON}" | REPO_ROOT="${REPO_ROOT}" PYTHONPATH="${REPO_ROOT}/src" python3 -c "
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -27,7 +26,7 @@ try:
 except Exception:
     payload = {}
 
-repo_root = Path('${REPO_ROOT}')
+repo_root = Path(os.environ.get('REPO_ROOT', '.'))
 state_file = repo_root / '.aegis' / 'lifecycle_state.json'
 
 current_phase = 'SHIP'
